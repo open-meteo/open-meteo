@@ -344,7 +344,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let windspeed = try get(derived: .windspeed_10m, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let relhum = try get(derived: .relativehumidity_2m, time: time).data
-            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: nil), .celsius)
+            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: nil), .celsius)
         case .vapour_pressure_deficit:
             fallthrough
         case .vapor_pressure_deficit:

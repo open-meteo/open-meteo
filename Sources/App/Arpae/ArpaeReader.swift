@@ -115,7 +115,7 @@ struct ArpaeReader: GenericReaderDerived, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_2m, time: time).data
             let dewpoint = try get(raw: .dew_point_2m, time: time)
             let relhum = zip(temperature, dewpoint.data).map(Meteorology.relativeHumidity)
-            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: nil), .celsius)
+            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: nil), .celsius)
         case .vapor_pressure_deficit, .vapour_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let dewpoint = try get(raw: .dew_point_2m, time: time).data

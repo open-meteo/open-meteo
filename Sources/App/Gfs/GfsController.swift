@@ -432,7 +432,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
                 let relhum = try get(raw: .surface(.relative_humidity_2m), time: time).data
                 let radiation = try get(raw: .surface(.shortwave_radiation), time: time).data
-                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
+                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: radiation), .celsius)
             case .evapotranspiration:
                 let latent = try get(raw: .surface(.latent_heat_flux), time: time).data
                 let evapotranspiration = latent.map(Meteorology.evapotranspiration)

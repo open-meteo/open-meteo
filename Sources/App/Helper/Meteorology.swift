@@ -112,28 +112,28 @@ struct Meteorology {
     /// Apparent temperature which combines the effects of humidity, solar radiation and wind on the feels-like temperature should be added. It is similar to the Wet-bulb globe temperature
     /// See https://github.com/open-meteo/open-meteo/issues/13
     /// Formular from https://calculator.academy/apparent-temperature-calculator/
-    @inlinable static func apparentTemperature(temperature_2m: Float, relativehumidity_2m: Float, windspeed_10m: Float, shortware_radiation: Float?) -> Float {
+    @inlinable static func apparentTemperature(temperature_2m: Float, relativehumidity_2m: Float, windspeed_10m: Float, shortwave_radiation: Float?) -> Float {
         let windspeed_2m = windspeed_10m * 0.75
         // humidity in hPa
         let e = relativehumidity_2m/100.0 * 6.105 * exp( 17.27 * temperature_2m / ( 237.7 + temperature_2m ) )
         // Radition absorbed by body
-        let Q = max(0, 0.1*((shortware_radiation ?? 550) - 550.0))
+        let Q = max(0, 0.1*((shortwave_radiation ?? 550) - 550.0))
         let AT = temperature_2m + 0.348 * e - 0.70 * windspeed_2m + 0.70 * (Q/(windspeed_2m+10)) - 4.25
         return AT
     }
     
     /// Caclculate apparent temperature for an array
-    @inlinable static func apparentTemperature(temperature_2m: [Float], relativehumidity_2m: [Float], windspeed_10m: [Float], shortware_radiation: [Float]?) -> [Float] {
+    @inlinable static func apparentTemperature(temperature_2m: [Float], relativehumidity_2m: [Float], windspeed_10m: [Float], shortwave_radiation: [Float]?) -> [Float] {
         precondition(temperature_2m.count == relativehumidity_2m.count)
         precondition(temperature_2m.count == windspeed_10m.count)
-        if let shortware_radiation {
-            precondition(temperature_2m.count == shortware_radiation.count)
+        if let shortwave_radiation {
+            precondition(temperature_2m.count == shortwave_radiation.count)
         }
         
         var out = [Float]()
         out.reserveCapacity(temperature_2m.count)
         for i in temperature_2m.indices {
-            let at = Self.apparentTemperature(temperature_2m: temperature_2m[i], relativehumidity_2m: relativehumidity_2m[i], windspeed_10m: windspeed_10m[i], shortware_radiation: shortware_radiation?[i])
+            let at = Self.apparentTemperature(temperature_2m: temperature_2m[i], relativehumidity_2m: relativehumidity_2m[i], windspeed_10m: windspeed_10m[i], shortwave_radiation: shortwave_radiation?[i])
             out.append(at)
         }
         return out

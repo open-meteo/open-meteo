@@ -453,7 +453,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let relhum = try get(derived: .surface(.relativehumidity_2m), time: time).data
                 let radiation = try get(derived: .surface(.shortwave_radiation), time: time).data
-                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortware_radiation: radiation), .celsius)
+                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: radiation), .celsius)
             case .shortwave_radiation:
                 let direct = try get(raw: .direct_radiation, time: time).data
                 let diffuse = try get(raw: .diffuse_radiation, time: time).data
