@@ -74,7 +74,7 @@ struct SyncCommand: AsyncCommand {
            fatalError("Number of servers and models sets must be the same")
         }
         let pastDays = signature.pastDays ?? 7
-        var variablesSig = signature.variables.split(separator: ",").map(String.init) + ["static"]
+        let variablesSig = signature.variables.split(separator: ",").map(String.init) + ["static"]
         let concurrent = signature.concurrent ?? 4
         /// Undocumented switch to download all weather variables. This can generate immense traffic!
         let downloadAllVariables = variablesSig.contains("really_download_all_variables")
@@ -105,7 +105,7 @@ struct SyncCommand: AsyncCommand {
                         guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
                             fatalError("could not get variable from string")
                         }
-                        let variable = remoteDirectory[variablePos..<remoteDirectory.index(before: remoteDirectory.endIndex)]
+                        let variable = remoteDirectory[remoteDirectory.index(after: variablePos)..<remoteDirectory.index(before: remoteDirectory.endIndex)]
                         let isPreviousDay = variable.contains("_previous_day")
                         let isPressureLevel = variable.contains("hPa")
                         let isSurface = !isPressureLevel && !variable.contains("_previous_day")
