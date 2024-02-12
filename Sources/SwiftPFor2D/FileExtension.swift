@@ -104,8 +104,13 @@ extension FileHandle {
             let error = String(cString: strerror(errno))
             fatalError("fstat failed on open file descriptor. Error \(errno) \(error)")
         }
-        let seconds = Double(stats.st_mtimespec.tv_sec)
-        let nanosends = Double(stats.st_mtimespec.tv_nsec)
+        #if os(Linux)
+            let seconds = Double(stats.st_mtim.tv_sec)
+            let nanosends = Double(stats.st_mtim.tv_nsec)
+        #else
+            let seconds = Double(stats.st_mtimespec.tv_sec)
+            let nanosends = Double(stats.st_mtimespec.tv_nsec)
+        #endif
         return (Int(stats.st_size), Date(timeIntervalSince1970: seconds + nanosends / 1000))
     }
 }
