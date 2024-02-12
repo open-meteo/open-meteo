@@ -451,6 +451,10 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     public let chunk1: Int
     
     public init(fn: Backend) throws {
+        if fn.needsPrefetch {
+            // Fetch header
+            fn.prefetchData(offset: 0, count: OmHeader.length)
+        }
         let header = fn.withUnsafeBytes {
             $0.baseAddress!.withMemoryRebound(to: OmHeader.self, capacity: 1) { ptr in
                 ptr.pointee
@@ -469,6 +473,14 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         scalefactor = header.scalefactor
         // bug in version 1: compression type was random
         compression = header.version == 1 ? .p4nzdec256 : CompressionType(rawValue: header.compression)!
+        
+        if fn.needsPrefetch {
+            // Fetch chunk lookup table
+            let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
+            let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
+            let nChunks = nDim0Chunks * nDim1Chunks
+            fn.prefetchData(offset: 0, count: OmHeader.length + nChunks * MemoryLayout<Int>.stride)
+        }
     }
     
     /// Prefetch fhe required data regions into memory
@@ -699,10 +711,11 @@ extension OmFileReader where Backend == MmapFileCached {
         }
         let cacheFn = try FileHandle.createNewFile(file: cacheFile, sparseSize: backendStats.size)
         let mmap = try MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile)
-        // load 1 MB from cache. TODO maybe need to load more
-        mmap.prefetchData(offset: 0, count: 1024*1024)
+        if cacheFile.contains("/static/") {
+            // load static files into cache entirely
+            mmap.prefetchData(offset: 0, count: backendStats.size)
+        }
         try self.init(fn: mmap)
-        
     }
     
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.

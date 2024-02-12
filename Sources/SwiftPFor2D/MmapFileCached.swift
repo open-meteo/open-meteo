@@ -30,10 +30,15 @@ public final class MmapFileCached {
     public func prefetchData(offset: Int, count: Int) {
         if let frontend {
             // Check for sparse hole and promote data from backend
-            let range = offset ..< offset + count
-            if frontend.data.allZero(range) {
-                let backendData = UnsafeMutableBufferPointer(mutating: backend.data)
-                frontend.data[range] = backendData[range]
+            let blockSize = 128*1024
+            let blockStart = offset.floor(to: blockSize)
+            let blockEnd = (offset + count).ceil(to: blockSize)
+            for block in stride(from: blockStart, to: blockEnd, by: blockSize) {
+                let range = block..<min(block+blockSize, backend.data.count)
+                if frontend.data.allZero(range) {
+                    let backendData = UnsafeMutableBufferPointer(mutating: backend.data)
+                    frontend.data[range] = backendData[range]
+                }
             }
         } else {
             backend.prefetchData(offset: offset, count: count)
