@@ -187,7 +187,7 @@ extension GribMessage {
         case "lcc": return JmaSurfaceVariable.cloud_cover_low
         case "mcc": return JmaSurfaceVariable.cloud_cover_mid
         case "hcc": return JmaSurfaceVariable.cloud_cover_high
-        case "dswrf": return JmaSurfaceVariable.shortwave_radiation
+        case "dswrf", "msdwswrf": return JmaSurfaceVariable.shortwave_radiation
         case "unknown":
             if parameterCategory == 6 && parameterNumber == 1 {
                 return JmaSurfaceVariable.cloud_cover
