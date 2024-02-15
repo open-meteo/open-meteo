@@ -20,6 +20,11 @@ struct OpenMeteo {
         }
         return  "./data/"
     }()
+    
+    /// Cache all data access using spare files in this directory
+    static var cacheDirectory = {
+        return Environment.get("CACHE_DIRECTORY")
+    }()
 }
 
 extension Application {

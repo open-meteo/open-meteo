@@ -48,6 +48,15 @@ struct SyncCommand: AsyncCommand {
         
         @Option(name: "concurrent", short: "c", help: "Number of concurrent file download. Default 4")
         var concurrent: Int?
+        
+        @Option(name: "data-directory-max-size-gb", help: "Trim data directory to the speicfied target size in gigabyte GB")
+        var dataDirectoryMaxSize: Int?
+        
+        @Option(name: "cache-directory-max-size-gb", help: "Trim cache directory to the speicfied target size in gigabyte GB")
+        var cacheDirectoryMaxSize: Int?
+        
+        @Flag(name: "execute", help: "Actually perfom file delete on cleanup")
+        var execute: Bool
     }
     
     static var previousDayVariables = ["temperature_2m", "dew_point_2m", "relative_humidity_2m", "precipitation", "snowfall_water_equivalent", "snowfall", "frozen_precipitation_percent", "pressure_msl", "cloud_cover", "wind_u_component_10m", "wind_v_component_10m", "showers", "shortwave_radiation", "direct_radiation", "diffuse_radiation", "wind_gusts_10m", "wind_speed_10m", "wind_direction_10m", "weather_code", "cape", "relative_humidity_1000hPa", "lifted_index"]
@@ -143,6 +152,14 @@ struct SyncCommand: AsyncCommand {
                     guard let repeatInterval = signature.repeatInterval else {
                         break
                     }
+                    
+                    if let dataDirectoryMaxSize = signature.dataDirectoryMaxSize, dataDirectoryMaxSize > 0 {
+                        try cacheDirectoryCleanup(logger: logger, cacheDirectory: OpenMeteo.dataDirectory, maxSize: dataDirectoryMaxSize * 1<<30, execute: signature.execute)
+                    }
+                    if let cacheDirectoryMaxSize = signature.cacheDirectoryMaxSize, cacheDirectoryMaxSize > 0, let cacheDirectory = OpenMeteo.cacheDirectory {
+                        try cacheDirectoryCleanup(logger: logger, cacheDirectory: cacheDirectory, maxSize: cacheDirectoryMaxSize * 1<<30, execute: signature.execute)
+                    }
+                    
                     logger.info("Repeat in \(repeatInterval) minutes")
                     try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
                 } catch {
@@ -152,6 +169,72 @@ struct SyncCommand: AsyncCommand {
             }
             await curl.printStatistics()
         }
+    }
+    
+    /**
+     Delete old files to trim directory size
+     */
+    func cacheDirectoryCleanup(logger: Logger, cacheDirectory: String, maxSize: Int, execute: Bool) throws {
+        logger.info("Checking directory size of '\(cacheDirectory)'. Target size \(maxSize.bytesHumanReadable)")
+        if cacheDirectory.isEmpty, maxSize <= 0 {
+            fatalError()
+        }
+        let resourceKeys : [URLResourceKey] = [.isRegularFileKey, .fileAllocatedSizeKey, .contentModificationDateKey]
+        guard let enumerator = FileManager.default.enumerator(
+            at: URL(fileURLWithPath: cacheDirectory),
+            includingPropertiesForKeys: resourceKeys,
+            options: [.skipsHiddenFiles, .skipsPackageDescendants]
+        ) else {
+            fatalError("Could not get enumerator")
+        }
+        
+        var files = [(file: URL, modifiedAt: Date, size: Int)]()
+        var totalSize: Int = 0
+        for case let fileURL as URL in enumerator {
+            do {
+                if fileURL.absoluteString.last == "~" {
+                    continue
+                }
+                let fileAttributes = try fileURL.resourceValues(forKeys: Set(resourceKeys))
+                guard fileAttributes.isRegularFile == true,
+                        let size = fileAttributes.fileAllocatedSize,
+                        let modificationDate = fileAttributes.contentModificationDate else {
+                    continue
+                }
+                totalSize += size
+                if !fileURL.absoluteString.contains(".om") || fileURL.absoluteString.contains("/static/") {
+                    continue
+                }
+                files.append((fileURL, modificationDate, size))
+            } catch {
+                print(error, fileURL)
+            }
+        }
+        if totalSize < maxSize {
+            logger.info("OK, Total Size: \(totalSize.bytesHumanReadable)")
+            return
+        }
+        logger.info("Cleanup, current size \(totalSize.bytesHumanReadable), deleting \((totalSize-maxSize).bytesHumanReadable)")
+        
+        // Sort by modification date
+        files.sort(by: {$0.modifiedAt < $1.modifiedAt})
+        for file in files {
+            guard totalSize > maxSize else {
+                break
+            }
+            if execute {
+                logger.info("Remove file \(file.file), modified at \(file.modifiedAt), size \(file.size.bytesHumanReadable)")
+                do {
+                    try FileManager.default.removeItem(at: file.file)
+                } catch {
+                    print(error, file.file)
+                }
+            } else {
+                logger.info("[DRY RUN] Would remove file \(file.file), modified at \(file.modifiedAt), size \(file.size.bytesHumanReadable)")
+            }
+            totalSize -= file.size
+        }
+        logger.info("New size \(totalSize.bytesHumanReadable)")
     }
 }
 

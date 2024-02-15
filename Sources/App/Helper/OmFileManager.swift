@@ -17,29 +17,33 @@ enum OmFileManagerReadable: Hashable {
     
     /// Assemble the full file system path
     func getFilePath() -> String {
+        return "\(OpenMeteo.dataDirectory)\(getRelativeFilePath())"
+    }
+    
+    private func getRelativeFilePath() -> String {
         switch self {
         case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
             let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
             let previousDay = previousDay > 0 ? "_previous_day\(previousDay)" : ""
             if let chunk {
-                return "\(domain.directory)\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
+                return "\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type)_\(chunk).om"
             }
-            return "\(domain.directory)\(variable)\(previousDay)\(ensembleMember)/\(type).om"
+            return "\(domain.rawValue)/\(variable)\(previousDay)\(ensembleMember)/\(type).om"
         case .staticFile(let domain, let variable, let chunk):
             if let chunk {
                 // E.g. DEM model '/copernicus_dem90/static/lat_-1.om'
-                return "\(domain.directory)static/\(variable)_\(chunk).om"
+                return "\(domain.rawValue)/static/\(variable)_\(chunk).om"
             }
-            return "\(domain.directory)static/\(variable).om"
+            return "\(domain.rawValue)/static/\(variable).om"
         }
     }
     
-    func createDirectory() throws {
-        let file = getFilePath()
+    func createDirectory(dataDirectory: String = OpenMeteo.dataDirectory) throws {
+        let file = getRelativeFilePath()
         guard let last = file.lastIndex(of: "/") else {
             return
         }
-        let path = String(file[file.startIndex..<last])
+        let path = "\(dataDirectory)\(file[file.startIndex..<last])"
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
     
@@ -50,6 +54,20 @@ enum OmFileManagerReadable: Hashable {
         }
         return try OmFileReader(file: file)
     }
+    
+    func openReadCached() throws -> OmFileReader<MmapFileCached>? {
+        let fileRel = getRelativeFilePath()
+        let file = "\(OpenMeteo.dataDirectory)\(fileRel)"
+        guard FileManager.default.fileExists(atPath: file) else {
+            return nil
+        }
+        if let cacheDir = OpenMeteo.cacheDirectory {
+            let cacheFile = "\(cacheDir)\(fileRel)"
+            try createDirectory(dataDirectory: cacheDir)
+            return try OmFileReader(file: file, cacheFile: cacheFile)
+        }
+        return try OmFileReader(file: file, cacheFile: nil)
+    }
 }
 
 /// cache file handles, background close checks
@@ -57,7 +75,7 @@ enum OmFileManagerReadable: Hashable {
 final class OmFileManager: LifecycleHandler {
     /// A file might exist and is open, or it is missing
     enum OmFileState {
-        case exists(file: OmFileReader<MmapFile>)
+        case exists(file: OmFileReader<MmapFileCached>)
         case missing(path: String)
     }
     
@@ -128,12 +146,12 @@ final class OmFileManager: LifecycleHandler {
     }
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
+    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
         try instance.get(file)
     }
 
     /// Get cached file or return nil, if the files does not exist
-    public func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
+    public func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
         let key = file.hashValue
         
         return try cached.withLockedValue { cached in
@@ -145,7 +163,7 @@ final class OmFileManager: LifecycleHandler {
                     return nil
                 }
             }
-            guard let file = try file.openRead() else {
+            guard let file = try file.openReadCached() else {
                 cached[key] = .missing(path: file.getFilePath())
                 return nil
             }

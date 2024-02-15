@@ -520,7 +520,7 @@ struct ExportCommand: AsyncCommand {
 
 extension Gridable {
     /// Return true if there is no land around a 5x5 box
-    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFile>) throws -> Bool {
+    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFileCached>) throws -> Bool {
         for y in -2...2 {
             for x in -2...2 {
                 let point = max(0, min(gridpoint + y * nx + x, count))
