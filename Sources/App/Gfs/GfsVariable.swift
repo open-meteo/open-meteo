@@ -87,6 +87,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .shortwave_radiation, .diffuse_radiation: return true
         case .wind_gusts_10m, .wind_u_component_10m, .wind_v_component_10m: return true
         case .cape, .lifted_index: return true
+        case .wind_u_component_80m, .wind_v_component_80m: return true
+        case .wind_u_component_100m, .wind_v_component_100m: return true
         //case .wind_speed_40m, .wind_direction_40m: return true
         //case .wind_speed_80m, .wind_direction_80m: return true
         //case .wind_speed_120m, .wind_direction_120m: return true

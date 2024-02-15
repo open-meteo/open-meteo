@@ -59,6 +59,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
+        case .wind_speed_80m, .wind_direction_80m: return true
+        case .wind_speed_120m, .wind_direction_120m: return true
         case .cape: return true
         default: return false
         }

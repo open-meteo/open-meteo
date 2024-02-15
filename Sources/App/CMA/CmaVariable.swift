@@ -68,6 +68,9 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m, .wind_u_component_10m, .wind_v_component_10m: return true
+        case .wind_u_component_70m, .wind_v_component_70m: return true
+        case .wind_u_component_120m, .wind_v_component_120m: return true
+        case .wind_u_component_180m, .wind_v_component_180m: return true
         case .cape: return true
         default: return false
         }
