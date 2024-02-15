@@ -59,9 +59,8 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
         case .weather_code: return true
-        //case .wind_speed_40m, .wind_direction_40m: return true
-        //case .wind_speed_80m, .wind_direction_80m: return true
-        //case .wind_speed_120m, .wind_direction_120m: return true
+        case .wind_speed_80m, .wind_direction_80m: return true
+        case .wind_speed_120m, .wind_direction_120m: return true
         default: return false
         }
     }
