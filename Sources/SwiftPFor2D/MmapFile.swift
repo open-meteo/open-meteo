@@ -1,23 +1,35 @@
 import Foundation
 
-/// Mmap a all pages for a file
+/// `Mmap` all pages for a file
 public final class MmapFile {
     public let data: UnsafeBufferPointer<UInt8>
     public let file: FileHandle
+    
+    public enum Mode {
+        case readOnly
+        case readWrite
+        
+        /// mmap `prot` attribute
+        fileprivate var prot: Int32 {
+            switch self {
+            case .readOnly:
+                return PROT_READ
+            case .readWrite:
+                return PROT_READ | PROT_WRITE
+            }
+        }
+    }
 
     /// Mmap the entire filehandle
-    public init(fn: FileHandle) throws {
+    public init(fn: FileHandle, mode: Mode = .readOnly) throws {
         let len = try Int(fn.seekToEnd())
-                
-        // for write: guard let mem = mmap(nil, len, PROT_READ | PROT_WRITE, MAP_SHARED, fn, 0),
-        guard let mem = mmap(nil, len, PROT_READ, MAP_SHARED, fn.fileDescriptor, 0), mem != UnsafeMutableRawPointer(bitPattern: -1) else {
+        guard let mem = mmap(nil, len, mode.prot, MAP_SHARED, fn.fileDescriptor, 0), mem != UnsafeMutableRawPointer(bitPattern: -1) else {
             let error = String(cString: strerror(errno))
             throw SwiftPFor2DError.cannotOpenFile(errno: errno, error: error)
         }
         //madvise(mem, len, MADV_SEQUENTIAL)
         let start = mem.assumingMemoryBound(to: UInt8.self)
-        data = UnsafeBufferPointer(start: start, count: len)
-        
+        self.data = UnsafeBufferPointer(start: start, count: len)
         self.file = fn
     }
     
