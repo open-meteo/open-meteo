@@ -3,7 +3,7 @@ Description = Run Open-Meteo API
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
-PassEnvironment=VAPOR_ENV API_SYNC_APIKEYS NGINX_SENDFILE_PREFIX LOG_LEVEL
+PassEnvironment=VAPOR_ENV API_SYNC_APIKEYS NGINX_SENDFILE_PREFIX LOG_LEVEL CACHE_DIRECTORY
 Type=simple
 User=openmeteo-api
 Group=openmeteo-api
