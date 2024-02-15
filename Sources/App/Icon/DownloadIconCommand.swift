@@ -126,6 +126,9 @@ struct DownloadIconCommand: AsyncCommand {
         var handles = [GenericVariableHandle]()
         var handles15minIconD2 = [GenericVariableHandle]()
         
+        let deaverager = GribDeaverager()
+        let deaverager15min = GribDeaverager()
+        
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         lazy var domainElevation = {
             guard let elevation = try? domain.getStaticFile(type: .elevation)?.readAll() else {
@@ -165,22 +168,26 @@ struct DownloadIconCommand: AsyncCommand {
                     let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
                     try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
                     for (i, message) in messages.enumerated() {
+                        guard let stepRange = message.get(attribute: "stepRange"),
+                              let stepType = message.get(attribute: "stepType") else {
+                            fatalError("could not get step range or type")
+                        }
                         let timestamp = run.add(hour*3600 + i*900)
                         try grib2d.load(message: message)
-                        var data = grib2d.array.data
                         if let fma = variable.multiplyAdd {
-                            data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
-                        let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                        let fn = try writer.writeTemporary(compressionType: compression, scalefactor: variable.scalefactor, all: data)
+                        // Deaccumulate precipitation
+                        guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            continue
+                        }
+                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         handles15minIconD2.append(GenericVariableHandle(
                             variable: variable,
                             time: timestamp,
                             member: 0,
                             fn: fn,
-                            skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run),
-                            isAveragedOverTime: variable.isAveragedOverForecastTime,
-                            isAccumulatedSinceModelStart: variable.isAccumulatedSinceModelStart
+                            skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
                         ))
                     }
                     messages = [messages[0]]
@@ -193,6 +200,16 @@ struct DownloadIconCommand: AsyncCommand {
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    guard let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType") else {
+                        fatalError("could not get step range or type")
+                    }
+                    
+                    // Deaccumulate precipitation
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        continue
                     }
                     
                     if let variable = variable as? IconSurfaceVariable {
@@ -259,16 +276,13 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                     }
                     //logger.info("Compressing and writing data to \(filenameDest)")
-                    let compression = variable.isAveragedOverForecastTime || variable.isAccumulatedSinceModelStart ? CompressionType.fpxdec32 : .p4nzdec256
-                    let fn = try writer.writeTemporary(compressionType: compression, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable,
                         time: timestamp,
                         member: member,
                         fn: fn,
-                        skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run),
-                        isAveragedOverTime: variable.isAveragedOverForecastTime,
-                        isAccumulatedSinceModelStart: variable.isAccumulatedSinceModelStart
+                        skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
                     ))
                 }
                 // icon global downloads tend to use a lot of memory due to numerous allocations

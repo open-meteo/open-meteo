@@ -2,8 +2,6 @@
 /// Define functions to download surface and pressure level variables for ICON
 protocol IconVariableDownloadable: GenericVariable {
     func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool
-    var isAveragedOverForecastTime: Bool { get }
-    var isAccumulatedSinceModelStart: Bool { get }
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     func getVarAndLevel(domain: IconDomains) -> (variable: String, cat: String, level: Int?)?
 }
@@ -56,27 +54,6 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .showers: fallthrough
         case .rain: return true
         case .updraft: return true
-        default: return false
-        }
-    }
-    
-    var isAveragedOverForecastTime: Bool {
-        switch self {
-        case .diffuse_radiation: return true
-        case .direct_radiation: return true
-        case .sensible_heat_flux: return true
-        case .latent_heat_flux: return true
-        default: return false
-        }
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        switch self {
-        case .snowfall_water_equivalent: fallthrough
-        case .snowfall_convective_water_equivalent: fallthrough
-        case .precipitation: fallthrough
-        case .showers: fallthrough
-        case .rain: return true
         default: return false
         }
     }
@@ -271,15 +248,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
     }
 }
 
-extension IconPressureVariable: IconVariableDownloadable {    
-    var isAveragedOverForecastTime: Bool {
-        return false
-    }
-    
-    var isAccumulatedSinceModelStart: Bool {
-        return false
-    }
-    
+extension IconPressureVariable: IconVariableDownloadable {
     func skipHour(hour: Int, domain: IconDomains, forDownload: Bool, run: Timestamp) -> Bool {
         return false
     }

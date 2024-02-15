@@ -11,17 +11,13 @@ struct GenericVariableHandle {
     let member: Int
     let fn: FileHandle
     let skipHour0: Bool
-    let isAveragedOverTime: Bool
-    let isAccumulatedSinceModelStart: Bool
     
-    public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool, isAveragedOverTime: Bool = false, isAccumulatedSinceModelStart: Bool = false) {
+    public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool) {
         self.variable = variable
         self.time = time
         self.member = member
         self.fn = fn
         self.skipHour0 = skipHour0
-        self.isAveragedOverTime = isAveragedOverTime
-        self.isAccumulatedSinceModelStart = isAccumulatedSinceModelStart
     }
     
     /// Process concurrently
@@ -60,8 +56,6 @@ struct GenericVariableHandle {
             let variable = handles[0].variable
             
             let skip = handles[0].skipHour0 ? 1 : 0
-            let isAveragedOverTime = handles[0].isAveragedOverTime
-            let isAccumulatedSinceModelStart = handles[0].isAccumulatedSinceModelStart
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
             
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
@@ -102,14 +96,14 @@ struct GenericVariableHandle {
                 }
                 
                 // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-                if isAveragedOverTime {
-                    data3d.deavergeOverTime()
-                }
+                //if isAveragedOverTime {
+                //    data3d.deavergeOverTime()
+                //}
                 
                 // De-accumulate precipitation
-                if isAccumulatedSinceModelStart {
-                    data3d.deaccumulateOverTime()
-                }
+                //if isAccumulatedSinceModelStart {
+                //    data3d.deaccumulateOverTime()
+                //}
                 
                 // Interpolate all missing values
                 data3d.interpolateInplace(
