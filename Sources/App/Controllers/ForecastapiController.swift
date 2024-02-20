@@ -105,12 +105,16 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain(subdomain, alias: alias)
+        let host = try await req.ensureSubdomain(subdomain, alias: alias)
+        /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
+        let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
+        let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
+        let forecastDay = isHistoricalForecastApi ? 1 : self.forecastDay
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
         
         let currentTime = Timestamp.now()
-        let allowedRange = historyStartDate ..< currentTime.add(days: forecastDaysMax)
+        let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]

@@ -173,9 +173,11 @@ enum RateLimitError: Error, AbortError {
 
 extension Request {
     /// On open-meteo servers, make sure, the right domain is active
-    func ensureSubdomain(_ subdomain: String, alias: [String] = []) async throws {
+    /// Returns the hostdomain if running on "open-meteo.com"
+    @discardableResult
+    func ensureSubdomain(_ subdomain: String, alias: [String] = []) async throws -> String? {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
-            return
+            return nil
         }
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: {host.starts(with: $0)}) == true
         let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
@@ -186,10 +188,11 @@ extension Request {
         
         if isFreeApi {
             guard let address = peerAddress ?? remoteAddress else {
-                return
+                return host
             }
             try await RateLimiter.instance.check(address: address)
         }
+        return host
     }
     
     /// For customer API endpoints, check API key.
