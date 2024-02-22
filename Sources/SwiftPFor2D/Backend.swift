@@ -55,6 +55,10 @@ extension FileHandle: OmFileWriterBackend {
 
 /// Make `FileHandle` work as reader
 extension MmapFile: OmFileReaderBackend {
+    public func prefetchData(offset: Int, count: Int) {
+        self.prefetchData(offset: offset, count: count, advice: .willneed)
+    }
+    
     public func preRead(offset: Int, count: Int) {
         
     }

@@ -53,7 +53,7 @@ public final class MmapFile {
     }
     
     /// Tell the OS to prefault the required memory pages. Subsequent calls to read data should be faster
-    public func prefetchData(offset: Int, count: Int, advice: MAdvice = .willneed) {
+    public func prefetchData(offset: Int, count: Int, advice: MAdvice) {
         let pageStart = offset.floor(to: 4096)
         let pageEnd = (offset + count).ceil(to: 4096)
         let length = pageEnd - pageStart
