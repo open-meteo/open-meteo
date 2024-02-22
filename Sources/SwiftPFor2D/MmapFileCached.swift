@@ -59,6 +59,7 @@ extension MmapFileCached: OmFileReaderBackend {
                 let block = blockStart ..< min(blockEnd, backendData.count)
                 backend.prefetchData(offset: blockStart, count: blockSize)
                 frontendData[block] = backendData[block]
+                backend.prefetchData(offset: blockStart, count: blockSize, advice: .dontneed)
             }
         }
     }

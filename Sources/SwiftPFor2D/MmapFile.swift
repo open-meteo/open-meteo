@@ -19,6 +19,20 @@ public final class MmapFile {
             }
         }
     }
+    
+    public enum MAdvice {
+        case willneed
+        case dontneed
+        
+        fileprivate var mode: Int32 {
+            switch self {
+            case .willneed:
+                return MADV_WILLNEED
+            case .dontneed:
+                return MADV_DONTNEED
+            }
+        }
+    }
 
     /// Mmap the entire filehandle
     public init(fn: FileHandle, mode: Mode = .readOnly) throws {
@@ -39,11 +53,11 @@ public final class MmapFile {
     }
     
     /// Tell the OS to prefault the required memory pages. Subsequent calls to read data should be faster
-    public func prefetchData(offset: Int, count: Int) {
+    public func prefetchData(offset: Int, count: Int, advice: MAdvice = .willneed) {
         let pageStart = offset.floor(to: 4096)
         let pageEnd = (offset + count).ceil(to: 4096)
         let length = pageEnd - pageStart
-        let ret = madvise(UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart)), length, MADV_WILLNEED)
+        let ret = madvise(UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart)), length, advice.mode)
         guard ret == 0 else {
             let error = String(cString: strerror(errno))
             fatalError("madvice failed! ret=\(ret), errno=\(errno), \(error)")
