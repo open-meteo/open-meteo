@@ -495,13 +495,18 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         var fetchStart = 0
         var fetchEnd = 0
         fn.withUnsafeBytes { ptr in
-            fn.preRead(offset: OmHeader.length, count: nChunks * MemoryLayout<Int>.stride)
             let chunkOffsets = ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self, capacity: nChunks)
             
             let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
             
             for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
-                for c1 in dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1) {
+                let c1Range = dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1)
+                let c1Chunks = c1Range.add(c0 * nDim1Chunks)
+                // pre-read chunk table at specific offset
+                fn.prefetchData(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
+                fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
+                
+                for c1 in c1Range {
                     // load chunk from mmap
                     let chunkNum = c0 * nDim1Chunks + c1
                     let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
@@ -554,7 +559,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         
         let nChunks = nDim0Chunks * nDim1Chunks
         fn.withUnsafeBytes { ptr in
-            fn.preRead(offset: OmHeader.length, count: nChunks * MemoryLayout<Int>.stride)
+            //fn.preRead(offset: OmHeader.length, count: nChunks * MemoryLayout<Int>.stride)
             let chunkOffsets = ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self, capacity: nChunks)
             
             let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
@@ -566,7 +571,11 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             case .p4nzdec256:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                 for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
-                    for c1 in dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1) {
+                    let c1Range = dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1)
+                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
+                    // pre-read chunk table at specific offset
+                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
+                    for c1 in c1Range {
                         // load chunk into buffer
                         // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
                         let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
@@ -582,11 +591,13 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         
                         // load chunk from mmap
                         let chunkNum = c0 * nDim1Chunks + c1
+                        precondition(chunkNum < nChunks, "invalid chunkNum")
                         let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
+                        precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
                         let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
                         fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
                         let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
-                        precondition(uncompressedBytes == lengthCompressedBytes)
+                        precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
                         
                         // 2D delta decoding
                         delta2d_decode(length0, length1, chunkBuffer)
@@ -697,7 +708,9 @@ extension OmFileReader where Backend == MmapFileCached {
         
         if let cacheFn = try? FileHandle.openFileReadWrite(file: cacheFile) {
             let cacheStats = cacheFn.fileSizeAndModificationTime()
-            if cacheStats.size == backendStats.size && cacheStats.modificationTime >= backendStats.modificationTime {
+            if cacheStats.size == backendStats.size
+                && cacheStats.modificationTime >= backendStats.modificationTime
+                && cacheStats.creationTime >= backendStats.creationTime {
                 // cache file exists and usable
                 try self.init(fn: MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile))
                 return

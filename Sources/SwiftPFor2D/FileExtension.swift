@@ -98,7 +98,7 @@ extension FileHandle {
         return Int(stats.st_size)
     }
     
-    public func fileSizeAndModificationTime() -> (size: Int, modificationTime: Date) {
+    public func fileSizeAndModificationTime() -> (size: Int, modificationTime: Date, creationTime: Date) {
         var stats = stat()
         guard fstat(fileDescriptor, &stats) != -1 else {
             let error = String(cString: strerror(errno))
@@ -107,11 +107,17 @@ extension FileHandle {
         #if os(Linux)
             let seconds = Double(stats.st_mtim.tv_sec)
             let nanosends = Double(stats.st_mtim.tv_nsec)
+            let creationSeconds = Double(stats.st_ctim.tv_sec)
+            let creationNanosends = Double(stats.st_ctim.tv_nsec)
         #else
             let seconds = Double(stats.st_mtimespec.tv_sec)
             let nanosends = Double(stats.st_mtimespec.tv_nsec)
+            let creationSeconds = Double(stats.st_ctimespec.tv_sec)
+            let creationNanosends = Double(stats.st_ctimespec.tv_nsec)
         #endif
-        return (Int(stats.st_size), Date(timeIntervalSince1970: seconds + nanosends / 1000))
+        let mTime = Date(timeIntervalSince1970: seconds + nanosends / 1000)
+        let cTime = Date(timeIntervalSince1970: creationSeconds + creationNanosends / 1000)
+        return (Int(stats.st_size), mTime, cTime)
     }
 }
 

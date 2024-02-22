@@ -42,16 +42,23 @@ extension MmapFileCached: OmFileReaderBackend {
         guard let frontend else {
             return
         }
-        // Check for sparse hole and promote data from backend
+        // Check for sparse hole in a page and promote data from backend
+        // Promote 128k at once
         let blockSize = 128*1024
-        let blockStart = offset.floor(to: blockSize)
-        let blockEnd = (offset + count).ceil(to: blockSize)
+        let pageSize = 4096
+        let pageStart = offset.floor(to: pageSize)
+        let pageEnd = (offset + count).ceil(to: pageSize)
         let backendData = UnsafeMutableBufferPointer(mutating: backend.data)
         let frontendData = UnsafeMutableBufferPointer(mutating: frontend.data)
-        for block in stride(from: blockStart, to: blockEnd, by: blockSize) {
-            let range = block..<min(block+blockSize, backendData.count)
+        
+        for page in stride(from: pageStart, to: pageEnd, by: pageSize) {
+            let range = page..<min(page+pageSize, backendData.count)
             if frontendData.allZero(range) {
-                frontendData[range] = backendData[range]
+                let blockStart = page.floor(to: blockSize)
+                let blockEnd = (page + pageSize).ceil(to: blockSize)
+                let block = blockStart ..< min(blockEnd, backendData.count)
+                backend.prefetchData(offset: blockStart, count: blockSize)
+                frontendData[block] = backendData[block]
             }
         }
     }
