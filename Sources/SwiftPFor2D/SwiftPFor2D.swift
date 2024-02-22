@@ -499,8 +499,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             
             let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
             
-            for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
-                let c1Range = dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1)
+            for c0 in dim0Read.divide(by: chunk0) {
+                let c1Range = dim1Read.divide(by: chunk1)
                 let c1Chunks = c1Range.add(c0 * nDim1Chunks)
                 // pre-read chunk table at specific offset
                 fn.prefetchData(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
@@ -570,8 +570,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 fallthrough
             case .p4nzdec256:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
-                for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
-                    let c1Range = dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1)
+                for c0 in dim0Read.divide(by: chunk0) {
+                    let c1Range = dim1Read.divide(by: chunk1)
                     let c1Chunks = c1Range.add(c0 * nDim1Chunks)
                     // pre-read chunk table at specific offset
                     fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
@@ -629,8 +629,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
                 
-                for c0 in dim0Read.lowerBound / chunk0 ..< dim0Read.upperBound.divideRoundedUp(divisor: chunk0) {
-                    for c1 in dim1Read.lowerBound / chunk1 ..< dim1Read.upperBound.divideRoundedUp(divisor: chunk1) {
+                for c0 in dim0Read.divide(by: chunk0) {
+                    for c1 in dim1Read.divide(by: chunk1) {
                         // load chunk into buffer
                         // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
                         let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
@@ -675,6 +675,13 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 }
             }
         }
+    }
+}
+
+extension Range where Element == Int {
+    /// Divide lower and upper bound. For upper bound use `divideRoundedUp`
+    func divide(by: Int) -> Range<Int> {
+        return lowerBound / by ..< upperBound.divideRoundedUp(divisor: by)
     }
 }
 
