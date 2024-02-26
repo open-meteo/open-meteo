@@ -162,7 +162,8 @@ struct GemDownload: AsyncCommand {
     /// Download data and store as compressed files for each timestep
     func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, server: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5) // 12 hours and 6 hours interval so we let 1 hour for data conversion
+        let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
         let downloadDirectory = domain.downloadDirectory
         let nMembers = domain.ensembleMembers
         
@@ -202,64 +203,73 @@ struct GemDownload: AsyncCommand {
                     continue
                 }
                 let url = domain.getUrl(run: run, hour: hour, gribName: gribName, server: server)
+                // snowfall file might be missing. Ignore any issues here
+                let isSnowfallWaterEq = domain == .gem_hrdps_continental && gribName == "WEASN_Sfc"
+                let deadLineHours = isSnowfallWaterEq ? 0.05 : nil
                 
-                for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
-                    let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
-                    let memberStr = member > 0 ? "_\(member)" : ""
-                    //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
-                    //fatalError()
-                    try grib2d.load(message: message)
-                    if domain == .gem_global_ensemble {
-                        // Only ensemble model is shifted by 180°
-                        grib2d.array.shift180Longitudee()
-                    }
-                    
-                    // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
-                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-                    
-                    guard let stepRange = message.get(attribute: "stepRange"),
-                          let stepType = message.get(attribute: "stepType") else {
-                        fatalError("could not get step range")
-                    }
-                    // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        continue
-                    }
-                    
-                    // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
-                    if domain == .gem_global_ensemble, let variable = variable as? GemSurfaceVariable {
-                        // keep wind speed in memory, which actually contains wind U-component
-                        if [.wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m].contains(variable) {
-                            inMemory[.init(variable, member)] = grib2d.array.data
+                do {
+                    for message in try await curl.downloadGrib(url: url, bzip2Decode: false, deadLineHours: deadLineHours) {
+                        let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
+                        let memberStr = member > 0 ? "_\(member)" : ""
+                        //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
+                        //fatalError()
+                        try grib2d.load(message: message)
+                        if domain == .gem_global_ensemble {
+                            // Only ensemble model is shifted by 180°
+                            grib2d.array.shift180Longitudee()
+                        }
+                        
+                        // Scaling before compression with scalefactor
+                        if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
+                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        }
+                        
+                        guard let stepRange = message.get(attribute: "stepRange"),
+                              let stepType = message.get(attribute: "stepType") else {
+                            fatalError("could not get step range")
+                        }
+                        // Deaccumulate precipitation
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                             continue
                         }
-                        if let windspeedVariable = variable.winddirectionCounterPartVariable {
-                            guard let u = inMemory[.init(windspeedVariable, member)] else {
-                                fatalError("Wind speed calculation requires \(windspeedVariable) to download")
+                        
+                        // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
+                        if domain == .gem_global_ensemble, let variable = variable as? GemSurfaceVariable {
+                            // keep wind speed in memory, which actually contains wind U-component
+                            if [.wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m].contains(variable) {
+                                inMemory[.init(variable, member)] = grib2d.array.data
+                                continue
                             }
-                            let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                            let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed)
-                            handles.append(GenericVariableHandle(
-                                variable: windspeedVariable,
-                                time: run.add(hours: hour),
-                                member: member,
-                                fn: fn,
-                                skipHour0: variable.skipHour0
-                            ))
-                            grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
+                            if let windspeedVariable = variable.winddirectionCounterPartVariable {
+                                guard let u = inMemory[.init(windspeedVariable, member)] else {
+                                    fatalError("Wind speed calculation requires \(windspeedVariable) to download")
+                                }
+                                let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
+                                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed)
+                                handles.append(GenericVariableHandle(
+                                    variable: windspeedVariable,
+                                    time: run.add(hours: hour),
+                                    member: member,
+                                    fn: fn,
+                                    skipHour0: variable.skipHour0
+                                ))
+                                grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
+                            }
                         }
+                        
+                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        handles.append(GenericVariableHandle(
+                            variable: variable,
+                            time: run.add(hours: hour),
+                            member: member,
+                            fn: fn,
+                            skipHour0: variable.skipHour0
+                        ))
                     }
-                    
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    handles.append(GenericVariableHandle(
-                        variable: variable,
-                        time: run.add(hours: hour),
-                        member: member,
-                        fn: fn,
-                        skipHour0: variable.skipHour0
-                    ))
+                } catch {
+                    if !isSnowfallWaterEq {
+                        throw error
+                    }
                 }
             }
         }
