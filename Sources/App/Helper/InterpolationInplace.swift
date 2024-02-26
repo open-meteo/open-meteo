@@ -40,23 +40,25 @@ extension Array where Element == Float {
         case .solar_backwards_averaged:
             interpolateInplaceSolarBackwards(skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
         case .backwards_sum:
-            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst)
+            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst, isSummation: true)
         case .backwards:
-            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst)
+            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst, isSummation: false)
         }
     }
     
     
     /// Interpolate missing values, but taking the next valid value
     /// `skipFirst` set skip first to prevent filling the frist hour of precipitation
-    mutating func interpolateInplaceBackwards(nTime: Int, skipFirst: Int) {
+    mutating func interpolateInplaceBackwards(nTime: Int, skipFirst: Int, isSummation: Bool) {
         precondition(nTime <= self.count)
         precondition(skipFirst <= nTime)
         precondition(self.count % nTime == 0)
         let nLocations = self.count / nTime
         for l in 0..<nLocations {
+            var previousIndex = 0
             for t in skipFirst..<nTime {
                 guard self[l * nTime + t].isNaN else {
+                    previousIndex = t
                     continue
                 }
                 // Seek next valid value
@@ -66,8 +68,8 @@ extension Array where Element == Float {
                         continue
                     }
                     // Fill up all values until the first valid value
-                    for t in t..<t2 {
-                        self[l * nTime + t] = value
+                    for t in t...t2 {
+                        self[l * nTime + t] = isSummation ? value / Float(t2 - previousIndex) : value
                     }
                     break
                 }

@@ -14,18 +14,23 @@ final class ArrayTests: XCTestCase {
     
     func testBackwardInterpolateInplace() {
         var a: [Float] = [0,1,.nan,.nan,.nan,5]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0)
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0, isSummation: false)
         XCTAssertEqual(a, [0,1,5,5,5,5])
         
         // Make sure nTime is honored correctly
         a = [0,.nan,1,.nan,.nan,.nan, 0,.nan,1,.nan,.nan,.nan]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0)
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0, isSummation: false)
         XCTAssertEqualArray(a, [0,1,1,.nan,.nan,.nan, 0,1,1,.nan,.nan,.nan], accuracy: 0.0001)
         
         // Make sure nTime is honored correctly
         a = [.nan,.nan,1,.nan,.nan,.nan, .nan,.nan,1,.nan,.nan,.nan]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 1)
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 1, isSummation: false)
         XCTAssertEqualArray(a, [.nan,1,1,.nan,.nan,.nan, .nan,1,1,.nan,.nan,.nan], accuracy: 0.0001)
+        
+        // Check sum
+        a = [.nan,.nan,1,.nan,.nan,.nan, .nan,.nan,1,.nan,.nan,.nan]
+        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 1, isSummation: true)
+        XCTAssertEqualArray(a, [.nan,0.5,0.5,.nan,.nan,.nan, .nan,0.5,0.5,.nan,.nan,.nan], accuracy: 0.0001)
     }
     
     func testLinearInterpolateInplace() {
