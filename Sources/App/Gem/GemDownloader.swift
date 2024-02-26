@@ -204,8 +204,8 @@ struct GemDownload: AsyncCommand {
                 }
                 let url = domain.getUrl(run: run, hour: hour, gribName: gribName, server: server)
                 // snowfall file might be missing. Ignore any issues here
-                let isSnowfallWaterEq = domain == .gem_hrdps_continental && gribName == "WEASN_Sfc"
-                let deadLineHours = isSnowfallWaterEq ? 0.05 : nil
+                let isSnowfallWaterEq = domain == .gem_hrdps_continental && (gribName == "WEASN_Sfc" || gribName == "APCP_Sfc")
+                let deadLineHours = isSnowfallWaterEq ? 0.01 : nil
                 
                 do {
                     for message in try await curl.downloadGrib(url: url, bzip2Decode: false, deadLineHours: deadLineHours) {
