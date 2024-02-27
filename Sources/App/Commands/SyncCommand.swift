@@ -243,6 +243,9 @@ fileprivate extension URL {
     /// Get the allocated size on disk. Swift implementation reports incorrect sizes on Linx https://github.com/apple/swift-corelibs-foundation/issues/4885
     func getAllocatedSize() -> Int {
         return withUnsafeFileSystemRepresentation({ path in
+            guard let path else {
+                return 0
+            }
             var stats = stat()
             guard lstat(path, &stats) != -1 else {
                 let error = String(cString: strerror(errno))
