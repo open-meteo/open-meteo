@@ -180,7 +180,8 @@ struct SyncCommand: AsyncCommand {
         if cacheDirectory.isEmpty, maxSize <= 0 {
             fatalError()
         }
-        let resourceKeys : [URLResourceKey] = [.isRegularFileKey, .fileAllocatedSizeKey, .contentModificationDateKey]
+        /// `totalFileAllocatedSize` is prefered to get the size of sparse files on linux
+        let resourceKeys : [URLResourceKey] = [.isRegularFileKey, .fileAllocatedSizeKey, .contentModificationDateKey, .totalFileAllocatedSizeKey]
         guard let enumerator = FileManager.default.enumerator(
             at: URL(fileURLWithPath: cacheDirectory),
             includingPropertiesForKeys: resourceKeys,
@@ -198,7 +199,7 @@ struct SyncCommand: AsyncCommand {
                 }
                 let fileAttributes = try fileURL.resourceValues(forKeys: Set(resourceKeys))
                 guard fileAttributes.isRegularFile == true,
-                        let size = fileAttributes.fileAllocatedSize,
+                        let size = fileAttributes.totalFileAllocatedSize ?? fileAttributes.fileAllocatedSize,
                         let modificationDate = fileAttributes.contentModificationDate else {
                     continue
                 }
