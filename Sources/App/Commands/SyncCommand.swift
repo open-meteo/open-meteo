@@ -180,8 +180,7 @@ struct SyncCommand: AsyncCommand {
         if cacheDirectory.isEmpty, maxSize <= 0 {
             fatalError()
         }
-        /// `totalFileAllocatedSize` is prefered to get the size of sparse files on linux
-        let resourceKeys : [URLResourceKey] = [.isRegularFileKey, .fileAllocatedSizeKey, .contentModificationDateKey, .totalFileAllocatedSizeKey]
+        let resourceKeys : [URLResourceKey] = [.isRegularFileKey, .contentModificationDateKey]
         guard let enumerator = FileManager.default.enumerator(
             at: URL(fileURLWithPath: cacheDirectory),
             includingPropertiesForKeys: resourceKeys,
@@ -199,10 +198,10 @@ struct SyncCommand: AsyncCommand {
                 }
                 let fileAttributes = try fileURL.resourceValues(forKeys: Set(resourceKeys))
                 guard fileAttributes.isRegularFile == true,
-                        let size = fileAttributes.totalFileAllocatedSize ?? fileAttributes.fileAllocatedSize,
                         let modificationDate = fileAttributes.contentModificationDate else {
                     continue
                 }
+                let size = fileURL.getAllocatedSize()
                 totalSize += size
                 if !fileURL.absoluteString.contains(".om") || fileURL.absoluteString.contains("/static/") {
                     continue
@@ -237,6 +236,21 @@ struct SyncCommand: AsyncCommand {
             totalSize -= file.size
         }
         logger.info("New size \(totalSize.bytesHumanReadable)")
+    }
+}
+
+fileprivate extension URL {
+    /// Get the allocated size on disk. Swift implementation reports incorrect sizes on Linx https://github.com/apple/swift-corelibs-foundation/issues/4885
+    func getAllocatedSize() -> Int {
+        return withUnsafeFileSystemRepresentation({ path in
+            var stats = stat()
+            guard lstat(path, &stats) != -1 else {
+                let error = String(cString: strerror(errno))
+                fatalError("lstat failed. Error \(errno) \(error)")
+            }
+            // must be 512 https://unix.stackexchange.com/questions/521151/why-is-st-blocks-always-reported-in-512-byte-blocks
+            return Int(stats.st_blocks) * 512
+        })
     }
 }
 
