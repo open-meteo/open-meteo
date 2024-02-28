@@ -4,9 +4,15 @@ import Foundation
 struct GaussianGrid: Gridable {
     enum GridType {
         case o1280
+        case t639
         
         var count: Int {
-            return 4 * 1280 * (1280 + 9) // 6599680
+            switch self {
+            case .o1280:
+                return 4 * 1280 * (1280 + 9) // 6599680
+            case .t639:
+                return 542080
+            }
         }
     }
     

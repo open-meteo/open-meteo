@@ -323,6 +323,9 @@ extension EcmwfDomain {
         case .ifs04,. ifs025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
+        case .aifs025:
+            // AIFS025 has a delay of 6-7 hours after initialisation
+            return twoHoursAgo.with(hour: ((t.hour - 6 + 24) % 24) / 6 * 6)
         }
     }
     /// Get download url for a given domain and timestep
@@ -340,6 +343,9 @@ extension EcmwfDomain {
             return "\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         case .ifs025_ensemble:
             return "\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
+        case .aifs025:
+            let product = "oper"// run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            return "\(base)\(dateStr)/\(runStr)z/aifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         }
     }
 }
