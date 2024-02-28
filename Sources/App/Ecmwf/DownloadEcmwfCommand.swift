@@ -214,6 +214,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
                 
+                //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
+                //fatalError()
+                
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
