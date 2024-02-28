@@ -3,6 +3,8 @@ import Foundation
 /// Represent a ECMWF variable as available in the grib2 files
 enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVariableMixable {
     case precipitation
+    /// only in aifs
+    case dew_point_2m
     case runoff
     case soil_temperature_0_to_7cm
     case surface_temperature
@@ -90,6 +92,9 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
+    
+    /// Generated while downloading
+    case relative_humidity_2m
     
     
     enum DownloadOrProcess {
@@ -271,6 +276,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return .percentage
         case .cloud_cover_high:
             return .percentage
+        case .dew_point_2m:
+            return .celsius
+        case .relative_humidity_2m:
+            return .percentage
         }
     }
     
@@ -367,6 +376,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return nil
         case .cloud_cover_high:
             return nil
+        case .dew_point_2m:
+            return 2
+        case .relative_humidity_2m:
+            return 2
         }
     }
     
@@ -462,6 +475,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return nil
         case .cloud_cover_high:
             return nil
+        case .dew_point_2m:
+            return "2d"
+        case .relative_humidity_2m:
+            return "2r"
         }
     }
     
@@ -557,6 +574,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return 1
         case .cloud_cover_high:
             return 1
+        case .dew_point_2m:
+            return 20
+        case .relative_humidity_2m:
+            return 1
         }
     }
     
@@ -573,7 +594,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .temperature_250hPa: fallthrough
         case .temperature_200hPa: fallthrough
         case .temperature_50hPa: fallthrough
-        case .temperature_2m:
+        case .temperature_2m, .dew_point_2m:
             return (1, -273.15)
         case .pressure_msl:
             return (1/100, 0)
@@ -622,7 +643,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
 
 enum EcmwfVariableDerived: String, GenericVariableMixable {
     case relativehumidity_2m
-    case relative_humidity_2m
     case dewpoint_2m
     case dew_point_2m
     case apparent_temperature

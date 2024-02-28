@@ -330,15 +330,13 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .surface_temperature, time: time)
         case .surface_air_pressure:
             return try get(raw: .surface_pressure, time: time)
-        case .relative_humidity_2m:
-            fallthrough
         case .relativehumidity_2m:
-            return try get(raw: .relative_humidity_1000hPa, time: time)
+            return try get(raw: .relative_humidity_2m, time: time)
         case .dew_point_2m:
             fallthrough
         case .dewpoint_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
-            let rh = try get(derived: .relativehumidity_2m, time: time)
+            let rh = try get(raw: .relative_humidity_2m, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .apparent_temperature:
             let windspeed = try get(derived: .windspeed_10m, time: time).data
@@ -593,14 +591,12 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .surface_temperature, time: time)
         case .surface_air_pressure:
             try prefetchData(raw: .surface_pressure, time: time)
-        case .relative_humidity_2m:
-            fallthrough
         case .relativehumidity_2m:
-            try prefetchData(raw: .relative_humidity_1000hPa, time: time)
+            try prefetchData(raw: .relative_humidity_2m, time: time)
         case .dew_point_2m:
             fallthrough
         case .dewpoint_2m:
-            try prefetchData(raw: .relative_humidity_1000hPa, time: time)
+            try prefetchData(raw: .relative_humidity_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
         case .apparent_temperature:
             try prefetchData(derived: .relativehumidity_2m, time: time)

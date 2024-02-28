@@ -262,6 +262,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                 }
                 
+                if domain == .aifs025 && variable == .dew_point_2m {
+                    await inMemory.set(.init(variable, member), grib2d.array.data)
+                    return nil
+                }
+                
                 if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                     // do not generate some database files for ensemble
                     return nil
@@ -281,6 +286,28 @@ struct DownloadEcmwfCommand: AsyncCommand {
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating cloud cover")
             for member in 0..<domain.ensembleMembers {
+                /// calculate RH 2m from dewpoint. Only store RH on disk.
+                if let dewpoint = await inMemory.get(.init(.dew_point_2m, member)), let temperature = await inMemory.get(.init(.temperature_2m, member)) {
+                    let rh = zip(temperature, dewpoint).map(Meteorology.relativeHumidity)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: rh)
+                    handles.append(GenericVariableHandle(
+                        variable: EcmwfVariable.relative_humidity_2m,
+                        time: timestamp,
+                        member: member,
+                        fn: fn,
+                        skipHour0: false
+                    ))
+                } else if let rh1000 = await inMemory.get(.init(.relative_humidity_1000hPa, member)) {
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: rh1000)
+                    handles.append(GenericVariableHandle(
+                        variable: EcmwfVariable.relative_humidity_2m,
+                        time: timestamp,
+                        member: member,
+                        fn: fn,
+                        skipHour0: false
+                    ))
+                }
+                
                 /// Relative humidity missing in AIFS
                 try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
                 try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
