@@ -193,7 +193,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
                         return true
                     }
-                    return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
+                    if let level = variable.level {
+                        return shortName == variable.gribName && levelhPa == level
+                    }
+                    return shortName == variable.gribName
                 }) else {
                     print(
                         message.get(attribute: "name")!,

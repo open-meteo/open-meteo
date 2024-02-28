@@ -12,6 +12,9 @@ enum EcmwfDomain: String, GenericDomain {
     case aifs025
     
     func getDownloadForecastSteps(run: Int) -> [Int] {
+        if self == .aifs025 {
+            return Array(stride(from: 0, through: 360, by: dtHours))
+        }
         switch run {
         case 0,12: return Array(stride(from: 0, through: 144, by: dtHours)) + Array(stride(from: 150, through: isEnsemble ? 360 : 240, by: dtHours))
         case 6,18: return Array(stride(from: 0, through: isEnsemble ? 144 : 90, by: dtHours))
