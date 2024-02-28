@@ -131,7 +131,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     
     var storePreviousForecast: Bool {
         switch self {
-        case .temperature_2m, .relative_humidity_1000hPa, .dew_point_2m: return true
+        case .temperature_2m, .relative_humidity_1000hPa, .dew_point_2m, .relative_humidity_2m: return true
         case .precipitation: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
