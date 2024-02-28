@@ -261,6 +261,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         await inMemory.set(.init(variable, member), grib2d.array.data)
                     }
                 }
+                if variable == .temperature_2m {
+                    await inMemory.set(.init(variable, member), grib2d.array.data)
+                }
                 
                 if variable == .dew_point_2m {
                     await inMemory.set(.init(variable, member), grib2d.array.data)
