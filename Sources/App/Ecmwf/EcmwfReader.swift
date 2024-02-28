@@ -75,11 +75,25 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let u = try get(raw: .wind_u_component_700hPa, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
+        case .wind_speed_600hPa:
+            fallthrough
+        case .windspeed_600hPa:
+            let v = try get(raw: .wind_v_component_600hPa, time: time)
+            let u = try get(raw: .wind_u_component_600hPa, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_500hPa:
             fallthrough
         case .windspeed_500hPa:
             let v = try get(raw: .wind_v_component_500hPa, time: time)
             let u = try get(raw: .wind_u_component_500hPa, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .wind_speed_400hPa:
+            fallthrough
+        case .windspeed_400hPa:
+            let v = try get(raw: .wind_v_component_400hPa, time: time)
+            let u = try get(raw: .wind_u_component_400hPa, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_300hPa:
@@ -101,6 +115,13 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .windspeed_200hPa:
             let v = try get(raw: .wind_v_component_200hPa, time: time)
             let u = try get(raw: .wind_u_component_200hPa, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .wind_speed_100hPa:
+            fallthrough
+        case .windspeed_100hPa:
+            let v = try get(raw: .wind_v_component_100hPa, time: time)
+            let u = try get(raw: .wind_u_component_100hPa, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_50hPa:
@@ -138,11 +159,25 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let u = try get(raw: .wind_u_component_700hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
+        case .wind_direction_600hPa:
+            fallthrough
+        case .winddirection_600hPa:
+            let v = try get(raw: .wind_v_component_600hPa, time: time)
+            let u = try get(raw: .wind_u_component_600hPa, time: time)
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_500hPa:
             fallthrough
         case .winddirection_500hPa:
             let v = try get(raw: .wind_v_component_500hPa, time: time)
             let u = try get(raw: .wind_u_component_500hPa, time: time)
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            return DataAndUnit(direction, .degreeDirection)
+        case .wind_direction_400hPa:
+            fallthrough
+        case .winddirection_400hPa:
+            let v = try get(raw: .wind_v_component_400hPa, time: time)
+            let u = try get(raw: .wind_u_component_400hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_300hPa:
@@ -164,6 +199,13 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .winddirection_200hPa:
             let v = try get(raw: .wind_v_component_200hPa, time: time)
             let u = try get(raw: .wind_u_component_200hPa, time: time)
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            return DataAndUnit(direction, .degreeDirection)
+        case .wind_direction_100hPa:
+            fallthrough
+        case .winddirection_100hPa:
+            let v = try get(raw: .wind_v_component_100hPa, time: time)
+            let u = try get(raw: .wind_u_component_100hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_50hPa:
@@ -217,11 +259,21 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .cloudcover_700hPa:
             let rh = try get(raw: .relative_humidity_700hPa, time: time)
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 700)}), .percentage)
+        case .cloud_cover_600hPa:
+            fallthrough
+        case .cloudcover_600hPa:
+            let rh = try get(raw: .relative_humidity_600hPa, time: time)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 600)}), .percentage)
         case .cloud_cover_500hPa:
             fallthrough
         case .cloudcover_500hPa:
             let rh = try get(raw: .relative_humidity_500hPa, time: time)
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 500)}), .percentage)
+        case .cloud_cover_400hPa:
+            fallthrough
+        case .cloudcover_400hPa:
+            let rh = try get(raw: .relative_humidity_400hPa, time: time)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 400)}), .percentage)
         case .cloud_cover_300hPa:
             fallthrough
         case .cloudcover_300hPa:
@@ -237,6 +289,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .cloudcover_200hPa:
             let rh = try get(raw: .relative_humidity_200hPa, time: time)
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 200)}), .percentage)
+        case .cloud_cover_100hPa:
+            fallthrough
+        case .cloudcover_100hPa:
+            let rh = try get(raw: .relative_humidity_100hPa, time: time)
+            return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 100)}), .percentage)
         case .cloudcover_50hPa:
             fallthrough
         case .cloud_cover_50hPa:
@@ -260,14 +317,20 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .relative_humidity_850hPa, time: time)
         case .relativehumidity_700hPa:
             return try get(raw: .relative_humidity_700hPa, time: time)
+        case .relativehumidity_600hPa:
+            return try get(raw: .relative_humidity_300hPa, time: time)
         case .relativehumidity_500hPa:
             return try get(raw: .relative_humidity_500hPa, time: time)
+        case .relativehumidity_400hPa:
+            return try get(raw: .relative_humidity_300hPa, time: time)
         case .relativehumidity_300hPa:
             return try get(raw: .relative_humidity_300hPa, time: time)
         case .relativehumidity_250hPa:
             return try get(raw: .relative_humidity_250hPa, time: time)
         case .relativehumidity_200hPa:
             return try get(raw: .relative_humidity_200hPa, time: time)
+        case .relativehumidity_100hPa:
+            return try get(raw: .relative_humidity_300hPa, time: time)
         case .relativehumidity_50hPa:
             return try get(raw: .relative_humidity_50hPa, time: time)
         case .dew_point_1000hPa:
@@ -294,11 +357,23 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_700hPa, time: time)
             let rh = try get(raw: .relative_humidity_700hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dew_point_600hPa:
+            fallthrough
+        case .dewpoint_600hPa:
+            let temperature = try get(raw: .temperature_600hPa, time: time)
+            let rh = try get(raw: .relative_humidity_600hPa, time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .dew_point_500hPa:
             fallthrough
         case .dewpoint_500hPa:
             let temperature = try get(raw: .temperature_500hPa, time: time)
             let rh = try get(raw: .relative_humidity_500hPa, time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dew_point_400hPa:
+            fallthrough
+        case .dewpoint_400hPa:
+            let temperature = try get(raw: .temperature_400hPa, time: time)
+            let rh = try get(raw: .relative_humidity_400hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .dew_point_300hPa:
             fallthrough
@@ -318,6 +393,12 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_200hPa, time: time)
             let rh = try get(raw: .relative_humidity_200hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
+        case .dew_point_100hPa:
+            fallthrough
+        case .dewpoint_100hPa:
+            let temperature = try get(raw: .temperature_100hPa, time: time)
+            let rh = try get(raw: .relative_humidity_100hPa, time: time)
+            return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .dew_point_50hPa:
             fallthrough
         case .dewpoint_50hPa:
@@ -330,15 +411,13 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .surface_temperature, time: time)
         case .surface_air_pressure:
             return try get(raw: .surface_pressure, time: time)
-        case .relative_humidity_2m:
-            fallthrough
         case .relativehumidity_2m:
-            return try get(raw: .relative_humidity_1000hPa, time: time)
+            return try get(raw: .relative_humidity_2m, time: time)
         case .dew_point_2m:
             fallthrough
         case .dewpoint_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
-            let rh = try get(derived: .relativehumidity_2m, time: time)
+            let rh = try get(raw: .relative_humidity_2m, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .apparent_temperature:
             let windspeed = try get(derived: .windspeed_10m, time: time).data
@@ -394,11 +473,21 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .windspeed_700hPa:
             try prefetchData(raw: .wind_v_component_700hPa, time: time)
             try prefetchData(raw: .wind_u_component_700hPa, time: time)
+        case .wind_speed_600hPa:
+            fallthrough
+        case .windspeed_600hPa:
+            try prefetchData(raw: .wind_v_component_600hPa, time: time)
+            try prefetchData(raw: .wind_u_component_600hPa, time: time)
         case .wind_speed_500hPa:
             fallthrough
         case .windspeed_500hPa:
             try prefetchData(raw: .wind_v_component_500hPa, time: time)
             try prefetchData(raw: .wind_u_component_500hPa, time: time)
+        case .wind_speed_400hPa:
+            fallthrough
+        case .windspeed_400hPa:
+            try prefetchData(raw: .wind_v_component_400hPa, time: time)
+            try prefetchData(raw: .wind_u_component_400hPa, time: time)
         case .wind_speed_300hPa:
             fallthrough
         case .windspeed_300hPa:
@@ -414,6 +503,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .windspeed_200hPa:
             try prefetchData(raw: .wind_v_component_200hPa, time: time)
             try prefetchData(raw: .wind_u_component_200hPa, time: time)
+        case .wind_speed_100hPa:
+            fallthrough
+        case .windspeed_100hPa:
+            try prefetchData(raw: .wind_v_component_100hPa, time: time)
+            try prefetchData(raw: .wind_u_component_100hPa, time: time)
         case .wind_speed_50hPa:
             fallthrough
         case .windspeed_50hPa:
@@ -444,11 +538,21 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .winddirection_700hPa:
             try prefetchData(raw: .wind_v_component_700hPa, time: time)
             try prefetchData(raw: .wind_u_component_700hPa, time: time)
+        case .wind_direction_600hPa:
+            fallthrough
+        case .winddirection_600hPa:
+            try prefetchData(raw: .wind_v_component_600hPa, time: time)
+            try prefetchData(raw: .wind_u_component_600hPa, time: time)
         case .wind_direction_500hPa:
             fallthrough
         case .winddirection_500hPa:
             try prefetchData(raw: .wind_v_component_500hPa, time: time)
             try prefetchData(raw: .wind_u_component_500hPa, time: time)
+        case .wind_direction_400hPa:
+            fallthrough
+        case .winddirection_400hPa:
+            try prefetchData(raw: .wind_v_component_400hPa, time: time)
+            try prefetchData(raw: .wind_u_component_400hPa, time: time)
         case .wind_direction_300hPa:
             fallthrough
         case .winddirection_300hPa:
@@ -464,6 +568,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .winddirection_200hPa:
             try prefetchData(raw: .wind_v_component_200hPa, time: time)
             try prefetchData(raw: .wind_u_component_200hPa, time: time)
+        case .wind_direction_100hPa:
+            fallthrough
+        case .winddirection_100hPa:
+            try prefetchData(raw: .wind_v_component_100hPa, time: time)
+            try prefetchData(raw: .wind_u_component_100hPa, time: time)
         case .wind_direction_50hPa:
             fallthrough
         case .winddirection_50hPa:
@@ -491,10 +600,18 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             fallthrough
         case .cloudcover_700hPa:
             try prefetchData(raw: .relative_humidity_700hPa, time: time)
+        case .cloud_cover_600hPa:
+            fallthrough
+        case .cloudcover_600hPa:
+            try prefetchData(raw: .relative_humidity_600hPa, time: time)
         case .cloud_cover_500hPa:
             fallthrough
         case .cloudcover_500hPa:
             try prefetchData(raw: .relative_humidity_500hPa, time: time)
+        case .cloud_cover_400hPa:
+            fallthrough
+        case .cloudcover_400hPa:
+            try prefetchData(raw: .relative_humidity_400hPa, time: time)
         case .cloud_cover_300hPa:
             fallthrough
         case .cloudcover_300hPa:
@@ -507,6 +624,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             fallthrough
         case .cloudcover_200hPa:
             try prefetchData(raw: .relative_humidity_200hPa, time: time)
+        case .cloud_cover_100hPa:
+            fallthrough
+        case .cloudcover_100hPa:
+            try prefetchData(raw: .relative_humidity_100hPa, time: time)
         case .cloud_cover_50hPa:
             fallthrough
         case .cloudcover_50hPa:
@@ -532,14 +653,20 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .relative_humidity_850hPa, time: time)
         case .relativehumidity_700hPa:
             try prefetchData(raw: .relative_humidity_700hPa, time: time)
+        case .relativehumidity_600hPa:
+            try prefetchData(raw: .relative_humidity_600hPa, time: time)
         case .relativehumidity_500hPa:
             try prefetchData(raw: .relative_humidity_500hPa, time: time)
+        case .relativehumidity_400hPa:
+            try prefetchData(raw: .relative_humidity_400hPa, time: time)
         case .relativehumidity_300hPa:
             try prefetchData(raw: .relative_humidity_300hPa, time: time)
         case .relativehumidity_250hPa:
             try prefetchData(raw: .relative_humidity_250hPa, time: time)
         case .relativehumidity_200hPa:
             try prefetchData(raw: .relative_humidity_200hPa, time: time)
+        case .relativehumidity_100hPa:
+            try prefetchData(raw: .relative_humidity_100hPa, time: time)
         case .relativehumidity_50hPa:
             try prefetchData(raw: .relative_humidity_50hPa, time: time)
         case .dew_point_1000hPa:
@@ -562,11 +689,21 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .dewpoint_700hPa:
             try prefetchData(raw: .temperature_700hPa, time: time)
             try prefetchData(raw: .relative_humidity_700hPa, time: time)
+        case .dew_point_600hPa:
+            fallthrough
+        case .dewpoint_600hPa:
+            try prefetchData(raw: .temperature_600hPa, time: time)
+            try prefetchData(raw: .relative_humidity_600hPa, time: time)
         case .dew_point_500hPa:
             fallthrough
         case .dewpoint_500hPa:
             try prefetchData(raw: .temperature_500hPa, time: time)
             try prefetchData(raw: .relative_humidity_500hPa, time: time)
+        case .dew_point_400hPa:
+            fallthrough
+        case .dewpoint_400hPa:
+            try prefetchData(raw: .temperature_400hPa, time: time)
+            try prefetchData(raw: .relative_humidity_400hPa, time: time)
         case .dew_point_300hPa:
             fallthrough
         case .dewpoint_300hPa:
@@ -582,6 +719,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .dewpoint_200hPa:
             try prefetchData(raw: .temperature_200hPa, time: time)
             try prefetchData(raw: .relative_humidity_200hPa, time: time)
+        case .dew_point_100hPa:
+            fallthrough
+        case .dewpoint_100hPa:
+            try prefetchData(raw: .temperature_100hPa, time: time)
+            try prefetchData(raw: .relative_humidity_100hPa, time: time)
         case .dew_point_50hPa:
             fallthrough
         case .dewpoint_50hPa:
@@ -593,14 +735,12 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .surface_temperature, time: time)
         case .surface_air_pressure:
             try prefetchData(raw: .surface_pressure, time: time)
-        case .relative_humidity_2m:
-            fallthrough
         case .relativehumidity_2m:
-            try prefetchData(raw: .relative_humidity_1000hPa, time: time)
+            try prefetchData(raw: .relative_humidity_2m, time: time)
         case .dew_point_2m:
             fallthrough
         case .dewpoint_2m:
-            try prefetchData(raw: .relative_humidity_1000hPa, time: time)
+            try prefetchData(raw: .relative_humidity_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
         case .apparent_temperature:
             try prefetchData(derived: .relativehumidity_2m, time: time)

@@ -127,7 +127,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(domain.downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
         try domain.surfaceElevationFileOm.createDirectory()
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        if domain == .aifs025 {
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 1, chunk1: 20*20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        } else {
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        }
+
     }
     
     /// Download ECMWF ifs open data
@@ -163,6 +168,23 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             let inMemory = DictionaryActor<EcmwfVariableMember, [Float]>()
             
+            /// Relative humidity missing in AIFS
+            func calcRh(rh: EcmwfVariable, q:  EcmwfVariable, t: EcmwfVariable, member: Int, hpa: Float) async throws {
+                guard await inMemory.get(.init(rh, member)) == nil, let q = await inMemory.get(.init(q, member)), let t = await inMemory.get(.init(t, member)) else {
+                    return
+                }
+                let data = Meteorology.specificToRelativeHumidity(specificHumidity: q, temperature: t, pressure: .init(repeating: hpa, count: t.count))
+                await inMemory.set(.init(rh, member), data)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: data)
+                handles.append(GenericVariableHandle(
+                    variable: rh,
+                    time: timestamp,
+                    member: member,
+                    fn: fn,
+                    skipHour0: false
+                ))
+            }
+            
             let url = domain.getUrl(base: base, run: run, hour: hour)
             let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                 return variables.contains(where: { variable in
@@ -188,7 +210,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
                         return true
                     }
-                    return shortName == variable.gribName && levelhPa == (variable.level ?? 0)
+                    if let level = variable.level {
+                        return shortName == variable.gribName && levelhPa == level
+                    }
+                    return shortName == variable.gribName
                 }) else {
                     print(
                         message.get(attribute: "name")!,
@@ -209,6 +234,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
                 
+                //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
+                //fatalError()
+                
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
@@ -222,6 +250,21 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 // Keep relative humidity in memory to generate total cloud cover files
                 if variable.gribName == "r" {
                     await inMemory.set(.init(variable, member), grib2d.array.data)
+                }
+                
+                if domain == .aifs025 {
+                    // keep specific humidity and temperature in memory
+                    if variable.gribName == "q" {
+                        await inMemory.set(.init(variable, member), grib2d.array.data)
+                    }
+                    if variable.gribName == "t" {
+                        await inMemory.set(.init(variable, member), grib2d.array.data)
+                    }
+                }
+                
+                if variable == .dew_point_2m {
+                    await inMemory.set(.init(variable, member), grib2d.array.data)
+                    return nil
                 }
                 
                 if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
@@ -243,6 +286,42 @@ struct DownloadEcmwfCommand: AsyncCommand {
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating cloud cover")
             for member in 0..<domain.ensembleMembers {
+                /// calculate RH 2m from dewpoint. Only store RH on disk.
+                if let dewpoint = await inMemory.get(.init(.dew_point_2m, member)), let temperature = await inMemory.get(.init(.temperature_2m, member)) {
+                    let rh = zip(temperature, dewpoint).map(Meteorology.relativeHumidity)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: rh)
+                    handles.append(GenericVariableHandle(
+                        variable: EcmwfVariable.relative_humidity_2m,
+                        time: timestamp,
+                        member: member,
+                        fn: fn,
+                        skipHour0: false
+                    ))
+                } else if let rh1000 = await inMemory.get(.init(.relative_humidity_1000hPa, member)) {
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: rh1000)
+                    handles.append(GenericVariableHandle(
+                        variable: EcmwfVariable.relative_humidity_2m,
+                        time: timestamp,
+                        member: member,
+                        fn: fn,
+                        skipHour0: false
+                    ))
+                }
+                
+                /// Relative humidity missing in AIFS
+                try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
+                try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
+                try await calcRh(rh: .relative_humidity_850hPa, q: .specific_humidity_850hPa, t: .temperature_850hPa, member: member, hpa: 850)
+                try await calcRh(rh: .relative_humidity_700hPa, q: .specific_humidity_700hPa, t: .temperature_700hPa, member: member, hpa: 700)
+                try await calcRh(rh: .relative_humidity_600hPa, q: .specific_humidity_600hPa, t: .temperature_600hPa, member: member, hpa: 600)
+                try await calcRh(rh: .relative_humidity_500hPa, q: .specific_humidity_500hPa, t: .temperature_500hPa, member: member, hpa: 500)
+                try await calcRh(rh: .relative_humidity_400hPa, q: .specific_humidity_400hPa, t: .temperature_400hPa, member: member, hpa: 400)
+                try await calcRh(rh: .relative_humidity_300hPa, q: .specific_humidity_300hPa, t: .temperature_300hPa, member: member, hpa: 300)
+                try await calcRh(rh: .relative_humidity_250hPa, q: .specific_humidity_250hPa, t: .temperature_250hPa, member: member, hpa: 250)
+                try await calcRh(rh: .relative_humidity_200hPa, q: .specific_humidity_200hPa, t: .temperature_200hPa, member: member, hpa: 200)
+                try await calcRh(rh: .relative_humidity_100hPa, q: .specific_humidity_100hPa, t: .temperature_100hPa, member: member, hpa: 100)
+                try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
+                
                 guard let rh1000 = await inMemory.get(.init(.relative_humidity_1000hPa, member)),
                       let rh925 = await inMemory.get(.init(.relative_humidity_925hPa, member)),
                       let rh850 = await inMemory.get(.init(.relative_humidity_850hPa, member)),
@@ -323,6 +402,9 @@ extension EcmwfDomain {
         case .ifs04,. ifs025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
+        case .aifs025:
+            // AIFS025 has a delay of 6-7 hours after initialisation
+            return twoHoursAgo.with(hour: ((t.hour - 6 + 24) % 24) / 6 * 6)
         }
     }
     /// Get download url for a given domain and timestep
@@ -340,6 +422,9 @@ extension EcmwfDomain {
             return "\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         case .ifs025_ensemble:
             return "\(base)\(dateStr)/\(runStr)z/ifs/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
+        case .aifs025:
+            let product = "oper"// run.hour == 0 || run.hour == 12 ? "oper" : "scda"
+            return "\(base)\(dateStr)/\(runStr)z/aifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
         }
     }
 }
