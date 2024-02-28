@@ -168,6 +168,23 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             let inMemory = DictionaryActor<EcmwfVariableMember, [Float]>()
             
+            /// Relative humidity missing in AIFS
+            func calcRh(rh: EcmwfVariable, q:  EcmwfVariable, t: EcmwfVariable, member: Int, hpa: Float) async throws {
+                guard await inMemory.get(.init(rh, member)) == nil, let q = await inMemory.get(.init(q, member)), let t = await inMemory.get(.init(t, member)) else {
+                    return
+                }
+                let data = Meteorology.specificToRelativeHumidity(specificHumidity: q, temperature: t, pressure: .init(repeating: hpa, count: t.count))
+                await inMemory.set(.init(rh, member), data)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: data)
+                handles.append(GenericVariableHandle(
+                    variable: rh,
+                    time: timestamp,
+                    member: member,
+                    fn: fn,
+                    skipHour0: false
+                ))
+            }
+            
             let url = domain.getUrl(base: base, run: run, hour: hour)
             let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                 return variables.contains(where: { variable in
@@ -235,6 +252,16 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     await inMemory.set(.init(variable, member), grib2d.array.data)
                 }
                 
+                if domain == .aifs025 {
+                    // keep specific humidity and temperature in memory
+                    if variable.gribName == "q" {
+                        await inMemory.set(.init(variable, member), grib2d.array.data)
+                    }
+                    if variable.gribName == "t" {
+                        await inMemory.set(.init(variable, member), grib2d.array.data)
+                    }
+                }
+                
                 if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                     // do not generate some database files for ensemble
                     return nil
@@ -254,6 +281,17 @@ struct DownloadEcmwfCommand: AsyncCommand {
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating cloud cover")
             for member in 0..<domain.ensembleMembers {
+                /// Relative humidity missing in AIFS
+                try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
+                try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
+                try await calcRh(rh: .relative_humidity_850hPa, q: .specific_humidity_850hPa, t: .temperature_850hPa, member: member, hpa: 850)
+                try await calcRh(rh: .relative_humidity_700hPa, q: .specific_humidity_700hPa, t: .temperature_700hPa, member: member, hpa: 700)
+                try await calcRh(rh: .relative_humidity_500hPa, q: .specific_humidity_500hPa, t: .temperature_500hPa, member: member, hpa: 500)
+                try await calcRh(rh: .relative_humidity_300hPa, q: .specific_humidity_300hPa, t: .temperature_300hPa, member: member, hpa: 300)
+                try await calcRh(rh: .relative_humidity_250hPa, q: .specific_humidity_250hPa, t: .temperature_250hPa, member: member, hpa: 250)
+                try await calcRh(rh: .relative_humidity_200hPa, q: .specific_humidity_200hPa, t: .temperature_200hPa, member: member, hpa: 200)
+                try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
+                
                 guard let rh1000 = await inMemory.get(.init(.relative_humidity_1000hPa, member)),
                       let rh925 = await inMemory.get(.init(.relative_humidity_925hPa, member)),
                       let rh850 = await inMemory.get(.init(.relative_humidity_850hPa, member)),
