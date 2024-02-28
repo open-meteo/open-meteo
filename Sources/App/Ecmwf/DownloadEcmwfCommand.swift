@@ -127,7 +127,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(domain.downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
         try domain.surfaceElevationFileOm.createDirectory()
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        if domain == .aifs025 {
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 1, chunk1: 20*20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        } else {
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        }
+
     }
     
     /// Download ECMWF ifs open data

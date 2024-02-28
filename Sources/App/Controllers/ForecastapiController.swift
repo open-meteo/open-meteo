@@ -309,6 +309,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case ecmwf_ifs04
     case ecmwf_ifs025
+    case ecmwf_aifs025
     
     case metno_nordic
     
@@ -442,6 +443,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ecmwf_ifs025:
             return try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ecmwf_aifs025:
+            return try EcmwfReader(domain: .aifs025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .metno_nordic:
             return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gem_seamless:

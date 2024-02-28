@@ -18,7 +18,7 @@ struct GaussianGrid: Gridable {
     
     let type: GridType
     
-    var nx: Int { return 4 * 1280 * (1280 + 9) }
+    var nx: Int { return type.count }
     
     var ny: Int { 1 }
     
