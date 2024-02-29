@@ -75,7 +75,7 @@ enum EcmwfDomain: String, GenericDomain {
         case .ifs04, .ifs04_ensemble:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360/900, dy: 180/450)
         case .ifs025, .ifs025_ensemble:
-            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360/1440, dy: 180/721)
+            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360/1440, dy: 180/(721-1))
         case .aifs025:
             return GaussianGrid(type: .n320)
         }
