@@ -16,7 +16,7 @@ enum EcmwfDomain: String, GenericDomain {
             return Array(stride(from: 0, through: 360, by: dtHours))
         }
         switch run {
-        case 0,12: return Array(stride(from: 0, through: 144, by: dtHours)) + Array(stride(from: 150, through: isEnsemble ? 360 : 240, by: dtHours))
+        case 0,12: return Array(stride(from: 0, through: 144, by: dtHours)) + Array(stride(from: 150, through: isEnsemble ? 360 : 240, by: 6*3600))
         case 6,18: return Array(stride(from: 0, through: isEnsemble ? 144 : 90, by: dtHours))
         default: fatalError("Invalid run")
         }
