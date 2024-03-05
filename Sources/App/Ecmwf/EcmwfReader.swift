@@ -700,6 +700,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .cloud_cover, time: time)
             try prefetchData(derived: .snowfall, time: time)
             try prefetchData(raw: .precipitation, time: time)
+            try prefetchData(raw: .cape, time: time)
         case .rain:
             fallthrough
         case .snowfall:
