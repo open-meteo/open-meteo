@@ -4,17 +4,20 @@ import Foundation
 struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
     let reader: GenericReaderCached<EcmwfDomain, Variable>
     
+    let options: GenericReaderOptions
+    
     typealias Domain = EcmwfDomain
     
     typealias Variable = EcmwfVariable
     
     typealias Derived = EcmwfVariableDerived
     
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
+        self.options = options
     }
     
     func prefetchData(raw: EcmwfVariable, time: TimerangeDtAndSettings) throws {
@@ -33,18 +36,24 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
     
     func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
-        case .wind_speed_10m:
-            fallthrough
-        case .windspeed_10m:
+        case .wind_speed_10m, .windspeed_10m:
             let v = try get(raw: .wind_v_component_10m, time: time)
             let u = try get(raw: .wind_u_component_10m, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_direction_10m:
-            fallthrough
-        case .winddirection_10m:
+        case .wind_direction_10m, .winddirection_10m:
             let v = try get(raw: .wind_v_component_10m, time: time)
             let u = try get(raw: .wind_u_component_10m, time: time)
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            return DataAndUnit(direction, .degreeDirection)
+        case .wind_speed_100m, .windspeed_100m:
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let u = try get(raw: .wind_u_component_100m, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .wind_direction_100m, .winddirection_100m:
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let u = try get(raw: .wind_u_component_100m, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_speed_1000hPa:
@@ -423,7 +432,8 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let windspeed = try get(derived: .windspeed_10m, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let relhum = try get(derived: .relativehumidity_2m, time: time).data
-            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: nil), .celsius)
+            let swrad = try get(raw: .shortwave_radiation, time: time).data
+            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: swrad), .celsius)
         case .vapour_pressure_deficit:
             fallthrough
         case .vapor_pressure_deficit:
@@ -443,14 +453,65 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .cloud_cover_mid, time: time)
         case .cloudcover_high:
             return try get(raw: .cloud_cover_high, time: time)
+        case .terrestrial_radiation:
+            /// Use center averaged
+            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(solar, .wattPerSquareMetre)
+        case .terrestrial_radiation_instant:
+            /// Use center averaged
+            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(solar, .wattPerSquareMetre)
+        case .shortwave_radiation_instant:
+            let sw = try get(raw: .shortwave_radiation, time: time)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
+            return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+        case .direct_normal_irradiance:
+            let dhi = try get(derived: .direct_radiation, time: time).data
+            let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(dni, .wattPerSquareMetre)
+        case .direct_normal_irradiance_instant:
+            let direct = try get(derived: .direct_radiation_instant, time: time)
+            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(dni, direct.unit)
+        case .diffuse_radiation:
+            let swrad = try get(raw: .shortwave_radiation, time: time)
+            let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(diffuse, swrad.unit)
+        case .direct_radiation:
+            let swrad = try get(raw: .shortwave_radiation, time: time)
+            let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(zip(swrad.data, diffuse).map(-), swrad.unit)
+        case .direct_radiation_instant:
+            let direct = try get(derived: .direct_radiation, time: time)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
+            return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
+        case .diffuse_radiation_instant:
+            let diff = try get(derived: .diffuse_radiation, time: time)
+            let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
+            return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
+        case .global_tilted_irradiance:
+            let directRadiation = try get(derived: .direct_radiation, time: time).data
+            let diffuseRadiation = try get(derived: .diffuse_radiation, time: time).data
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
+            return DataAndUnit(gti, .wattPerSquareMetre)
+        case .global_tilted_irradiance_instant:
+            let directRadiation = try get(derived: .direct_radiation, time: time).data
+            let diffuseRadiation = try get(derived: .diffuse_radiation, time: time).data
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
+            return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }
     
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
         switch derived {
-        case .wind_speed_10m:
-            fallthrough
-        case .windspeed_10m:
+        case .terrestrial_radiation, .terrestrial_radiation_instant:
+            break
+        case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .shortwave_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant:
+            try prefetchData(raw: .shortwave_radiation, time: time)
+        case .windspeed_100m, .wind_speed_100m, .winddirection_100m, .wind_direction_100m:
+            try prefetchData(raw: .wind_u_component_100m, time: time)
+            try prefetchData(raw: .wind_v_component_100m, time: time)
+        case .windspeed_10m, .wind_speed_10m:
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
         case .wind_speed_1000hPa:
@@ -746,6 +807,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(derived: .relativehumidity_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(derived: .windspeed_10m, time: time)
+            try prefetchData(raw: .shortwave_radiation, time: time)
         case .vapour_pressure_deficit:
             fallthrough
         case .vapor_pressure_deficit:

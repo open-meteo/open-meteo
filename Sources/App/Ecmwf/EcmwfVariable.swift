@@ -8,6 +8,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     case dew_point_2m
     case runoff
     case soil_temperature_0_to_7cm
+    case soil_moisture_0_to_7cm
+    case soil_moisture_7_to_28cm
+    case cape
+    case shortwave_radiation
     case surface_temperature
     case geopotential_height_1000hPa
     case geopotential_height_925hPa
@@ -74,6 +78,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     case total_column_integrated_water_vapour
     case wind_v_component_10m
     case wind_u_component_10m
+    case wind_v_component_100m
+    case wind_u_component_100m
     case specific_humidity_1000hPa
     case specific_humidity_925hPa
     case specific_humidity_850hPa
@@ -135,8 +141,9 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .precipitation: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
-        //case .shortwave_radiation, .direct_radiation: return true
+        case .shortwave_radiation: return true
         case .wind_v_component_10m, .wind_u_component_10m: return true
+        case .wind_v_component_100m, .wind_u_component_100m: return true
         //case .weather_code: return true
         default: return false
         }
@@ -151,17 +158,23 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             fallthrough
         case .soil_temperature_0_to_7cm:
             fallthrough
+        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm:
+            fallthrough
         case .surface_temperature:
             fallthrough
         case .relative_humidity_1000hPa:
             fallthrough
         case .surface_pressure:
             fallthrough
+        case .shortwave_radiation:
+            fallthrough
+        case .cape:
+            fallthrough
         case .pressure_msl:
             fallthrough
-        case .wind_v_component_10m:
+        case .wind_v_component_10m, .wind_v_component_100m:
             fallthrough
-        case .wind_u_component_10m:
+        case .wind_u_component_10m, .wind_u_component_100m:
             fallthrough
         case .temperature_2m:
             fallthrough
@@ -335,6 +348,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return .celsius
         case .relative_humidity_2m:
             return .percentage
+        case .soil_moisture_0_to_7cm:
+            return .cubicMetrePerCubicMetre
+        case .soil_moisture_7_to_28cm:
+            return .cubicMetrePerCubicMetre
+        case .cape:
+            return .joulePerKilogram
+        case .shortwave_radiation:
+            return .wattPerSquareMetre
+        case .wind_v_component_100m:
+            return .metrePerSecond
+        case .wind_u_component_100m:
+            return .metrePerSecond
         }
     }
     
@@ -459,6 +484,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return 2
         case .relative_humidity_2m:
             return 2
+        case .soil_moisture_0_to_7cm:
+            return nil
+        case .soil_moisture_7_to_28cm:
+            return nil
+        case .cape:
+            return nil
+        case .shortwave_radiation:
+            return nil
+        case .wind_v_component_100m:
+            return nil
+        case .wind_u_component_100m:
+            return nil
         }
     }
     
@@ -582,6 +619,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return "2d"
         case .relative_humidity_2m:
             return "2r"
+        case .soil_moisture_0_to_7cm:
+            return "swvl1"
+        case .soil_moisture_7_to_28cm:
+            return "swvl2"
+        case .cape:
+            return "cape"
+        case .shortwave_radiation:
+            return "ssrd"
+        case .wind_v_component_100m:
+            return "100v"
+        case .wind_u_component_100m:
+            return "100u"
         }
     }
     
@@ -654,8 +703,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .surface_pressure: return 10
         case .pressure_msl: return 10
         case .total_column_integrated_water_vapour: return 10
-        case .wind_v_component_10m: return 10
-        case .wind_u_component_10m: return 10
+        case .wind_v_component_10m, .wind_u_component_100m: return 10
+        case .wind_u_component_10m, .wind_v_component_100m: return 10
         case .specific_humidity_1000hPa: fallthrough
         case .specific_humidity_925hPa: fallthrough
         case .specific_humidity_850hPa: fallthrough
@@ -705,6 +754,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
             return 20
         case .relative_humidity_2m:
             return 1
+        case .soil_moisture_0_to_7cm:
+            fallthrough
+        case .soil_moisture_7_to_28cm:
+            return 1000
+        case .cape:
+            return 0.1
+        case .shortwave_radiation:
+            return 1
         }
     }
     
@@ -747,6 +804,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .specific_humidity_100hPa: fallthrough
         case .specific_humidity_50hPa:
             return (1000, 0)
+        case .shortwave_radiation: return (1/(3*3600), 0) // joules to watt
         default:
             return nil
         }
@@ -772,6 +830,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .relative_humidity_200hPa: fallthrough
         case .relative_humidity_100hPa: fallthrough
         case .relative_humidity_50hPa: return .hermite(bounds: 0...100)
+        case .shortwave_radiation: return .solar_backwards_averaged
         default: return .hermite(bounds: nil)
         }
     }
@@ -785,6 +844,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case vapor_pressure_deficit
     case vapour_pressure_deficit
     case windspeed_10m
+    case windspeed_100m
     case windspeed_1000hPa
     case windspeed_925hPa
     case windspeed_850hPa
@@ -798,6 +858,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case windspeed_100hPa
     case windspeed_50hPa
     case wind_speed_10m
+    case wind_speed_100m
     case wind_speed_1000hPa
     case wind_speed_925hPa
     case wind_speed_850hPa
@@ -811,6 +872,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case wind_speed_100hPa
     case wind_speed_50hPa
     case winddirection_10m
+    case winddirection_100m
     case winddirection_1000hPa
     case winddirection_925hPa
     case winddirection_850hPa
@@ -824,6 +886,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case winddirection_100hPa
     case winddirection_50hPa
     case wind_direction_10m
+    case wind_direction_100m
     case wind_direction_1000hPa
     case wind_direction_925hPa
     case wind_direction_850hPa
@@ -913,6 +976,18 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
+    
+    case terrestrial_radiation
+    case terrestrial_radiation_instant
+    case direct_normal_irradiance
+    case direct_normal_irradiance_instant
+    case direct_radiation
+    case direct_radiation_instant
+    case diffuse_radiation_instant
+    case diffuse_radiation
+    case shortwave_radiation_instant
+    case global_tilted_irradiance
+    case global_tilted_irradiance_instant
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
