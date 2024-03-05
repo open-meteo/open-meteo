@@ -152,6 +152,9 @@ extension Array where Element == Float {
             return
         }
         for x in (1..<count).reversed() {
+            if self[x-1].isNaN {
+                continue
+            }
             self[x] = self[x-1] - self[x]
         }
     }
@@ -162,6 +165,9 @@ extension Array where Element == Float {
             return
         }
         for x in 1..<count {
+            if self[x-1].isNaN {
+                continue
+            }
             self[x] = self[x-1] - self[x]
         }
     }

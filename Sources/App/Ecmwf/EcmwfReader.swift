@@ -36,18 +36,24 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
     
     func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
-        case .wind_speed_10m:
-            fallthrough
-        case .windspeed_10m:
+        case .wind_speed_10m, .windspeed_10m:
             let v = try get(raw: .wind_v_component_10m, time: time)
             let u = try get(raw: .wind_u_component_10m, time: time)
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_direction_10m:
-            fallthrough
-        case .winddirection_10m:
+        case .wind_direction_10m, .winddirection_10m:
             let v = try get(raw: .wind_v_component_10m, time: time)
             let u = try get(raw: .wind_u_component_10m, time: time)
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            return DataAndUnit(direction, .degreeDirection)
+        case .wind_speed_100m, .windspeed_100m:
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let u = try get(raw: .wind_u_component_100m, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .wind_direction_100m, .winddirection_100m:
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let u = try get(raw: .wind_u_component_100m, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_speed_1000hPa:
@@ -426,7 +432,8 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let windspeed = try get(derived: .windspeed_10m, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let relhum = try get(derived: .relativehumidity_2m, time: time).data
-            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: nil), .celsius)
+            let swrad = try get(raw: .shortwave_radiation, time: time).data
+            return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: swrad), .celsius)
         case .vapour_pressure_deficit:
             fallthrough
         case .vapor_pressure_deficit:
@@ -501,9 +508,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             break
         case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .shortwave_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .wind_speed_10m:
-            fallthrough
-        case .windspeed_10m:
+        case .windspeed_100m, .wind_speed_100m, .winddirection_100m, .wind_direction_100m:
+            try prefetchData(raw: .wind_u_component_100m, time: time)
+            try prefetchData(raw: .wind_v_component_100m, time: time)
+        case .windspeed_10m, .wind_speed_10m:
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
         case .wind_speed_1000hPa:
@@ -799,6 +807,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(derived: .relativehumidity_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(derived: .windspeed_10m, time: time)
+            try prefetchData(raw: .shortwave_radiation, time: time)
         case .vapour_pressure_deficit:
             fallthrough
         case .vapor_pressure_deficit:

@@ -844,6 +844,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case vapor_pressure_deficit
     case vapour_pressure_deficit
     case windspeed_10m
+    case windspeed_100m
     case windspeed_1000hPa
     case windspeed_925hPa
     case windspeed_850hPa
@@ -857,6 +858,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case windspeed_100hPa
     case windspeed_50hPa
     case wind_speed_10m
+    case wind_speed_100m
     case wind_speed_1000hPa
     case wind_speed_925hPa
     case wind_speed_850hPa
@@ -870,6 +872,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case wind_speed_100hPa
     case wind_speed_50hPa
     case winddirection_10m
+    case winddirection_100m
     case winddirection_1000hPa
     case winddirection_925hPa
     case winddirection_850hPa
@@ -883,6 +886,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case winddirection_100hPa
     case winddirection_50hPa
     case wind_direction_10m
+    case wind_direction_100m
     case wind_direction_1000hPa
     case wind_direction_925hPa
     case wind_direction_850hPa
