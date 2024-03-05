@@ -196,7 +196,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 })
             }).mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                 guard let shortName = message.get(attribute: "shortName"),
-                      let stepRange = message.get(attribute: "stepRange"),
+                      var stepRange = message.get(attribute: "stepRange"),
                       let stepType = message.get(attribute: "stepType") else {
                     fatalError("could not get step range or type")
                 }
@@ -240,6 +240,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                // solar shortwave radition show accum with step range "90"
+                if stepType == "accum" && !stepRange.contains("-") {
+                    stepRange = "0-\(stepRange)"
                 }
                 
                 // Deaccumulate precipitation
