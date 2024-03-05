@@ -236,13 +236,14 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let cloudcover = try get(raw: .cloud_cover, time: time).data
             let precipitation = try get(raw: .precipitation, time: time).data
             let snowfall = try get(derived: .snowfall, time: time).data
+            let cape = try get(raw: .cape, time: time).data
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
                 convectivePrecipitation: nil,
                 snowfallCentimeters: snowfall,
                 gusts: nil,
-                cape: nil,
+                cape: cape,
                 liftedIndex: nil,
                 visibilityMeters: nil,
                 categoricalFreezingRain: nil,
