@@ -54,8 +54,7 @@ public struct ForecastapiController: RouteCollection {
             forecastDay: 10,
             has15minutely: false,
             hasCurrentWeather: false,
-            defaultModel: .ecmwf_ifs04,
-            put3HourlyDataIntoHourly: true).query
+            defaultModel: .ecmwf_ifs04).query
         )
         categoriesRoute.getAndPost("cma", use: WeatherApiController(
             has15minutely: false,
@@ -89,10 +88,8 @@ struct WeatherApiController {
     let defaultModel: MultiDomains
     let subdomain: String
     let alias: [String]
-    /// ecmwf v1 uses 3 hourly data in hourly field..
-    let put3HourlyDataIntoHourly: Bool
     
-    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = [], put3HourlyDataIntoHourly: Bool = false) {
+    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = []) {
         self.forecastDay = forecastDay
         self.forecastDaysMax = forecastDaysMax
         self.historyStartDate = historyStartDate
@@ -101,7 +98,6 @@ struct WeatherApiController {
         self.defaultModel = defaultModel
         self.subdomain = subdomain
         self.alias = alias
-        self.put3HourlyDataIntoHourly = put3HourlyDataIntoHourly
     }
     
     func query(_ req: Request) async throws -> Response {
