@@ -82,7 +82,7 @@ final class OmFileManager: LifecycleHandler {
     /// Non existing files are set to nil
     private let cached = NIOLockedValueBox<[Int: OmFileState]>(.init())
     
-    private let backgroundWatcher = NIOLockedValueBox<RepeatedTask?>(nil)
+    private let backgroundWatcher = NIOLockedValueBox<Task<(), Error>?>(nil)
     
     public static var instance = OmFileManager()
     
@@ -91,19 +91,39 @@ final class OmFileManager: LifecycleHandler {
     func didBoot(_ application: Application) throws {
         //let logger = application.logger
         //logger.debug("Starting OmFileManager")
+        let logger = application.logger
         backgroundWatcher.withLockedValue({
-            $0 = application.eventLoopGroup.next().scheduleRepeatedTask(initialDelay: .seconds(2), delay: .seconds(2), {
-                task in
-                
-                self.secondlyCallback()
-                
-
-            })
+            $0 = Task {
+                var count: Double = 0
+                var elapsed: Double = 0
+                var max: Double = 0
+                while true {
+                    let start = DispatchTime.now()
+                    let stats = self.secondlyCallback()
+                    let dt = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
+                    if dt > max {
+                        max = dt
+                    }
+                    elapsed += dt
+                    count += 1
+                    if count >= 10 {
+                        if (stats.open > 0) {
+                            logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint).")
+                        }
+                        count = 0
+                        elapsed = 0
+                        max = 0
+                    }
+                    try Task.checkCancellation()
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    try Task.checkCancellation()
+                }
+            }
         })
     }
     
     /// Called every couple of seconds to check for any file modifications
-    func secondlyCallback() {
+    func secondlyCallback() -> (open: Int, missing: Int, ejected: Int) {
         // Could be later used to expose some metrics
         var countExisting = 0
         var countMissing = 0
@@ -135,7 +155,7 @@ final class OmFileManager: LifecycleHandler {
                 countMissing += 1
             }
         }
-        
+        return (countExisting, countMissing, countEjected)
         //logger.info("OmFileManager tracking \(countExisting) open files, \(countMissing) missing files. \(countEjected) were ejected in this update.")
     }
     
