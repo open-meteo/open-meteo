@@ -562,7 +562,7 @@ struct DownloadBomCommand: AsyncCommand {
                         offset: nDims == 3 ? [0, 0, 0] : [0, levelIndex, 0, 0],
                         count: nDims == 3 ? [1, ny, nx]: [1, 1, ny, nx]
                     ) else {
-                        fatalError("Could not read analysis timestep for \(variable)")
+                        fatalError("Could not read analysis timestep for \(variable) levelIndex=\(levelIndex) dimensions=\(varAnalysis.dimensionsFlat)")
                     }
                     return (run, data)
                 } else {
