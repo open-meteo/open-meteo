@@ -108,7 +108,8 @@ final class OmFileManager: LifecycleHandler {
                     count += 1
                     if count >= 10 {
                         if (stats.open > 0) {
-                            logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint).")
+                            let buf = OmFileReader<MmapFile>.getStatistics()
+                            logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint). Buffers \(buf.count) total=\(buf.totalSize.bytesHumanReadable) max=\(buf.maxSize.bytesHumanReadable)")
                         }
                         count = 0
                         elapsed = 0
@@ -200,6 +201,15 @@ fileprivate var buffers = [Thread: UnsafeMutableRawBufferPointer]()
 fileprivate let lockBuffers = NIOLock()
 
 extension OmFileReader {
+    /// Basic buffer usage statistics
+    public static func getStatistics() -> (count: Int, totalSize: Int, maxSize: Int) {
+        return lockBuffers.withLock {
+            let total = buffers.reduce(0, {$0 + $1.value.count})
+            let max = buffers .max(by: {$0.value.count > $1.value.count})?.value.count ?? 0
+            return (buffers.count, total, max)
+        }
+    }
+    
     /// Thread safe buffer provider that automatically reallocates buffers
     public static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
         return lockBuffers.withLock {
