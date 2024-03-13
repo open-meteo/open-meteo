@@ -50,8 +50,14 @@ enum EcmwfDomain: String, GenericDomain {
     }
     
     var omFileLength: Int {
-        // 104
-        return (240 + 3*24) / dtHours
+        switch self {
+        case .ifs04, .ifs04_ensemble, .ifs025, .ifs025_ensemble:
+            // 10 days forecast, 3-hourly data
+            return (240 + 3*24) / dtHours // 104
+        case .aifs025:
+            // 15 days forecast, 6-hourly data
+            return (360 + 3*24) / dtHours // 72
+        }
     }
     
     var dtSeconds: Int {
@@ -74,10 +80,8 @@ enum EcmwfDomain: String, GenericDomain {
         switch self {
         case .ifs04, .ifs04_ensemble:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360/900, dy: 180/450)
-        case .ifs025, .ifs025_ensemble:
+        case .ifs025, .ifs025_ensemble, .aifs025:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360/1440, dy: 180/(721-1))
-        case .aifs025:
-            return GaussianGrid(type: .n320)
         }
         
     }
