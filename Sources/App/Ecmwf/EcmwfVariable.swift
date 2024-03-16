@@ -49,6 +49,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
     case wind_u_component_200hPa
     case wind_u_component_100hPa
     case wind_u_component_50hPa
+    case vertical_velocity_1000hPa
+    case vertical_velocity_925hPa
+    case vertical_velocity_850hPa
+    case vertical_velocity_700hPa
+    case vertical_velocity_600hPa
+    case vertical_velocity_500hPa
+    case vertical_velocity_400hPa
+    case vertical_velocity_300hPa
+    case vertical_velocity_250hPa
+    case vertical_velocity_200hPa
+    case vertical_velocity_100hPa
+    case vertical_velocity_50hPa
     case temperature_1000hPa
     case temperature_925hPa
     case temperature_850hPa
@@ -270,6 +282,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .wind_u_component_200hPa: fallthrough
         case .wind_u_component_100hPa: fallthrough
         case .wind_u_component_50hPa: return .metrePerSecond
+        case .vertical_velocity_1000hPa: fallthrough
+        case .vertical_velocity_925hPa: fallthrough
+        case .vertical_velocity_850hPa: fallthrough
+        case .vertical_velocity_600hPa: fallthrough
+        case .vertical_velocity_700hPa: fallthrough
+        case .vertical_velocity_500hPa: fallthrough
+        case .vertical_velocity_400hPa: fallthrough
+        case .vertical_velocity_300hPa: fallthrough
+        case .vertical_velocity_250hPa: fallthrough
+        case .vertical_velocity_200hPa: fallthrough
+        case .vertical_velocity_100hPa: fallthrough
+        case .vertical_velocity_50hPa: return .metrePerSecond
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough
@@ -406,6 +430,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .wind_u_component_200hPa: return 200
         case .wind_u_component_100hPa: return 100
         case .wind_u_component_50hPa: return 50
+        case .vertical_velocity_1000hPa: return 1000
+        case .vertical_velocity_925hPa: return 925
+        case .vertical_velocity_850hPa: return 850
+        case .vertical_velocity_700hPa: return 700
+        case .vertical_velocity_600hPa: return 600
+        case .vertical_velocity_500hPa: return 500
+        case .vertical_velocity_400hPa: return 400
+        case .vertical_velocity_300hPa: return 300
+        case .vertical_velocity_250hPa: return 250
+        case .vertical_velocity_200hPa: return 200
+        case .vertical_velocity_100hPa: return 100
+        case .vertical_velocity_50hPa: return 50
         case .temperature_1000hPa: return 1000
         case .temperature_925hPa: return 925
         case .temperature_850hPa: return 850
@@ -541,6 +577,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .wind_u_component_200hPa: return "u"
         case .wind_u_component_100hPa: return "u"
         case .wind_u_component_50hPa: return "u"
+        case .vertical_velocity_1000hPa: fallthrough
+        case .vertical_velocity_925hPa: fallthrough
+        case .vertical_velocity_850hPa: fallthrough
+        case .vertical_velocity_600hPa: fallthrough
+        case .vertical_velocity_700hPa: fallthrough
+        case .vertical_velocity_500hPa: fallthrough
+        case .vertical_velocity_400hPa: fallthrough
+        case .vertical_velocity_300hPa: fallthrough
+        case .vertical_velocity_250hPa: fallthrough
+        case .vertical_velocity_200hPa: fallthrough
+        case .vertical_velocity_100hPa: fallthrough
+        case .vertical_velocity_50hPa: return "w"
         case .temperature_1000hPa: return "t"
         case .temperature_925hPa: return "t"
         case .temperature_850hPa: return "t"
@@ -676,6 +724,18 @@ enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVari
         case .wind_u_component_200hPa: fallthrough
         case .wind_u_component_100hPa: fallthrough
         case .wind_u_component_50hPa: return 10
+        case .vertical_velocity_1000hPa: fallthrough
+        case .vertical_velocity_925hPa: fallthrough
+        case .vertical_velocity_850hPa: fallthrough
+        case .vertical_velocity_600hPa: fallthrough
+        case .vertical_velocity_700hPa: fallthrough
+        case .vertical_velocity_500hPa: fallthrough
+        case .vertical_velocity_400hPa: fallthrough
+        case .vertical_velocity_300hPa: fallthrough
+        case .vertical_velocity_250hPa: fallthrough
+        case .vertical_velocity_200hPa: fallthrough
+        case .vertical_velocity_100hPa: fallthrough
+        case .vertical_velocity_50hPa: return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level ?? 0)))
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough

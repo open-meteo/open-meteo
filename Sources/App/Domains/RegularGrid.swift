@@ -9,6 +9,10 @@ struct RegularGrid: Gridable {
     let dx: Float
     let dy: Float
     
+    var isGlobal: Bool {
+        return (Float(nx) * dx) >= 360 && (Float(ny) * dy) >= 180
+    }
+    
     func findPoint(lat: Float, lon: Float) -> Int? {
         let x = Int(roundf((lon-lonMin) / dx))
         let y = Int(roundf((lat-latMin) / dy))

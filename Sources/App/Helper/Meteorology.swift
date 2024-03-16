@@ -246,6 +246,54 @@ struct Meteorology {
         }
     }
     
+    /// Calculate U and V wind vectors using the geostrophic approximation.
+    public static func windComponents(geopotentialHeightMeters gph: [Float], geometricVerticalVelocity omega: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
+        precondition(grid.isGlobal, "Grid must be global to use circular differences")
+        
+        // squared because input is meters
+        let g: Float = 9.80665 * 9.80665
+        let earth_radius: Float = 6371e3
+        let nx = grid.nx
+        let ny = grid.ny
+        let coriolis_limit: Float = 1e-7
+        
+        var u = [Float](repeating: .nan, count: nx * ny)
+        var v = [Float](repeating: .nan, count: nx * ny)
+        for y in 0..<ny {
+            let latitude = grid.getCoordinates(gridpoint: y * nx).latitude
+            let f2 = 2 * 7.2921e-5 * sin(latitude.degreesToRadians)  // Coriolis parameter calculation
+            let f = abs(f2) <= coriolis_limit ? 0 : f2
+            
+            for x in 0..<nx {
+                let gridpoint = y * nx + x
+                // calculate gph differences. Handles cyclic grids
+                let z_diff_east = gph[y * nx + (x + 1) % nx] - gph[gridpoint]
+                let z_diff_north = gph[((y + 1) % ny) * nx + x] - gph[gridpoint]
+                
+                // Calculate grid spacing in meters (considering Earth's curvature)
+                let dx = earth_radius * cos(latitude.degreesToRadians) * Float(0.25).degreesToRadians
+                let dy = earth_radius * Float(0.25).degreesToRadians
+                
+                if f == 0 {
+                    u[gridpoint] = 0
+                    v[gridpoint] = 0
+                    continue
+                }
+                
+                // geostrophic wind
+                u[gridpoint] = -(g / (f * dx)) * (z_diff_east / 2)
+                v[gridpoint] = (g / (f * dy)) * ((-z_diff_north / 2) + omega[gridpoint])
+                
+                // ageostrophic wind
+                //let f90 = 2 * 7.2921e-5 * sin(Float(90).degreesToRadians)  // Coriolis parameter calculation
+                //u[gridpoint] = -(g / (f90 * dx)) * (-z_diff_north / 2)
+                //v[gridpoint] = (g / (f90 * dy)) * ((z_diff_east / 2) /*+ omega[gridpoint]*/)
+            }
+        }
+        return (u, v)
+
+    }
+    
     /// Calculate upper level clouds from relative humidity using Sundqvist et al. (1989):
     /// See https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     /// https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2018MS001400  chapter 3.1
