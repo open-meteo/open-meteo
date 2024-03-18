@@ -246,6 +246,82 @@ struct Meteorology {
         }
     }
     
+    /// Calculate U and V wind vectors using the geostrophic approximation. Uses straight flow at the equator.
+    public static func geostrophicWind(geopotentialHeightMeters gph: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
+        precondition(grid.isGlobal, "Grid must be global to use circular differences")
+        
+        let g: Float = 9.80665
+        let earth_radius: Float = 6371e3
+        let nx = grid.nx
+        let ny = grid.ny
+        
+        var gphSmooth = [Float](repeating: .nan, count: gph.count)
+        for y in 0..<ny {
+            for x in 0..<nx {
+                gphSmooth[y * nx + x] = (
+                      gph[((y + 0 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x - 2 + nx) % nx])/25
+            }
+        }
+        
+        var u = [Float](repeating: .nan, count: nx * ny)
+        var v = [Float](repeating: .nan, count: nx * ny)
+        for y in 0..<ny {
+            let latitude = grid.getCoordinates(gridpoint: y * nx).latitude
+            let f = 2 * 7.2921e-5 * sin(latitude.degreesToRadians)  // Coriolis parameter calculation
+            
+            for x in 0..<nx {
+                let gridpoint = y * nx + x
+                // calculate gph differences. Handles cyclic grids
+                let z_diff_east = gphSmooth[y * nx + (x + 1) % nx] - gphSmooth[y * nx + (x - 1 + nx) % nx]
+                let z_diff_north = gphSmooth[((y + 1) % ny) * nx + x] - gphSmooth[gridpoint]
+                
+                // Calculate grid spacing
+                let dx = earth_radius * Float(grid.dx).degreesToRadians /* cos(latitude.degreesToRadians) */
+                let dy = earth_radius * Float(grid.dy).degreesToRadians
+                
+                // geostrophic wind
+                let uGeostropic = f == 0 ? 0 : -(g / (f * dx)) * (z_diff_north /*/ 2*/)
+                let vGeostropic = f == 0 ? 0 : (g / (f * dy)) * ((z_diff_east /*/ 2*/) /*+ omega[gridpoint]*/)
+                
+                // straight wind at equator
+                let uStraight = z_diff_north * g / 2
+                let vStraight = -z_diff_east * g / 2
+                
+                // 0 = straight flow
+                // 1 = geostropic flow
+                let fraction = (Float(5)..<15).fraction(of: abs(latitude))
+                u[gridpoint] = uGeostropic * fraction + uStraight * (1-fraction)
+                v[gridpoint] = vGeostropic * fraction + vStraight * (1-fraction)
+            }
+        }
+        return (u, v)
+
+    }
+    
     /// Calculate upper level clouds from relative humidity using Sundqvist et al. (1989):
     /// See https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     /// https://agupubs.onlinelibrary.wiley.com/doi/10.1029/2018MS001400  chapter 3.1

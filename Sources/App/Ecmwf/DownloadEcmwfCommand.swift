@@ -185,11 +185,39 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 ))
             }
             
+            /// AIFS missed U/V wind components
+            func calcWindComponents(u: EcmwfVariable, v: EcmwfVariable, gph: EcmwfVariable, member: Int, hpa: Float) async throws {
+                guard await inMemory.get(.init(u, member)) == nil, let gph = await inMemory.get(.init(gph, member)) else {
+                    return
+                }
+                guard let grid = domain.grid as? RegularGrid else {
+                    fatalError("required regular grid")
+                }
+                let (uData, vData) = Meteorology.geostrophicWind(geopotentialHeightMeters: gph, grid: grid)
+                handles.append(GenericVariableHandle(
+                    variable: u,
+                    time: timestamp,
+                    member: member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: u.scalefactor, all: uData),
+                    skipHour0: false
+                ))
+                handles.append(GenericVariableHandle(
+                    variable: v,
+                    time: timestamp,
+                    member: member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: u.scalefactor, all: vData),
+                    skipHour0: false
+                ))
+            }
+            
             let url = domain.getUrl(base: base, run: run, hour: hour)
             let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     if let level = entry.level {
                         // entry is a pressure level variable
+                        if variable.gribName == "gh" && variable.level == level && entry.param == "z" {
+                            return true
+                        }
                         return variable.level == level && entry.param == variable.gribName
                     }
                     return entry.param == variable.gribName
@@ -211,6 +239,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         return true
                     }
                     if let level = variable.level {
+                        if shortName == "z" && variable.gribName == "gh" && levelhPa == level {
+                            return true
+                        }
                         return shortName == variable.gribName && levelhPa == level
                     }
                     return shortName == variable.gribName
@@ -242,6 +273,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
+                if shortName == "z" && domain == .aifs025 {
+                    grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
+                }
+                
                 // solar shortwave radition show accum with step range "90"
                 if stepType == "accum" && !stepRange.contains("-") {
                     stepRange = "0-\(stepRange)"
@@ -257,14 +292,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     await inMemory.set(.init(variable, member), grib2d.array.data)
                 }
                 
-                if domain == .aifs025 {
-                    // keep specific humidity and temperature in memory
-                    if variable.gribName == "q" {
-                        await inMemory.set(.init(variable, member), grib2d.array.data)
-                    }
-                    if variable.gribName == "t" {
-                        await inMemory.set(.init(variable, member), grib2d.array.data)
-                    }
+                // For AIFS keep specific humidity and temperature in memory
+                // geopotential and vertical velocity for wind calculation
+                if domain == .aifs025 && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
+                    await inMemory.set(.init(variable, member), grib2d.array.data)
                 }
                 if variable == .temperature_2m {
                     await inMemory.set(.init(variable, member), grib2d.array.data)
@@ -315,6 +346,20 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         skipHour0: false
                     ))
                 }
+                
+                /// U/V wind components
+                try await calcWindComponents(u: .wind_u_component_1000hPa, v: .wind_v_component_1000hPa, gph: .geopotential_height_1000hPa, member: member, hpa: 1000)
+                try await calcWindComponents(u: .wind_u_component_925hPa, v: .wind_v_component_925hPa, gph: .geopotential_height_925hPa, member: member, hpa: 925)
+                try await calcWindComponents(u: .wind_u_component_850hPa, v: .wind_v_component_850hPa, gph: .geopotential_height_850hPa, member: member, hpa: 850)
+                try await calcWindComponents(u: .wind_u_component_700hPa, v: .wind_v_component_700hPa, gph: .geopotential_height_700hPa, member: member, hpa: 700)
+                try await calcWindComponents(u: .wind_u_component_600hPa, v: .wind_v_component_600hPa, gph: .geopotential_height_600hPa, member: member, hpa: 600)
+                try await calcWindComponents(u: .wind_u_component_500hPa, v: .wind_v_component_500hPa, gph: .geopotential_height_500hPa, member: member, hpa: 500)
+                try await calcWindComponents(u: .wind_u_component_400hPa, v: .wind_v_component_400hPa, gph: .geopotential_height_400hPa, member: member, hpa: 400)
+                try await calcWindComponents(u: .wind_u_component_300hPa, v: .wind_v_component_300hPa, gph: .geopotential_height_300hPa, member: member, hpa: 300)
+                try await calcWindComponents(u: .wind_u_component_250hPa, v: .wind_v_component_250hPa, gph: .geopotential_height_250hPa, member: member, hpa: 250)
+                try await calcWindComponents(u: .wind_u_component_200hPa, v: .wind_v_component_200hPa, gph: .geopotential_height_200hPa, member: member, hpa: 200)
+                try await calcWindComponents(u: .wind_u_component_100hPa, v: .wind_v_component_100hPa, gph: .geopotential_height_100hPa, member: member, hpa: 100)
+                try await calcWindComponents(u: .wind_u_component_50hPa, v: .wind_v_component_50hPa, gph: .geopotential_height_50hPa, member: member, hpa: 50)
                 
                 /// Relative humidity missing in AIFS
                 try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
