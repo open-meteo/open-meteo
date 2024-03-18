@@ -246,48 +246,76 @@ struct Meteorology {
         }
     }
     
-    /// Calculate U and V wind vectors using the geostrophic approximation.
-    public static func windComponents(geopotentialHeightMeters gph: [Float], geometricVerticalVelocity omega: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
+    /// Calculate U and V wind vectors using the geostrophic approximation. Uses straight flow at the equator.
+    public static func geostropicWind(geopotentialHeightMeters gph: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
         precondition(grid.isGlobal, "Grid must be global to use circular differences")
         
-        // squared because input is meters
-        let g: Float = 9.80665 * 9.80665
+        let g: Float = 9.80665
         let earth_radius: Float = 6371e3
         let nx = grid.nx
         let ny = grid.ny
-        let coriolis_limit: Float = 1e-7
+        
+        var gphSmooth = [Float](repeating: .nan, count: gph.count)
+        for y in 0..<ny {
+            for x in 0..<nx {
+                gphSmooth[y * nx + x] = (
+                      gph[((y + 0 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y + 0 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y + 1 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y + 2 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y - 1 + ny) % ny) * nx + (x - 2 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x + 2 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x + 1 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x + 0 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x - 1 + nx) % nx]
+                    + gph[((y - 2 + ny) % ny) * nx + (x - 2 + nx) % nx])/25
+            }
+        }
         
         var u = [Float](repeating: .nan, count: nx * ny)
         var v = [Float](repeating: .nan, count: nx * ny)
         for y in 0..<ny {
             let latitude = grid.getCoordinates(gridpoint: y * nx).latitude
-            let f2 = 2 * 7.2921e-5 * sin(latitude.degreesToRadians)  // Coriolis parameter calculation
-            let f = abs(f2) <= coriolis_limit ? 0 : f2
+            let f = 2 * 7.2921e-5 * sin(latitude.degreesToRadians)  // Coriolis parameter calculation
             
             for x in 0..<nx {
                 let gridpoint = y * nx + x
                 // calculate gph differences. Handles cyclic grids
-                let z_diff_east = gph[y * nx + (x + 1) % nx] - gph[gridpoint]
-                let z_diff_north = gph[((y + 1) % ny) * nx + x] - gph[gridpoint]
+                let z_diff_east = gphSmooth[y * nx + (x + 1) % nx] - gphSmooth[y * nx + (x - 1 + nx) % nx]
+                let z_diff_north = gphSmooth[((y + 1) % ny) * nx + x] - gphSmooth[gridpoint]
                 
-                // Calculate grid spacing in meters (considering Earth's curvature)
-                let dx = earth_radius * cos(latitude.degreesToRadians) * Float(0.25).degreesToRadians
-                let dy = earth_radius * Float(0.25).degreesToRadians
-                
-                if f == 0 {
-                    u[gridpoint] = 0
-                    v[gridpoint] = 0
-                    continue
-                }
+                // Calculate grid spacing
+                let dx = earth_radius * Float(grid.dx).degreesToRadians /* cos(latitude.degreesToRadians) */
+                let dy = earth_radius * Float(grid.dy).degreesToRadians
                 
                 // geostrophic wind
-                u[gridpoint] = -(g / (f * dx)) * (z_diff_east / 2)
-                v[gridpoint] = (g / (f * dy)) * ((-z_diff_north / 2) + omega[gridpoint])
+                let uGeostropic = f == 0 ? 0 : -(g / (f * dx)) * (z_diff_north /*/ 2*/)
+                let vGeostropic = f == 0 ? 0 : (g / (f * dy)) * ((z_diff_east /*/ 2*/) /*+ omega[gridpoint]*/)
                 
-                // ageostrophic wind
-                //let f90 = 2 * 7.2921e-5 * sin(Float(90).degreesToRadians)  // Coriolis parameter calculation
-                //u[gridpoint] = -(g / (f90 * dx)) * (-z_diff_north / 2)
-                //v[gridpoint] = (g / (f90 * dy)) * ((z_diff_east / 2) /*+ omega[gridpoint]*/)
+                // straight wind at equator
+                let uStraight = z_diff_north * g / 2
+                let vStraight = -z_diff_east * g / 2
+                
+                // 0 = straight flow
+                // 1 = geostropic flow
+                let fraction = (Float(5)..<15).fraction(of: abs(latitude))
+                u[gridpoint] = uGeostropic * fraction + uStraight * (1-fraction)
+                v[gridpoint] = vGeostropic * fraction + vStraight * (1-fraction)
             }
         }
         return (u, v)

@@ -186,14 +186,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             
             /// AIFS missed U/V wind components
-            func calcWindComponents(u: EcmwfVariable, v: EcmwfVariable, verticalVelocity: EcmwfVariable, gph: EcmwfVariable, member: Int, hpa: Float) async throws {
-                guard await inMemory.get(.init(u, member)) == nil, let gph = await inMemory.get(.init(gph, member)), let verticalVelocity = await inMemory.get(.init(verticalVelocity, member)) else {
+            func calcWindComponents(u: EcmwfVariable, v: EcmwfVariable, gph: EcmwfVariable, member: Int, hpa: Float) async throws {
+                guard await inMemory.get(.init(u, member)) == nil, let gph = await inMemory.get(.init(gph, member)) else {
                     return
                 }
                 guard let grid = domain.grid as? RegularGrid else {
                     fatalError("required regular grid")
                 }
-                let (uData, vData) = Meteorology.windComponents(geopotentialHeightMeters: gph, geometricVerticalVelocity: verticalVelocity, grid: grid)
+                let (uData, vData) = Meteorology.geostropicWind(geopotentialHeightMeters: gph, grid: grid)
                 handles.append(GenericVariableHandle(
                     variable: u,
                     time: timestamp,
@@ -348,18 +348,18 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 }
                 
                 /// U/V wind components
-                try await calcWindComponents(u: .wind_u_component_1000hPa, v: .wind_v_component_1000hPa, verticalVelocity: .vertical_velocity_1000hPa, gph: .geopotential_height_1000hPa, member: member, hpa: 1000)
-                try await calcWindComponents(u: .wind_u_component_925hPa, v: .wind_v_component_925hPa, verticalVelocity: .vertical_velocity_925hPa, gph: .geopotential_height_925hPa, member: member, hpa: 925)
-                try await calcWindComponents(u: .wind_u_component_850hPa, v: .wind_v_component_850hPa, verticalVelocity: .vertical_velocity_850hPa, gph: .geopotential_height_850hPa, member: member, hpa: 850)
-                try await calcWindComponents(u: .wind_u_component_700hPa, v: .wind_v_component_700hPa, verticalVelocity: .vertical_velocity_700hPa, gph: .geopotential_height_700hPa, member: member, hpa: 700)
-                try await calcWindComponents(u: .wind_u_component_600hPa, v: .wind_v_component_600hPa, verticalVelocity: .vertical_velocity_600hPa, gph: .geopotential_height_600hPa, member: member, hpa: 600)
-                try await calcWindComponents(u: .wind_u_component_500hPa, v: .wind_v_component_500hPa, verticalVelocity: .vertical_velocity_500hPa, gph: .geopotential_height_500hPa, member: member, hpa: 500)
-                try await calcWindComponents(u: .wind_u_component_400hPa, v: .wind_v_component_400hPa, verticalVelocity: .vertical_velocity_400hPa, gph: .geopotential_height_400hPa, member: member, hpa: 400)
-                try await calcWindComponents(u: .wind_u_component_300hPa, v: .wind_v_component_300hPa, verticalVelocity: .vertical_velocity_300hPa, gph: .geopotential_height_300hPa, member: member, hpa: 300)
-                try await calcWindComponents(u: .wind_u_component_250hPa, v: .wind_v_component_250hPa, verticalVelocity: .vertical_velocity_250hPa, gph: .geopotential_height_250hPa, member: member, hpa: 250)
-                try await calcWindComponents(u: .wind_u_component_200hPa, v: .wind_v_component_200hPa, verticalVelocity: .vertical_velocity_200hPa, gph: .geopotential_height_200hPa, member: member, hpa: 200)
-                try await calcWindComponents(u: .wind_u_component_100hPa, v: .wind_v_component_100hPa, verticalVelocity: .vertical_velocity_100hPa, gph: .geopotential_height_100hPa, member: member, hpa: 100)
-                try await calcWindComponents(u: .wind_u_component_50hPa, v: .wind_v_component_50hPa, verticalVelocity: .vertical_velocity_50hPa, gph: .geopotential_height_50hPa, member: member, hpa: 50)
+                try await calcWindComponents(u: .wind_u_component_1000hPa, v: .wind_v_component_1000hPa, gph: .geopotential_height_1000hPa, member: member, hpa: 1000)
+                try await calcWindComponents(u: .wind_u_component_925hPa, v: .wind_v_component_925hPa, gph: .geopotential_height_925hPa, member: member, hpa: 925)
+                try await calcWindComponents(u: .wind_u_component_850hPa, v: .wind_v_component_850hPa, gph: .geopotential_height_850hPa, member: member, hpa: 850)
+                try await calcWindComponents(u: .wind_u_component_700hPa, v: .wind_v_component_700hPa, gph: .geopotential_height_700hPa, member: member, hpa: 700)
+                try await calcWindComponents(u: .wind_u_component_600hPa, v: .wind_v_component_600hPa, gph: .geopotential_height_600hPa, member: member, hpa: 600)
+                try await calcWindComponents(u: .wind_u_component_500hPa, v: .wind_v_component_500hPa, gph: .geopotential_height_500hPa, member: member, hpa: 500)
+                try await calcWindComponents(u: .wind_u_component_400hPa, v: .wind_v_component_400hPa, gph: .geopotential_height_400hPa, member: member, hpa: 400)
+                try await calcWindComponents(u: .wind_u_component_300hPa, v: .wind_v_component_300hPa, gph: .geopotential_height_300hPa, member: member, hpa: 300)
+                try await calcWindComponents(u: .wind_u_component_250hPa, v: .wind_v_component_250hPa, gph: .geopotential_height_250hPa, member: member, hpa: 250)
+                try await calcWindComponents(u: .wind_u_component_200hPa, v: .wind_v_component_200hPa, gph: .geopotential_height_200hPa, member: member, hpa: 200)
+                try await calcWindComponents(u: .wind_u_component_100hPa, v: .wind_v_component_100hPa, gph: .geopotential_height_100hPa, member: member, hpa: 100)
+                try await calcWindComponents(u: .wind_u_component_50hPa, v: .wind_v_component_50hPa, gph: .geopotential_height_50hPa, member: member, hpa: 50)
                 
                 /// Relative humidity missing in AIFS
                 try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
