@@ -146,6 +146,11 @@ struct SyncCommand: AsyncCommand {
                         let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                         try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                         try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                        if let cacheDirectory = OpenMeteo.cacheDirectory {
+                            // Delete cached file, in case cache is active
+                            let cacheFile = "\(cacheDirectory)/\(pathNoData)"
+                            try FileManager.default.removeItemIfExists(at: cacheFile)
+                        }
                         await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
                     }
                     await progress.finish()
