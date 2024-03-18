@@ -193,7 +193,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 guard let grid = domain.grid as? RegularGrid else {
                     fatalError("required regular grid")
                 }
-                let (uData, vData) = Meteorology.geostropicWind(geopotentialHeightMeters: gph, grid: grid)
+                let (uData, vData) = Meteorology.geostrophicWind(geopotentialHeightMeters: gph, grid: grid)
                 handles.append(GenericVariableHandle(
                     variable: u,
                     time: timestamp,

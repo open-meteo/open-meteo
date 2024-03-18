@@ -247,7 +247,7 @@ struct Meteorology {
     }
     
     /// Calculate U and V wind vectors using the geostrophic approximation. Uses straight flow at the equator.
-    public static func geostropicWind(geopotentialHeightMeters gph: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
+    public static func geostrophicWind(geopotentialHeightMeters gph: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
         precondition(grid.isGlobal, "Grid must be global to use circular differences")
         
         let g: Float = 9.80665
