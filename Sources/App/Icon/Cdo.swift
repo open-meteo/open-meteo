@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import SwiftEccodes
-
+import CHelper
 
 extension Process {
     /*static func bunzip2(file: String) throws {
@@ -82,6 +82,7 @@ struct CdoHelper {
         let messages = try SwiftEccodes.getMessages(fileName: gribFileRemapped, multiSupport: true)
         try FileManager.default.removeItem(atPath: gribFile)
         try FileManager.default.removeItem(atPath: gribFileRemapped)
+        chelper_malloc_trim()
         return messages
     }
 }

@@ -2,7 +2,6 @@ import Foundation
 import Vapor
 import SwiftPFor2D
 import Dispatch
-import CHelper
 
 /**
  TODO:
@@ -149,12 +148,12 @@ struct DownloadIconCommand: AsyncCommand {
             /// Keep precipitation in memory to correct weather codes
             var precipitation = [Int: Array2D]()
             
-            for variable in variables {
+            let handlesPerTimestep = try await variables.asyncCompactMap { variable -> [GenericVariableHandle]? in
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
-                    continue
+                    return nil
                 }
                 guard let v = variable.getVarAndLevel(domain: domain) else {
-                    continue
+                    return nil
                 }
                 let level = v.level.map({"_\($0)"}) ?? (domain == .iconD2 || domain == .iconD2Eps ? "_2d" : "")
                 let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? v.variable : v.variable.uppercased()
@@ -194,7 +193,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 
                 // Contains more than 1 message for ensemble models
-                for (member, message) in messages.enumerated() {
+                return try await messages.enumerated().asyncCompactMap { (member, message) -> GenericVariableHandle? in
                     try grib2d.load(message: message)
                     
                     // Scaling before compression with scalefactor
@@ -209,7 +208,7 @@ struct DownloadIconCommand: AsyncCommand {
                     
                     // Deaccumulate precipitation
                     guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        continue
+                        return nil
                     }
                     
                     if let variable = variable as? IconSurfaceVariable {
@@ -277,17 +276,24 @@ struct DownloadIconCommand: AsyncCommand {
                     }
                     //logger.info("Compressing and writing data to \(filenameDest)")
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    handles.append(GenericVariableHandle(
+                    return GenericVariableHandle(
                         variable: variable,
                         time: timestamp,
                         member: member,
                         fn: fn,
                         skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
-                    ))
+                    )
                 }
-                // icon global downloads tend to use a lot of memory due to numerous allocations
-                chelper_malloc_trim()
-            }
+            }.flatMap({$0})
+            
+            /*for (member, h) in handlesPerTimestep.grouped(by: {$0.member}) {
+                let t2m = h.first(where: {$0.variable as? IconSurfaceVariable == .temperature_2m })
+                let snofallHeight = h.first(where: {$0.variable as? IconSurfaceVariable == .snowfall_height })
+                
+                handles[handles.firstIndex(where: {$0.variable as? IconSurfaceVariable == .snowfall_height })!] = t2m!
+            }*/
+            
+            handles.append(contentsOf: handlesPerTimestep)
         }
         await curl.printStatistics()
         return (handles, handles15minIconD2)
