@@ -288,12 +288,14 @@ struct OmFileSplitter {
                 let skip = previousDay > 0 ? previousDay * 86400 / time.dtSeconds : skipFirst
                 let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
-                let omRead = try readFile.openRead()
-                try omRead?.willNeed()
-
                 let tempFile = readFile.getFilePath() + "~"
+                // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
+                FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
                 try FileManager.default.removeItemIfExists(at: tempFile)
                 let fn = try FileHandle.createNewFile(file: tempFile)
+                
+                let omRead = try readFile.openRead()
+                try omRead?.willNeed()
 
                 let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor)
 
