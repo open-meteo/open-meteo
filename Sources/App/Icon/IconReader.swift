@@ -57,7 +57,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let precipitation = try get(raw: .precipitation, time: time).data
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, time: time).data
                 let snow_con = try get(raw: .snowfall_convective_water_equivalent, time: time).data
-                return DataAndUnit(zip(precipitation, zip(snow_con, snow_gsp)).map({$0 - $1.0 - $1.1}), .millimetre)
+                return DataAndUnit(zip(precipitation, zip(snow_con, snow_gsp)).map({$0 - ($1.0.isNaN ? 0 : $1.0) - $1.1}), .millimetre)
             }
             
             // no dedicated rain field in ICON EPS and no snow, use temperautre
@@ -499,7 +499,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, time: time).data
                 let snow_con = try get(raw: .snowfall_convective_water_equivalent, time: time).data
                 let snowfall = zip(snow_gsp, snow_con).map({
-                    ($0 + $1) * 0.7
+                    ($0 + ($1.isNaN ? 0 : $1)) * 0.7
                 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:

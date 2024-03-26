@@ -333,7 +333,7 @@ struct DownloadIconCommand: AsyncCommand {
                     skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
                 ))
             }
-            /// More convective snow to
+            /// More convective snow to showers
             for (member, showers) in showers {
                 var out = showers.data
                 for i in showers.data.indices {
@@ -355,30 +355,14 @@ struct DownloadIconCommand: AsyncCommand {
             for (member, snowfall) in snowfallWaterEquivalent {
                 var out = snowfall.data
                 for i in snowfall.data.indices {
+                    // Add convective snow to normal snow. Convective snow is not stored on disk anymore
+                    out[i] += snowfallConvectiveWaterEquivalent[member]?.data[i] ?? 0
                     if temperature2m[member]?.data[i] ?? .nan > 2 || snowfallHeight[member]?.data[i] ?? .nan > domainElevation[i] + 50 {
                         out[i] = 0
                         continue
                     }
                 }
                 let variable = IconSurfaceVariable.snowfall_water_equivalent
-                handles.append(GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: out),
-                    skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
-                ))
-            }
-            /// Set convective snow to 0
-            for (member, snowfall) in snowfallConvectiveWaterEquivalent {
-                var out = snowfall.data
-                for i in snowfall.data.indices {
-                    if temperature2m[member]?.data[i] ?? .nan > 2 || snowfallHeight[member]?.data[i] ?? .nan > domainElevation[i] + 50 {
-                        out[i] = 0
-                        continue
-                    }
-                }
-                let variable = IconSurfaceVariable.snowfall_convective_water_equivalent
                 handles.append(GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
