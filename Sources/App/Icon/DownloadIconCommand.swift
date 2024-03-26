@@ -319,7 +319,7 @@ struct DownloadIconCommand: AsyncCommand {
             for (member, rain) in rain {
                 var out = rain.data
                 for i in rain.data.indices {
-                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                    if temperature2m[member]?.data[i] ?? .nan > 2 || snowfallHeight[member]?.data[i] ?? .nan > domainElevation[i] + 50 {
                         out[i] += snowfallWaterEquivalent[member]?.data[i] ?? 0
                         continue
                     }
@@ -337,7 +337,7 @@ struct DownloadIconCommand: AsyncCommand {
             for (member, showers) in showers {
                 var out = showers.data
                 for i in showers.data.indices {
-                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                    if temperature2m[member]?.data[i] ?? .nan > 2 || snowfallHeight[member]?.data[i] ?? .nan > domainElevation[i] + 50 {
                         out[i] += snowfallConvectiveWaterEquivalent[member]?.data[i] ?? 0
                         continue
                     }
@@ -355,7 +355,7 @@ struct DownloadIconCommand: AsyncCommand {
             for (member, snowfall) in snowfallWaterEquivalent {
                 var out = snowfall.data
                 for i in snowfall.data.indices {
-                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                    if temperature2m[member]?.data[i] ?? .nan > 2 || snowfallHeight[member]?.data[i] ?? .nan > domainElevation[i] + 50 {
                         out[i] = 0
                         continue
                     }
@@ -373,7 +373,7 @@ struct DownloadIconCommand: AsyncCommand {
             for (member, snowfall) in snowfallConvectiveWaterEquivalent {
                 var out = snowfall.data
                 for i in snowfall.data.indices {
-                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                    if temperature2m[member]?.data[i] ?? .nan > 2 || snowfallHeight[member]?.data[i] ?? .nan > domainElevation[i] + 50 {
                         out[i] = 0
                         continue
                     }
