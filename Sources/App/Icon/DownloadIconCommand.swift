@@ -148,6 +148,15 @@ struct DownloadIconCommand: AsyncCommand {
             /// Keep precipitation in memory to correct weather codes
             var precipitation = [Int: Array2D]()
             
+            /// Keep snowfall height to correct snowfall/rain
+            var snowfallHeight = [Int: Array2D]()
+            
+            /// Rain and snow will be corrected afterwards
+            var rain = [Int: Array2D]()
+            var showers = [Int: Array2D]()
+            var snowfallWaterEquivalent = [Int: Array2D]()
+            var snowfallConvectiveWaterEquivalent = [Int: Array2D]()
+            
             let handlesPerTimestep = try await variables.asyncCompactMap { variable -> [GenericVariableHandle]? in
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
                     return nil
@@ -219,6 +228,25 @@ struct DownloadIconCommand: AsyncCommand {
                             // store in memory for this member
                             temperature2m[member] = grib2d.array
                         }
+                        if variable == .snowfall_height {
+                            snowfallHeight[member] = grib2d.array
+                        }
+                        if variable == .rain {
+                            rain[member] = grib2d.array
+                            return nil // do not write rain, shower and snow yet
+                        }
+                        if variable == .showers {
+                            showers[member] = grib2d.array
+                            return nil
+                        }
+                        if variable == .snowfall_water_equivalent {
+                            snowfallWaterEquivalent[member] = grib2d.array
+                            return nil
+                        }
+                        if variable == .snowfall_convective_water_equivalent {
+                            snowfallConvectiveWaterEquivalent[member] = grib2d.array
+                            return nil
+                        }
                         if [.iconEps, .iconEuEps].contains(domain) {
                             if variable == .pressure_msl {
                                 // ICON EPC is actually downloading surface level pressure
@@ -252,7 +280,8 @@ struct DownloadIconCommand: AsyncCommand {
                                 }
                                 grib2d.array.data[i] = Float(weathercode.correctDwdIconWeatherCode(
                                     temperature_2m: t2m.data[i],
-                                    precipitation: precip.data[i]
+                                    precipitation: precip.data[i],
+                                    snowfallHeightAboveGrid: snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50
                                 ).rawValue)
                             }
                         }
@@ -286,12 +315,78 @@ struct DownloadIconCommand: AsyncCommand {
                 }
             }.flatMap({$0})
             
-            /*for (member, h) in handlesPerTimestep.grouped(by: {$0.member}) {
-                let t2m = h.first(where: {$0.variable as? IconSurfaceVariable == .temperature_2m })
-                let snofallHeight = h.first(where: {$0.variable as? IconSurfaceVariable == .snowfall_height })
-                
-                handles[handles.firstIndex(where: {$0.variable as? IconSurfaceVariable == .snowfall_height })!] = t2m!
-            }*/
+            /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above
+            for (member, rain) in rain {
+                var out = rain.data
+                for i in rain.data.indices {
+                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                        out[i] += snowfallWaterEquivalent[member]?.data[i] ?? 0
+                        continue
+                    }
+                }
+                let variable = IconSurfaceVariable.rain
+                handles.append(GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: out),
+                    skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                ))
+            }
+            /// More convective snow to
+            for (member, showers) in showers {
+                var out = showers.data
+                for i in showers.data.indices {
+                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                        out[i] += snowfallConvectiveWaterEquivalent[member]?.data[i] ?? 0
+                        continue
+                    }
+                }
+                let variable = IconSurfaceVariable.showers
+                handles.append(GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: out),
+                    skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                ))
+            }
+            /// Set snow to 0
+            for (member, snowfall) in snowfallWaterEquivalent {
+                var out = snowfall.data
+                for i in snowfall.data.indices {
+                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                        out[i] = 0
+                        continue
+                    }
+                }
+                let variable = IconSurfaceVariable.snowfall_water_equivalent
+                handles.append(GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: out),
+                    skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                ))
+            }
+            /// Set convective snow to 0
+            for (member, snowfall) in snowfallConvectiveWaterEquivalent {
+                var out = snowfall.data
+                for i in snowfall.data.indices {
+                    if temperature2m[member]?.data[i] ?? 99 < 2 || snowfallHeight[member]?.data[i] ?? -1000 > domainElevation[i] + 50 {
+                        out[i] = 0
+                        continue
+                    }
+                }
+                let variable = IconSurfaceVariable.snowfall_convective_water_equivalent
+                handles.append(GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: out),
+                    skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                ))
+            }
             
             handles.append(contentsOf: handlesPerTimestep)
         }
