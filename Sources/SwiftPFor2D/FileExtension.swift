@@ -150,7 +150,7 @@ extension FileManager {
                     mTime > Date().addingTimeInterval(-60) else {
                 break
             }
-            print("Another process is writing to \(at). Waiting up to 15 minutes. \(mTime.ISO8601Format())")
+            print("Another process is writing to \(at). Waiting up to 15 minutes.")
             sleep(10)
         }
     }
