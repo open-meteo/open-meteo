@@ -54,7 +54,7 @@ public struct ForecastapiController: RouteCollection {
             forecastDay: 10,
             has15minutely: false,
             hasCurrentWeather: false,
-            defaultModel: .ecmwf_ifs04).query
+            defaultModel: .ecmwf_ifs025).query
         )
         categoriesRoute.getAndPost("cma", use: WeatherApiController(
             has15minutely: false,
