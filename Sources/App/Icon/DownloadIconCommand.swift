@@ -140,6 +140,7 @@ struct DownloadIconCommand: AsyncCommand {
             let h3 = hour.zeroPadded(len: 3)
             
             let storage = VariablePerMemberStorage()
+            let storage15min = VariablePerMemberStorage()
             
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -176,6 +177,12 @@ struct DownloadIconCommand: AsyncCommand {
                         guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                             continue
                         }
+                        if let variable = variable as? IconSurfaceVariable {
+                            if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .showers, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
+                                await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
+                                continue
+                            }
+                        }
                         let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         await handles15minIconD2.append(GenericVariableHandle(
                             variable: variable,
@@ -209,7 +216,7 @@ struct DownloadIconCommand: AsyncCommand {
                     
                     if let variable = variable as? IconSurfaceVariable {
                         if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .showers, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
-                            await storage.set(variable: variable, member: member, data: grib2d.array)
+                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                             continue
                         }
                     }
@@ -232,14 +239,14 @@ struct DownloadIconCommand: AsyncCommand {
                 if [.iconEps, .iconEuEps].contains(domain) && v.variable == .pressure_msl {
                     // ICON EPC is actually downloading surface level pressure
                     // calculate sea level presure using temperature and elevation
-                    guard let t2m = await storage.get(variable: .temperature_2m, member: v.member) else {
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
                         fatalError("Sea level pressure calculation required temperature 2m")
                     }
                     data.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: data.data, elevation: domainElevation)
                 }
                 if domain == .iconEps && v.variable == .relative_humidity_2m {
                     // ICON EPS is using dewpoint, convert to relative humidity
-                    guard let t2m = await storage.get(variable: .temperature_2m, member: v.member) else {
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
                         fatalError("Relative humidity calculation requires temperature_2m")
                     }
                     data.data.multiplyAdd(multiply: 1, add: -273.15)
@@ -249,13 +256,13 @@ struct DownloadIconCommand: AsyncCommand {
                 // DWD ICON weather codes show rain although precipitation is 0
                 // Similar for snow at +2°C or more
                 if v.variable == .weather_code {
-                    guard let t2m = await storage.get(variable: .temperature_2m, member: v.member) else {
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
                         fatalError("Weather code correction requires temperature_2m")
                     }
-                    guard let precip = await storage.get(variable: .precipitation, member: v.member) else {
+                    guard let precip = await storage.get(v.with(variable: .precipitation)) else {
                         fatalError("Weather code correction requires precipitation")
                     }
-                    let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
                     for i in data.data.indices {
                         guard data.data[i].isFinite, let weathercode = WeatherCode(rawValue: Int(data.data[i])) else {
                             continue
@@ -272,7 +279,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
                 if v.variable == .freezing_level_height {
-                    guard let t2m = await storage.get(variable: .temperature_2m, member: v.member) else {
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
                         fatalError("Freezing level height correction requires temperature_2m")
                     }
                     for i in data.data.indices {
@@ -287,9 +294,9 @@ struct DownloadIconCommand: AsyncCommand {
                 
                 /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain {
-                    let t2m = await storage.get(variable: .temperature_2m, member: v.member)
-                    let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
-                    let snowfallWaterEquivalent = await storage.get(variable: .snowfall_water_equivalent, member: v.member)
+                    let t2m = await storage.get(v.with(variable: .temperature_2m))
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
+                    let snowfallWaterEquivalent = await storage.get(v.with(variable: .snowfall_water_equivalent))
                     for i in data.data.indices {
                         if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
                             data.data[i] += snowfallWaterEquivalent?.data[i] ?? 0
@@ -299,9 +306,9 @@ struct DownloadIconCommand: AsyncCommand {
                 
                 /// More convective snow to showers if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .showers {
-                    let t2m = await storage.get(variable: .temperature_2m, member: v.member)
-                    let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
-                    let snowfallConvectiveWaterEquivalent = await storage.get(variable: .snowfall_convective_water_equivalent, member: v.member)
+                    let t2m = await storage.get(v.with(variable: .temperature_2m))
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
+                    let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
                             data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
@@ -310,9 +317,10 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 /// Set snow to 0 if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .snowfall_water_equivalent {
-                    let t2m = await storage.get(variable: .temperature_2m, member: v.member)
-                    let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
-                    let snowfallConvectiveWaterEquivalent = await storage.get(variable: .snowfall_convective_water_equivalent, member: v.member)
+                    //print("in snow post")
+                    let t2m = await storage.get(v.with(variable: .temperature_2m))
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
+                    let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
                         data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
@@ -334,7 +342,63 @@ struct DownloadIconCommand: AsyncCommand {
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: v.variable.scalefactor, all: data.data)
                 await handles.append(GenericVariableHandle(
                     variable: v.variable,
-                    time: timestamp,
+                    time: v.timestamp,
+                    member: v.member,
+                    fn: fn,
+                    skipHour0: v.variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                ))
+            }
+            
+            /// Post process 15 minutes data. Note: There is no temperature in 15min data
+            try await storage15min.data.foreachConcurrent(nConcurrent: concurrent) { (v, data) in
+                var data = data
+                /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above groud
+                if v.variable == .rain {
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
+                    let snowfallWaterEquivalent = await storage.get(v.with(variable: .snowfall_water_equivalent))
+                    for i in data.data.indices {
+                        if snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
+                            data.data[i] += snowfallWaterEquivalent?.data[i] ?? 0
+                        }
+                    }
+                }
+                
+                /// More convective snow to showers if temperature is > 2°C or snowfall height is higher than 50 metre above groud
+                if v.variable == .showers {
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
+                    let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
+                    for i in data.data.indices {
+                        if snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
+                            data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
+                        }
+                    }
+                }
+                /// Set snow to 0 if temperature is > 2°C or snowfall height is higher than 50 metre above groud
+                if v.variable == .snowfall_water_equivalent {
+                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
+                    let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
+                    for i in data.data.indices {
+                        // Add convective snow, to regular snow
+                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
+                        if snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
+                            /*if (data.data[0] > 0.01) {
+                                print("corrected case value=\(data.data[0]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
+                            }*/
+                            data.data[i] = 0
+                        }
+                    }
+                }
+                
+                if v.variable == .snowfall_convective_water_equivalent {
+                    // Do not write snowfall_convective_water_equivalent to disk anymore
+                    return
+                }
+                
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: v.variable.scalefactor, all: data.data)
+                await handles15minIconD2.append(GenericVariableHandle(
+                    variable: v.variable,
+                    time: v.timestamp,
                     member: v.member,
                     fn: fn,
                     skipHour0: v.variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
@@ -433,17 +497,26 @@ struct DownloadIconCommand: AsyncCommand {
 fileprivate actor VariablePerMemberStorage {
     struct VariableAndMember: Hashable {
         let variable: IconSurfaceVariable
+        let timestamp: Timestamp
         let member: Int
+        
+        func with(variable: IconSurfaceVariable) -> VariableAndMember {
+            .init(variable: variable, timestamp: self.timestamp, member: self.member)
+        }
     }
     
     var data = [VariableAndMember: Array2D]()
     
-    func set(variable: IconSurfaceVariable, member: Int, data: Array2D) {
-        self.data[.init(variable: variable, member: member)] = data
+    func set(variable: IconSurfaceVariable, timestamp: Timestamp, member: Int, data: Array2D) {
+        self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
     }
     
-    func get(variable: IconSurfaceVariable, member: Int) -> Array2D? {
-        return data[.init(variable: variable, member: member)]
+    func get(variable: IconSurfaceVariable, timestamp: Timestamp, member: Int) -> Array2D? {
+        return data[.init(variable: variable, timestamp: timestamp, member: member)]
+    }
+    
+    func get(_ variable: VariableAndMember) -> Array2D? {
+        return data[variable]
     }
 }
 
