@@ -34,7 +34,7 @@ let package = Package(
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.10.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.0.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
-        .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.5"),
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "0.1.6"),
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "0.0.0")
     ] : []),

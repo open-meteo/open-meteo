@@ -126,7 +126,7 @@ struct DownloadIconCommand: AsyncCommand {
         let deaverager15min = GribDeaverager()
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
-        lazy var domainElevation = {
+        let domainElevation = {
             guard let elevation = try? domain.getStaticFile(type: .elevation)?.readAll() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
@@ -227,7 +227,7 @@ struct DownloadIconCommand: AsyncCommand {
             
             /// All variables for this timestep have been downloaded. Selected variables are kept in memory.
             /// Do some post processing
-            for (v, data) in await storage.data {
+            try await storage.data.foreachConcurrent(nConcurrent: concurrent) { (v, data) in
                 var data = data
                 if [.iconEps, .iconEuEps].contains(domain) && v.variable == .pressure_msl {
                     // ICON EPC is actually downloading surface level pressure
@@ -327,7 +327,7 @@ struct DownloadIconCommand: AsyncCommand {
                 
                 if v.variable == .snowfall_convective_water_equivalent {
                     // Do not write snowfall_convective_water_equivalent to disk anymore
-                    continue
+                    return
                 }
                 
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
