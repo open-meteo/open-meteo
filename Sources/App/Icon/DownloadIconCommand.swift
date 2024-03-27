@@ -263,7 +263,7 @@ struct DownloadIconCommand: AsyncCommand {
                         data.data[i] = Float(weathercode.correctDwdIconWeatherCode(
                             temperature_2m: t2m.data[i],
                             precipitation: precip.data[i],
-                            snowfallHeightAboveGrid: snowfallHeight?.data[i] ?? -1000 > domainElevation[i] + 50
+                            snowfallHeightAboveGrid: snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50
                         ).rawValue)
                     }
                 }
@@ -285,32 +285,30 @@ struct DownloadIconCommand: AsyncCommand {
                     }
                 }
                 
-                /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above
+                /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain {
                     let t2m = await storage.get(variable: .temperature_2m, member: v.member)
                     let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
                     let snowfallWaterEquivalent = await storage.get(variable: .snowfall_water_equivalent, member: v.member)
                     for i in data.data.indices {
-                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > domainElevation[i] + 50 {
+                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
                             data.data[i] += snowfallWaterEquivalent?.data[i] ?? 0
-                            continue
                         }
                     }
                 }
                 
-                /// More convective snow to showers
+                /// More convective snow to showers if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .showers {
                     let t2m = await storage.get(variable: .temperature_2m, member: v.member)
                     let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
                     let snowfallConvectiveWaterEquivalent = await storage.get(variable: .snowfall_convective_water_equivalent, member: v.member)
                     for i in data.data.indices {
-                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > domainElevation[i] + 50 {
+                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
                             data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
-                            continue
                         }
                     }
                 }
-                /// Set snow to 0
+                /// Set snow to 0 if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .snowfall_water_equivalent {
                     let t2m = await storage.get(variable: .temperature_2m, member: v.member)
                     let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
@@ -318,9 +316,11 @@ struct DownloadIconCommand: AsyncCommand {
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
                         data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
-                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > domainElevation[i] + 50 {
-                            data.data[i] += 0
-                            continue
+                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
+                            /*if (data.data[0] > 0.01) {
+                                print("corrected case value=\(data.data[0]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
+                            }*/
+                            data.data[i] = 0
                         }
                     }
                 }
