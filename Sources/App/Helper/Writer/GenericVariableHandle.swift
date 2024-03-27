@@ -123,6 +123,14 @@ struct GenericVariableHandle {
 }
 
 
+actor GenericVariableHandleStorage {
+    var handles = [GenericVariableHandle]()
+    
+    func append(_ element: GenericVariableHandle) {
+        handles.append(element)
+    }
+}
+
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {
     var data = [String: (step: Int, data: [Float])]()
