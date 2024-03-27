@@ -257,7 +257,7 @@ struct DownloadIconCommand: AsyncCommand {
                     }
                     let snowfallHeight = await storage.get(variable: .snowfall_height, member: v.member)
                     for i in data.data.indices {
-                        guard let weathercode = WeatherCode(rawValue: Int(data.data[i])) else {
+                        guard data.data[i].isFinite, let weathercode = WeatherCode(rawValue: Int(data.data[i])) else {
                             continue
                         }
                         data.data[i] = Float(weathercode.correctDwdIconWeatherCode(
