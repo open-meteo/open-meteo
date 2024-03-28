@@ -178,7 +178,7 @@ struct DownloadIconCommand: AsyncCommand {
                             continue
                         }
                         if let variable = variable as? IconSurfaceVariable {
-                            if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .showers, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
+                            if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
                                 await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
                                 continue
                             }
@@ -215,7 +215,7 @@ struct DownloadIconCommand: AsyncCommand {
                     }
                     
                     if let variable = variable as? IconSurfaceVariable {
-                        if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .showers, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
+                        if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                             continue
                         }
@@ -240,7 +240,7 @@ struct DownloadIconCommand: AsyncCommand {
                     // ICON EPC is actually downloading surface level pressure
                     // calculate sea level presure using temperature and elevation
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Sea level pressure calculation required temperature 2m")
+                        fatalError("Sea level pressure calculation requires temperature 2m")
                     }
                     data.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: data.data, elevation: domainElevation)
                 }
@@ -270,7 +270,7 @@ struct DownloadIconCommand: AsyncCommand {
                         data.data[i] = Float(weathercode.correctDwdIconWeatherCode(
                             temperature_2m: t2m.data[i],
                             precipitation: precip.data[i],
-                            snowfallHeightAboveGrid: snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50
+                            snowfallHeightAboveGrid: t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50
                         ).rawValue)
                     }
                 }
@@ -278,6 +278,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
                 /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
+                /// Note: snowfall height is NaN if snowfall height is at ground level
                 if v.variable == .freezing_level_height || v.variable == .snowfall_height {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
                         fatalError("Freezing level height and snowfall height correction requires temperature_2m")
@@ -293,39 +294,32 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 
                 /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above groud
-                if v.variable == .rain {
-                    let t2m = await storage.get(v.with(variable: .temperature_2m))
+                if v.variable == .rain, let snowfallWaterEquivalent = await storage.get(v.with(variable: .snowfall_water_equivalent)) {
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
+                        fatalError("Rain correction requires temperature 2m")
+                    }
                     let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
-                    let snowfallWaterEquivalent = await storage.get(v.with(variable: .snowfall_water_equivalent))
+                    let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
-                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
-                            data.data[i] += snowfallWaterEquivalent?.data[i] ?? 0
+                        if t2m.data[i] > 2 || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
+                            data.data[i] += snowfallWaterEquivalent.data[i] + (snowfallConvectiveWaterEquivalent?.data[0] ?? 0)
                         }
                     }
                 }
                 
-                /// More convective snow to showers if temperature is > 2°C or snowfall height is higher than 50 metre above groud
-                if v.variable == .showers {
-                    let t2m = await storage.get(v.with(variable: .temperature_2m))
-                    let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
-                    let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
-                    for i in data.data.indices {
-                        if t2m?.data[i] ?? .nan > 2 || snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
-                            data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
-                        }
-                    }
-                }
                 /// Set snow to 0 if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .snowfall_water_equivalent {
-                    let t2m = await storage.get(v.with(variable: .temperature_2m))!
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
+                        fatalError("Snow correction requires temperature 2m")
+                    }
                     let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
                     let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
                         data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
-                        if t2m.data[i] > 2 { //|| snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
+                        if t2m.data[i] > 2 || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             /*if (data.data[i] > 0.1 && domainElevation[i] > -100) {
-                                print("corrected case value=\(data.data[i]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
+                                print("corrected case value=\(data.data[i]) t=\(t2m.data[i]) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
                             }*/
                             data.data[i] = 0
                         }
@@ -352,35 +346,33 @@ struct DownloadIconCommand: AsyncCommand {
             try await storage15min.data.foreachConcurrent(nConcurrent: concurrent) { (v, data) in
                 var data = data
                 /// Add snow to liquid rain if temperature is > 2°C or snowfall height is higher than 50 metre above groud
-                if v.variable == .rain {
+                if v.variable == .rain, let snowfallWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_water_equivalent)) {
+                    /// Take temperature from 1-hourly data
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m, timestamp: v.timestamp.floor(toNearest: 3600))) else {
+                        fatalError("Rain correction requires temperature 2m")
+                    }
                     let snowfallHeight = await storage15min.get(v.with(variable: .snowfall_height))
-                    let snowfallWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_water_equivalent))
+                    let snowfallConvectiveWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
-                        if snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
-                            data.data[i] += snowfallWaterEquivalent?.data[i] ?? 0
+                        if t2m.data[i] > 2 || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
+                            data.data[i] += snowfallWaterEquivalent.data[i] + (snowfallConvectiveWaterEquivalent?.data[0] ?? 0)
                         }
                     }
                 }
                 
-                /// More convective snow to showers if temperature is > 2°C or snowfall height is higher than 50 metre above groud
-                if v.variable == .showers {
-                    let snowfallHeight = await storage15min.get(v.with(variable: .snowfall_height))
-                    let snowfallConvectiveWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_convective_water_equivalent))
-                    for i in data.data.indices {
-                        if snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
-                            data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
-                        }
-                    }
-                }
                 /// Set snow to 0 if temperature is > 2°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .snowfall_water_equivalent {
+                    /// Take temperature from 1-hourly data
+                    guard let t2m = await storage.get(v.with(variable: .temperature_2m, timestamp: v.timestamp.floor(toNearest: 3600))) else {
+                        fatalError("Snow correction requires temperature 2m")
+                    }
                     let snowfallHeight = await storage15min.get(v.with(variable: .snowfall_height))
                     let snowfallConvectiveWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
                         data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
-                        if snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50 {
-                            /*if (data.data[i] > 0.01) {
+                        if t2m.data[i] > 2 || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
+                            /*if (data.data[i] > 0.1 && domainElevation[i] > -100) {
                                 print("corrected case value=\(data.data[i]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
                             }*/
                             data.data[i] = 0
@@ -392,6 +384,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
                 if v.variable == .freezing_level_height || v.variable == .snowfall_height {
+                    /// Take temperature from 1-hourly data
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m, timestamp: v.timestamp.floor(toNearest: 3600))) else {
                         fatalError("Freezing level height and snowfall height correction requires temperature_2m")
                     }
