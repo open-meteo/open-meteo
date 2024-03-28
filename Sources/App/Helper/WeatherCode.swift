@@ -172,6 +172,49 @@ enum WeatherCode: Int {
             }
         }
         
+        if temperature_2m < -1 {
+            switch self {
+            case .lightRain:
+                return .slightSnowfall
+            case .moderateRain:
+                return .moderateSnowfall
+            case .heavyRain:
+                return .heavySnowfall
+            default:
+                break
+            }
+        }
+        
+        return self
+    }
+    
+    // If temperature smaller or greated 0°C, set or unset snow
+    func correctSnowRainHardCutOff(temperature_2m: Float) -> Self {
+        if temperature_2m > 0 {
+            // Weather code may show snow, although temperature is high
+            switch self {
+            case .slightSnowfall:
+                return .lightRain
+            case .moderateSnowfall:
+                return .moderateRain
+            case .heavySnowfall:
+                return .heavyRain
+            default:
+                break
+            }
+        }
+        if temperature_2m < 0 {
+            switch self {
+            case .lightRain:
+                return .slightSnowfall
+            case .moderateRain:
+                return .moderateSnowfall
+            case .heavyRain:
+                return .heavySnowfall
+            default:
+                break
+            }
+        }
         return self
     }
 }

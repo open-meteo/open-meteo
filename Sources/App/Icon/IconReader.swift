@@ -88,6 +88,38 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     modelDtSeconds: time.dtSeconds), .wmoCode
                 )
             }
+            
+            // In case elevation correction of more than 100m is necessary, always calculate snow manually with a hard cut at 0°C
+            if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
+                // in case temperature > 0°C, remove snow
+                if surface == .snowfall_water_equivalent {
+                    let snowfall = try reader.get(variable: .surface(.snowfall_water_equivalent), time: time).data
+                    let temperature = try get(raw: .temperature_2m, time: time).data
+                    return DataAndUnit(zip(snowfall, temperature).map({$0 * ($1 >= 0 ? 0 : 1)}), .millimetre)
+                }
+                // in case temperature <0°C, convert add snow to rain
+                if surface == .rain {
+                    let rain = try reader.get(variable: .surface(.rain), time: time).data
+                    let snowfall = try reader.get(variable: .surface(.snowfall_water_equivalent), time: time).data
+                    let temperature = try get(raw: .temperature_2m, time: time).data
+                    return DataAndUnit(zip(zip(rain, snowfall), temperature).map({$0.0 + max(0, $0.1 * ($1 < 0 ? 1 : 0))}), .millimetre)
+                }
+                
+                // Correct snow/rain in weather code according to temperature
+                if surface == .weather_code {
+                    var weatherCode = try reader.get(variable: .surface(.weather_code), time: time).data
+                    let temperature = try get(raw: .temperature_2m, time: time).data
+                    for i in weatherCode.indices {
+                        guard weatherCode[i].isFinite, let weathercode = WeatherCode(rawValue: Int(weatherCode[i])) else {
+                            continue
+                        }
+                        weatherCode[i] = Float(weathercode.correctSnowRainHardCutOff(
+                            temperature_2m: temperature[i]
+                        ).rawValue)
+                    }
+                    return DataAndUnit(weatherCode, .wmoCode)
+                }
+            }
         }
         
         // icon global and EU lack level 975
@@ -158,6 +190,30 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     try reader.prefetchData(variable: .surface(.showers), time: time)
                 }
                 return
+            }
+            
+            // In case elevation correction of more than 100m is necessary, always calculate snow manually with a hard cut at 0°C
+            if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
+                // in case temperature > 0°C, remove snow
+                if surface == .snowfall_water_equivalent {
+                    try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
+                    try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
+                    return
+                }
+                // in case temperature < 0°C, convert add snow to rain
+                if surface == .rain {
+                    try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
+                    try reader.prefetchData(variable: .surface(.rain), time: time)
+                    try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
+                    return
+                }
+                
+                // Correct snow/rain in weather code according to temperature
+                if surface == .weather_code {
+                    try reader.prefetchData(variable: .surface(.weather_code), time: time)
+                    try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
+                    return
+                }
             }
         }
         
