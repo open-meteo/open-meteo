@@ -289,7 +289,6 @@ struct GfsDownload: AsyncCommand {
             let timestamp = run.add(hours: forecastHour)
             
             for member in 0..<nMembers {
-                let memberStr = member > 0 ? "_\(member)" : ""
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
                                

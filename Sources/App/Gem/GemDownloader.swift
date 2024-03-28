@@ -164,7 +164,6 @@ struct GemDownload: AsyncCommand {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
-        let downloadDirectory = domain.downloadDirectory
         let nMembers = domain.ensembleMembers
         
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
@@ -179,7 +178,6 @@ struct GemDownload: AsyncCommand {
         let forecastHours = domain.getForecastHours(run: run)
         for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
-            let h3 = hour.zeroPadded(len: 3)
             struct GemSurfaceVariableMember: Hashable {
                 let variable: GemSurfaceVariable
                 let member: Int
@@ -210,7 +208,6 @@ struct GemDownload: AsyncCommand {
                 do {
                     for message in try await curl.downloadGrib(url: url, bzip2Decode: false, deadLineHours: deadLineHours) {
                         let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
-                        let memberStr = member > 0 ? "_\(member)" : ""
                         //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                         //fatalError()
                         try grib2d.load(message: message)

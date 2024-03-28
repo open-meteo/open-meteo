@@ -123,6 +123,41 @@ struct GenericVariableHandle {
 }
 
 
+actor GenericVariableHandleStorage {
+    var handles = [GenericVariableHandle]()
+    
+    func append(_ element: GenericVariableHandle) {
+        handles.append(element)
+    }
+}
+
+/// Thread safe storage for downloading grib messages. Can be used to post process data.
+actor VariablePerMemberStorage<V: Hashable> {
+    struct VariableAndMember: Hashable {
+        let variable: V
+        let timestamp: Timestamp
+        let member: Int
+        
+        func with(variable: V, timestamp: Timestamp? = nil) -> VariableAndMember {
+            .init(variable: variable, timestamp: timestamp ?? self.timestamp, member: self.member)
+        }
+    }
+    
+    var data = [VariableAndMember: Array2D]()
+    
+    func set(variable: V, timestamp: Timestamp, member: Int, data: Array2D) {
+        self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
+    }
+    
+    func get(variable: V, timestamp: Timestamp, member: Int) -> Array2D? {
+        return data[.init(variable: variable, timestamp: timestamp, member: member)]
+    }
+    
+    func get(_ variable: VariableAndMember) -> Array2D? {
+        return data[variable]
+    }
+}
+
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {
     var data = [String: (step: Int, data: [Float])]()

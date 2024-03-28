@@ -152,13 +152,13 @@ enum WeatherCode: Int {
     
     /// DWD ICON weather codes show rain although precipitation is 0
     /// Similar for snow at +2°C or more
-    func correctDwdIconWeatherCode(temperature_2m: Float, precipitation: Float) -> WeatherCode {
+    func correctDwdIconWeatherCode(temperature_2m: Float, precipitation: Float, snowfallHeightAboveGrid: Bool) -> WeatherCode {
         if precipitation <= 0 && self.isPrecipitationEvent {
             // Weather code shows drizzle, but no precipitation, demote to overcast
             return .overcast
         }
         
-        if temperature_2m >= 2 {
+        if temperature_2m >= 2 || snowfallHeightAboveGrid {
             // Weather code may show snow, although temperature is high
             switch self {
             case .slightSnowfall:
@@ -172,6 +172,49 @@ enum WeatherCode: Int {
             }
         }
         
+        if temperature_2m < -1 {
+            switch self {
+            case .lightRain:
+                return .slightSnowfall
+            case .moderateRain:
+                return .moderateSnowfall
+            case .heavyRain:
+                return .heavySnowfall
+            default:
+                break
+            }
+        }
+        
+        return self
+    }
+    
+    // If temperature smaller or greated 0°C, set or unset snow
+    func correctSnowRainHardCutOff(temperature_2m: Float) -> Self {
+        if temperature_2m > 0 {
+            // Weather code may show snow, although temperature is high
+            switch self {
+            case .slightSnowfall:
+                return .lightRain
+            case .moderateSnowfall:
+                return .moderateRain
+            case .heavySnowfall:
+                return .heavyRain
+            default:
+                break
+            }
+        }
+        if temperature_2m < 0 {
+            switch self {
+            case .lightRain:
+                return .slightSnowfall
+            case .moderateRain:
+                return .moderateSnowfall
+            case .heavyRain:
+                return .heavySnowfall
+            default:
+                break
+            }
+        }
         return self
     }
 }
