@@ -278,12 +278,12 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
                 /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
-                if v.variable == .freezing_level_height {
+                if v.variable == .freezing_level_height || v.variable == .snowfall_height {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Freezing level height correction requires temperature_2m")
+                        fatalError("Freezing level height and snowfall height correction requires temperature_2m")
                     }
                     for i in data.data.indices {
-                        let freezingLevelHeight = data.data[i]
+                        let freezingLevelHeight = data.data[i].isNaN ? max(0, domainElevation[i]) : data.data[i]
                         let temperature_2m = t2m.data[i]
                         let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
                         if newHeight <= domainElevation[i] {
@@ -328,21 +328,6 @@ struct DownloadIconCommand: AsyncCommand {
                                 print("corrected case value=\(data.data[i]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
                             }*/
                             data.data[i] = 0
-                        }
-                    }
-                }
-                
-                /// Snowall height is set to NaN if snowfall height is at ground level
-                if v.variable == .snowfall_height {
-                    guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("snowfall_height correction requires temperature_2m")
-                    }
-                    for i in data.data.indices {
-                        let snowfallHeight = data.data[i].isNaN ? max(0, domainElevation[i]) : data.data[i]
-                        let temperature_2m = t2m.data[i]
-                        let newHeight = snowfallHeight - abs(-1 * temperature_2m) * 0.7 * 100
-                        if newHeight <= domainElevation[i] {
-                            data.data[i] = newHeight
                         }
                     }
                 }
@@ -403,15 +388,17 @@ struct DownloadIconCommand: AsyncCommand {
                     }
                 }
                 
-                /// Snowall height is set to NaN if snowfall height is at ground level
-                if v.variable == .snowfall_height {
+                /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
+                /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
+                /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
+                if v.variable == .freezing_level_height || v.variable == .snowfall_height {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m, timestamp: v.timestamp.floor(toNearest: 3600))) else {
-                        fatalError("snowfall_height correction requires temperature_2m")
+                        fatalError("Freezing level height and snowfall height correction requires temperature_2m")
                     }
                     for i in data.data.indices {
-                        let snowfallHeight = data.data[i].isNaN ? max(0, domainElevation[i]) : data.data[i]
+                        let freezingLevelHeight = data.data[i].isNaN ? max(0, domainElevation[i]) : data.data[i]
                         let temperature_2m = t2m.data[i]
-                        let newHeight = snowfallHeight - abs(-1 * temperature_2m) * 0.7 * 100
+                        let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
                         if newHeight <= domainElevation[i] {
                             data.data[i] = newHeight
                         }
