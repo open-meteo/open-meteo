@@ -139,8 +139,8 @@ struct DownloadIconCommand: AsyncCommand {
             let timestamp = run.add(hours: hour)
             let h3 = hour.zeroPadded(len: 3)
             
-            let storage = VariablePerMemberStorage()
-            let storage15min = VariablePerMemberStorage()
+            let storage = VariablePerMemberStorage<IconSurfaceVariable>()
+            let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -500,32 +500,6 @@ struct DownloadIconCommand: AsyncCommand {
                 try DomainRegistry.dwd_icon_d2_15min.syncToS3(bucket: uploadS3Bucket, variables: variables)
             }
         }
-    }
-}
-
-fileprivate actor VariablePerMemberStorage {
-    struct VariableAndMember: Hashable {
-        let variable: IconSurfaceVariable
-        let timestamp: Timestamp
-        let member: Int
-        
-        func with(variable: IconSurfaceVariable, timestamp: Timestamp? = nil) -> VariableAndMember {
-            .init(variable: variable, timestamp: timestamp ?? self.timestamp, member: self.member)
-        }
-    }
-    
-    var data = [VariableAndMember: Array2D]()
-    
-    func set(variable: IconSurfaceVariable, timestamp: Timestamp, member: Int, data: Array2D) {
-        self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
-    }
-    
-    func get(variable: IconSurfaceVariable, timestamp: Timestamp, member: Int) -> Array2D? {
-        return data[.init(variable: variable, timestamp: timestamp, member: member)]
-    }
-    
-    func get(_ variable: VariableAndMember) -> Array2D? {
-        return data[variable]
     }
 }
 
