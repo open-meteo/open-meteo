@@ -56,8 +56,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             if reader.domain == .iconEuEps, surface == .rain {
                 let precipitation = try get(raw: .precipitation, time: time).data
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snow_con = try get(raw: .snowfall_convective_water_equivalent, time: time).data
-                return DataAndUnit(zip(precipitation, zip(snow_con, snow_gsp)).map({$0 - ($1.0.isNaN ? 0 : $1.0) - $1.1}), .millimetre)
+                return DataAndUnit(zip(precipitation, snow_gsp).map({$0 - $1}), .millimetre)
             }
             
             // no dedicated rain field in ICON EPS and no snow, use temperautre
@@ -161,7 +160,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             if reader.domain == .iconEuEps, surface == .rain {
                 try reader.prefetchData(variable: .surface(.precipitation), time: time)
                 try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
-                try reader.prefetchData(variable: .surface(.snowfall_convective_water_equivalent), time: time)
                 return
             }
             
@@ -178,7 +176,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try reader.prefetchData(variable: .surface(.cloud_cover), time: time)
                 if reader.domain != .iconEuEps {
                     try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
-                    try reader.prefetchData(variable: .surface(.snowfall_convective_water_equivalent), time: time)
                     try reader.prefetchData(variable: .surface(.wind_gusts_10m), time: time)
                     try reader.prefetchData(variable: .surface(.cape), time: time)
                 }
@@ -357,7 +354,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     try prefetchData(raw: .temperature_2m, time: time)
                 } else {
                     try prefetchData(raw: .snowfall_water_equivalent, time: time)
-                    try prefetchData(raw: .snowfall_convective_water_equivalent, time: time)
                 }
             case .surface_pressure:
                 try prefetchData(raw: .pressure_msl, time: time)
@@ -553,10 +549,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     return DataAndUnit(snowfall, SiUnit.centimetre)
                 }
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snow_con = try get(raw: .snowfall_convective_water_equivalent, time: time).data
-                let snowfall = zip(snow_gsp, snow_con).map({
-                    ($0 + ($1.isNaN ? 0 : $1)) * 0.7
-                })
+                let snowfall = snow_gsp.map({$0 * 0.7})
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relative_humidity_2m, time: time)

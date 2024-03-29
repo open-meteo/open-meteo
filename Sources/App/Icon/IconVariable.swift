@@ -155,7 +155,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     /// Large scale rain in mm
     case rain
     
-    /// convective snowfall
+    /// convective snowfall. Note: Only downloaded and then added to `snowfall_water_equivalent`
     case snowfall_convective_water_equivalent
     
     /// largescale snowfall
