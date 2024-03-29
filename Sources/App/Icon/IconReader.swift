@@ -101,7 +101,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     let rain = try reader.get(variable: .surface(.rain), time: time).data
                     let snowfall = try reader.get(variable: .surface(.snowfall_water_equivalent), time: time).data
                     let temperature = try get(raw: .temperature_2m, time: time).data
-                    return DataAndUnit(zip(zip(rain, snowfall), temperature).map({$0.0 + max(0, $0.1 * ($1 < 0 ? 1 : 0))}), .millimetre)
+                    return DataAndUnit(zip(zip(rain, snowfall), temperature).map({$0.0 + max(0, $0.1 * ($1 >= 0 ? 1 : 0))}), .millimetre)
                 }
                 
                 // Correct snow/rain in weather code according to temperature
