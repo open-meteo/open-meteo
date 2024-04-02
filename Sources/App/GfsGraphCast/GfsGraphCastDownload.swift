@@ -93,7 +93,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 return GfsGraphCastPressureVariable(variable: .wind_v_component, level: level)
             case "Geopotential height":
                 return GfsGraphCastPressureVariable(variable: .geopotential_height, level: level)
-            case "Vertical velocity (geometric)":
+            case "Vertical velocity (pressure)":
                 return GfsGraphCastPressureVariable(variable: .vertical_velocity, level: level)
             case "Specific humidity":
                 return GfsGraphCastPressureVariable(variable: .specific_humdity, level: level)
@@ -166,9 +166,9 @@ struct GfsGraphCastDownload: AsyncCommand {
                         }
                     }
                     
-                    if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .specific_humdity].contains(variable.variable) {
+                    if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .specific_humdity, .vertical_velocity].contains(variable.variable) {
                         await storage.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
-                        if variable.variable == .specific_humdity {
+                        if variable.variable == .specific_humdity || variable.variable == .vertical_velocity {
                             // do not store specific humidity on disk
                             return nil
                         }
@@ -188,7 +188,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 let level = v.variable.level
                 logger.info("Calculating relative humidity on level \(level)")
                 guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
-                    fatalError("Weather code correction requires temperature_2m")
+                    fatalError("Requires temperature_2m")
                 }
                 
                 let data = Meteorology.specificToRelativeHumidity(specificHumidity: data.data, temperature: t.data, pressure: .init(repeating: Float(level), count: t.count))
@@ -201,6 +201,28 @@ struct GfsGraphCastDownload: AsyncCommand {
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: rhVariable.scalefactor, all: data)
                 return GenericVariableHandle(
                     variable: rhVariable,
+                    time: v.timestamp,
+                    member: v.member,
+                    fn: fn,
+                    skipHour0: false
+                )
+            }.compactMap({$0})
+            
+            // convert pressure vertical velocity to geometric velocity
+            let handles3 = try await storage.data.mapConcurrent(nConcurrent: concurrent) { (v, data) -> GenericVariableHandle? in
+                guard v.variable.variable == .vertical_velocity else {
+                    return nil
+                }
+                let level = v.variable.level
+                logger.info("Calculating vertical velocity on level \(level)")
+                guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
+                    fatalError("Requires temperature_2m")
+                }
+                let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: v.variable.scalefactor, all: data)
+                return GenericVariableHandle(
+                    variable: v.variable,
                     time: v.timestamp,
                     member: v.member,
                     fn: fn,
@@ -276,7 +298,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     skipHour0: false
                 )
             ]
-            return handles + handles2 + handlesClouds
+            return handles + handles2 + handles3 + handlesClouds
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)
