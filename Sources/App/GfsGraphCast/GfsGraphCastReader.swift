@@ -3,10 +3,8 @@
 enum GfsGraphCastVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case windspeed_10m
     case winddirection_10m
-    
     case wind_speed_10m
     case wind_direction_10m
-   
     case surface_pressure
     case weathercode
     case weather_code

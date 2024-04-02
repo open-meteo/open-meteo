@@ -6,7 +6,6 @@ import SwiftEccodes
 
 /**
  Downloader for GFS GraphCast
-
  */
 struct GfsGraphCastDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -28,7 +27,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
     }
-
+    
     var help: String {
         "Download a specified GFS GraphCast model run"
     }
@@ -49,9 +48,9 @@ struct GfsGraphCastDownload: AsyncCommand {
     
     func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain) async throws {
         let logger = context.application.logger
-
+        
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-
+        
         let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent)
