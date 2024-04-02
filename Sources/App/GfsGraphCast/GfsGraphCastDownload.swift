@@ -3,11 +3,10 @@ import Foundation
 import SwiftPFor2D
 import Vapor
 import SwiftEccodes
-import NIOConcurrencyHelpers
 
 /**
  Downloader for GFS GraphCast
- 
+
  */
 struct GfsGraphCastDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -25,6 +24,9 @@ struct GfsGraphCastDownload: AsyncCommand {
         
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
     }
 
     var help: String {
@@ -35,7 +37,17 @@ struct GfsGraphCastDownload: AsyncCommand {
         disableIdleSleep()
         
         let domain = try GfsGraphCastDomain.load(rawValue: signature.domain)
+        if let timeinterval = signature.timeinterval {
+            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
+                try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+            }
+            return
+        }
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
+        try await downloadRun(using: context, signature: signature, run: run, domain: domain)
+    }
+    
+    func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain) async throws {
         let logger = context.application.logger
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
@@ -108,49 +120,13 @@ struct GfsGraphCastDownload: AsyncCommand {
             }
         default: break
         }
-        
         logger.debug("Unmapped GRIB message \(shortName) \(stepRange) \(stepType) \(typeOfLevel) \(level) \(parameterName) \(parameterUnits) \(cfName) \(scaledValueOfFirstFixedSurface) \(scaledValueOfSecondFixedSurface) \(paramId)")
         return nil
     }
     
-    /// Create elevation and sea mask
-    func writeElevation(grib: [GribMessage], domain: GfsGraphCastDomain) async throws {
-        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
-        try domain.surfaceElevationFileOm.createDirectory()
-        guard let orogGrib = grib.first(where: { message in
-            message.get(attribute: "shortName") == "orog"
-        }) else {
-            fatalError("Could not get orography")
-        }
-        guard let soilMoistureGrib = grib.first(where: { message in
-            message.get(attribute: "shortName") == "q" && message.get(attribute: "typeOfLevel") == "depthBelowLandLayer"
-        }) else {
-            fatalError("Could not get soil moisture")
-        }
-        var orog = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        var soilMoisture = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        try orog.load(message: orogGrib)
-        try soilMoisture.load(message: soilMoistureGrib)
-        orog.array.shift180LongitudeAndFlipLatitude()
-        soilMoisture.array.shift180LongitudeAndFlipLatitude()
-        
-        for i in orog.array.data.indices {
-            if soilMoisture.array.data[i].isNaN || soilMoisture.array.data[i] > 1000 {
-                // Mark as sea level
-                orog.array.data[i] = -999
-            }
-        }
-        //try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
-        
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: orog.array.data)
-    }
-    
-    /// Uses concurrent downloads and concurrent data conversion to process data as fast as possible
-    /// Each download GRIB file is split into hundrets 16 MB parts and download in parallel using HTTP RANGE.
-    /// Individual grib messages are extracted while downloading and processed concurrently
     func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 10
+        let deadLineHours: Double = 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let forecastHours = domain.forecastHours(run: run.hour)
@@ -164,13 +140,12 @@ struct GfsGraphCastDownload: AsyncCommand {
             let url = "\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_37_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(thhh)"
             let timestamp = run.add(hours: forecastHour)
             let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
-            var handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
                 return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     guard let variable = getCmaVariable(logger: logger, message: message) else {
                         return nil
                     }
-                    guard let stepRange = message.get(attribute: "stepRange"),
-                          let stepType = message.get(attribute: "stepType") else {
+                    guard let stepRange = message.get(attribute: "stepRange") else {
                         fatalError("could not get step range or type")
                     }
                     

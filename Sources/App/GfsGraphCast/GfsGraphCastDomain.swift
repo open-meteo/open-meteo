@@ -1,6 +1,4 @@
 import Foundation
-import SwiftPFor2D
-
 
 enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     case graphcast025
@@ -29,21 +27,19 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         return 6*3600
     }
     
-    
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
+        // GraphCast has a delay of 15 hours hours after initialisation. Cronjobs starts at 15:20
         return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
     }
     
-    /// `SecondFlush` is used to download the hours 390-840 from GFS ensemble 0.5° which are 18 hours later available
     func forecastHours(run: Int) -> [Int] {
         return Array(stride(from: 6, through: 240, by: 6))
     }
 
     var levels: [Int] {
-        return [10, 15, 20, 30, 40, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
+        return [10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
     }
     
     var omFileLength: Int {
