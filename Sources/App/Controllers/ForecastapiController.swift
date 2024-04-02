@@ -193,8 +193,8 @@ struct WeatherApiController {
                             var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
                             return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.compactMap { variable -> ApiColumn<ForecastVariableDaily>? in
                                 if variable == .sunrise || variable == .sunset {
-                                    // only calculate sunrise/set once
-                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyRead.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                                    // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
+                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: timezone.utcOffsetSeconds)
                                     riseSet = times
                                     if variable == .sunset {
                                         return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -203,7 +203,7 @@ struct WeatherApiController {
                                     }
                                 }
                                 if variable == .daylight_duration {
-                                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyRead.range, lat: reader.modelLat)
+                                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: reader.modelLat)
                                     return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                 }
                                 
