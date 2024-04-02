@@ -270,6 +270,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gfs_mix
     case gfs_global
     case gfs_hrrr
+    case gfs_graphcast025
     
     case meteofrance_seamless
     case meteofrance_mix
@@ -387,6 +388,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try GfsMixer(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .gfs_hrrr:
             return try GfsMixer(domains: [.hrrr_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+        case .gfs_graphcast025:
+            return try GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .meteofrance_seamless:
             fallthrough
         case .meteofrance_mix:

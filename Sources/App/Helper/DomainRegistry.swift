@@ -35,6 +35,7 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_hrrr_conus
     case ncep_hrrr_conus_15min
     case ncep_cfsv2
+    case ncep_gfs_graphcast025
     
     case glofas_consolidated_v4
     case glofas_consolidated_v3
@@ -226,6 +227,8 @@ enum DomainRegistry: String, CaseIterable {
             return ArpaeDomain.cosmo_2i_ruc
         case .arpae_cosmo_5m:
             return ArpaeDomain.cosmo_5m
+        case .ncep_gfs_graphcast025:
+            return GfsGraphCastDomain.graphcast025
         }
     }
 }
