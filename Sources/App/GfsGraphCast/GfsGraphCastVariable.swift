@@ -141,6 +141,8 @@ struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, G
         switch variable {
         case .temperature:
             return (1, -273.15)
+        case .specific_humdity:
+            return (1000, 0)
         default:
             return nil
         }

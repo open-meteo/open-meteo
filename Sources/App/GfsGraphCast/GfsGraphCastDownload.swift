@@ -156,7 +156,6 @@ struct GfsGraphCastDownload: AsyncCommand {
         let forecastHours = domain.forecastHours(run: run.hour)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let deaverager = GribDeaverager()
         
         // https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/graphcastgfs.20240401/00/forecasts_37_levels/graphcastgfs.t00z.pgrb2.0p25.f006
         let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
@@ -186,9 +185,11 @@ struct GfsGraphCastDownload: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        return nil
+                    if let variable = variable as? GfsGraphCastSurfaceVariable, variable == .precipitation {
+                        // There are 2 precipitation messages inside. Actiually the second is no precip
+                        if stepRange.starts(with: "0-") {
+                            return nil
+                        }
                     }
                     
                     if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .specific_humdity].contains(variable.variable) {
