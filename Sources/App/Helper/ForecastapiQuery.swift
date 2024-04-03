@@ -126,36 +126,57 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         }
     }
     
+    enum ApiRequestGeometry {
+        case coordinates([CoordinatesAndTimeZonesAndDates])
+        case boundingBox(BoundingBoxWGS84, dates: [ApiQueryStartEndRanges], timezone: TimezoneWithOffset)
+    }
+    
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
-    func prepareCoordinates(allowTimezones: Bool) throws -> [CoordinatesAndTimeZonesAndDates] {
+    func prepareCoordinates(allowTimezones: Bool) throws -> ApiRequestGeometry {
         let dates = try getStartEndDates()
+        if let bb = try getBoundingBox() {
+            let timezones = allowTimezones ? try TimeZoneOrAuto.load(commaSeparatedOptional: timezone) ?? [] : []
+            guard timezones.count <= 1 else {
+                throw ForecastapiError.generic(message: "Only one timezone may be specified with bounding box queries")
+            }
+            let timezone: TimezoneWithOffset = try timezones.first.map({
+                switch $0 {
+                case .auto:
+                    throw ForecastapiError.generic(message: "Timezone 'auto' not supported with bounding box queries")
+                case .timezone(let t):
+                    return TimezoneWithOffset(timezone: t)
+                }
+            }) ?? TimezoneWithOffset.gmt
+            return .boundingBox(bb, dates: dates, timezone: timezone)
+        }
+        
         let coordinates = try getCoordinatesWithTimezone(allowTimezones: allowTimezones)
         
         /// If no start/end dates are set, leav it `nil`
         guard dates.count > 0 else {
-            return coordinates.map({
+            return .coordinates(coordinates.map({
                 CoordinatesAndTimeZonesAndDates(coordinate: $0.coordinate, timezone: $0.timezone, startEndDate: nil)
-            })
+            }))
         }
         /// Multiple coordinates, but one start/end date. Return the same date range for each coordinate
         if dates.count == 1 {
-            return coordinates.map({
+            return .coordinates(coordinates.map({
                 CoordinatesAndTimeZonesAndDates(coordinate: $0.coordinate, timezone: $0.timezone, startEndDate: dates[0])
-            })
+            }))
         }
         /// Single coordinate, but multiple dates. Return different date ranges, but always the same coordinate
         if coordinates.count == 1 {
-            return dates.map {
+            return .coordinates(dates.map {
                 CoordinatesAndTimeZonesAndDates(coordinate: coordinates[0].coordinate, timezone: coordinates[0].timezone, startEndDate: $0)
-            }
+            })
         }
         guard dates.count == coordinates.count else {
             throw ForecastapiError.coordinatesAndStartEndDatesCountMustBeTheSame
         }
-        return zip(coordinates, dates).map {
+        return .coordinates(zip(coordinates, dates).map {
             CoordinatesAndTimeZonesAndDates(coordinate: $0.0.coordinate, timezone: $0.0.timezone, startEndDate: $0.1)
-        }
+        })
     }
     
     /// Parse `&bounding_box=` parameter. Format: lat1, lon1, lat2, lon2

@@ -125,17 +125,41 @@ struct WeatherApiController {
         let nParamsDaily = paramsDaily?.count ?? 0
         let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
         
-        let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
-            let coordinates = prepared.coordinate
+        /// Prepare readers based on geometry
+        let prepared2: [(/*coordinates: CoordinatesAndElevation,*/ locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: MultiDomains, reader: GenericReaderMulti<ForecastVariable>)])]
+        
+        switch prepared {
+        case .coordinates(let coordinates):
+            prepared2 = try coordinates.map { prepared in
+                let coordinates = prepared.coordinate
+                let timezone = prepared.timezone
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+                
+                return (/*coordinates,*/ coordinates.locationId, timezone, time, try domains.compactMap { domain in
+                    guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
+                        return nil
+                    }
+                    return (domain, reader)
+                })
+            }
+        case .boundingBox(_, dates: let dates, timezone: let timezone):
+            fatalError()
+        }
+        
+        let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared2.map { prepared in
+            //let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            //let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = prepared.time
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
             
-            let readers: [ForecastapiResult<MultiDomains>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
+            let readers: [ForecastapiResult<MultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                /*guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
                     return nil
-                }
+                }*/
+                let reader = readerAndDomain.reader
+                let domain = readerAndDomain.domain
                 
                 return .init(
                     model: domain,
@@ -194,7 +218,7 @@ struct WeatherApiController {
                             return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.compactMap { variable -> ApiColumn<ForecastVariableDaily>? in
                                 if variable == .sunrise || variable == .sunset {
                                     // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
-                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: coordinates.latitude, lon: coordinates.longitude, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: reader.modelLat, lon: reader.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
                                     riseSet = times
                                     if variable == .sunset {
                                         return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -233,7 +257,7 @@ struct WeatherApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))

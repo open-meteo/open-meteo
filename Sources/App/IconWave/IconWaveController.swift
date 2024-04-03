@@ -29,6 +29,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
 
 struct IconWaveController {
     func query(_ req: Request) async throws -> Response {
+        /*
         try await req.ensureSubdomain("marine-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("marine-api", apikey: params.apikey)
@@ -113,7 +114,8 @@ struct IconWaveController {
         }
         let result = ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json)*/
+        fatalError()
     }
 }
 

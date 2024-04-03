@@ -87,6 +87,7 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GloFasController {
     func query(_ req: Request) async throws -> Response {
+        /*
         try await req.ensureSubdomain("flood-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("flood-api", apikey: params.apikey)
@@ -156,6 +157,8 @@ struct GloFasController {
         let result = ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
         return try await result.response(format: params.format ?? .json)
+         */
+        fatalError()
     }
 }
 
