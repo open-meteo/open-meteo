@@ -217,3 +217,9 @@ enum GridSelectionMode: String, Codable {
     case sea
     case nearest
 }
+
+
+struct BoundingBoxWGS84 {
+    let latitude: Range<Float>
+    let longitude: Range<Float>
+}
