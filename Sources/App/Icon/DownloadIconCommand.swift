@@ -302,7 +302,9 @@ struct DownloadIconCommand: AsyncCommand {
                     let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
-                            data.data[i] += snowfallWaterEquivalent.data[i] + (snowfallConvectiveWaterEquivalent?.data[0] ?? 0)
+                            let snowWater = snowfallWaterEquivalent.data[i].isNaN ? 0 : snowfallWaterEquivalent.data[i]
+                            let snowConvWater = snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
+                            data.data[i] += snowWater + snowConvWater
                         }
                     }
                 }
@@ -316,7 +318,7 @@ struct DownloadIconCommand: AsyncCommand {
                     let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
-                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
+                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             /*if (data.data[i] > 0.1 && domainElevation[i] > -100) {
                                 print("corrected case value=\(data.data[i]) t=\(t2m.data[i]) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
@@ -355,7 +357,9 @@ struct DownloadIconCommand: AsyncCommand {
                     let snowfallConvectiveWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
-                            data.data[i] += snowfallWaterEquivalent.data[i] + (snowfallConvectiveWaterEquivalent?.data[0] ?? 0)
+                            let snowWater = snowfallWaterEquivalent.data[i].isNaN ? 0 : snowfallWaterEquivalent.data[i]
+                            let snowConvWater = snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
+                            data.data[i] += snowWater + snowConvWater
                         }
                     }
                 }
@@ -370,7 +374,7 @@ struct DownloadIconCommand: AsyncCommand {
                     let snowfallConvectiveWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_convective_water_equivalent))
                     for i in data.data.indices {
                         // Add convective snow, to regular snow
-                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[i] ?? 0
+                        data.data[i] += snowfallConvectiveWaterEquivalent?.data[0].isNaN == true ? 0 : snowfallConvectiveWaterEquivalent?.data[0] ?? 0
                         if t2m.data[i] > IconDomains.tMelt || (t2m.data[i] > 0 && snowfallHeight?.data[i] ?? .nan > max(0, domainElevation[i]) + 50) {
                             /*if (data.data[i] > 0.1 && domainElevation[i] > -100) {
                                 print("corrected case value=\(data.data[i]) t=\(t2m?.data[i] ?? .nan) sh=\(snowfallHeight?.data[i] ?? .nan) ele=\(domainElevation[i])")
