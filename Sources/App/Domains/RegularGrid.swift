@@ -48,11 +48,11 @@ struct RegularGrid: Gridable {
     }
     
     func findBox(boundingBox bb: BoundingBoxWGS84) -> some Sequence<Int> {
-        let x1 = Int(bb.longitude.lowerBound / dx) - Int(lonMin / dx)
-        let x2 = Int(bb.longitude.upperBound / dx) - Int(lonMin / dx)
+        let x1 = Int(roundf((bb.longitude.lowerBound-lonMin) / dx))
+        let x2 = Int(roundf((bb.longitude.upperBound-lonMin) / dx))
         
-        let y1 = Int(bb.latitude.lowerBound / dy) - Int(latMin / dy)
-        let y2 = Int(bb.latitude.upperBound / dy) - Int(latMin / dy)
+        let y1 = Int(roundf((bb.latitude.lowerBound-latMin) / dy))
+        let y2 = Int(roundf((bb.latitude.upperBound-latMin) / dy))
         
         let xRange = x1 ..< x2
         let yRange = y1 ..< y2
