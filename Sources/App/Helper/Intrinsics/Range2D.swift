@@ -1,48 +1,57 @@
 import Foundation
 
 /// Range, but with 2 dimensions
-struct Range2D<Element1: Comparable, Element2: Comparable> {
-    let y: Range<Element1>
-    let x: Range<Element2>
+struct Range2D {
+    let y: Range<Int>
+    let x: Range<Int>
     
-    init(_ y: Range<Element1>, _ x: Range<Element2>) {
+    init(_ y: Range<Int>, _ x: Range<Int>) {
         self.y = y
         self.x = x
     }
 }
 
-extension Range2D: Sequence where Element1: Strideable, Element2: Strideable {
-    func makeIterator() -> Iterator {
-        return Iterator(range: self)
+extension Range2D: Sequence {
+    func makeIterator() -> Iterator2D<Range<Int>, Range<Int>> {
+        return Iterator2D(y, x)
+    }
+}
+
+/*
+ Iterator over 2 sequences as 2 dimensions Y and X. It will iterate y-times of x.
+ */
+struct Iterator2D<Y: Sequence, X: Sequence>: IteratorProtocol {
+    var yIterator: Y.Iterator
+    var y: Y.Element?
+    var xIterator: X.Iterator
+    let xSequence: X
+    
+    init(_ y: Y, _ x: X) {
+        self.yIterator = y.makeIterator()
+        self.y = yIterator.next()
+        self.xIterator = x.makeIterator()
+        self.xSequence = x
     }
     
-    struct Iterator: IteratorProtocol {
-        var y: Element1
-        var x: Element2
-        let range: Range2D
-        
-        init(range: Range2D) {
-            self.y = range.y.lowerBound
-            self.x = range.x.lowerBound
-            self.range = range
+    mutating func next() -> (y: Y.Element, x: X.Element)? {
+        guard let y else {
+            return nil
         }
-        
-        mutating func next() -> (y: Element1, x: Element2)? {
-            let xNext = x.advanced(by: 1)
-            if xNext == range.x.upperBound {
-                let yNext = y.advanced(by: 1)
-                if yNext == range.y.upperBound {
-                    return nil
-                }
-                let currentX = x
-                let currentY = y
-                x = range.x.lowerBound
-                y = yNext
-                return (currentY, currentX)
+        guard let x = xIterator.next() else {
+            // xIterator finished, get next y and a new xIterator
+            guard let yNext = yIterator.next() else {
+                // end of itertion
+                self.y = nil
+                return nil
             }
-            let currentX = x
-            x = xNext
-            return (y, currentX)
+            self.y = yNext
+            self.xIterator = xSequence.makeIterator()
+            guard let x = xIterator.next() else {
+                self.y = nil
+                return nil
+            }
+            return (yNext, x)
         }
+        return (y, x)
     }
 }
