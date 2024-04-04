@@ -46,4 +46,67 @@ struct RegularGrid: Gridable {
         let yFraction = (lat-latMin).truncatingRemainder(dividingBy: dy)
         return GridPoint2DFraction(gridpoint: Int(y) * nx + Int(x), xFraction: xFraction, yFraction: yFraction)
     }
+    
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> some Sequence<Int> {
+        let x1 = Int(bb.longitude.lowerBound / dx) - Int(lonMin / dx)
+        let x2 = Int(bb.longitude.upperBound / dx) - Int(lonMin / dx)
+        
+        let y1 = Int(bb.latitude.lowerBound / dy) - Int(latMin / dy)
+        let y2 = Int(bb.latitude.upperBound / dy) - Int(latMin / dy)
+        
+        let xRange = x1 ..< x2
+        let yRange = y1 ..< y2
+        
+        return RegularGridSlice(grid: self, yRange: yRange, xRange: xRange)
+    }
+}
+
+/// Represend a subsection of a grid. Similar to an array slice, but using two dimensions
+/// Important: The iterated coordinates are in global coordinates (-> gridpoint index). Array slices would use local indices.
+struct RegularGridSlice {
+    let grid: RegularGrid
+    let yRange: Range<Int>
+    let xRange: Range<Int>
+}
+
+extension RegularGridSlice: Sequence {
+    func makeIterator() -> GridSliceXyIterator {
+        return GridSliceXyIterator(yRange: yRange, xRange: xRange, nx: grid.nx)
+    }
+}
+
+/// Iterate over a subset of a grib following x and y ranges. The element returns the global grid coordinate (grid point index as integer)
+struct GridSliceXyIterator: IteratorProtocol {
+    /// Current position of the iteration
+    var position: Int
+    /// End of the iteration (not including)
+    let end: Int
+    /// Number of x steps in the grid slice
+    let nxSlice: Int
+    /// Number of x steps in the grid
+    let nx: Int
+    
+    init(yRange: Range<Int>, xRange: Range<Int>, nx: Int) {
+        let count = xRange.count * yRange.count
+        self.end = ((yRange.upperBound - 1) * nx + xRange.upperBound)
+        // For empty grids, set the position pointer to the end of iteration
+        self.position = count == 0 ? self.end : (yRange.lowerBound * nx + xRange.lowerBound - 1)
+        self.nxSlice = xRange.count
+        self.nx = nx
+    }
+    
+    mutating func next() -> Int? {
+        guard (position + 1) < end else {
+            // End of iteration
+            return nil
+        }
+        let xSliceUpperBound = end % nx
+        guard (position + 1) % nx < xSliceUpperBound else {
+            // X range exceeded, increment Y, restart x
+            position = position + 1 + nx - nxSlice
+            return position
+        }
+        position += 1
+        return position
+    }
 }
