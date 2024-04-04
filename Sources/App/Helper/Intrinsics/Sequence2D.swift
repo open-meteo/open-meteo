@@ -1,19 +1,26 @@
 import Foundation
 
-/// Range, but with 2 dimensions
-struct Range2D {
-    let y: Range<Int>
-    let x: Range<Int>
+/// Sequence, but with 2 dimensions
+struct Sequence2D<S1: Sequence, S2: Sequence> {
+    let y: S1
+    let x: S2
     
-    init(_ y: Range<Int>, _ x: Range<Int>) {
+    init(_ y: S1, _ x: S2) {
         self.y = y
         self.x = x
     }
 }
 
-extension Range2D: Sequence {
-    func makeIterator() -> Iterator2D<Range<Int>, Range<Int>> {
+extension Sequence2D: Sequence {
+    func makeIterator() -> Iterator2D<S1, S2> {
         return Iterator2D(y, x)
+    }
+}
+
+extension Sequence {
+    /// Iterate over 2 dimensions. The second sequence is iterated self.count times
+    func iterate2D<S: Sequence>(over other: S) -> Sequence2D<Self, S> {
+        return Sequence2D(self, other)
     }
 }
 
