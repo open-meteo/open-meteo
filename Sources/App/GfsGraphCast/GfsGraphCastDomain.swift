@@ -31,7 +31,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         // GraphCast has a delay of 15 hours hours after initialisation. Cronjobs starts at 15:20
-        return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
+        return t.with(hour: ((t.hour - 15 + 24) % 24) / 6 * 6)
     }
     
     func forecastHours(run: Int) -> [Int] {
