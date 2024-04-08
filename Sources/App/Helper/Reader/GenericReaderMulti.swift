@@ -43,6 +43,10 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         self.reader = reader
     }
     
+    public static func getReadersFor(domain: MultiDomainMixerDomain, box: BoundingBoxWGS84, options: GenericReaderOptions) throws -> [Self] {
+        fatalError()
+    }
+    
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
         for reader in reader {
             if time.dtSeconds > reader.modelDtSeconds {
