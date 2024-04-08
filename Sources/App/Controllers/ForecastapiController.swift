@@ -125,7 +125,7 @@ struct WeatherApiController {
         let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
         let options = params.readerOptions
         
-        /// Prepare readers for Point, MultiPoint or BoundBox queries
+        /// Prepare readers based on geometry
         /// Readers are returned as a callback to release memory after data has been retrieved
         let prepared = try GenericReaderMulti<ForecastVariable>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDay: forecastDay, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
         

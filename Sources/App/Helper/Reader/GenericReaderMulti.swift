@@ -47,25 +47,6 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         self.reader = reader
     }
     
-    /// Return a reader for each grid-cell inside a bounding box
-    public static func getReadersFor(domain: MultiDomainMixerDomain, box: BoundingBoxWGS84, options: GenericReaderOptions) throws -> [() throws -> (Self?)] {
-        guard let grid = domain.genericDomain?.grid else {
-            throw ForecastapiError.generic(message: "Bounbing box calls not supported for domain \(domain)")
-        }
-        guard let gridpoionts = (grid as? RegularGrid)?.findBox(boundingBox: box) else {
-            throw ForecastapiError.generic(message: "Bounbing box calls not supported for grid of domain \(domain)")
-        }
-        print(gridpoionts)
-        return gridpoionts.map( { gridpoint -> (() throws -> (Self?)) in
-            return {
-                guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
-                    return nil
-                }
-                return Self.init(domain: domain, reader: [reader])
-            }
-        })
-    }
-    
     /// Prepare readers for Point, MultiPoint and BoundingBox queries
     public static func prepareReaders<Domain: MultiDomainMixerDomain>(domains: [Domain], params: ApiQueryParameter, currentTime: Timestamp, forecastDay: Int, forecastDaysMax: Int, pastDaysMax: Int, allowedRange: Range<Timestamp>) throws -> [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: Domain, reader: () throws -> (Self?))])] {
         let options = params.readerOptions
@@ -106,7 +87,6 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
                 
                 return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(Domain, () throws -> Self?)])] in
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                    let readers = try Self.getReadersFor(domain: domain, box: bbox, options: options)
                     return gridpoionts.enumerated().map( { (locationId, gridpoint) in
                         return (locationId, timezone, time, [(domain, { () -> Self? in
                             guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
