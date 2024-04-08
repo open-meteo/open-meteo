@@ -3,6 +3,14 @@ import Vapor
 
 
 enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain {
+    var genericDomain: (any GenericDomain)? {
+        fatalError()
+    }
+    
+    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
+        fatalError()
+    }
+    
     case best_match
     case ewam
     case gwam

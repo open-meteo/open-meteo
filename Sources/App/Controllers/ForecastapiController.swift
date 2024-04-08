@@ -144,7 +144,15 @@ struct WeatherApiController {
             }
         case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
             prepared2 = try domains.flatMap ({ domain in
-                return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(MultiDomains, () throws -> GenericReaderMulti<ForecastVariable>)])] in
+                if dates.count == 0 {
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: 92)
+                    let readers = try GenericReaderMulti<ForecastVariable>.getReadersFor(domain: domain, box: bbox, options: options)
+                    return readers.enumerated().map { (locationId, reader) in
+                        (locationId, timezone, time, [(domain, reader)])
+                    }
+                }
+                
+                return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(MultiDomains, () throws -> GenericReaderMulti<ForecastVariable>?)])] in
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: 92)
                     let readers = try GenericReaderMulti<ForecastVariable>.getReadersFor(domain: domain, box: bbox, options: options)
                     return readers.enumerated().map { (locationId, reader) in
@@ -507,6 +515,24 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try ArpaeReader(domain: .cosmo_2i_ruc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .arpae_cosmo_5m:
             return try ArpaeReader(domain: .cosmo_5m, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        }
+    }
+    
+    var genericDomain: (any GenericDomain)? {
+        switch self {
+        case .icon_global:
+            return IconDomains.icon
+        default:
+            return nil
+        }
+    }
+    
+    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
+        switch self {
+        case .icon_global:
+            return try IconReader(domain: .icon, gridpoint: gridpoint, options: options)
+        default:
+            return nil
         }
     }
     

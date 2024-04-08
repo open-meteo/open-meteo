@@ -4,7 +4,11 @@ import Foundation
 protocol MultiDomainMixerDomain: RawRepresentableString {
     var countEnsembleMember: Int { get }
     
+    var genericDomain: GenericDomain? { get }
+    
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol]
+    
+    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)?
 }
 
 /// Combine multiple independent weather models, that may not have given forecast variable
@@ -43,8 +47,23 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         self.reader = reader
     }
     
-    public static func getReadersFor(domain: MultiDomainMixerDomain, box: BoundingBoxWGS84, options: GenericReaderOptions) throws -> [() throws -> (Self)] {
-        fatalError()
+    /// Return a reader for each grid-cell inside a bounding box
+    public static func getReadersFor(domain: MultiDomainMixerDomain, box: BoundingBoxWGS84, options: GenericReaderOptions) throws -> [() throws -> (Self?)] {
+        guard let grid = domain.genericDomain?.grid else {
+            throw ForecastapiError.generic(message: "Bounbing box calls not supported for domain \(domain)")
+        }
+        guard let gridpoionts = (grid as? RegularGrid)?.findBox(boundingBox: box) else {
+            throw ForecastapiError.generic(message: "Bounbing box calls not supported for grid of domain \(domain)")
+        }
+        print(gridpoionts)
+        return gridpoionts.map( { gridpoint -> (() throws -> (Self?)) in
+            return {
+                guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
+                    return nil
+                }
+                return Self.init(domain: domain, reader: [reader])
+            }
+        })
     }
     
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
