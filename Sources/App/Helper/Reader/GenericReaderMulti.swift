@@ -43,7 +43,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         self.reader = reader
     }
     
-    public static func getReadersFor(domain: MultiDomainMixerDomain, box: BoundingBoxWGS84, options: GenericReaderOptions) throws -> [Self] {
+    public static func getReadersFor(domain: MultiDomainMixerDomain, box: BoundingBoxWGS84, options: GenericReaderOptions) throws -> [() throws -> (Self)] {
         fatalError()
     }
     

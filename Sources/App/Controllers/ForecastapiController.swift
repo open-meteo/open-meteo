@@ -127,9 +127,8 @@ struct WeatherApiController {
         let options = params.readerOptions
         
         /// Prepare readers based on geometry
-        let prepared2: [(/*coordinates: CoordinatesAndElevation,*/ locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: MultiDomains, reader: GenericReaderMulti<ForecastVariable>)])]
-        
-        /// Note: keeping the reader in memory requires a lot of memory
+        /// Readers are returned as a callback to release memory after data has been retrieved
+        let prepared2: [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: MultiDomains, reader: () throws -> GenericReaderMulti<ForecastVariable>?)])]
         
         switch prepared {
         case .coordinates(let coordinates):
@@ -137,17 +136,15 @@ struct WeatherApiController {
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-                
-                return (/*coordinates,*/ coordinates.locationId, timezone, time, try domains.compactMap { domain in
-                    guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
-                        return nil
-                    }
-                    return (domain, reader)
+                return (coordinates.locationId, timezone, time, domains.compactMap { domain in
+                    return (domain, {
+                        return try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
+                    })
                 })
             }
         case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
             prepared2 = try domains.flatMap ({ domain in
-                return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(MultiDomains, GenericReaderMulti<ForecastVariable>)])] in
+                return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(MultiDomains, () throws -> GenericReaderMulti<ForecastVariable>)])] in
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: 92)
                     let readers = try GenericReaderMulti<ForecastVariable>.getReadersFor(domain: domain, box: bbox, options: options)
                     return readers.enumerated().map { (locationId, reader) in
@@ -158,18 +155,15 @@ struct WeatherApiController {
         }
         
         let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared2.map { prepared in
-            //let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            //let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
             let time = prepared.time
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
             
             let readers: [ForecastapiResult<MultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
-                /*guard let reader = try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
+                guard let reader = try readerAndDomain.reader() else {
                     return nil
-                }*/
-                let reader = readerAndDomain.reader
+                }
                 let domain = readerAndDomain.domain
                 
                 return .init(
