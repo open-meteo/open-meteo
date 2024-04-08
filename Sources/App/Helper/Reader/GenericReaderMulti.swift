@@ -66,6 +66,60 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         })
     }
     
+    /// Prepare readers for Point, MultiPoint and BoundingBox queries
+    public static func prepareReaders<Domain: MultiDomainMixerDomain>(domains: [Domain], params: ApiQueryParameter, currentTime: Timestamp, forecastDay: Int, forecastDaysMax: Int, pastDaysMax: Int, allowedRange: Range<Timestamp>) throws -> [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: Domain, reader: () throws -> (Self?))])] {
+        let options = params.readerOptions
+        let prepared = try params.prepareCoordinates(allowTimezones: true)
+        
+        switch prepared {
+        case .coordinates(let coordinates):
+            return try coordinates.map { prepared in
+                let coordinates = prepared.coordinate
+                let timezone = prepared.timezone
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                return (coordinates.locationId, timezone, time, domains.compactMap { domain in
+                    return (domain, {
+                        return try Self.init(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
+                    })
+                })
+            }
+        case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
+            return try domains.flatMap ({ domain in
+                guard let grid = domain.genericDomain?.grid else {
+                    throw ForecastapiError.generic(message: "Bounbing box calls not supported for domain \(domain)")
+                }
+                guard let gridpoionts = (grid as? RegularGrid)?.findBox(boundingBox: bbox) else {
+                    throw ForecastapiError.generic(message: "Bounbing box calls not supported for grid of domain \(domain)")
+                }
+                
+                if dates.count == 0 {
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    return gridpoionts.enumerated().map( { (locationId, gridpoint) in
+                        return (locationId, timezone, time, [(domain, { () -> Self? in
+                            guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
+                                return nil
+                            }
+                            return Self.init(domain: domain, reader: [reader])
+                        })])
+                    })
+                }
+                
+                return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(Domain, () throws -> Self?)])] in
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    let readers = try Self.getReadersFor(domain: domain, box: bbox, options: options)
+                    return gridpoionts.enumerated().map( { (locationId, gridpoint) in
+                        return (locationId, timezone, time, [(domain, { () -> Self? in
+                            guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
+                                return nil
+                            }
+                            return Self.init(domain: domain, reader: [reader])
+                        })])
+                    })
+                })
+            })
+        }
+    }
+    
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
         for reader in reader {
             if time.dtSeconds > reader.modelDtSeconds {

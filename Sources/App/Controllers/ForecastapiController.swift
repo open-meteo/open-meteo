@@ -112,7 +112,6 @@ struct WeatherApiController {
         let currentTime = Timestamp.now()
         let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)
         
-        let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
         let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
         let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
@@ -126,43 +125,11 @@ struct WeatherApiController {
         let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
         let options = params.readerOptions
         
-        /// Prepare readers based on geometry
+        /// Prepare readers for Point, MultiPoint or BoundBox queries
         /// Readers are returned as a callback to release memory after data has been retrieved
-        let prepared2: [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: MultiDomains, reader: () throws -> GenericReaderMulti<ForecastVariable>?)])]
+        let prepared = try GenericReaderMulti<ForecastVariable>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDay: forecastDay, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
         
-        switch prepared {
-        case .coordinates(let coordinates):
-            prepared2 = try coordinates.map { prepared in
-                let coordinates = prepared.coordinate
-                let timezone = prepared.timezone
-                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-                return (coordinates.locationId, timezone, time, domains.compactMap { domain in
-                    return (domain, {
-                        return try GenericReaderMulti<ForecastVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
-                    })
-                })
-            }
-        case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
-            prepared2 = try domains.flatMap ({ domain in
-                if dates.count == 0 {
-                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: 92)
-                    let readers = try GenericReaderMulti<ForecastVariable>.getReadersFor(domain: domain, box: bbox, options: options)
-                    return readers.enumerated().map { (locationId, reader) in
-                        (locationId, timezone, time, [(domain, reader)])
-                    }
-                }
-                
-                return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(MultiDomains, () throws -> GenericReaderMulti<ForecastVariable>?)])] in
-                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: 92)
-                    let readers = try GenericReaderMulti<ForecastVariable>.getReadersFor(domain: domain, box: bbox, options: options)
-                    return readers.enumerated().map { (locationId, reader) in
-                        (locationId, timezone, time, [(domain, reader)])
-                    }
-                })
-            })
-        }
-        
-        let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared2.map { prepared in
+        let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
             let timezone = prepared.timezone
             let time = prepared.time
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
