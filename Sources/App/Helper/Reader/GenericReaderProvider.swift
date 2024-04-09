@@ -11,7 +11,7 @@ protocol GenericReaderProvider {
 
 extension GenericReaderProvider {
     /// Prepare readers for Point, MultiPoint and BoundingBox queries
-    public static func prepareReaders(domains: [Domain], params: ApiQueryParameter, currentTime: Timestamp, forecastDay: Int, forecastDaysMax: Int, pastDaysMax: Int, allowedRange: Range<Timestamp>) throws -> [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: Domain, reader: () throws -> (Self?))])] {
+    public static func prepareReaders(domains: [Domain], params: ApiQueryParameter, currentTime: Timestamp, forecastDayDefault: Int, forecastDaysMax: Int, pastDaysMax: Int, allowedRange: Range<Timestamp>) throws -> [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: Domain, reader: () throws -> (Self?))])] {
         let options = params.readerOptions
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         
@@ -20,7 +20,7 @@ extension GenericReaderProvider {
             return try coordinates.map { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
-                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                 return (coordinates.locationId, timezone, time, domains.compactMap { domain in
                     return (domain, {
                         return try Self.init(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
@@ -37,7 +37,7 @@ extension GenericReaderProvider {
                 }
                 
                 if dates.count == 0 {
-                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     return gridpoionts.enumerated().map( { (locationId, gridpoint) in
                         return (locationId, timezone, time, [(domain, { () -> Self? in
                             guard let reader = try Self.init(domain: domain, gridpoint: gridpoint, options: options) else {
@@ -49,7 +49,7 @@ extension GenericReaderProvider {
                 }
                 
                 return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(Domain, () throws -> Self?)])] in
-                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDay, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     return gridpoionts.enumerated().map( { (locationId, gridpoint) in
                         return (locationId, timezone, time, [(domain, { () -> Self? in
                             guard let reader = try Self.init(domain: domain, gridpoint: gridpoint, options: options) else {

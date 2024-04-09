@@ -105,7 +105,7 @@ struct WeatherApiController {
         /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
         let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
         let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
-        let forecastDay = isHistoricalForecastApi ? 1 : self.forecastDay
+        let forecastDayDefault = isHistoricalForecastApi ? 1 : self.forecastDay
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
         
@@ -126,7 +126,7 @@ struct WeatherApiController {
         
         /// Prepare readers based on geometry
         /// Readers are returned as a callback to release memory after data has been retrieved
-        let prepared = try GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDay: forecastDay, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
+        let prepared = try GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
         
         let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
             let timezone = prepared.timezone
