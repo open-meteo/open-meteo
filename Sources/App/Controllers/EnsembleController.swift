@@ -8,7 +8,8 @@ import Vapor
  */
 public struct EnsembleApiController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("ensemble-api")
+        let host = try await req.ensureSubdomain("ensemble-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("ensemble-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
@@ -77,7 +78,7 @@ public struct EnsembleApiController {
         }
         let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

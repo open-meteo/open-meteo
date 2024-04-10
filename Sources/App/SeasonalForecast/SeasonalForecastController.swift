@@ -148,7 +148,8 @@ extension SeasonalForecastReader {
  */
 struct SeasonalForecastController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("seasonal-api")
+        let host = try await req.ensureSubdomain("seasonal-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("seasonal-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
@@ -246,7 +247,7 @@ struct SeasonalForecastController {
         }
         let result = ForecastapiResult<SeasonalForecastDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

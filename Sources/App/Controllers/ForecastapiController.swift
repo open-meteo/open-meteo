@@ -108,6 +108,7 @@ struct WeatherApiController {
     
     func query(_ req: Request) async throws -> Response {
         let host = try await req.ensureSubdomain(subdomain, alias: alias)
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
         let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
         let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
@@ -246,7 +247,7 @@ struct WeatherApiController {
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

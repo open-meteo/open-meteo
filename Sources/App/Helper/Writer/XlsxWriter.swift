@@ -5,9 +5,6 @@ import Vapor
 extension ForecastapiResult {
     func toXlsxResponse(timestamp: Timestamp) throws -> Response {
         let multiLocation = results.count > 1
-        if results.count > 100 {
-            throw ForecastapiError.generic(message: "XLSX supports only up to 100 locations")
-        }
         
         let sheet = try XlsxWriter()
         sheet.startRow()

@@ -11,9 +11,6 @@ extension ForecastapiResult {
     func toFlatbuffersResponse(fixedGenerationTime: Double?) throws -> Response {
         // First excution outside stream, to capture potential errors better
         //var first = try self.first?()
-        if results.count > 1000 {
-            throw ForecastapiError.generic(message: "Only up to 1000 locations can be requested at once")
-        }
         let response = Response(body: .init(stream: { writer in
             writer.submit {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.

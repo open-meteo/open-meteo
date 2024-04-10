@@ -5,7 +5,8 @@ import Vapor
 
 struct CmipController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("climate-api")
+        let host = try await req.ensureSubdomain("climate-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("climate-api", apikey: params.apikey)
         
@@ -75,7 +76,7 @@ struct CmipController {
         }
         let result = ForecastapiResult<Cmip6Domain>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 
