@@ -109,6 +109,11 @@ public struct Timestamp: Hashable {
         Timestamp(timeIntervalSince1970 - timeIntervalSince1970.moduloPositive(toNearest))
     }
     
+    /// Floor to the nearest multiple of given hoiurs. E.g. 6 would floor hour 20 to 18.
+    public func floor(toNearestHour: Int) -> Timestamp {
+        self.floor(toNearest: toNearestHour * 3600)
+    }
+    
     public func ceil(toNearest: Int) -> Timestamp {
         Timestamp(timeIntervalSince1970.ceil(to: toNearest))
     }
