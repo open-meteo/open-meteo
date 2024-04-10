@@ -215,6 +215,12 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
     
+    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+        let reader = try GenericReader<GfsDomain, Variable>(domain: domain, position: gridpoint)
+        self.reader = GenericReaderMixerSameDomain(reader: [GfsReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)])
+        self.options = options
+    }
+    
     func prefetchData(raw: GfsReaderLowLevel.MixingVar, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }

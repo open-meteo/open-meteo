@@ -278,8 +278,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gfs_seamless
     case gfs_mix
     case gfs_global
-    case gfs_global025
-    case gfs_global013
+    case gfs025
+    case gfs013
     case gfs_hrrr
     case gfs_graphcast025
     
@@ -397,9 +397,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs_global:
             return try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .gfs_global025:
+        case .gfs025:
             return try GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .gfs_global013:
+        case .gfs013:
             return try GfsReader(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs_hrrr:
             return try GfsReader(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
@@ -500,6 +500,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         switch self {
         case .icon_global:
             return IconDomains.icon
+        case .gfs025:
+            return GfsDomain.gfs025
+        case .gfs013:
+            return GfsDomain.gfs013
+        case .gfs_hrrr:
+            return GfsDomain.hrrr_conus
         default:
             return nil
         }
@@ -509,6 +515,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         switch self {
         case .icon_global:
             return try IconReader(domain: .icon, gridpoint: gridpoint, options: options)
+        case .gfs025:
+            return try GfsReader(domain: .gfs025, gridpoint: gridpoint, options: options)
+        case .gfs013:
+            return try GfsReader(domain: .gfs013, gridpoint: gridpoint, options: options)
+        case .gfs_hrrr:
+            return try GfsReader(domain: .hrrr_conus, gridpoint: gridpoint, options: options)
+        //case .gfs_graphcast025:
+            //return try GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]})
         default:
             return nil
         }

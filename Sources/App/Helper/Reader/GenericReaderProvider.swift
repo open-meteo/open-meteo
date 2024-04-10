@@ -30,10 +30,10 @@ extension GenericReaderProvider {
         case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
             return try domains.flatMap ({ domain in
                 guard let grid = domain.genericDomain?.grid else {
-                    throw ForecastapiError.generic(message: "Bounbing box calls not supported for domain \(domain)")
+                    throw ForecastapiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                 }
                 guard let gridpoionts = (grid as? RegularGrid)?.findBox(boundingBox: bbox) else {
-                    throw ForecastapiError.generic(message: "Bounbing box calls not supported for grid of domain \(domain)")
+                    throw ForecastapiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                 }
                 
                 if dates.count == 0 {
