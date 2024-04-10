@@ -14,6 +14,13 @@ struct RegularGrid: Gridable {
     }
     
     func findPoint(lat: Float, lon: Float) -> Int? {
+        guard let (x,y) = findPointXy(lat: lat, lon: lon) else {
+            return nil
+        }
+        return y * nx + x
+    }
+    
+    func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
         let x = Int(roundf((lon-lonMin) / dx))
         let y = Int(roundf((lat-latMin) / dy))
         
@@ -23,7 +30,7 @@ struct RegularGrid: Gridable {
         if yy < 0 || xx < 0 || yy >= ny || xx >= nx {
             return nil
         }
-        return yy * nx + xx
+        return (xx, yy)
     }
     
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
@@ -48,11 +55,10 @@ struct RegularGrid: Gridable {
     }
     
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
-        let x1 = Int(roundf((bb.longitude.lowerBound-lonMin) / dx))
-        let x2 = Int(roundf((bb.longitude.upperBound-lonMin) / dx))
-        
-        let y1 = Int(roundf((bb.latitude.lowerBound-latMin) / dy))
-        let y2 = Int(roundf((bb.latitude.upperBound-latMin) / dy))
+        guard let (x1, y1) = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
+              let (x2, y2) = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound) else {
+            return []
+        }
         
         let xRange = x1 ..< x2
         let yRange = y1 > y2 ? y2 ..< y1 : y1 ..< y2
