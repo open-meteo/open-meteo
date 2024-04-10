@@ -55,7 +55,7 @@ struct RegularGrid: Gridable {
         let y2 = Int(roundf((bb.latitude.upperBound-latMin) / dy))
         
         let xRange = x1 ..< x2
-        let yRange = y1 ..< y2
+        let yRange = y1 > y2 ? y2 ..< y1 : y1 ..< y2
         
         return RegularGridSlice(grid: self, yRange: yRange, xRange: xRange)
     }
