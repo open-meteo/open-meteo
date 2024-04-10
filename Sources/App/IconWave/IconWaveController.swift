@@ -61,7 +61,7 @@ struct IconWaveController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<IconWaveVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
+                guard let reader = try GenericReaderMulti<IconWaveVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                     return nil
                 }
                 
