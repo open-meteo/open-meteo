@@ -47,7 +47,7 @@ struct RegularGrid: Gridable {
         return GridPoint2DFraction(gridpoint: Int(y) * nx + Int(x), xFraction: xFraction, yFraction: yFraction)
     }
     
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> some Sequence<Int> {
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
         let x1 = Int(roundf((bb.longitude.lowerBound-lonMin) / dx))
         let x2 = Int(roundf((bb.longitude.upperBound-lonMin) / dx))
         

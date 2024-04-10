@@ -65,6 +65,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         }
         return trueNorthDirection
     }
+    
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
+        return nil
+    }
 }
 
 fileprivate extension ClosedRange where Bound == Float {

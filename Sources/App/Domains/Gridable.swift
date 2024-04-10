@@ -8,6 +8,7 @@ public protocol Gridable {
     
     func findPoint(lat: Float, lon: Float) -> Int?
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction?
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>>
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
 }
 
@@ -219,7 +220,7 @@ enum GridSelectionMode: String, Codable {
 }
 
 
-struct BoundingBoxWGS84 {
+public struct BoundingBoxWGS84 {
     let latitude: Range<Float>
     let longitude: Range<Float>
 }

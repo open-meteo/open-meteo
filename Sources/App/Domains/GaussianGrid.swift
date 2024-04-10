@@ -119,4 +119,8 @@ struct GaussianGrid: Gridable {
         let x = (Int(round(lon / dx)) + nx) % nx
         return integral(y: y) + x
     }
+    
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
+        return nil
+    }
 }

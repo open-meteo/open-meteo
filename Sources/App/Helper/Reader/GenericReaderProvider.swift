@@ -32,13 +32,15 @@ extension GenericReaderProvider {
                 guard let grid = domain.genericDomain?.grid else {
                     throw ForecastapiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                 }
-                guard let gridpoionts = (grid as? RegularGrid)?.findBox(boundingBox: bbox) else {
+                guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
                     throw ForecastapiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
                 }
                 
                 if dates.count == 0 {
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                    return gridpoionts.enumerated().map( { (locationId, gridpoint) in
+                    var locationId = -1
+                    return gridpoionts.map( { gridpoint in
+                        locationId += 1
                         return (locationId, timezone, time, [(domain, { () -> Self? in
                             guard let reader = try Self.init(domain: domain, gridpoint: gridpoint, options: options) else {
                                 return nil
@@ -50,7 +52,9 @@ extension GenericReaderProvider {
                 
                 return try dates.flatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(DomainProvider, () throws -> Self?)])] in
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
-                    return gridpoionts.enumerated().map( { (locationId, gridpoint) in
+                    var locationId = -1
+                    return gridpoionts.map( { gridpoint in
+                        locationId += 1
                         return (locationId, timezone, time, [(domain, { () -> Self? in
                             guard let reader = try Self.init(domain: domain, gridpoint: gridpoint, options: options) else {
                                 return nil
