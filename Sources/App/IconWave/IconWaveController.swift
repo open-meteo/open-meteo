@@ -4,11 +4,11 @@ import Vapor
 
 enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain {
     var genericDomain: (any GenericDomain)? {
-        fatalError()
+        return nil
     }
     
     func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
-        fatalError()
+        return nil
     }
     
     case best_match
@@ -37,7 +37,6 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
 
 struct IconWaveController {
     func query(_ req: Request) async throws -> Response {
-        /*
         try await req.ensureSubdomain("marine-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("marine-api", apikey: params.apikey)
@@ -45,6 +44,9 @@ struct IconWaveController {
         let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
+        guard case .coordinates(let prepared) = prepared else {
+            throw ForecastapiError.generic(message: "Bounding box not supported")
+        }
         let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         let paramsHourly = try IconWaveVariable.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try IconWaveVariable.load(commaSeparatedOptional: params.current)
@@ -122,8 +124,7 @@ struct IconWaveController {
         }
         let result = ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)*/
-        fatalError()
+        return try await result.response(format: params.format ?? .json)
     }
 }
 
