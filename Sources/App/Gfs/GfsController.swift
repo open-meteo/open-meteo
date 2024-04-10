@@ -88,75 +88,38 @@ struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariab
     }
 }
 
-typealias GfsVariableDerived = SurfaceAndPressureVariable<GfsVariableDerivedSurface, GfsPressureVariableDerived>
-
-typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
-
-struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
-    typealias Domain = GfsDomain
-    
-    typealias Variable = GfsVariable
-    
-    typealias Derived = GfsVariableDerived
-    
-    typealias MixingVar = GfsVariableCombined
-    
-    let reader: GenericReaderMixerSameDomain<GenericReaderCached<GfsDomain, Variable>>
-    
-    let domain: Domain
-    
-    let options: GenericReaderOptions
-    
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        switch domain {
-        case .gfs013:
-            // Note gfs025_ensemble only offers precipitation probability at 3h
-            // A nicer implementation should use a dedicated variables enum
-            let readers: [GenericReaderCached<GfsDomain, Variable>] = try [GfsDomain.gfs025_ensemble, .gfs025, .gfs013].compactMap {
-                guard let reader = try GenericReader<GfsDomain, Variable>(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                    return nil
-                }
-                return GenericReaderCached(reader: reader)
-            }
-            guard !readers.isEmpty else {
-                return nil
-            }
-            self.reader = GenericReaderMixerSameDomain(reader: readers)
-        case .gfs025:
-            fatalError("gfs025 should not been initilised in GfsMixer025_013")
-        case .gfs025_ensemble:
-            fatalError("gfs025_ensemble should not been initilised in GfsMixer025_013")
-        case .gfs025_ens:
-            guard let reader = try GenericReader<GfsDomain, Variable>(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
-        case .gfs05_ens:
-            guard let reader = try GenericReader<GfsDomain, Variable>(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                return nil
-            }
-            self.reader = GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: reader)])
-        case .hrrr_conus:
-            // Combine HRRR hourly and 15 minutely data. This way, weather codes can be calculated using HRRR hourly and 15 minutely data.
-            // E.g. CAPE is not available for HRRR 15 minutely data.
-            let readers: [GenericReaderCached<GfsDomain, Variable>] = try [GfsDomain.hrrr_conus, .hrrr_conus_15min].compactMap {
-                guard let reader = try GenericReader<GfsDomain, Variable>(domain: $0, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
-                    return nil
-                }
-                return GenericReaderCached(reader: reader)
-            }
-            guard !readers.isEmpty else {
-                return nil
-            }
-            self.reader = GenericReaderMixerSameDomain(reader: readers)
-        case .hrrr_conus_15min:
-            fatalError("hrrr_conus_15min should not been initilised in GfsMixer025_013")
-        }
-        self.domain = domain
-        self.options = options
+/// Read GFS domains and perform domain specific corrections
+struct GfsReaderLowLevel: GenericReaderProtocol {
+    var modelLat: Float {
+        reader.modelLat
     }
     
-    func get(raw: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    var modelLon: Float {
+        reader.modelLon
+    }
+    
+    var modelElevation: ElevationOrSea {
+        reader.modelElevation
+    }
+    
+    var targetElevation: Float {
+        reader.targetElevation
+    }
+    
+    var modelDtSeconds: Int {
+        reader.modelDtSeconds
+    }
+    
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        return try reader.getStatic(type: type)
+    }
+    
+    typealias MixingVar = GfsVariable
+    
+    let reader: GenericReaderCached<GfsDomain, GfsVariable>
+    let domain: GfsDomain
+    
+    func get(variable raw: GfsVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
         if domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloud_cover {
             let rh = try reader.get(variable: .pressure(GfsPressureVariable(variable: .relative_humidity, level: pressure.level)), time: time)
@@ -185,10 +148,17 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(dhi, ghi.unit)
         }
         
+        /// Only GFS013 has showers
+        if domain != .gfs013, case let .surface(variable) = raw, variable == .showers {
+            // Use precip to return an array with 0, but preserve NaNs if the timerange is unavailable
+            let precip = try reader.get(variable: .surface(.precipitation), time: time)
+            return DataAndUnit(precip.data.map({ $0 * 0 }), precip.unit)
+        }
+        
         return try reader.get(variable: raw, time: time)
     }
     
-    func prefetchData(raw: Variable, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable raw: GfsVariable, time: TimerangeDtAndSettings) throws {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
         if domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloud_cover {
             return try reader.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relative_humidity, level: pressure.level)), time: time)
@@ -204,7 +174,59 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             return try reader.prefetchData(variable: .surface(.shortwave_radiation), time: time)
         }
         
+        /// Only GFS013 has showers
+        if domain != .gfs013, case let .surface(variable) = raw, variable == .showers {
+            return try reader.prefetchData(variable: .surface(.precipitation), time: time)
+        }
+        
         try reader.prefetchData(variable: raw, time: time)
+    }
+}
+
+
+typealias GfsVariableDerived = SurfaceAndPressureVariable<GfsVariableDerivedSurface, GfsPressureVariableDerived>
+
+typealias GfsVariableCombined = VariableOrDerived<GfsVariable, GfsVariableDerived>
+
+struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
+    typealias Domain = GfsDomain
+    
+    typealias Variable = GfsVariable
+    
+    typealias Derived = GfsVariableDerived
+    
+    typealias MixingVar = GfsVariableCombined
+    
+    let reader: GenericReaderMixerSameDomain<GfsReaderLowLevel>
+        
+    let options: GenericReaderOptions
+    
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
+        let readers: [GfsReaderLowLevel] = try domains.compactMap { domain in
+            guard let reader = try GenericReader<GfsDomain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+                return nil
+            }
+            return GfsReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)
+        }
+        guard !readers.isEmpty else {
+            return nil
+        }
+        self.reader = GenericReaderMixerSameDomain(reader: readers)
+        self.options = options
+    }
+    
+    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+        let reader = try GenericReader<GfsDomain, Variable>(domain: domain, position: gridpoint)
+        self.reader = GenericReaderMixerSameDomain(reader: [GfsReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)])
+        self.options = options
+    }
+    
+    func prefetchData(raw: GfsReaderLowLevel.MixingVar, time: TimerangeDtAndSettings) throws {
+        try reader.prefetchData(variable: raw, time: time)
+    }
+    
+    func get(raw: GfsReaderLowLevel.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        return try reader.get(variable: raw, time: time)
     }
     
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
@@ -273,9 +295,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
-                if domain == .gfs013 {
-                    try prefetchData(raw: .surface(.showers), time: time)
-                }
+                try prefetchData(raw: .surface(.showers), time: time)
             case .snowfall:
                 try prefetchData(raw: .surface(.frozen_precipitation_percent), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
@@ -466,22 +486,13 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 let frozen_precipitation_percent = try get(raw: .surface(.frozen_precipitation_percent), time: time).data
                 let precipitation = try get(raw: .surface(.precipitation), time: time).data
-                if domain != .gfs013 {
-                    // showers are only in gfs013
-                    let rain = zip(frozen_precipitation_percent, precipitation).map({ (frozen_precipitation_percent, precipitation) in
-                        let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
-                        return max(precipitation - snowfallWaterEqivalent , 0)
-                    })
-                    return DataAndUnit(rain, .millimetre)
-                } else {
-                    let showers = try get(raw: .surface(.showers), time: time).data
-                    let rain = zip(frozen_precipitation_percent, zip(precipitation, showers)).map({ (frozen_precipitation_percent, arg1) in
-                        let (precipitation, showers) = arg1
-                        let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
-                        return max(precipitation - snowfallWaterEqivalent - showers, 0)
-                    })
-                    return DataAndUnit(rain, .millimetre)
-                }
+                let showers = try get(raw: .surface(.showers), time: time).data
+                let rain = zip(frozen_precipitation_percent, zip(precipitation, showers)).map({ (frozen_precipitation_percent, arg1) in
+                    let (precipitation, showers) = arg1
+                    let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
+                    return max(precipitation - snowfallWaterEqivalent - showers, 0)
+                })
+                return DataAndUnit(rain, .millimetre)
             case .relativehumidity_2m:
                 return try get(raw: .surface(.relative_humidity_2m), time: time)
             case .surface_pressure:
@@ -617,14 +628,5 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .pressure(GfsPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }
         }
-    }
-}
-
-
-struct GfsMixer: GenericReaderMixer {
-    let reader: [GfsReader]
-    
-    static func makeReader(domain: GfsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GfsReader? {
-        return try GfsReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 }

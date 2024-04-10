@@ -87,13 +87,17 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GloFasController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("flood-api")
+        let host = try await req.ensureSubdomain("flood-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("flood-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
         
         let prepared = try params.prepareCoordinates(allowTimezones: false)
+        guard case .coordinates(let prepared) = prepared else {
+            throw ForecastapiError.generic(message: "Bounding box not supported")
+        }
         let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
             throw ForecastapiError.generic(message: "Parameter 'daily' required")
@@ -155,7 +159,7 @@ struct GloFasController {
         }
         let result = ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

@@ -403,6 +403,12 @@ struct Era5Factory {
         return .init(reader: GenericReaderCached(reader: reader), options: options)
     }
     
+    /// Build a single reader for a given CdsDomain
+    public static func makeReader(domain: CdsDomain, gridpoint: Int, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderCached<CdsDomain, Era5Variable>> {
+        let reader = try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint)
+        return .init(reader: GenericReaderCached(reader: reader), options: options)
+    }
+    
     /**
      Build a combined ERA5 and ERA5-Land reader.
      Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5

@@ -24,13 +24,20 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     }
     
     func findPoint(lat: Float, lon: Float) -> Int? {
+        guard let (x,y) = findPointXy(lat: lat, lon: lon) else {
+            return nil
+        }
+        return y * nx + x
+    }
+    
+    func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
         let pos = projection.forward(latitude: lat, longitude: lon)
         let x = Int(round((pos.x - xrange.lowerBound) / xrange.length * Float(nx-1)))
         let y = Int(round((pos.y - yrange.lowerBound) / yrange.length * Float(ny-1)))
         if y < 0 || x < 0 || y >= ny || x >= nx {
             return nil
         }
-        return y * nx + x
+        return (x, y)
     }
     
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
@@ -65,10 +72,37 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         }
         return trueNorthDirection
     }
+    
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
+        guard let sw = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
+              let se = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.upperBound),
+              let nw = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.lowerBound),
+              let ne = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound) else {
+            return []
+        }
+        
+        let xRange = min(sw.x, nw.x) ..< max(se.x, ne.x)
+        let yRange = min(sw.y, nw.y) ..< max(se.y, ne.y)
+        
+        return ProjectionGridSlice(grid: self, yRange: yRange, xRange: xRange)
+    }
 }
 
 fileprivate extension ClosedRange where Bound == Float {
     var length: Float {
         return upperBound - lowerBound
+    }
+}
+
+
+struct ProjectionGridSlice<Projection: Projectable> {
+    let grid: ProjectionGrid<Projection>
+    let yRange: Range<Int>
+    let xRange: Range<Int>
+}
+
+extension ProjectionGridSlice: Sequence {
+    func makeIterator() -> GridSliceXyIterator {
+        return GridSliceXyIterator(yRange: yRange, xRange: xRange, nx: grid.nx)
     }
 }

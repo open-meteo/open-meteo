@@ -579,11 +579,13 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .ecmwf_ifs025:
             return .ecmwfIfs025
         case .ecmwf_aifs025:
-            // TODO register AIFS 025
-            return .ecmwfIfs025
+            return .ecmwfAifs025
         case .gfs_graphcast025:
-            // TODO register graphcast 025
+            return .gfsGraphcast025
+        case .gfs025:
             return .gfs025
+        case .gfs013:
+            return .gfs013
         }
     }
 }

@@ -5,7 +5,8 @@ import Vapor
 
 struct CmipController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("climate-api")
+        let host = try await req.ensureSubdomain("climate-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("climate-api", apikey: params.apikey)
         
@@ -13,6 +14,9 @@ struct CmipController {
         let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
         
         let prepared = try params.prepareCoordinates(allowTimezones: false)
+        guard case .coordinates(let prepared) = prepared else {
+            throw ForecastapiError.generic(message: "Bounding box not supported")
+        }
         let domains = try Cmip6Domain.load(commaSeparatedOptional: params.models) ?? [.MRI_AGCM3_2_S]
         let paramsDaily = try Cmip6VariableOrDerivedPostBias.load(commaSeparatedOptional: params.daily)
         let nVariables = (paramsDaily?.count ?? 0) * domains.count
@@ -72,7 +76,7 @@ struct CmipController {
         }
         let result = ForecastapiResult<Cmip6Domain>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

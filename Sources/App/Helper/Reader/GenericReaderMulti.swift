@@ -1,17 +1,19 @@
 import Foundation
 
 
-protocol MultiDomainMixerDomain: RawRepresentableString {
+protocol MultiDomainMixerDomain: RawRepresentableString, GenericDomainProvider {
     var countEnsembleMember: Int { get }
     
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol]
+    
+    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)?
 }
 
 /// Combine multiple independent weather models, that may not have given forecast variable
-struct GenericReaderMulti<Variable: GenericVariableMixable> {
+struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainMixerDomain>: GenericReaderProvider {
     private let reader: [any GenericReaderProtocol]
     
-    let domain: MultiDomainMixerDomain
+    let domain: Domain
     
     var modelLat: Float {
         reader.last!.modelLat
@@ -29,18 +31,26 @@ struct GenericReaderMulti<Variable: GenericVariableMixable> {
         reader.last!.modelElevation
     }
     
-    public init(domain: MultiDomainMixerDomain, reader: [any GenericReaderProtocol]) {
+    public init(domain: Domain, reader: [any GenericReaderProtocol]) {
         self.reader = reader
         self.domain = domain
     }
     
-    public init?(domain: MultiDomainMixerDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         guard !reader.isEmpty else {
             return nil
         }
         self.domain = domain
         self.reader = reader
+    }
+    
+    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+        guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
+            return nil
+        }
+        self.domain = domain
+        self.reader = [reader]
     }
     
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {

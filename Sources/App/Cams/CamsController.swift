@@ -1,37 +1,73 @@
 import Foundation
 import Vapor
 
+extension CamsQuery.Domain: GenericDomainProvider {
+    var genericDomain: (any GenericDomain)? {
+        switch self {
+        case .auto:
+            return nil
+        case .cams_global:
+            return CamsDomain.cams_global
+        case .cams_europe:
+            return CamsDomain.cams_europe
+        }
+    }
+}
+
+extension CamsMixer: GenericReaderProvider {
+    init?(domain: CamsQuery.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
+        guard let reader = try Self.init(domains: domain.camsDomains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            return nil
+        }
+        self = reader
+    }
+    
+    init?(domain: CamsQuery.Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+        switch domain {
+        case .auto:
+            return nil
+        case .cams_global:
+            let reader = try GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint)
+            self.reader = [CamsReader(reader: GenericReaderCached(reader: reader))]
+        case .cams_europe:
+            let reader = try GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint)
+            self.reader = [CamsReader(reader: GenericReaderCached(reader: reader))]
+        }
+    }
+}
+
 /**
  API for Air quality data
  */
 struct CamsController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("air-quality-api")
+        let host = try await req.ensureSubdomain("air-quality-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("air-quality-api", apikey: params.apikey)
         
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
         
-        let prepared = try params.prepareCoordinates(allowTimezones: true)
         let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
         let domains = try (params.domains.map({[$0]}) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
 
         let nVariables = (paramsHourly?.count ?? 0) * domains.count
         
+        let prepared = try CamsMixer.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
+        
         let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
-            let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 5, forecastDaysMax: 7, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = prepared.time
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-            
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
-            let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try CamsMixer(domains: domain.camsDomains, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .nearest, options: params.readerOptions) else {
+            let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                guard let reader = try readerAndDomain.reader() else {
                     return nil
                 }
+                let domain = readerAndDomain.domain
                 
                 let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsHourly.map { variables in
                     return {
@@ -75,11 +111,11 @@ struct CamsController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
         }
         let result = ForecastapiResult<CamsQuery.Domain>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

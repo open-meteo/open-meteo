@@ -8,27 +8,29 @@ import Vapor
  */
 public struct EnsembleApiController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("ensemble-api")
+        let host = try await req.ensureSubdomain("ensemble-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("ensemble-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 35)
         
-        let prepared = try params.prepareCoordinates(allowTimezones: true)
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
+        let prepared = try GenericReaderMulti<EnsembleVariable, EnsembleMultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 7, forecastDaysMax: 35, pastDaysMax: 92, allowedRange: allowedRange)
+        
         let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
         let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, {$0 + $1.countEnsembleMember})
         
         let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
-            let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 35, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = prepared.time
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             
-            let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<EnsembleVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: params.readerOptions) else {
+            let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                guard let reader = try readerAndDomain.reader() else {
                     return nil
                 }
+                let domain = readerAndDomain.domain
                 return .init(
                     model: domain,
                     latitude: reader.modelLat,
@@ -71,11 +73,11 @@ public struct EnsembleApiController {
             guard !readers.isEmpty else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
-            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+            return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
         }
         let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 
@@ -130,11 +132,11 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
         case .ecmwf_ifs025:
             return try EcmwfReader(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs025:
-            return try GfsReader(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GfsReader(domains: [.gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs05:
-            return try GfsReader(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GfsReader(domains: [.gfs05_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs_seamless:
-            return try GfsMixer(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            return try GfsReader(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gem_global:
             return try GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .bom_access_global_ensemble:
@@ -168,6 +170,14 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble.ensembleMembers
         }
+    }
+    
+    var genericDomain: (any GenericDomain)? {
+        return nil
+    }
+    
+    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
+        return nil
     }
 }
 

@@ -3,6 +3,14 @@ import Vapor
 
 
 enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain {
+    var genericDomain: (any GenericDomain)? {
+        return nil
+    }
+    
+    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
+        return nil
+    }
+    
     case best_match
     case ewam
     case gwam
@@ -29,13 +37,17 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
 
 struct IconWaveController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("marine-api")
+        let host = try await req.ensureSubdomain("marine-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
+        guard case .coordinates(let prepared) = prepared else {
+            throw ForecastapiError.generic(message: "Bounding box not supported")
+        }
         let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
         let paramsHourly = try IconWaveVariable.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try IconWaveVariable.load(commaSeparatedOptional: params.current)
@@ -50,7 +62,7 @@ struct IconWaveController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<IconWaveVariable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
+                guard let reader = try GenericReaderMulti<IconWaveVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                     return nil
                 }
                 
@@ -113,7 +125,7 @@ struct IconWaveController {
         }
         let result = ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

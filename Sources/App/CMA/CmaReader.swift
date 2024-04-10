@@ -134,6 +134,12 @@ struct CmaReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
     
+    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+        let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
+        self.reader = GenericReaderCached(reader: reader)
+        self.options = options
+    }
+    
     func get(raw: CmaVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }

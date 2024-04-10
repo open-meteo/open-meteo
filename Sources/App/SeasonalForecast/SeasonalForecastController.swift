@@ -148,13 +148,17 @@ extension SeasonalForecastReader {
  */
 struct SeasonalForecastController {
     func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("seasonal-api")
+        let host = try await req.ensureSubdomain("seasonal-api")
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try req.ensureApiKey("seasonal-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
         
         let prepared = try params.prepareCoordinates(allowTimezones: false)
+        guard case .coordinates(let prepared) = prepared else {
+            throw ForecastapiError.generic(message: "Bounding box not supported")
+        }
         /// Will be configurable by API later
         let domains = [SeasonalForecastDomainApi.cfsv2]
         
@@ -243,7 +247,7 @@ struct SeasonalForecastController {
         }
         let result = ForecastapiResult<SeasonalForecastDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 
