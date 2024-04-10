@@ -391,9 +391,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             
             // Remaining parts of the world
             return [gfs, icon]
-        case .gfs_seamless:
-            fallthrough
-        case .gfs_mix:
+        case .gfs_mix, .gfs_seamless:
             return try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs_global:
             return try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
@@ -405,47 +403,27 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try GfsReader(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs_graphcast025:
             return try GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .meteofrance_seamless:
-            fallthrough
-        case .meteofrance_mix:
+        case .meteofrance_mix, .meteofrance_seamless:
             return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arpege_seamless:
-            fallthrough
-        case .arpege_seamless:
+        case .meteofrance_arpege_seamless, .arpege_seamless:
             return try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arome_seamless:
-            fallthrough
-        case .arome_seamless:
+        case .meteofrance_arome_seamless, .arome_seamless:
             return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .arpege_world:
-            fallthrough
-        case .meteofrance_arpege_world:
+        case .meteofrance_arpege_world, .arpege_world:
             return try MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .arpege_europe:
-            fallthrough
-        case .meteofrance_arpege_europe:
+        case .meteofrance_arpege_europe, .arpege_europe:
             return try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .arome_france:
-            fallthrough
-        case .meteofrance_arome_france:
+        case .meteofrance_arome_france, .arome_france:
             return try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .arome_france_hd:
-            fallthrough
-        case .meteofrance_arome_france_hd:
+        case .meteofrance_arome_france_hd, .arome_france_hd:
             return try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .jma_seamless:
-            fallthrough
-        case .jma_mix:
+        case .jma_mix, .jma_seamless:
             return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .jma_msm:
             return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .jms_gsm:
-            fallthrough
-        case .jma_gsm:
+        case .jms_gsm, .jma_gsm:
             return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .icon_seamless:
-            fallthrough
-        case .icon_mix:
+        case .icon_seamless, .icon_mix:
             return try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .icon_global:
             return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
