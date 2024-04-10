@@ -203,7 +203,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     func response(format: ForecastResultFormat, numberOfLocationsMaximum: Int, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil) async throws -> Response {
         return try await ForecastapiController.runLoop.next().submit {
             if results.count > numberOfLocationsMaximum {
-                throw ForecastapiError.generic(message: "Only up to 1000 locations can be requested at once")
+                throw ForecastapiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
             }
             if format == .xlsx && results.count > 100 {
                 throw ForecastapiError.generic(message: "XLSX supports only up to 100 locations")

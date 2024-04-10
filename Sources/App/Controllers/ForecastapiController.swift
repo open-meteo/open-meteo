@@ -79,11 +79,6 @@ public struct ForecastapiController: RouteCollection {
     }
 }
 
-/**
- TODO:
- - gfs025 gfs013 domains
- - bounding box grid support for irrgeulars
- */
 
 struct WeatherApiController {
     let forecastDay: Int
