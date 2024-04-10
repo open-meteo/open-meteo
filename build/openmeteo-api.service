@@ -1,5 +1,6 @@
 [Unit]
 Description = Run Open-Meteo API
+StartLimitIntervalSec=0
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
@@ -11,7 +12,7 @@ WorkingDirectory=/var/lib/openmeteo-api/
 ExecStart=/usr/local/bin/openmeteo-api serve -b $API_BIND --env $VAPOR_ENV
 ExecStopPost=/bin/bash -c 'if [ "$$EXIT_STATUS" != 0 ]; then /usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %N; fi'
 Restart=always
-RestartSec=1
+RestartSec=2
 
 [Install]
 WantedBy = default.target
