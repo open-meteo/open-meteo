@@ -584,6 +584,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .gfs_graphcast025:
             // TODO register graphcast 025
             return .gfs025
+        case .gfs_global025:
+            return .gfs025
+        case .gfs_global013:
+            // TODO registyer 013 domain
+            return .gfs025
         }
     }
 }
