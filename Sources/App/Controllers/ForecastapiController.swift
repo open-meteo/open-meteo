@@ -476,14 +476,60 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     var genericDomain: (any GenericDomain)? {
         switch self {
-        case .icon_global:
-            return IconDomains.icon
         case .gfs025:
             return GfsDomain.gfs025
         case .gfs013:
             return GfsDomain.gfs013
         case .gfs_hrrr:
             return GfsDomain.hrrr_conus
+        case .gfs_graphcast025:
+            return GfsGraphCastDomain.graphcast025
+        case .meteofrance_arpege_world, .arpege_world:
+            return MeteoFranceDomain.arpege_world
+        case .meteofrance_arpege_europe, .arpege_europe:
+            return MeteoFranceDomain.arpege_europe
+        case .meteofrance_arome_france, .arome_france:
+            return MeteoFranceDomain.arome_france
+        case .meteofrance_arome_france_hd, .arome_france_hd:
+            return MeteoFranceDomain.arome_france_hd
+        case .icon_global:
+            return IconDomains.icon
+        case .icon_eu:
+            return IconDomains.iconEu
+        case .icon_d2:
+            return IconDomains.iconD2
+        case .ecmwf_ifs04:
+            return EcmwfDomain.ifs04
+        case .ecmwf_ifs025:
+            return EcmwfDomain.ifs025
+        case .ecmwf_aifs025:
+            return EcmwfDomain.aifs025
+        case .metno_nordic:
+            return MetNoDomain.nordic_pp
+        case .gem_global:
+            return GemDomain.gem_global
+        case .gem_regional:
+            return GemDomain.gem_regional
+        case .gem_hrdps_continental:
+            return GemDomain.gem_hrdps_continental
+        case .era5:
+            return CdsDomain.era5
+        case .era5_land:
+            return CdsDomain.era5_land
+        case .cerra:
+            return CdsDomain.cerra
+        case .ecmwf_ifs:
+            return CdsDomain.ecmwf_ifs
+        case .cma_grapes_global:
+            return CmaDomain.grapes_global
+        case .bom_access_global:
+            return BomDomain.access_global
+        case .arpae_cosmo_2i:
+            return ArpaeDomain.cosmo_2i
+        case .arpae_cosmo_2i_ruc:
+            return ArpaeDomain.cosmo_2i_ruc
+        case .arpae_cosmo_5m:
+            return ArpaeDomain.cosmo_5m
         default:
             return nil
         }
@@ -491,16 +537,60 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
         switch self {
-        case .icon_global:
-            return try IconReader(domain: .icon, gridpoint: gridpoint, options: options)
         case .gfs025:
             return try GfsReader(domain: .gfs025, gridpoint: gridpoint, options: options)
         case .gfs013:
             return try GfsReader(domain: .gfs013, gridpoint: gridpoint, options: options)
         case .gfs_hrrr:
             return try GfsReader(domain: .hrrr_conus, gridpoint: gridpoint, options: options)
-        //case .gfs_graphcast025:
-            //return try GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]})
+        case .gfs_graphcast025:
+            return try GfsGraphCastReader(domain: .graphcast025, gridpoint: gridpoint, options: options)
+        case .meteofrance_arpege_world, .arpege_world:
+            return try MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
+        case .meteofrance_arpege_europe, .arpege_europe:
+            return try MeteoFranceReader(domain: .arpege_europe, gridpoint: gridpoint, options: options)
+        case .meteofrance_arome_france, .arome_france:
+            return try MeteoFranceReader(domain: .arome_france, gridpoint: gridpoint, options: options)
+        case .meteofrance_arome_france_hd, .arome_france_hd:
+            return try MeteoFranceReader(domain: .arome_france_hd, gridpoint: gridpoint, options: options)
+        case .icon_global:
+            return try IconReader(domain: .icon, gridpoint: gridpoint, options: options)
+        case .icon_eu:
+            return try IconReader(domain: .iconEu, gridpoint: gridpoint, options: options)
+        case .icon_d2:
+            return try IconReader(domain: .iconD2, gridpoint: gridpoint, options: options)
+        case .ecmwf_ifs04:
+            return try EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)
+        case .ecmwf_ifs025:
+            return try EcmwfReader(domain: .ifs025, gridpoint: gridpoint, options: options)
+        case .ecmwf_aifs025:
+            return try EcmwfReader(domain: .aifs025, gridpoint: gridpoint, options: options)
+        case .metno_nordic:
+            return try MetNoReader(domain: .nordic_pp, gridpoint: gridpoint, options: options)
+        case .gem_global:
+            return try GemReader(domain: .gem_global, gridpoint: gridpoint, options: options)
+        case .gem_regional:
+            return try GemReader(domain: .gem_regional, gridpoint: gridpoint, options: options)
+        case .gem_hrdps_continental:
+            return try GemReader(domain: .gem_hrdps_continental, gridpoint: gridpoint, options: options)
+        case .era5:
+            return try Era5Factory.makeReader(domain: .era5, gridpoint: gridpoint, options: options)
+        case .era5_land:
+            return try Era5Factory.makeReader(domain: .era5_land, gridpoint: gridpoint, options: options)
+        case .cerra:
+            return try CerraReader(domain: .cerra, gridpoint: gridpoint, options: options)
+        case .ecmwf_ifs:
+            return try Era5Factory.makeReader(domain: .ecmwf_ifs, gridpoint: gridpoint, options: options)
+        case .cma_grapes_global:
+            return try CmaReader(domain: .grapes_global, gridpoint: gridpoint, options: options)
+        case .bom_access_global:
+            return try BomReader(domain: .access_global, gridpoint: gridpoint, options: options)
+        case .arpae_cosmo_2i:
+            return try ArpaeReader(domain: .cosmo_2i, gridpoint: gridpoint, options: options)
+        case .arpae_cosmo_2i_ruc:
+            return try ArpaeReader(domain: .cosmo_2i_ruc, gridpoint: gridpoint, options: options)
+        case .arpae_cosmo_5m:
+            return try ArpaeReader(domain: .cosmo_5m, gridpoint: gridpoint, options: options)
         default:
             return nil
         }

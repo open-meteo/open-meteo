@@ -19,7 +19,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
     
-    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options

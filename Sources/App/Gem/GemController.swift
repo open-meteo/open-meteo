@@ -103,6 +103,12 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         self.options = options
     }
     
+    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+        let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
+        self.reader = GenericReaderCached(reader: reader)
+        self.options = options
+    }
+    
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
