@@ -46,6 +46,11 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let forecast_hours: Int?
     let forecast_minutely_15: Int?
     
+    /// If forecast_hours is set, the default is to start from the current hour. With `initial_hours`, a different hout of the day can be selected
+    /// E.g. initial_hours=0 and forecast_hours=12 would return the first 12 hours of the current day.
+    let initial_hours: Int?
+    let initial_minutely_15: Int?
+    
     let format: ForecastResultFormat?
     let models: [String]?
     let cell_selection: GridSelectionMode?
@@ -314,13 +319,13 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         }
         
         // Evaluate any forecast_xxx, past_xxx parameter or fallback to default time
-        let daily = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days, forecastSteps: forecast_days, pastStepsMax: pastDaysMax, forecastStepsMax: forecastDaysMax, forecastStepsDefault: forecastDaysDefault, dtSeconds: 86400) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecastDaysDefault, dtSeconds: 86400)
+        let daily = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days, forecastSteps: forecast_days, pastStepsMax: pastDaysMax, forecastStepsMax: forecastDaysMax, forecastStepsDefault: forecastDaysDefault, initialStep: nil, dtSeconds: 86400) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecastDaysDefault, initialStep: nil, dtSeconds: 86400)
         
         // Falls back to daily range as well
-        let hourly = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_hours, forecastSteps: forecast_hours, pastStepsMax: pastDaysMax * 24, forecastStepsMax: forecastDaysMax * 24, forecastStepsDefault: forecastDaysMax*24, dtSeconds: 3600) ?? daily.with(dtSeconds: 3600)
+        let hourly = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_hours, forecastSteps: forecast_hours, pastStepsMax: pastDaysMax * 24, forecastStepsMax: forecastDaysMax * 24, forecastStepsDefault: forecastDaysMax*24, initialStep: initial_hours, dtSeconds: 3600) ?? daily.with(dtSeconds: 3600)
         
         // May default back to 3 day forecast
-        let minutely_15 = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_minutely_15, forecastSteps: forecast_minutely_15, pastStepsMax: pastDaysMax * 24 * 4, forecastStepsMax: forecastDaysMax * 24 * 4, forecastStepsDefault: 3 * 24 * 4, dtSeconds: 900) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days ?? 0, forecastSteps: forecast_days ?? 3, dtSeconds: 86400).with(dtSeconds: 900)
+        let minutely_15 = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_minutely_15, forecastSteps: forecast_minutely_15, pastStepsMax: pastDaysMax * 24 * 4, forecastStepsMax: forecastDaysMax * 24 * 4, forecastStepsDefault: 3 * 24 * 4, initialStep: initial_minutely_15, dtSeconds: 900) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days ?? 0, forecastSteps: forecast_days ?? 3, initialStep: nil, dtSeconds: 86400).with(dtSeconds: 900)
         
         return ForecastApiTimeRange(
             dailyDisplay: daily.add(-1 * actualUtcOffset),
@@ -331,28 +336,24 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         )
     }
     
-    /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time.
-    public static func forecastTimeRange(currentTime: Timestamp, utcOffsetSeconds: Int, pastDays: Int?, forecastDays: Int, dtSeconds: Int = 3600*24) -> TimerangeLocal {
-        /// aligin starttime to localtime 0:00
-        let pastDaysSeconds = (pastDays ?? 0) * dtSeconds
-        let starttimeUtc = ((currentTime.timeIntervalSince1970 + utcOffsetSeconds) / dtSeconds) * dtSeconds - utcOffsetSeconds - pastDaysSeconds
-        let endtimeUtc = starttimeUtc + forecastDays*dtSeconds + pastDaysSeconds
-        let time = Timestamp(starttimeUtc) ..< Timestamp(endtimeUtc)
-        return TimerangeLocal(range: time, utcOffsetSeconds: utcOffsetSeconds)
-    }
-    
     /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time. UTC offset has not been subtracted.
-    public static func forecastTimeRange2(currentTime: Timestamp, utcOffset: Int,pastSteps: Int, forecastSteps: Int, dtSeconds: Int) -> TimerangeDt {
+    public static func forecastTimeRange2(currentTime: Timestamp, utcOffset: Int,pastSteps: Int, forecastSteps: Int, initialStep: Int?, dtSeconds: Int) -> TimerangeDt {
         let pastSeconds = pastSteps * dtSeconds
-        /// aligin starttime to localtime
-        let start = ((currentTime.timeIntervalSince1970 + utcOffset) / dtSeconds) * dtSeconds - pastSeconds
-        let end = start + forecastSteps * dtSeconds + pastSeconds
+        let start: Int
+        if let initialStep {
+            // Align start to a specified hour per day
+            start = ((currentTime.timeIntervalSince1970 + utcOffset) / 86400) * 86400 + initialStep * dtSeconds
+        } else {
+            // Align start to current hour or current 15 minutely step (default)
+            start = ((currentTime.timeIntervalSince1970 + utcOffset) / dtSeconds) * dtSeconds
+        }
+        let end = start + forecastSteps * dtSeconds
         
-        return TimerangeDt(range: Timestamp(start) ..< Timestamp(end), dtSeconds: dtSeconds)
+        return TimerangeDt(range: Timestamp(start - pastSeconds) ..< Timestamp(end), dtSeconds: dtSeconds)
     }
     
     /// Return an aligned timerange for a local-time 7 day forecast. Timestamps are in UTC time. UTC offset has not been subtracted.
-    public static func forecastTimeRange2(currentTime: Timestamp, utcOffset: Int,pastSteps: Int?, forecastSteps: Int?, pastStepsMax: Int, forecastStepsMax: Int, forecastStepsDefault: Int, dtSeconds: Int) throws -> TimerangeDt? {
+    public static func forecastTimeRange2(currentTime: Timestamp, utcOffset: Int,pastSteps: Int?, forecastSteps: Int?, pastStepsMax: Int, forecastStepsMax: Int, forecastStepsDefault: Int, initialStep: Int?, dtSeconds: Int) throws -> TimerangeDt? {
         
         if pastSteps == nil && forecastSteps == nil {
             return nil
@@ -366,7 +367,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         if pastSteps < 0 || pastSteps > pastStepsMax {
             throw ForecastapiError.pastDaysInvalid(given: pastSteps, allowed: 0...pastStepsMax)
         }
-        return Self.forecastTimeRange2(currentTime: currentTime, utcOffset: utcOffset, pastSteps: pastSteps, forecastSteps: forecastSteps, dtSeconds: dtSeconds)
+        return Self.forecastTimeRange2(currentTime: currentTime, utcOffset: utcOffset, pastSteps: pastSteps, forecastSteps: forecastSteps, initialStep: initialStep, dtSeconds: dtSeconds)
     }
 }
 
