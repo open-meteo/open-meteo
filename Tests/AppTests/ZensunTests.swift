@@ -13,11 +13,11 @@ final class ZensunTests: XCTestCase {
     func testSunRiseSetLosAngeles() {
         // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
         let utcOffsetSeconds = -25200
-        let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = ApiQueryParameter.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
+       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
+        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
         
         // vancouver: lat: 49.25, lon: -123.12
-        let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 34.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 34.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
         XCTAssertEqual(times.rise[0], Timestamp(1636208261))
         XCTAssertEqual(times.set[0], Timestamp(1636246534))
         let sunset = times.set.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
@@ -30,10 +30,10 @@ final class ZensunTests: XCTestCase {
     func testSunRiseSetVancouver() {
         // https://www.timeanddate.com/sun/canada/vancouver?month=11&year=2021
         let utcOffsetSeconds = -25200
-        let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
-        let time = ApiQueryParameter.forecastTimeRange(currentTime: currentTime, utcOffsetSeconds: utcOffsetSeconds, pastDays: 0, forecastDays: 1)
+       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
+        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
         
-        let times = Zensun.calculateSunRiseSet(timeRange: time.range, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 49.25, lon: -123.12, utcOffsetSeconds: utcOffsetSeconds)
         XCTAssertEqual(times.rise[0], Timestamp(1636211364))
         XCTAssertEqual(times.set[0], Timestamp(1636245772))
         let sunset = times.set.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
@@ -196,7 +196,7 @@ final class ZensunTests: XCTestCase {
         XCTAssertEqualArray(gtiTrackHorizontal, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 59.943016, 562.7015, 797.77844, 1038.7473, 1185.6353, 1205.2142, 1210.2856, 1106.8444, 939.80383, 752.5833, 385.76633, 27.280811, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
         
         let gtiTrackVertical = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: .nan, azimuth: 0, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
-        XCTAssertEqualArray(gtiTrackHorizontal, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 59.943016, 562.7015, 797.77844, 1038.7473, 1185.6353, 1205.2142, 1210.2856, 1106.8444, 939.80383, 752.5833, 385.76633, 27.280811, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        XCTAssertEqualArray(gtiTrackVertical, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9092948, 98.51584, 108.27706, 206.66702, 316.56372, 418.15967, 417.75742, 277.57715, 196.47887, 122.20553, 34.23313, 0.90873635, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
         
         let gtiBiAxialTracking = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: .nan, azimuth: .nan, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
         XCTAssertEqualArray(gtiBiAxialTracking, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 77.22054, 624.142, 838.312, 1045.3708, 1184.8297, 1209.3428, 1214.2375, 1106.0839, 945.6867, 787.8196, 448.4831, 35.248135, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
