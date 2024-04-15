@@ -8,7 +8,7 @@ struct CmipController {
         let host = try await req.ensureSubdomain("climate-api")
         let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try req.ensureApiKey("climate-api", apikey: params.apikey)
+        try await req.ensureApiKey("climate-api", apikey: params.apikey)
         
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)

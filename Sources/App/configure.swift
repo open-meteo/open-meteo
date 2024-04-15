@@ -113,7 +113,13 @@ public func configure(_ app: Application) throws {
     //app.views.use(.leaf)
     
     app.lifecycle.repeatedTask(
-        initialDelay: .seconds(2),
+        initialDelay: .seconds(0),
+        delay: .seconds(120),
+        ApiKeyManager.update
+    )
+    
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(0),
         delay: .seconds(2),
         OmFileManager.instance.backgroundTask
     )

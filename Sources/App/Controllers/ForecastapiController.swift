@@ -109,7 +109,7 @@ struct WeatherApiController {
         let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
         let forecastDayDefault = isHistoricalForecastApi ? 1 : self.forecastDay
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
+        try await req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
         
         let currentTime = Timestamp.now()
         let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)

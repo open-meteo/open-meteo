@@ -40,7 +40,7 @@ struct IconWaveController {
         let host = try await req.ensureSubdomain("marine-api")
         let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try req.ensureApiKey("marine-api", apikey: params.apikey)
+        try await req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
         

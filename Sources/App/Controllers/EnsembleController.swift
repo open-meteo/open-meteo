@@ -11,7 +11,7 @@ public struct EnsembleApiController {
         let host = try await req.ensureSubdomain("ensemble-api")
         let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try req.ensureApiKey("ensemble-api", apikey: params.apikey)
+        try await req.ensureApiKey("ensemble-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 35)
         

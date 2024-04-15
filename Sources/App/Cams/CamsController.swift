@@ -44,7 +44,7 @@ struct CamsController {
         let host = try await req.ensureSubdomain("air-quality-api")
         let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try req.ensureApiKey("air-quality-api", apikey: params.apikey)
+        try await req.ensureApiKey("air-quality-api", apikey: params.apikey)
         
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 7, 29) ..< currentTime.add(86400 * 6)
