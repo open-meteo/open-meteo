@@ -1,44 +1,11 @@
 import Foundation
 import Vapor
 import NIO
-import NIOConcurrencyHelpers
-
 
 /**
- Limit API request rate limit for the free API.
+ Limit API request rate for the free API.
  Count how many calls have been made by a given IP address.
  */
-final class RateLimiterLifecycle: LifecycleHandler {
-    private let backgroundWatcher = NIOLockedValueBox<RepeatedTask?>(nil)
-    
-    public static var instance = RateLimiterLifecycle()
-        
-    private init() {}
-    
-    /// Setup timer to empty statics every minute, hour or day
-    func didBoot(_ application: Application) throws {
-        backgroundWatcher.withLockedValue({
-            let eventloop = application.eventLoopGroup.next()
-            $0 = eventloop.scheduleRepeatedAsyncTask(
-                initialDelay: .seconds(Int64(60 - Timestamp.now().second)),
-                delay: .seconds(60),
-                { task in
-                    eventloop.makeFutureWithTask({
-                        await RateLimiter.instance.minutelyCallback()
-                    })
-                }
-            )
-        })
-    }
-    
-    func shutdown(_ application: Application) {
-        backgroundWatcher.withLockedValue {
-            $0?.cancel()
-        }
-    }
-}
-
-/// Thread safe access to rate limiter
 final actor RateLimiter {
     private static let limitDaily = Float(Environment.get("CALL_LIMIT_DAILY").flatMap(Int.init) ?? 10_000)
     
@@ -62,6 +29,7 @@ final actor RateLimiter {
         
     private init() {}
     
+    /// Called every minute from a life cycle handler
     func minutelyCallback() {
         let now = Timestamp.now().timeIntervalSince1970
         minutelyPerIPv4.removeAll(keepingCapacity: true)
