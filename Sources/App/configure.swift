@@ -114,7 +114,7 @@ public func configure(_ app: Application) throws {
     
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
-        delay: .seconds(120),
+        delay: .seconds(10),
         ApiKeyManager.update
     )
     

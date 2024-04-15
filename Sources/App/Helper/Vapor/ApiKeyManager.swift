@@ -3,12 +3,17 @@ import Vapor
 import AsyncHTTPClient
 
 /**
- Keep track of API keys and update a list of API keys from a backend server
+ Keep track of API keys and update a list of API keys from a file
  */
 public final actor ApiKeyManager {
     public static var instance = ApiKeyManager()
     
-    private init() {}
+    private init() {
+        guard let apikeysPath = Environment.get("API_APIKEYS_PATH") else {
+            return
+        }
+        self.apiKeys = (try? String(contentsOfFile: apikeysPath, encoding: .utf8))?.split(separator: ",") ?? []
+    }
     
     var apiKeys = [String.SubSequence]()
     
@@ -29,18 +34,12 @@ public final actor ApiKeyManager {
     
     /// Fetch API keys and update database
     @Sendable public static func update(application: Application) async {
-        guard let apikeysUrl = Environment.get("API_APIKEYS_URL"), apikeysUrl.starts(with: "http") else {
+        guard let apikeysPath = Environment.get("API_APIKEYS_PATH") else {
             return
         }
         let logger = application.logger
-        // Fetch URL
-        let request = HTTPClientRequest(url: apikeysUrl)
-        guard let response = try? await application.http.client.shared.execute(request, timeout: .seconds(30), logger: logger) else {
-            logger.error("Could not fetch API keys")
-            return
-        }
-        guard let string = try? await response.body.collect(upTo: 1024*1024).readStringImmutable() else {
-            logger.error("Could not decode API key strings")
+        guard let string = try? String(contentsOfFile: apikeysPath, encoding: .utf8) else {
+            logger.error("Could not read content from API_APIKEYS_PATH \(apikeysPath)")
             return
         }
         // Set new keys
