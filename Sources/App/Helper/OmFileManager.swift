@@ -72,7 +72,7 @@ enum OmFileManagerReadable: Hashable {
 
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
-final class OmFileManager: LifecycleHandler {
+struct OmFileManager {
     /// A file might exist and is open, or it is missing
     enum OmFileState {
         case exists(file: OmFileReader<MmapFileCached>)
@@ -82,53 +82,35 @@ final class OmFileManager: LifecycleHandler {
     /// Non existing files are set to nil
     private let cached = NIOLockedValueBox<[Int: OmFileState]>(.init())
     
-    private let backgroundWatcher = NIOLockedValueBox<Task<(), Error>?>(nil)
+    private let statistics = NIOLockedValueBox<(count: Double, elapsed: Double, max: Double)>((0,0,0))
     
     public static var instance = OmFileManager()
     
     private init() {}
     
-    func didBoot(_ application: Application) throws {
+    /// Called every 2 conds from a life cycle handler on any available thread
+    @Sendable func backgroundTask(application: Application) {
         let logger = application.logger
-        backgroundWatcher.withLockedValue({
-            $0 = Task {
-                try await backgroundTask(logger: logger)
-            }
-        })
-    }
-    
-    func shutdown(_ application: Application) {
-        backgroundWatcher.withLockedValue {
-            $0?.cancel()
+        var (count, elapsed, max) = statistics.withLockedValue({$0})
+        
+        let start = DispatchTime.now()
+        let stats = self.secondlyCallback()
+        let dt = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
+        if dt > max {
+            max = dt
         }
-    }
-    
-    func backgroundTask(logger: Logger) async throws {
-        var count: Double = 0
-        var elapsed: Double = 0
-        var max: Double = 0
-        while true {
-            let start = DispatchTime.now()
-            let stats = self.secondlyCallback()
-            let dt = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
-            if dt > max {
-                max = dt
+        elapsed += dt
+        count += 1
+        if count >= 10 {
+            if (stats.open > 0) {
+                let buf = OmFileReader<MmapFile>.getStatistics()
+                logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint). Buffers \(buf.count) total=\(buf.totalSize.bytesHumanReadable) max=\(buf.maxSize.bytesHumanReadable)")
             }
-            elapsed += dt
-            count += 1
-            if count >= 10 {
-                if (stats.open > 0) {
-                    let buf = OmFileReader<MmapFile>.getStatistics()
-                    logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint). Buffers \(buf.count) total=\(buf.totalSize.bytesHumanReadable) max=\(buf.maxSize.bytesHumanReadable)")
-                }
-                count = 0
-                elapsed = 0
-                max = 0
-            }
-            try Task.checkCancellation()
-            try await Task.sleep(nanoseconds: 2_000_000_000)
-            try Task.checkCancellation()
+            count = 0
+            elapsed = 0
+            max = 0
         }
+        statistics.withLockedValue({ $0 = (count, elapsed, max) })
     }
     
     /// Called every couple of seconds to check for any file modifications

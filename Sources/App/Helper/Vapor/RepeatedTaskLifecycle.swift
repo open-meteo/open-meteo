@@ -29,7 +29,7 @@ final class RepeatedTaskLifecycle: LifecycleHandler {
                 initialDelay: initialDelay,
                 delay: delay
             ) { repeatedTask in
-                return eventloop.makeFutureWithTask({
+                return application.eventLoopGroup.makeFutureWithTask({
                     return try await self.taskFn(application)
                 })
             }

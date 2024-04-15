@@ -112,7 +112,11 @@ public func configure(_ app: Application) throws {
 
     //app.views.use(.leaf)
     
-    app.lifecycle.use(OmFileManager.instance)
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(2),
+        delay: .seconds(2),
+        OmFileManager.instance.backgroundTask
+    )
     
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(Int64(60 - Timestamp.now().second)),
