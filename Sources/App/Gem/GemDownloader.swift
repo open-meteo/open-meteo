@@ -102,7 +102,7 @@ struct GemDownload: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        try domain.surfaceElevationFileOm.createDirectory()
         
         logger.info("Downloading height and elevation data")
         

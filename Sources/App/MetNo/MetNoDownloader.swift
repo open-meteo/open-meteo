@@ -79,6 +79,7 @@ struct MetNoDownloader: AsyncCommand {
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if !FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             logger.info("Creating elevation file")
+            try domain.surfaceElevationFileOm.createDirectory()
             // unit meters
             guard var altitude = try ncFile.getVariable(name: "altitude")?.asType(Float.self)?.read() else {
                 fatalError("Could not get float data from altitude")
