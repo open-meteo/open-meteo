@@ -154,6 +154,15 @@ struct GfsGraphCastDownload: AsyncCommand {
                     try grib2d.load(message: message)
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                     
+                    // Although it is supposed to be Kelvin, suddenly Celsius is used for temperature. Dynmically detect the right unit
+                    if variable as? GfsGraphCastSurfaceVariable == GfsGraphCastSurfaceVariable.temperature_2m
+                        || (variable as? GfsGraphCastPressureVariable)?.variable == .temperature {
+                        // If temperture appears to be celsius, set it back to kelvin
+                        if grib2d.array.data[0..<1000].mean() < 100 {
+                            grib2d.array.data.multiplyAdd(multiply: 1, add: 273.15)
+                        }
+                    }
+                    
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
