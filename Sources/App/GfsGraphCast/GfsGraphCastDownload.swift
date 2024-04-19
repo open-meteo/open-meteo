@@ -158,7 +158,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     if variable as? GfsGraphCastSurfaceVariable == GfsGraphCastSurfaceVariable.temperature_2m
                         || (variable as? GfsGraphCastPressureVariable)?.variable == .temperature {
                         // If temperture appears to be celsius, set it back to kelvin
-                        if grib2d.array.data[0..<1000].mean() < 210 {
+                        if grib2d.array.data[0..<1000].mean() < 100 {
                             grib2d.array.data.multiplyAdd(multiply: 1, add: 273.15)
                         }
                     }
