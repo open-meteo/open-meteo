@@ -40,8 +40,6 @@ struct MetNoDownloader: AsyncCommand {
                 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        
         try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
@@ -165,6 +163,7 @@ struct MetNoDownloader: AsyncCommand {
             progress.finish()
             
             if createNetcdf {
+                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
                 try spatial.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", nx: nx, ny: ny)
             }
         }

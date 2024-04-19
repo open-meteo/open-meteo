@@ -178,7 +178,6 @@ struct GfsDownload: AsyncCommand {
     
     /// download GFS025 and NAM CONUS
     func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let logger = application.logger
         
         // GFS025 ensemble does not have elevation information, use non-ensemble version
@@ -391,7 +390,6 @@ struct GfsDownload: AsyncCommand {
     /// Download precipitation members from GFS ensemble and calculate probability
     func downloadPrecipitationProbability(application: Application, run: Timestamp) async throws -> [GenericVariableHandle] {
         let domain = GfsDomain.gfs025_ensemble
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let grid = domain.grid
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
