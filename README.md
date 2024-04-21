@@ -56,7 +56,8 @@ Apps:
 - [Rain](https://github.com/DarkMooNight/Rain) Free, open source, beautiful, minimal and fast weather app
 - [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
 - [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
-
+- [ForgottenValley](https://apps.apple.com/au/app/forgottenvalley/id6478435407) - An all in one IOS app that incorporates weather, river heights, traffic cameras and roadworks.
+  
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
 - [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
