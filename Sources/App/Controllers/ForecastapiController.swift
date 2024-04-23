@@ -172,10 +172,10 @@ struct WeatherApiController {
                     },
                     current: paramsCurrent.map { variables in
                         return {
-                            .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
+                            .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
                                 let (v, previousDay) = variable.variableAndPreviousDay
                                 guard let d = try reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return nil
+                                    return .init(variable: variable.resultVariable, unit: .undefined, value: .nan)
                                 }
                                 return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
                             })
@@ -183,10 +183,10 @@ struct WeatherApiController {
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
+                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
                                 let (v, previousDay) = variable.variableAndPreviousDay
                                 guard let d = try reader.get(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return nil
+                                    return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.hourlyRead.count))])
                                 }
                                 assert(time.hourlyRead.count == d.data.count)
                                 return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
@@ -196,7 +196,7 @@ struct WeatherApiController {
                     daily: paramsDaily.map { dailyVariables in
                         return {
                             var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
-                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.compactMap { variable -> ApiColumn<ForecastVariableDaily>? in
+                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<ForecastVariableDaily> in
                                 if variable == .sunrise || variable == .sunset {
                                     // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
                                     let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: reader.modelLat, lon: reader.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
@@ -213,7 +213,7 @@ struct WeatherApiController {
                                 }
                                 
                                 guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
-                                    return nil
+                                    return ApiColumn(variable: variable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.dailyRead.count))])
                                 }
                                 assert(time.dailyRead.count == d.data.count)
                                 return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
@@ -223,10 +223,10 @@ struct WeatherApiController {
                     sixHourly: nil,
                     minutely15: paramsMinutely.map { variables in
                         return {
-                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.compactMap { variable in
+                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
                                 let (v, previousDay) = variable.variableAndPreviousDay
                                 guard let d = try reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return nil
+                                    return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.minutely15.count))])
                                 }
                                 assert(time.minutely15.count == d.data.count)
                                 return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])

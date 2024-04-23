@@ -48,7 +48,7 @@ public struct EnsembleApiController {
                     current: nil,
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.compactMap { variable in
+                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
                                     guard let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
@@ -59,7 +59,7 @@ public struct EnsembleApiController {
                                     return ApiArray.float(d.data)
                                 }
                                 guard allMembers.count > 0 else {
-                                    return nil
+                                    return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.hourlyRead.count)), count: reader.domain.countEnsembleMember))
                                 }
                                 return .init(variable: variable.resultVariable, unit: unit ?? .undefined, variables: allMembers)
                             })
