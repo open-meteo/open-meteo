@@ -353,6 +353,18 @@ struct GfsDownload: AsyncCommand {
                         }
                     }
                     
+                    // Cloud cover in GFS ensemble may be -1 or 101 or 102
+                    if [GfsDomain.gfs025_ens, .gfs05_ens].contains(domain), let variable = variable.variable as? GfsSurfaceVariable, variable == .cloud_cover {
+                        for i in grib2d.array.data.indices {
+                            if grib2d.array.data[i] > 100 {
+                                grib2d.array.data[i] = 100
+                            }
+                            if grib2d.array.data[i] < 0 {
+                                grib2d.array.data[i] = 0
+                            }
+                        }
+                    }
+                    
                     // Scaling before compression with scalefactor
                     if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
