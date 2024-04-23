@@ -195,6 +195,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     /// Maximum updraft within 10 km altitude `W_CTMAX`
     case updraft
     
+    case visibility
+    
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -264,6 +266,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return 0.1
         case .updraft:
             return 100
+        case .visibility: return 0.05 // 50 meter
         }
     }
     
@@ -321,6 +324,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .metre
         case .updraft:
             return .metrePerSecondNotUnitConverted
+        case .visibility:
+            return .metre
         }
     }
     
@@ -432,6 +437,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .solar_backwards_averaged
         case .updraft:
             return .hermite(bounds: nil)
+        case .visibility:
+            return .linear
         }
     }
     
