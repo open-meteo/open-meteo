@@ -66,7 +66,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = try await download2(application: context.application, domain: domain, run: run, variables: variables)
-        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
+        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
         //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         

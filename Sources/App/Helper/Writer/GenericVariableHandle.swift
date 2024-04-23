@@ -21,21 +21,22 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int) async throws {
         let startTime = Date()
         if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
-                try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: nMembers, handles: $0.flatMap{$0.values})
+                try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values})
             })
         } else {
-            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: nMembers, handles: handles)
+            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles)
         }
         let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
         logger.info("Conversion completed in \(timeElapsed)")
     }
     
     /// Process each variable and update time-series optimised files
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self]) throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self]) throws {
+        let nMembers = (handles.max(by: {$0.member > $1.member})?.member ?? 0) + 1
         let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
         let nLocationsPerChunk = om.nLocationsPerChunk
         guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
