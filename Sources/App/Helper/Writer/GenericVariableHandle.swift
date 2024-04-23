@@ -50,8 +50,8 @@ struct GenericVariableHandle {
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
             let variable = handles[0].variable
             let skip = handles[0].skipHour0 ? 1 : 0
-            let nMembers = (handles.max(by: {$0.member > $1.member})?.member ?? 0) + 1
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
+            let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue) (\(nMembers) members)")
             
             let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
             let nLocationsPerChunk = om.nLocationsPerChunk
