@@ -10,7 +10,7 @@ struct RegularGrid: Gridable {
     let dy: Float
     
     var isGlobal: Bool {
-        return (Float(nx) * dx) >= 360 && (Float(ny) * dy) >= 180
+        return (Float(nx) * dx) >= 359 && (Float(ny) * dy) >= 179
     }
     
     func findPoint(lat: Float, lon: Float) -> Int? {
@@ -24,9 +24,9 @@ struct RegularGrid: Gridable {
         let x = Int(roundf((lon-lonMin) / dx))
         let y = Int(roundf((lat-latMin) / dy))
         
-        // Allow points on the border. Technically for global grids, this grid point now wrappes to the eastern side
-        let xx = x == -1 ? 0 : (x == nx) ? (nx-1) : x
-        let yy = y == -1 ? 0 : (y == ny) ? (ny-1) : y
+        // Allow points on the border. For global grids, this grid point now wrappes to the eastern side
+        let xx = Float(nx) * dx >= 359 ? x.moduloPositive(nx) : x
+        let yy = Float(ny) * dy >= 179 ? y.moduloPositive(ny) : y
         if yy < 0 || xx < 0 || yy >= ny || xx >= nx {
             return nil
         }
