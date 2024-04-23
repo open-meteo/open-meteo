@@ -52,7 +52,6 @@ struct JmaDownload: AsyncCommand {
         guard let server = signature.server else {
             fatalError("Parameter server required")
         }
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {

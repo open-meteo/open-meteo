@@ -11,13 +11,6 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_hrdps_continental
     case gem_global_ensemble
     
-    var omfileDirectory: String {
-        return "\(OpenMeteo.dataDirectory)omfile-\(rawValue)/"
-    }
-    var downloadDirectory: String {
-        return "\(OpenMeteo.tempDirectory)download-\(rawValue)/"
-    }
-    
     var domainRegistry: DomainRegistry {
         switch self {
         case .gem_global:

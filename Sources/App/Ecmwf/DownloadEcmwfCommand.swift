@@ -61,7 +61,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
@@ -125,7 +124,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let ((surfacePressure, sealevelPressure), (temperature_2m, landmask)) = $0
             return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
         }
-        //try Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1).writeNetcdf(filename: "\(domain.downloadDirectory)/elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
         try domain.surfaceElevationFileOm.createDirectory()
         if domain == .aifs025 {
             try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 1, chunk1: 20*20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)

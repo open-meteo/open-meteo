@@ -52,7 +52,6 @@ struct GfsGraphCastDownload: AsyncCommand {
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let nConcurrent = signature.concurrent ?? 1
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles, concurrent: nConcurrent)
         

@@ -81,10 +81,7 @@ struct GemDownload: AsyncCommand {
         let variables = onlyVariables ?? variablesDefault
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
-        
+                
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
@@ -102,7 +99,7 @@ struct GemDownload: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
-        try FileManager.default.createDirectory(atPath: domain.omfileDirectory, withIntermediateDirectories: true)
+        try domain.surfaceElevationFileOm.createDirectory()
         
         logger.info("Downloading height and elevation data")
         
@@ -145,7 +142,6 @@ struct GemDownload: AsyncCommand {
             for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
                 try grib2d.load(message: message)
                 landmask = grib2d.array
-                //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)landmask.nc")
             }
             if let landmask {
                 for i in landmask.data.indices {
@@ -155,7 +151,6 @@ struct GemDownload: AsyncCommand {
             }
         }
         
-        //try Array2D(data: height, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(domain.downloadDirectory)terrain.nc")
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height)
     }
     

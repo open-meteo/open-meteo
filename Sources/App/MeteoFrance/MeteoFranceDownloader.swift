@@ -63,9 +63,7 @@ struct MeteoFranceDownload: AsyncCommand {
         let variables = variablesAll.filter({ $0.availableFor(domain: domain, forecastSecond: 0) })
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        
-        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        
+                
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = try await download2(application: context.application, domain: domain, run: run, variables: variables)
         try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
@@ -103,7 +101,7 @@ struct MeteoFranceDownload: AsyncCommand {
         } else {
             grib2d.array.flipLatitude()
         }
-        try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc")
+        //try grib2d.array.writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc")
         //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         //message.dumpAttributes()
         

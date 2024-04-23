@@ -285,6 +285,7 @@ struct DownloadEra5Command: AsyncCommand {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
+        try domain.surfaceElevationFileOm.createDirectory()
         
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)

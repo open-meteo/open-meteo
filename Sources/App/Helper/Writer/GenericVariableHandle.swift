@@ -64,6 +64,7 @@ struct GenericVariableHandle {
             
             // Create netcdf file for debugging
             if createNetcdf {
+                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
                 let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
                 try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [

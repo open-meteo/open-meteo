@@ -5,6 +5,9 @@ struct OpenMeteo {
     /// Data directory with trailing slash
     static var dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
+            guard dir.last == "/" else {
+                fatalError("TEMP_DIRECTORY must end with a trailing slash")
+            }
             return dir
         }
         return  "./data/"
@@ -13,12 +16,12 @@ struct OpenMeteo {
     /// Temporary directory with trailing slash
     static var tempDirectory = {
         if let dir = Environment.get("TEMP_DIRECTORY") {
+            guard dir.last == "/" else {
+                fatalError("TEMP_DIRECTORY must end with a trailing slash")
+            }
             return dir
         }
-        if let dir = Environment.get("DATA_DIRECTORY") {
-            return dir
-        }
-        return  "./data/"
+        return dataDirectory
     }()
     
     /// Cache all data access using spare files in this directory
