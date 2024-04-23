@@ -94,6 +94,20 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         self.options = options
     }
     
+    func get(raw: SurfaceAndPressureVariable<JmaSurfaceVariable, JmaPressureVariable>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        switch raw {
+        case .pressure(let variable):
+            if variable.variable == .geopotential_height {
+                let data = try self.reader.get(variable: raw, time: time)
+                return DataAndUnit(data.data.map { $0 * 9.80665 }, data.unit)
+            }
+        default:
+            break
+        }
+        
+        return try self.reader.get(variable: raw, time: time)
+    }
+    
     func prefetchData(raw: JmaSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(raw: .surface(raw), time: time)
     }
