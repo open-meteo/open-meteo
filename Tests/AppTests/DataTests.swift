@@ -35,13 +35,19 @@ final class DataTests: XCTestCase {
     
     func testRegularGrid() {
         let grid = RegularGrid(nx: 768, ny: 384, latMin: -90, lonMin: -180, dx: 360/768, dy: 180/384)
-        
+
         // Exactly on the border
         let pos = grid.findPoint(lat: 89.90001, lon: 179.80002)!
         let (lat,lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 294911)
-        XCTAssertEqual(lat, 89.53125, accuracy: 0.001)
-        XCTAssertEqual(lon, 179.53125, accuracy: 0.001)
+        XCTAssertEqual(pos, 0)
+        XCTAssertEqual(lat, -90.0, accuracy: 0.001)
+        XCTAssertEqual(lon, -180.0, accuracy: 0.001)
+
+        let pos2 = IconDomains.icon.grid.findPoint(lat: -16.805414, lon: 179.990623)!
+        let (lat2,lon2) = IconDomains.icon.grid.getCoordinates(gridpoint: pos2)
+        XCTAssertEqual(pos2, 1687095)
+        XCTAssertEqual(lat2, -16.75, accuracy: 0.001)
+        XCTAssertEqual(lon2, -179.875, accuracy: 0.001)
     }
     
     func testElevationMatching() throws {
