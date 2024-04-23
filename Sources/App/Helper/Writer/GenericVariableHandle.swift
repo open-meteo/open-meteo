@@ -36,9 +36,6 @@ struct GenericVariableHandle {
     
     /// Process each variable and update time-series optimised files
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self]) throws {
-        let nMembers = (handles.max(by: {$0.member > $1.member})?.member ?? 0) + 1
-        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
-        let nLocationsPerChunk = om.nLocationsPerChunk
         guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
             logger.warning("No data to convert")
             return
@@ -49,20 +46,21 @@ struct GenericVariableHandle {
         
         let grid = domain.grid
         let nLocations = grid.count
-                
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
             let variable = handles[0].variable
-            
             let skip = handles[0].skipHour0 ? 1 : 0
+            let nMembers = (handles.max(by: {$0.member > $1.member})?.member ?? 0) + 1
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
+            
+            let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
+            let nLocationsPerChunk = om.nLocationsPerChunk
+            var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
+            var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
             
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
                 return (time, try h.map{(try OmFileReader(fn: $0.fn), $0.member)})
             }
-            
             // Create netcdf file for debugging
             if createNetcdf {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
