@@ -297,6 +297,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     return nil
                 }
+                // Keep precip in memory for probability
+                if domain == .ifs025_ensemble && variable == .precipitation {
+                    await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                }
                 
                 if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                     // do not generate some database files for ensemble
@@ -429,6 +433,18 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     fn: fnCloudCover,
                     skipHour0: false
                 ))
+            }
+            
+            if domain == .ifs025_ensemble {
+                logger.info("Calculating precipitation probability")
+                if let handle = try await inMemory.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    domain: domain,
+                    timestamp: timestamp,
+                    dtHoursOfCurrentStep: domain.dtHours
+                ) {
+                    handles.append(handle)
+                }
             }
         }
         await curl.printStatistics()
