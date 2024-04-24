@@ -235,33 +235,7 @@ struct DownloadIconCommand: AsyncCommand {
             
             /// Calculate precipitation >0.1mm/h probability
             if domain.ensembleMembers > 1 {
-                // Usefull probs, precip >0.1, >1, clouds <20%, clouds 20-50, 50-80, >80, snowfall eq >0.1, >1.0, wind >20kt, temp <0, temp >25
-                // Note: Does not consider dt switches
-                var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
-                let threshold = Float(0.1) * Float(domain.dtHours)
-                for (v, data) in await storage.data {
-                    if v.variable == .precipitation {
-                        for i in data.data.indices {
-                            if data.data[i] >= threshold {
-                                precipitationProbability01[i] += 100 / Float(domain.ensembleMembers)
-                            }
-                        }
-                    }
-                }
-                if precipitationProbability01.max() ?? 0 > 0 {
-                    let variable = GfsSurfaceVariable.precipitation_probability
-                    /// Do not set `chunknLocations` because only 1 member is stored
-                    let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
-                    let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: precipitationProbability01)
-                    await handles.append(GenericVariableHandle(
-                        variable: variable,
-                        time: timestamp,
-                        member: 0,
-                        fn: fn,
-                        skipHour0: false
-                    ))
-                }
+                try await handles.append(contentsOf: storage.calculatePrecipitationProbability(precipitationVariable: .precipitation, domain: domain))
             }
             
             /// All variables for this timestep have been downloaded. Selected variables are kept in memory.

@@ -287,6 +287,8 @@ struct GfsDownload: AsyncCommand {
             logger.info("Downloading forecastHour \(forecastHour)")
             let timestamp = run.add(hours: forecastHour)
             
+            let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
+            
             for member in 0..<nMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
@@ -380,6 +382,10 @@ struct GfsDownload: AsyncCommand {
                         inMemoryPressure[variable] = grib2d.array.data
                     }
                     
+                    if let variable = variable.variable as? GfsSurfaceVariable, variable == .precipitation {
+                        await storePrecipMembers.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    }
+                    
                     if domain == .gfs013 && variable.variable as? GfsSurfaceVariable == .pressure_msl {
                         // do not write pressure to disk
                         continue
@@ -393,6 +399,9 @@ struct GfsDownload: AsyncCommand {
                         skipHour0: variable.variable.skipHour0(for: domain)
                     ))
                 }
+            }
+            if domain.ensembleMembers > 1 {
+                try await handles.append(contentsOf: storePrecipMembers.calculatePrecipitationProbability(precipitationVariable: .precipitation, domain: domain))
             }
         }
         await curl.printStatistics()

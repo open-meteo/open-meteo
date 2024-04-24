@@ -51,7 +51,8 @@ struct GenericVariableHandle {
             let variable = handles[0].variable
             let skip = handles[0].skipHour0 ? 1 : 0
             let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue) (\(nMembers) members)")
+            let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr)")
             
             let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
             let nLocationsPerChunk = om.nLocationsPerChunk
@@ -128,6 +129,10 @@ actor GenericVariableHandleStorage {
     
     func append(_ element: GenericVariableHandle) {
         handles.append(element)
+    }
+    
+    func append(contentsOf elements: [GenericVariableHandle]) {
+        handles.append(contentsOf: elements)
     }
 }
 
