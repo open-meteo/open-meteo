@@ -283,6 +283,7 @@ struct GfsDownload: AsyncCommand {
         /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
         let keepVariableInMemoryPressure: [GfsPressureVariableType] = (domain == .hrrr_conus || domain == .gfs05_ens) ? [.temperature] : []
         
+        var previousHour = 0
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             let timestamp = run.add(hours: forecastHour)
@@ -401,8 +402,16 @@ struct GfsDownload: AsyncCommand {
                 }
             }
             if domain.ensembleMembers > 1 {
-                try await handles.append(contentsOf: storePrecipMembers.calculatePrecipitationProbability(precipitationVariable: .precipitation, domain: domain))
+                if let handle = try await storePrecipMembers.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    domain: domain,
+                    timestamp: timestamp,
+                    dtHoursOfCurrentStep: forecastHour - previousHour
+                ) {
+                    handles.append(handle)
+                }
             }
+            previousHour = forecastHour
         }
         await curl.printStatistics()
         return handles

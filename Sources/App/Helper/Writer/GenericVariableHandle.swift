@@ -131,6 +131,13 @@ actor GenericVariableHandleStorage {
         handles.append(element)
     }
     
+    func append(_ element: GenericVariableHandle?) {
+        guard let element else {
+            return
+        }
+        handles.append(element)
+    }
+    
     func append(contentsOf elements: [GenericVariableHandle]) {
         handles.append(contentsOf: elements)
     }

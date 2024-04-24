@@ -135,6 +135,7 @@ struct DownloadIconCommand: AsyncCommand {
         }()
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        var previousHour = 0
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             let timestamp = run.add(hours: hour)
@@ -235,7 +236,12 @@ struct DownloadIconCommand: AsyncCommand {
             
             /// Calculate precipitation >0.1mm/h probability
             if domain.ensembleMembers > 1 {
-                try await handles.append(contentsOf: storage.calculatePrecipitationProbability(precipitationVariable: .precipitation, domain: domain))
+                try await handles.append(storage.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    domain: domain,
+                    timestamp: timestamp,
+                    dtHoursOfCurrentStep: hour - previousHour
+                ))
             }
             
             /// All variables for this timestep have been downloaded. Selected variables are kept in memory.
@@ -423,6 +429,7 @@ struct DownloadIconCommand: AsyncCommand {
                     skipHour0: v.variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
                 ))
             }
+            previousHour = hour
         }
         await curl.printStatistics()
         return await (handles.handles, handles15minIconD2.handles)
