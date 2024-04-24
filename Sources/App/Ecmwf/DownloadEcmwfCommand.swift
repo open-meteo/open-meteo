@@ -148,6 +148,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         var handles = [GenericVariableHandle]()
         let deaverager = GribDeaverager()
         
+        var previousHour = 0
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             let timestamp = run.add(hours: hour)
@@ -441,11 +442,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     precipitationVariable: .precipitation,
                     domain: domain,
                     timestamp: timestamp,
-                    dtHoursOfCurrentStep: domain.dtHours
+                    dtHoursOfCurrentStep: hour - previousHour
                 ) {
                     handles.append(handle)
                 }
             }
+            previousHour = hour
         }
         await curl.printStatistics()
         return handles
