@@ -517,7 +517,7 @@ struct DownloadIconCommand: AsyncCommand {
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(
                 bucket: uploadS3Bucket,
-                variables: domain.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
             )
             if domain == .iconD2 {
                 try DomainRegistry.dwd_icon_d2_15min.syncToS3(bucket: uploadS3Bucket, variables: variables)
