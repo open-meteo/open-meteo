@@ -131,11 +131,11 @@ struct GfsGraphCastDownload: AsyncCommand {
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         
-        // https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/graphcastgfs.20240401/00/forecasts_37_levels/graphcastgfs.t00z.pgrb2.0p25.f006
+        // https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/graphcastgfs.20240401/00/forecasts_13_levels/graphcastgfs.t00z.pgrb2.0p25.f006
         let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let thhh = forecastHour.zeroPadded(len: 3)
-            let url = "\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_37_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(thhh)"
+            let url = "\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_13_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(thhh)"
             let timestamp = run.add(hours: forecastHour)
             let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
             let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
@@ -152,15 +152,6 @@ struct GfsGraphCastDownload: AsyncCommand {
                     //message.dumpAttributes()
                     try grib2d.load(message: message)
                     grib2d.array.shift180LongitudeAndFlipLatitude()
-                    
-                    // Although it is supposed to be Kelvin, suddenly Celsius is used for temperature. Dynmically detect the right unit
-                    if variable as? GfsGraphCastSurfaceVariable == GfsGraphCastSurfaceVariable.temperature_2m
-                        || (variable as? GfsGraphCastPressureVariable)?.variable == .temperature {
-                        // If temperture appears to be celsius, set it back to kelvin
-                        if grib2d.array.data[0..<1000].mean() < 100 {
-                            grib2d.array.data.multiplyAdd(multiply: 1, add: 273.15)
-                        }
-                    }
                     
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {

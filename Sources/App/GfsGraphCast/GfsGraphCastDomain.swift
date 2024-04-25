@@ -39,7 +39,9 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     }
     
     var levels: [Int] {
-        return [10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
+        // Switched to 13 levels from 37 on 2024-05-25. See https://github.com/NOAA-EMC/graphcast/issues/39
+        //return [10, 20, 30, 50, 70, 100, 125, 150, 175, 200, 225, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
+        return [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
     }
     
     var omFileLength: Int {
