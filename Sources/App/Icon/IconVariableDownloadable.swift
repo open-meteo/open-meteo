@@ -217,7 +217,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .updraft:
             return domain == .iconD2 ? ("w_ctmax", "single-level", nil) : nil // only in icon d2
         case .visibility:
-            return domain == .icon ? nil : ("vis", "single-level", nil) // not in icon global
+            return nil // Still unavailable until 2025-04-25
+            // domain == .icon ? nil : ("vis", "single-level", nil) // not in icon global
         }
     }
     
