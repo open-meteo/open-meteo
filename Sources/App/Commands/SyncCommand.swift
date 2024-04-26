@@ -87,6 +87,9 @@ struct SyncCommand: AsyncCommand {
         let variablesSetA = signature.variables.split(separator: ";").map {
             $0.split(separator: ",").map(String.init)  + ["static"]
         }
+        if variablesSetA.count > 1 && variablesSetA.count != serverSet.count {
+            fatalError("Number of servers and variables sets must be the same")
+        }
         let variablesSet = variablesSetA.count != serverSet.count ? [[String]](repeating: variablesSetA[0], count: serverSet.count) : variablesSetA
         
         let pastDays = signature.pastDays ?? 7
