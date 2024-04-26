@@ -246,7 +246,6 @@ struct GemDownload: AsyncCommand {
                             // keep precipitation to calculate probabilitties later
                             if [.precipitation].contains(variable) {
                                 await storePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                                continue
                             }
                             if let windspeedVariable = variable.winddirectionCounterPartVariable {
                                 guard let u = inMemory[.init(windspeedVariable, member)] else {
