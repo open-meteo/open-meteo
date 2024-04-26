@@ -93,9 +93,7 @@ extension Array where Element == GenericVariableHandle {
                 guard nMember > 1 else {
                     return nil
                 }
-                print(timestamp.iso8601_YYYY_MM_dd_HH_mm)
                 let dt = previousTimesamp.map { (timestamp.timeIntervalSince1970 - $0.timeIntervalSince1970) / 3600 } ?? domain.dtHours
-                print(dt)
                 precondition(dt > 0, "dt <= 0")
                 var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
                 let threshold = Float(0.1) * Float(dt)

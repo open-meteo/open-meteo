@@ -483,7 +483,15 @@ struct DownloadBomCommand: AsyncCommand {
                 if pos >= timeForecast.count {
                     return nil
                 }
-                defer {pos += 1}
+                defer {
+                    pos += 1
+                    /// Precipitation in ensemble is 1-hourly, but the rest is 3-hourly. Skip 1-hourly data and only use 3-hourly
+                    if domain.dtHours == 3 {
+                        while pos < timeForecast.count && timeForecast[pos] % (3*3600) != 0 {
+                            pos += 1
+                        }
+                    }
+                }
                 // search level if requried
                 let levelIndex = level.map { level in
                     guard let index = try? ncForecast
