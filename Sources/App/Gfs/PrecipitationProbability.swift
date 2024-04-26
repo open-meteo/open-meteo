@@ -77,3 +77,50 @@ extension VariablePerMemberStorage {
         )
     }
 }
+
+extension Array where Element == GenericVariableHandle {
+    /// Calculate precipitation >0.1mm/h probability. BOM downloads multiple timesteps, uncompress handles and calculate probabilities
+    /// `precipitationVariable` is used to filter only precipitation variables
+    /// `domain` must be set to generate a temporary file handle afterwards
+    func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain) throws -> [GenericVariableHandle] {
+        var previousTimesamp: Timestamp? = nil
+        return try self
+            .filter({$0.variable.omFileName == precipitationVariable.omFileName})
+            .groupedPreservedOrder(by: {$0.time})
+            .sorted(by: {$0.key < $1.key})
+            .compactMap({ (timestamp, handles) -> GenericVariableHandle? in
+                let nMember = handles.count
+                guard nMember > 1 else {
+                    return nil
+                }
+                print(timestamp.iso8601_YYYY_MM_dd_HH_mm)
+                let dt = previousTimesamp.map { (timestamp.timeIntervalSince1970 - $0.timeIntervalSince1970) / 3600 } ?? domain.dtHours
+                print(dt)
+                precondition(dt > 0, "dt <= 0")
+                var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
+                let threshold = Float(0.1) * Float(dt)
+                for d in handles {
+                    let reader = try d.makeReader()
+                    for (i, value) in try reader.readAll().enumerated() {
+                        if value >= threshold {
+                            precipitationProbability01[i] += 1
+                        }
+                    }
+                }
+                previousTimesamp = timestamp
+                precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
+                let variable = ProbabilityVariable.precipitation_probability
+                /// Do not set `chunknLocations` because only 1 member is stored
+                let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
+                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: precipitationProbability01)
+                return GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: 0,
+                    fn: fn,
+                    skipHour0: false
+                )
+            })
+    }
+}

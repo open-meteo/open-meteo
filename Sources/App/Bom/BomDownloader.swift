@@ -31,6 +31,9 @@ struct DownloadBomCommand: AsyncCommand {
         
         @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
         var skipExisting: Bool
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {
@@ -61,7 +64,10 @@ struct DownloadBomCommand: AsyncCommand {
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
         }
     }
     
@@ -222,8 +228,8 @@ struct DownloadBomCommand: AsyncCommand {
             //("cld_phys_thunder_p", nil)
         ]
         
-        let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
-            return try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+        let handles: [GenericVariableHandle] = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
+            var handles =  try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
                 let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
                 let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc_\(member).nc"
                 let memberStr = ((run.hour % 12 == 6) ? (member+17) : member).zeroPadded(len: 3)
@@ -246,7 +252,15 @@ struct DownloadBomCommand: AsyncCommand {
                     return GenericVariableHandle(variable: omVariable, time: timestamp, member: member, fn: fn, skipHour0: false)
                 }
             }
-        }
+            if domain == .access_global_ensemble && variable.om == .precipitation {
+                logger.info("Calculating precipitation probability")
+                try handles.append(contentsOf: handles.calculatePrecipitationProbabilityMultipleTimestamps(
+                    precipitationVariable: BomVariable.precipitation,
+                    domain: domain
+                ))
+            }
+            return handles
+        }.flatMap({$0})
         
         let handlesSnow = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
             logger.info("Calculate weather codes and snow sum member_\(member)")
@@ -313,7 +327,7 @@ struct DownloadBomCommand: AsyncCommand {
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)
-        return handles.flatMap({$0}) + handlesSnow + handlesWind + handlesRh
+        return handles + handlesSnow + handlesWind + handlesRh
     }
     
     /// Download variables, convert to temporary om files and return all handles

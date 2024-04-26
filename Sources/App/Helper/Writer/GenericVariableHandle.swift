@@ -9,7 +9,7 @@ struct GenericVariableHandle {
     let variable: GenericVariable
     let time: Timestamp
     let member: Int
-    let fn: FileHandle
+    private let fn: FileHandle
     let skipHour0: Bool
     
     public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool) {
@@ -18,6 +18,10 @@ struct GenericVariableHandle {
         self.member = member
         self.fn = fn
         self.skipHour0 = skipHour0
+    }
+    
+    public func makeReader() throws -> OmFileReader<MmapFile> {
+        try OmFileReader(fn: fn)
     }
     
     /// Process concurrently
@@ -60,7 +64,7 @@ struct GenericVariableHandle {
             var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
             
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
-                return (time, try h.map{(try OmFileReader(fn: $0.fn), $0.member)})
+                return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
             // Create netcdf file for debugging
             if createNetcdf {
@@ -156,6 +160,10 @@ actor VariablePerMemberStorage<V: Hashable> {
     }
     
     var data = [VariableAndMember: Array2D]()
+    
+    init(data: [VariableAndMember : Array2D] = [VariableAndMember: Array2D]()) {
+        self.data = data
+    }
     
     func set(variable: V, timestamp: Timestamp, member: Int, data: Array2D) {
         self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
