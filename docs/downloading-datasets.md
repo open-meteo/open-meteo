@@ -52,7 +52,7 @@ The DWD ICON models are the most important source for the 7 days weather API. Th
 As a minimum requirement, ICON global should be downloaded. To download the 00 run:
 
 ```bash
-<exe> download icon --run 00 --only-variables temperature_2m,weathercode
+<exe> download icon --run 00 --only-variables temperature_2m,weather_code
 ``` 
  
 If `only-variables` is omitted, all ICON weather variables are downloaded, which could take a couple of hours.
