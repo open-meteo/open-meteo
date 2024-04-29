@@ -217,7 +217,8 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .updraft:
             return domain == .iconD2 ? ("w_ctmax", "single-level", nil) : nil // only in icon d2
         case .visibility:
-            return domain != .iconD2 ? nil : ("vis", "single-level", nil) // not in icon global
+            return nil
+            // 2025-04-29: only available as ICON grid in D2. Not available as regular grid
             // Still unavailable until 2025-04-25
             // domain == .icon ? nil : ("vis", "single-level", nil) // not in icon global
         }
