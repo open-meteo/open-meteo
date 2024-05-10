@@ -313,6 +313,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // do not generate some database files for ensemble
                     return nil
                 }
+                // Shortwave radiation and precipitation contain always 0 values for hour 0.
+                if hour == 0 && [.shortwave_radiation, .precipitation, .runoff].contains(variable) {
+                    return nil
+                }
                 
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(
