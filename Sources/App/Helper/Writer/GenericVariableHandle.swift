@@ -9,7 +9,7 @@ struct GenericVariableHandle {
     let variable: GenericVariable
     let time: Timestamp
     let member: Int
-    let fn: FileHandle
+    private let fn: FileHandle
     let skipHour0: Bool
     
     public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool) {
@@ -20,24 +20,26 @@ struct GenericVariableHandle {
         self.skipHour0 = skipHour0
     }
     
+    public func makeReader() throws -> OmFileReader<MmapFile> {
+        try OmFileReader(fn: fn)
+    }
+    
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self], concurrent: Int) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int) async throws {
         let startTime = Date()
         if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
-                try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: nMembers, handles: $0.flatMap{$0.values})
+                try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values})
             })
         } else {
-            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, nMembers: nMembers, handles: handles)
+            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles)
         }
         let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
         logger.info("Conversion completed in \(timeElapsed)")
     }
     
     /// Process each variable and update time-series optimised files
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, nMembers: Int, handles: [Self]) throws {
-        let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
-        let nLocationsPerChunk = om.nLocationsPerChunk
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self]) throws {
         guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
             logger.warning("No data to convert")
             return
@@ -48,20 +50,22 @@ struct GenericVariableHandle {
         
         let grid = domain.grid
         let nLocations = grid.count
-                
-        var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
-        var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
             let variable = handles[0].variable
-            
             let skip = handles[0].skipHour0 ? 1 : 0
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)")
+            let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
+            let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr)")
+            
+            let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
+            let nLocationsPerChunk = om.nLocationsPerChunk
+            var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
+            var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
             
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
-                return (time, try h.map{(try OmFileReader(fn: $0.fn), $0.member)})
+                return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
-            
             // Create netcdf file for debugging
             if createNetcdf {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
@@ -130,6 +134,17 @@ actor GenericVariableHandleStorage {
     func append(_ element: GenericVariableHandle) {
         handles.append(element)
     }
+    
+    func append(_ element: GenericVariableHandle?) {
+        guard let element else {
+            return
+        }
+        handles.append(element)
+    }
+    
+    func append(contentsOf elements: [GenericVariableHandle]) {
+        handles.append(contentsOf: elements)
+    }
 }
 
 /// Thread safe storage for downloading grib messages. Can be used to post process data.
@@ -145,6 +160,10 @@ actor VariablePerMemberStorage<V: Hashable> {
     }
     
     var data = [VariableAndMember: Array2D]()
+    
+    init(data: [VariableAndMember : Array2D] = [VariableAndMember: Array2D]()) {
+        self.data = data
+    }
     
     func set(variable: V, timestamp: Timestamp, member: Int, data: Array2D) {
         self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data

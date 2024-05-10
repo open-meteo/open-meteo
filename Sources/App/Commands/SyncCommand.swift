@@ -83,18 +83,28 @@ struct SyncCommand: AsyncCommand {
         guard serverSet.count == modelsSet.count else {
            fatalError("Number of servers and models sets must be the same")
         }
+        
+        let variablesSetA = signature.variables.split(separator: ";").map {
+            $0.split(separator: ",").map(String.init)  + ["static"]
+        }
+        if variablesSetA.count > 1 && variablesSetA.count != serverSet.count {
+            fatalError("Number of servers and variables sets must be the same")
+        }
+        let variablesSet = variablesSetA.count != serverSet.count ? [[String]](repeating: variablesSetA[0], count: serverSet.count) : variablesSetA
+        
         let pastDays = signature.pastDays ?? 7
-        let variablesSig = signature.variables.split(separator: ",").map(String.init) + ["static"]
         let concurrent = signature.concurrent ?? 4
-        /// Undocumented switch to download all weather variables. This can generate immense traffic!
-        let downloadAllVariables = variablesSig.contains("really_download_all_variables")
-        let downloadAllPreviousDay = variablesSig.contains("really_download_all_previous_day")
-        let downloadAllPressureLevel = variablesSig.contains("really_download_all_pressure_levels")
-        let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
-        let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
         
         /// Download from each server concurrently
-        await zip(serverSet, modelsSet).foreachConcurrent(nConcurrent: serverSet.count) { (server, models) in
+        await zip(serverSet, zip(modelsSet, variablesSet)).foreachConcurrent(nConcurrent: serverSet.count) { (server, arg1) in
+            let (models, variablesSig) = arg1
+            /// Undocumented switch to download all weather variables. This can generate immense traffic!
+            let downloadAllVariables = variablesSig.contains("really_download_all_variables")
+            let downloadAllPreviousDay = variablesSig.contains("really_download_all_previous_day")
+            let downloadAllPressureLevel = variablesSig.contains("really_download_all_pressure_levels")
+            let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
+            let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
+            
             let curl = Curl(logger: logger, client: context.application.dedicatedHttpClient, retryError4xx: false)
             
             while true {

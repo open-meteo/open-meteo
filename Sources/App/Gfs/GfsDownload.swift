@@ -40,6 +40,9 @@ struct GfsDownload: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {
@@ -77,7 +80,7 @@ struct GfsDownload: AsyncCommand {
         case .gfs025_ensemble:
             variables = [GfsSurfaceVariable.precipitation_probability]
             let handles = try await downloadPrecipitationProbability(application: context.application, run: run)
-            try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: 1, handles: handles)
+            try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -112,12 +115,15 @@ struct GfsDownload: AsyncCommand {
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
             
             let nConcurrent = signature.concurrent ?? 1
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
         }
     }
     
@@ -283,9 +289,12 @@ struct GfsDownload: AsyncCommand {
         /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
         let keepVariableInMemoryPressure: [GfsPressureVariableType] = (domain == .hrrr_conus || domain == .gfs05_ens) ? [.temperature] : []
         
+        var previousHour = 0
         for forecastHour in forecastHours {
             logger.info("Downloading forecastHour \(forecastHour)")
             let timestamp = run.add(hours: forecastHour)
+            
+            let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
             
             for member in 0..<nMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
@@ -380,6 +389,10 @@ struct GfsDownload: AsyncCommand {
                         inMemoryPressure[variable] = grib2d.array.data
                     }
                     
+                    if let variable = variable.variable as? GfsSurfaceVariable, variable == .precipitation {
+                        await storePrecipMembers.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    }
+                    
                     if domain == .gfs013 && variable.variable as? GfsSurfaceVariable == .pressure_msl {
                         // do not write pressure to disk
                         continue
@@ -394,6 +407,17 @@ struct GfsDownload: AsyncCommand {
                     ))
                 }
             }
+            if domain.ensembleMembers > 1 {
+                if let handle = try await storePrecipMembers.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    domain: domain,
+                    timestamp: timestamp,
+                    dtHoursOfCurrentStep: forecastHour - previousHour
+                ) {
+                    handles.append(handle)
+                }
+            }
+            previousHour = forecastHour
         }
         await curl.printStatistics()
         return handles

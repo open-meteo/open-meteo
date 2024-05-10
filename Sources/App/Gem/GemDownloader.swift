@@ -37,6 +37,9 @@ struct GemDownload: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
     
     var help: String {
@@ -84,11 +87,14 @@ struct GemDownload: AsyncCommand {
                 
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
         }
     }
     
@@ -171,7 +177,9 @@ struct GemDownload: AsyncCommand {
         let deaverager = GribDeaverager()
                 
         let forecastHours = domain.getForecastHours(run: run)
+        var previousHour = 0
         for hour in forecastHours {
+            let timestamp = run.add(hours: hour)
             logger.info("Downloading hour \(hour)")
             struct GemSurfaceVariableMember: Hashable {
                 let variable: GemSurfaceVariable
@@ -199,6 +207,9 @@ struct GemDownload: AsyncCommand {
                 // snowfall file might be missing. Ignore any issues here
                 let isSnowfallWaterEq = domain == .gem_hrdps_continental && (gribName == "WEASN_Sfc" || gribName == "APCP_Sfc")
                 let deadLineHours = isSnowfallWaterEq ? 0.01 : nil
+                
+                /// Store precip to calculate probability later
+                let storePrecipitation = VariablePerMemberStorage<GemSurfaceVariable>()
                 
                 do {
                     for message in try await curl.downloadGrib(url: url, bzip2Decode: false, deadLineHours: deadLineHours) {
@@ -232,6 +243,10 @@ struct GemDownload: AsyncCommand {
                                 inMemory[.init(variable, member)] = grib2d.array.data
                                 continue
                             }
+                            // keep precipitation to calculate probabilitties later
+                            if [.precipitation].contains(variable) {
+                                await storePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            }
                             if let windspeedVariable = variable.winddirectionCounterPartVariable {
                                 guard let u = inMemory[.init(windspeedVariable, member)] else {
                                     fatalError("Wind speed calculation requires \(windspeedVariable) to download")
@@ -263,6 +278,19 @@ struct GemDownload: AsyncCommand {
                         throw error
                     }
                 }
+                
+                if domain == .gem_global_ensemble && variable as? GemSurfaceVariable == GemSurfaceVariable.precipitation {
+                    logger.info("Calculating precipitation probability")
+                    if let handle = try await storePrecipitation.calculatePrecipitationProbability(
+                        precipitationVariable: .precipitation,
+                        domain: domain,
+                        timestamp: timestamp,
+                        dtHoursOfCurrentStep: hour - previousHour
+                    ) {
+                        handles.append(handle)
+                    }
+                }
+                previousHour = hour
             }
         }
         await curl.printStatistics()

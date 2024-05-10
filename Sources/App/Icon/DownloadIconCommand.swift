@@ -38,6 +38,9 @@ struct DownloadIconCommand: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {
@@ -135,6 +138,7 @@ struct DownloadIconCommand: AsyncCommand {
         }()
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        var previousHour = 0
         for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             let timestamp = run.add(hours: hour)
@@ -231,6 +235,16 @@ struct DownloadIconCommand: AsyncCommand {
                         skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
                     ))
                 }
+            }
+            
+            /// Calculate precipitation >0.1mm/h probability
+            if domain.ensembleMembers > 1 {
+                try await handles.append(storage.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    domain: domain,
+                    timestamp: timestamp,
+                    dtHoursOfCurrentStep: hour - previousHour
+                ))
             }
             
             /// All variables for this timestep have been downloaded. Selected variables are kept in memory.
@@ -418,6 +432,7 @@ struct DownloadIconCommand: AsyncCommand {
                     skipHour0: v.variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
                 ))
             }
+            previousHour = hour
         }
         await curl.printStatistics()
         return await (handles.handles, handles15minIconD2.handles)
@@ -491,16 +506,19 @@ struct DownloadIconCommand: AsyncCommand {
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
         
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, nMembers: domain.ensembleMembers, handles: handles, concurrent: nConcurrent)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, nMembers: IconDomains.iconD2_15min.ensembleMembers, handles: handles15minIconD2, concurrent: nConcurrent)
+            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
             if domain == .iconD2 {
                 try DomainRegistry.dwd_icon_d2_15min.syncToS3(bucket: uploadS3Bucket, variables: variables)
             }

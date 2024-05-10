@@ -341,13 +341,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             guard let icon: any GenericReaderProtocol = try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
+            let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let iconProbabilities = try ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            
             guard let gfs: any GenericReaderProtocol = try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             // Scandinavian region, combine with ICON
             if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return Array([gfs, icon, iconEu, metno].compacted())
+                return Array([gfsProbabilites, iconProbabilities, gfs, icon, iconEu, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
@@ -356,7 +359,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 guard let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                     throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
                 }
-                return [gfs, icon, iconEu, iconD2, iconD2_15min]
+                return [gfsProbabilites, iconProbabilities, gfs, icon, iconEu, iconD2, iconD2_15min]
             }
             // For western europe, use arome models
             if let arome_france_hd = try MeteoFranceReader(domain: .arome_france_hd, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
@@ -364,33 +367,35 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 let arome_france = try MeteoFranceReader(domain: .arome_france, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arome_france_15min = try MeteoFranceReader(domain: .arome_france_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return Array([gfs, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
+                return Array([gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
             }
             // For North America, use HRRR
             if let hrrr = try GfsReader(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return [icon, gfs, hrrr]
+                return [gfsProbabilites, icon, gfs, hrrr]
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
             if let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return [gfs, icon, jma_msm]
+                return [gfsProbabilites, iconProbabilities, gfs, icon, jma_msm]
             }
             
             // Remaining eastern europe
             if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return [gfs, icon, iconEu]
+                return [gfsProbabilites, iconProbabilities, gfs, icon, iconEu]
             }
             
             // Northern africa
             if let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                return [gfs, icon, arpege_europe]
+                return [gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe]
             }
             
             // Remaining parts of the world
-            return [gfs, icon]
+            return [gfsProbabilites, iconProbabilities, gfs, icon]
         case .gfs_mix, .gfs_seamless:
-            return try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [gfsProbabilites] + (try GfsReader(domains: [.gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .gfs_global:
-            return try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [gfsProbabilites] + (try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .gfs025:
             return try GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs013:
@@ -420,25 +425,32 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .jms_gsm, .jma_gsm:
             return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .icon_seamless, .icon_mix:
-            return try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            let iconProbabilities = try ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [iconProbabilities] + (try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .icon_global:
-            return try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let iconProbabilities = try ProbabilityReader.makeIconGlobalReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [iconProbabilities] + (try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .icon_eu:
-            return try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let iconProbabilities = try ProbabilityReader.makeIconEuReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return (iconProbabilities.flatMap({[$0]}) ?? []) + (try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .icon_d2:
-            return try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            let iconProbabilities = try ProbabilityReader.makeIconD2Reader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return (iconProbabilities.flatMap({[$0]}) ?? []) + (try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .ecmwf_ifs04:
             return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .ecmwf_ifs025:
-            return try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [probabilities] + (try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .ecmwf_aifs025:
             return try EcmwfReader(domain: .aifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .metno_nordic:
             return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gem_seamless:
-            return try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            let probabilities = try ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [probabilities] + (try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .gem_global:
-            return try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let probabilities = try ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [probabilities] + (try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .gem_regional:
             return try GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gem_hrdps_continental:
@@ -458,7 +470,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .cma_grapes_global:
             return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .bom_access_global:
-            return try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            let probabilities = try ProbabilityReader.makeBomReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            return [probabilities] + (try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .arpae_cosmo_seamless:
             return try ArpaeMixer(domains: [.cosmo_5m, .cosmo_2i, .cosmo_2i_ruc], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .arpae_cosmo_2i:
