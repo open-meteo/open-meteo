@@ -313,18 +313,20 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // do not generate some database files for ensemble
                     return nil
                 }
+                let skipHour0 = [.shortwave_radiation, .precipitation, .runoff].contains(variable)
                 // Shortwave radiation and precipitation contain always 0 values for hour 0.
-                if hour == 0 && [.shortwave_radiation, .precipitation, .runoff].contains(variable) {
+                if hour == 0 && skipHour0 {
                     return nil
                 }
                 
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                // Note: skipHour0 needs still to be set for solar interpolation
                 return GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
                     member: member,
                     fn: fn,
-                    skipHour0: false
+                    skipHour0: skipHour0
                 )
             }.collect().compactMap({$0})
             handles.append(contentsOf: h)
