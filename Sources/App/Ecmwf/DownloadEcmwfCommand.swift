@@ -24,6 +24,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
         
+        @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
+        var maxForecastHour: Int?
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
+        
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
@@ -55,8 +61,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
         
         let logger = context.application.logger
 
-        logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
         let defaultVariables = domain.isEnsemble ? ensembleVariables : EcmwfVariable.allCases
@@ -64,8 +68,18 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
+        if let timeinterval = signature.timeinterval {
+            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
+                logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+                let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+            }
+            return
+        }
+        logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        
         try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
-        let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent)
+        let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -131,22 +145,20 @@ struct DownloadEcmwfCommand: AsyncCommand {
             return landmask < 0.5 ? -999 : Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
         }
         try domain.surfaceElevationFileOm.createDirectory()
-        if domain == .aifs025 {
-            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 1, chunk1: 20*20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
-        } else {
-            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
-        }
-
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
+        var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
+        if let maxForecastHour {
+            forecastHours = forecastHours.filter({$0 <= maxForecastHour})
+        }
         let nMembers = domain.ensembleMembers
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -155,7 +167,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         
         var previousHour = 0
-        for hour in forecastSteps {
+        for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
             let timestamp = run.add(hours: hour)
             
