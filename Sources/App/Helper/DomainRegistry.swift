@@ -62,6 +62,8 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_ifs025
     case ecmwf_ifs025_ensemble
     case ecmwf_aifs025
+    case ecmwf_wam025
+    case ecmwf_wam025_ensemble
     
     case jma_msm
     case jma_gsm

@@ -1,5 +1,14 @@
 import Foundation
 
+enum EcmwfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    case wave_direction
+    case wave_height
+    case wave_period
+    case wave_period_peak
+    
+}
+
+
 /// Represent a ECMWF variable as available in the grib2 files
 /// Only AIFS has additional levels 100, 400 and 600
 enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVariableMixable {
