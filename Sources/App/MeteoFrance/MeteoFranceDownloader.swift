@@ -113,7 +113,7 @@ struct MeteoFranceDownload: AsyncCommand {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
         let logger = application.logger
-        let deadLineHours: Double = domain == .arpege_europe && run.hour == 12 ? 5.9 : 5
+        let deadLineHours: Double = 6.5
         Process.alarm(seconds: Int(deadLineHours+2) * 3600)
         defer { Process.alarm(seconds: 0) }
         
