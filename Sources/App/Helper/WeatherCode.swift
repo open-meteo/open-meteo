@@ -39,15 +39,15 @@ enum WeatherCode: Int {
         
         let modelDtHours = Float(modelDtSeconds) / 3600
         
-        let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / modelDtHours) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / modelDtHours) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
+        //let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / modelDtHours) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / modelDtHours) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
         
-        if let cape, cape >= 2000 {
+        if let cape, cape >= 3000 {
             if let liftedIndex {
-                if liftedIndex <= -3 {
-                    return thunderstromStrength
+                if liftedIndex <= -5 {
+                    return .thunderstormSlightOrModerate
                 }
             } else {
-                return thunderstromStrength
+                return .thunderstormSlightOrModerate
             }
         }
         
