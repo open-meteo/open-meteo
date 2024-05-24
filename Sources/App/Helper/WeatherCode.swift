@@ -53,7 +53,7 @@ enum WeatherCode: Int {
         
         if let categoricalFreezingRain, categoricalFreezingRain >= 1 {
             switch precipitation / modelDtHours {
-            case 0.1..<0.5: return .lightFreezingDrizzle
+            case 0.01..<0.5: return .lightFreezingDrizzle
             case 0.5..<1.0: return .moderateOrDenseFreezingDrizzle
             case 1.0..<1.3: return .moderateOrDenseFreezingDrizzle
             case 1.3..<2.5: return .lightFreezingRain
@@ -86,7 +86,7 @@ enum WeatherCode: Int {
         }
         
         switch precipitation / modelDtHours {
-        case 0.1..<0.5: return .lightDrizzle
+        case 0.01..<0.5: return .lightDrizzle
         case 0.5..<1.0: return .moderateDrizzle
         case 1.0..<1.3: return .denseDrizzle
         case 1.3..<2.5: return .lightRain
