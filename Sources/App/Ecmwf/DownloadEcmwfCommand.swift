@@ -60,6 +60,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let logger = context.application.logger
+        let isWave = domain == .wam025 || domain == .wam025_ensemble
 
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
@@ -67,22 +68,23 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let variables = onlyVariables ?? defaultVariables
         let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
+        
+        let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_period_peak]
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+                let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
             }
             return
         }
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        let isWave = domain == .wam025 || domain == .wam025_ensemble
 
         if !isWave {
             try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         }
-        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: [.wave_direction, .wave_height, .wave_period, .wave_period_peak], concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {

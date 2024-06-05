@@ -45,7 +45,12 @@ enum EcmwfDomain: String, GenericDomain {
     }
     
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .wam025:
+            return .ecmwf_ifs025
+        default:
+            return domainRegistry
+        }
     }
     
     var hasYearlyFiles: Bool {
