@@ -119,7 +119,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .wave_height:
             return .hermite(bounds: nil)
         case .wave_direction:
-            return .backwards
+            return .linearDegrees
         case .wave_period:
             return .hermite(bounds: nil)
         }

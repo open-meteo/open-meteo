@@ -174,8 +174,7 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .wind_direction_80m:
             fallthrough
         case .wind_direction_120m:
-            // TODO need a better interpolation for wind direction
-            return .backwards
+            return .linearDegrees
         case .surface_temperature:
             return .hermite(bounds: nil)
         case .soil_temperature_0_to_10cm:

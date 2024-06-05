@@ -371,8 +371,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .wind_direction_80m:
             fallthrough
         case .wind_direction_120m:
-            // TODO need a better interpolation for wind direction
-            return .backwards
+            return .linearDegrees
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
         case .showers:
@@ -569,8 +568,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         case .wind_speed:
             return .hermite(bounds: nil)
         case .wind_direction:
-            // TODO better interpolation for wind direction
-            return .backwards
+            return .linearDegrees
         case .geopotential_height:
             return .hermite(bounds: nil)
         }

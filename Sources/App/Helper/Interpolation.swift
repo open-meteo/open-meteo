@@ -9,6 +9,8 @@ extension Array where Element == Float {
             return interpolateNearest(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .linear:
             return interpolateLinear(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
+        case .linearDegrees:
+            return interpolateLinearDegrees(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .hermite(let bounds):
             return interpolateHermite(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor, bounds: bounds)
         case .solar_backwards_averaged:
@@ -109,6 +111,22 @@ extension Array where Element == Float {
             let index = Swift.min((t.timeIntervalSince1970 - time.dtSeconds) / timeLow.dtSeconds + 1 - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds, self.count-1)
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
             return roundf(self[index] * multiply * scalefactor) / scalefactor
+        }
+    }
+    
+    /// Interpolate degree values from 0-360°
+    func interpolateLinearDegrees(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+        return time.map { t in
+            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
+            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
+            let A = self[index]
+            let B = index+1 >= self.count ? A : self[index+1]
+            let A2 = (abs(B-A) > 180 && A < B) ? A + 360 : A
+            let B2 = (abs(B-A) > 180 && A > B) ? B + 360 : B
+            let h = A2 * (1-fraction) + B2 * fraction
+            let h2 = h.truncatingRemainder(dividingBy: 360)
+            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+            return roundf(h2 * scalefactor) / scalefactor
         }
     }
     

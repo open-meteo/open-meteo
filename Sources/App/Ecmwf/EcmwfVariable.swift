@@ -18,7 +18,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         case .wave_period, .wave_period_peak:
             return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
-            return .linear
+            return .linearDegrees
         }
     }
     

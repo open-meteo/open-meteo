@@ -35,6 +35,8 @@ extension Array where Element == Float {
         switch type {
         case .linear:
             interpolateInplaceLinear(nTime: time.count)
+        case .linearDegrees:
+            interpolateInplaceLinearDegrees(nTime: time.count)
         case .hermite(let bounds):
             interpolateInplaceHermite(nTime: time.count, bounds: bounds)
         case .solar_backwards_averaged:
@@ -103,6 +105,42 @@ extension Array where Element == Float {
                         /// Calculate fraction from 0-1 for linear interpolation
                         let fraction = Float(t - previousIndex) / Float(t2 - previousIndex)
                         self[l * nTime + t] = value * fraction + previousValue * (1 - fraction)
+                    }
+                    break
+                }
+            }
+        }
+    }
+    
+    /// Interpolate missing values by seeking for the next valid value and perform a linear interpolation
+    mutating func interpolateInplaceLinearDegrees(nTime: Int) {
+        precondition(nTime <= self.count)
+        precondition(self.count % nTime == 0)
+        let nLocations = self.count / nTime
+        for l in 0..<nLocations {
+            /// Previous value that was not NaN
+            var previousValue = Float.nan
+            var previousIndex = 0
+            for t in 0..<nTime {
+                guard self[l * nTime + t].isNaN else {
+                    previousValue = self[l * nTime + t]
+                    previousIndex = t
+                    continue
+                }
+                // Seek next valid value
+                for t2 in t..<nTime {
+                    let value = self[l * nTime + t2]
+                    guard !value.isNaN else {
+                        continue
+                    }
+                    // Fill up all values until the first valid value
+                    for t in t..<t2 {
+                        /// Calculate fraction from 0-1 for linear interpolation
+                        let fraction = Float(t - previousIndex) / Float(t2 - previousIndex)
+                        let A2 = (abs(previousValue-value) > 180 && value < previousValue) ? value + 360 : value
+                        let B2 = (abs(previousValue-value) > 180 && value > previousValue) ? previousValue + 360 : previousValue
+                        let h = A2 * fraction + B2 * (1 - fraction)
+                        self[l * nTime + t] = h.truncatingRemainder(dividingBy: 360)
                     }
                     break
                 }

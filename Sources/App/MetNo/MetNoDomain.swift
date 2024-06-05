@@ -117,7 +117,7 @@ enum MetNoVariable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .wind_speed_10m:
             return .hermite(bounds: nil)
         case .wind_direction_10m:
-            return .hermite(bounds: nil)
+            return .linearDegrees
         case .precipitation:
             return .backwards_sum
         case .wind_gusts_10m:

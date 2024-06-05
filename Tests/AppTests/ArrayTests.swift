@@ -33,6 +33,11 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqualArray(a, [.nan,0.5,0.5,.nan,.nan,.nan, .nan,0.5,0.5,.nan,.nan,.nan], accuracy: 0.0001)
     }
     
+    func testInterpolateDegrees() {
+        let time = TimerangeDt(start: Timestamp(0), nTime: 4, dtSeconds: 3600)
+        XCTAssertEqual([Float(10),350,20,300].interpolateLinearDegrees(timeOld: time, timeNew: time.with(dtSeconds: 900), scalefactor: 1), [10.0, 5.0, 0.0, 355.0, 350.0, 358.0, 5.0, 13.0, 20.0, 0.0, 340.0, 320.0, 300.0, 300.0, 300.0, 300.0])
+    }
+    
     func testLinearInterpolateInplace() {
         var a: [Float] = [0,1,.nan,.nan,.nan,5]
         a.interpolateInplaceLinear(nTime: 6)
@@ -42,6 +47,10 @@ final class ArrayTests: XCTestCase {
         a = [0,.nan,1,.nan,.nan,.nan, 0,.nan,1,.nan,.nan,.nan]
         a.interpolateInplaceLinear(nTime: 6)
         XCTAssertEqualArray(a, [0,0.5,1,.nan,.nan,.nan, 0,0.5,1,.nan,.nan,.nan], accuracy: 0.0001)
+        
+        a = [355,.nan,20,.nan,.nan,.nan, 340,.nan,20,.nan,.nan,.nan]
+        a.interpolateInplaceLinearDegrees(nTime: 6)
+        XCTAssertEqualArray(a, [355.0, 7.5, 20.0, .nan, .nan, .nan, 340.0, 0.0, 20.0, .nan, .nan, .nan], accuracy: 0.0001)
     }
     
     func testHermiteInterpolateInplace() {

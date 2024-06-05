@@ -90,6 +90,9 @@ enum ReaderInterpolation {
     /// Simple linear interpolation
     case linear
     
+    /// Interpolate 0-360° values
+    case linearDegrees
+    
     /// Hermite interpolation for more smooth interpolation for temperature
     case hermite(bounds: ClosedRange<Float>?)
     
@@ -104,7 +107,7 @@ enum ReaderInterpolation {
     /// How many timesteps on the left and right side are used for interpolation
     var padding: Int {
         switch self {
-        case .linear:
+        case .linear, .linearDegrees:
             return 1
         case .hermite:
             return 2
