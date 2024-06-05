@@ -1,8 +1,90 @@
 import Foundation
 
+protocol EcmwfVariableDownloadable: GenericVariable {
+    
+}
+
+enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, GenericVariableMixable {
+    case wave_direction
+    case wave_height
+    case wave_period
+    case wave_period_peak
+    
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .wave_height:
+            return .linear
+        case .wave_period, .wave_period_peak:
+            return .hermite(bounds: 0...Float.infinity)
+        case .wave_direction:
+            return .linear
+        }
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .wave_height:
+            return .metre
+        case .wave_period, .wave_period_peak:
+            return .seconds
+        case .wave_direction:
+            return .degreeDirection
+        }
+    }
+    var scalefactor: Float {
+        let period: Float = 20 // 0.05s resolution
+        let height: Float = 50 // 0.002m resolution
+        let direction: Float = 1
+        switch self {
+        case .wave_height:
+            return height
+        case .wave_period, .wave_period_peak:
+            return period
+        case .wave_direction:
+            return direction
+        }
+    }
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+        
+    var omFileName: (file: String, level: Int) {
+        return (nameInFiles, 0)
+    }
+    
+    var nameInFiles: String {
+        return rawValue
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var gribName: String? {
+        // mp2    Mean zero-crossing wave period
+        switch self {
+        case .wave_direction:
+            return "mwd"
+        case .wave_height:
+            return "swh" // Significant height of combined wind waves and swell
+        case .wave_period:
+            return "mwp"
+        case .wave_period_peak:
+            return "pp1d"
+        }
+    }
+}
+
+
 /// Represent a ECMWF variable as available in the grib2 files
 /// Only AIFS has additional levels 100, 400 and 600
-enum EcmwfVariable: String, CaseIterable, Hashable, GenericVariable, GenericVariableMixable {
+enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, GenericVariableMixable {
     case precipitation
     /// only in aifs
     case dew_point_2m

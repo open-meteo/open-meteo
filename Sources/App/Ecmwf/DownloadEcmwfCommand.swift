@@ -60,6 +60,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
         let logger = context.application.logger
+        let isWave = domain == .wam025 || domain == .wam025_ensemble
 
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
         let ensembleVariables = EcmwfVariable.allCases.filter({$0.includeInEnsemble != nil})
@@ -67,19 +68,23 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let variables = onlyVariables ?? defaultVariables
         let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
+        
+        let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_period_peak]
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+                let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
             }
             return
         }
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        
-        try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
-        let handles = try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+
+        if !isWave {
+            try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
+        }
+        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -476,6 +481,93 @@ struct DownloadEcmwfCommand: AsyncCommand {
         await curl.printStatistics()
         return handles
     }
+    
+    
+    /// Download ECMWF ifs open data
+    func downloadEcmwfWave(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+        let logger = application.logger
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        Process.alarm(seconds: 6 * 3600)
+        defer { Process.alarm(seconds: 0) }
+        
+        var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
+        if let maxForecastHour {
+            forecastHours = forecastHours.filter({$0 <= maxForecastHour})
+        }
+        let nMembers = domain.ensembleMembers
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        
+        var handles = [GenericVariableHandle]()
+        
+        for hour in forecastHours {
+            logger.info("Downloading hour \(hour)")
+            let timestamp = run.add(hours: hour)
+            
+            if variables.isEmpty {
+                continue
+            }
+            
+            let url = domain.getUrl(base: base, run: run, hour: hour)
+            let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
+                return variables.contains(where: { variable in
+                    return entry.param == variable.gribName
+                })
+            }).mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                guard let shortName = message.get(attribute: "shortName") else {
+                    fatalError("could not get step range or type")
+                }
+                if shortName == "lsm" {
+                    return nil
+                }
+                let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
+                let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
+                
+                guard let variable = variables.first(where: { variable in
+                    return shortName == variable.gribName
+                }) else {
+                    print(
+                        message.get(attribute: "name")!,
+                        message.get(attribute: "shortName")!,
+                        message.get(attribute: "level")!,
+                        message.get(attribute: "paramId")!
+                    )
+                    if message.get(attribute: "name") == "unknown" {
+                        message.iterate(namespace: .ls).forEach({print($0)})
+                        message.iterate(namespace: .parameter).forEach({print($0)})
+                        message.iterate(namespace: .mars).forEach({print($0)})
+                        message.iterate(namespace: .all).forEach({print($0)})
+                    }
+                    fatalError("Got unknown variable \(shortName) \(levelhPa)")
+                }
+                //logger.info("Processing \(variable)")
+                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                try grib2d.load(message: message)
+                grib2d.array.flipLatitude()
+                
+                //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: false)
+                //fatalError()
+                
+                // Scaling before compression with scalefactor
+                //if let fma = variable.multiplyAdd {
+                //    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                //}
+                
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                // Note: skipHour0 needs still to be set for solar interpolation
+                return GenericVariableHandle(
+                    variable: variable,
+                    time: timestamp,
+                    member: member,
+                    fn: fn,
+                    skipHour0: false
+                )
+            }.collect().compactMap({$0})
+            handles.append(contentsOf: h)
+        }
+        await curl.printStatistics()
+        return handles
+    }
 }
 
 extension EcmwfDomain {
@@ -485,9 +577,9 @@ extension EcmwfDomain {
         let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
-        case .ifs04_ensemble, .ifs025_ensemble:
+        case .ifs04_ensemble, .ifs025_ensemble ,.wam025_ensemble:
             fallthrough
-        case .ifs04,. ifs025:
+        case .ifs04,. ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
         case .aifs025:
@@ -503,6 +595,12 @@ extension EcmwfDomain {
         case .ifs04:
             let product = run.hour == 0 || run.hour == 12 ? "oper" : "scda"
             return "\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
+        case .wam025:
+            let product = run.hour == 0 || run.hour == 12 ? "wave" : "scwv"
+            return "\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-fc.grib2"
+        case .wam025_ensemble:
+            let product = run.hour == 0 || run.hour == 12 ? "waef" : "scda"
+            return "\(base)\(dateStr)/\(runStr)z/ifs/0p25/\(product)/\(dateStr)\(runStr)0000-\(hour)h-\(product)-ef.grib2"
         case .ifs04_ensemble:
             return "\(base)\(dateStr)/\(runStr)z/ifs/0p4-beta/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-ef.grib2"
         case .ifs025:
