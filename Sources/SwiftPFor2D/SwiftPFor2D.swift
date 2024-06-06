@@ -503,8 +503,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 let c1Range = dim1Read.divide(by: chunk1)
                 let c1Chunks = c1Range.add(c0 * nDim1Chunks)
                 // pre-read chunk table at specific offset
-                fn.prefetchData(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
-                fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
+                fn.prefetchData(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
+                fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
                 
                 for c1 in c1Range {
                     // load chunk from mmap
@@ -574,7 +574,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     let c1Range = dim1Read.divide(by: chunk1)
                     let c1Chunks = c1Range.add(c0 * nDim1Chunks)
                     // pre-read chunk table at specific offset
-                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: c1Range.count * MemoryLayout<Int>.stride)
+                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
                     for c1 in c1Range {
                         // load chunk into buffer
                         // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
@@ -630,7 +630,12 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
                 
                 for c0 in dim0Read.divide(by: chunk0) {
-                    for c1 in dim1Read.divide(by: chunk1) {
+                    let c1Range = dim1Read.divide(by: chunk1)
+                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
+                    // pre-read chunk table at specific offset
+                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
+                    
+                    for c1 in c1Range {
                         // load chunk into buffer
                         // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
                         let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
