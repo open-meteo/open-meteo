@@ -13,6 +13,13 @@ updates:
   - dependency-type: indirect
   commit-message:
     prefix: "fix: "
+  groups:
+    swift-core:
+      patterns:
+        - "github.com/apple/*"
+    vapor:
+      patterns:
+        - "github.com/vapor/*"
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
