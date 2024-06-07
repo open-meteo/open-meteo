@@ -27,30 +27,6 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
         return (rawValue, 0)
     }
     
-    /// Name used on the dwd open data server
-    var netcdfName: String {
-        switch self {
-        case .wave_height:
-            return "VHM0"
-        case .wave_period:
-            return "VTM10"
-        case .wave_direction:
-            return "VMDR"
-        case .wind_wave_height:
-            return "VHM0_WW"
-        case .wind_wave_period:
-            return "VTM01_WW"
-        case .wind_wave_direction:
-            return "VMDR_WW"
-        case .swell_wave_height:
-            return "VHM0_SW1"
-        case .swell_wave_period:
-            return "VTM01_SW1"
-        case .swell_wave_direction:
-            return "VMDR_SW1"
-        }
-    }
-    
     /// Si unit
     var unit: SiUnit {
         switch self {

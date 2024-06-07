@@ -45,7 +45,7 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     var grid: Gridable {
         switch self {
         case .mfwave, .mfcurrents:
-            return RegularGrid(nx: 4320, ny: 2041, latMin: -90, lonMin: -180, dx: 1/12, dy: 0.25)
+            return RegularGrid(nx: 4320, ny: 2041, latMin: -90, lonMin: -180, dx: 1/12, dy: 1/12)
         }
     }
     

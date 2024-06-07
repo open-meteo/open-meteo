@@ -65,38 +65,64 @@ struct MfWaveDownload: AsyncCommand {
         let ny = domain.grid.ny
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        
-        var grib2d = GribArray2D(nx: nx, ny: ny)
-        
+                
         let server = "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202311/"
         
         // Iterate from d-1 to d+10 in 12 hour steps
-        for step in stride(from: run.add(days: -1), to: run.add(days: 10), by: 12*3600) {
-            logger.info("Downloading hour \(step)")
+        let handles = try await stride(from: run.add(days: -1), to: run.add(days: 10), by: 12*3600).asyncMap { step -> [GenericVariableHandle] in
+            logger.info("Downloading file with timestap \(step)")
             
             let r = run.toComponents()
             let url = "\(server)\(r.year)/\(r.month.zeroPadded(len: 2))/mfwamglocep_\(step.format_YYYYMMddHH)_R\(run.format_YYYYMMdd)_\(run.hh)H.nc"
             let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
-            try memory.withUnsafeReadableBytes({ memory in
+            return try memory.withUnsafeReadableBytes({ memory in
                 guard let nc = try NetCDF.open(memory: memory) else {
                     fatalError("Could not open netcdf from memory")
                 }
-                for ncvar in nc.getVariables() {
-                    guard let variable = ncvar.toMfVariable() else {
-                        continue
-                    }
-                    print(variable)
+                // Converted from "hours since 1950-01-01"
+                guard let timestamps = try nc.getVariable(name: "time")?
+                    .asType(Int32.self)?
+                    .read()
+                    .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)})
+                else {
+                    fatalError("Could not read time array")
                 }
+                return try nc.getVariables().map { ncvar -> [GenericVariableHandle] in
+                    guard let variable = ncvar.toMfVariable() else {
+                        return []
+                    }
+                    guard let ncInt16 = ncvar.asType(Int16.self) else {
+                        fatalError("Variable \(variable) is not Int16 type")
+                    }
+                    guard let scaleFactor: Float = try ncvar.getAttribute("scale_factor")?.read() else {
+                        fatalError("Could not get scalefactor")
+                    }
+                    guard let missingValue: Int16 = try ncvar.getAttribute("missing_value")?.read() else {
+                        fatalError("Could not get scalefactor")
+                    }
+                    return try timestamps.enumerated().map { (i,timestamp) -> GenericVariableHandle in
+                        logger.info("Process variable \(variable) timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
+                        let data = try ncInt16.read(offset: [i,0,0], count: [1, ny, nx]).map {
+                            if $0 == missingValue {
+                                return Float.nan
+                            }
+                            return Float($0) * scaleFactor
+                        }
+                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                        // Note: skipHour0 needs still to be set for solar interpolation
+                        return GenericVariableHandle(
+                            variable: variable,
+                            time: timestamp,
+                            member: 0,
+                            fn: fn,
+                            skipHour0: false
+                        )
+                    }
+                }.flatMap({$0})
             })
-            
-            
-            // download netcdf to temp
-            // open netcdf
-            // loop variables -> extract some
-            // return handle
-        }
+        }.flatMap({$0})
         await curl.printStatistics()
-        return []
+        return handles
     }
 }
 
