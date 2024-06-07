@@ -10,6 +10,8 @@ enum DomainRegistry: String, CaseIterable {
     case meteofrance_arome_france_hd_15min
     case meteofrance_arpege_europe
     case meteofrance_arpege_world025
+    case meteofrance_wave
+    case meteofrance_currents
     
     case cams_europe
     case cams_global
@@ -103,6 +105,10 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoFranceDomain.arpege_europe
         case .meteofrance_arpege_world025:
             return MeteoFranceDomain.arpege_world
+        case .meteofrance_wave:
+            return MfWaveDomain.mfwave
+        case .meteofrance_currents:
+            return MfWaveDomain.mfcurrents
         case .cams_europe:
             return CamsDomain.cams_europe
         case .cams_global:

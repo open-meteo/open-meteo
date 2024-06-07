@@ -83,6 +83,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadIconWaveCommand(), as: "download-iconwave")
     app.asyncCommands.use(DownloadEcmwfCommand(), as: "download-ecmwf")
     app.asyncCommands.use(DownloadEra5Command(), as: "download-era5")
+    app.asyncCommands.use(MfWaveDownload(), as: "download-mfwave")
     app.asyncCommands.use(DownloadDemCommand(), as: "download-dem")
     app.asyncCommands.use(DownloadCamsCommand(), as: "download-cams")
     app.asyncCommands.use(MeteoFranceDownload(), as: "download-meteofrance")
