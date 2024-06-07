@@ -100,3 +100,46 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
         }
     }
 }
+
+enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    case ocen_u_current
+    case ocen_v_current
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+    
+    /// Si unit
+    var unit: SiUnit {
+        switch self {
+        case .ocen_u_current, .ocen_v_current:
+            return .metrePerSecond
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .ocen_u_current, .ocen_v_current:
+            return 100
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .ocen_u_current, .ocen_v_current:
+            return .hermite(bounds: nil)
+        }
+    }
+}

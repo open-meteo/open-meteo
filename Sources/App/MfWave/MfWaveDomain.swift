@@ -51,7 +51,22 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        // Delay of 11 hours after initialisation
-        return t.add(hours: -11).floor(toNearestHour: 12)
+        switch self {
+        case .mfwave:
+            // Delay of 11 hours after initialisation
+            return t.add(hours: -11).floor(toNearestHour: 12)
+        case .mfcurrents:
+            // Delay of 11 hours after initialisation
+            return t.add(hours: -11).floor(toNearestHour: 24)
+        }
+    }
+    
+    var stepHoursPerFile: Int {
+        switch self {
+        case .mfwave:
+            return 12 // 2 files per day
+        case .mfcurrents:
+            return 24 // 1 file per day
+        }
     }
 }

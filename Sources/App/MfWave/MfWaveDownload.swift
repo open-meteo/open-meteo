@@ -51,8 +51,6 @@ struct MfWaveDownload: AsyncCommand {
     
     /// Download all timesteps and preliminarily covnert it to compressed files
     func download(application: Application, domain: MfWaveDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
-        // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202311/2024/06/mfwamglocep_2024060500_R20240606_00H.nc
-        // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_wav_anfc_0.083deg_static_202211/GLO-MFC_001_027_bathy.nc
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
@@ -63,17 +61,13 @@ struct MfWaveDownload: AsyncCommand {
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let nx = domain.grid.nx
         let ny = domain.grid.ny
-        
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                
-        let server = "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202311/"
         
         // Iterate from d-1 to d+10 in 12 hour steps
-        let handles = try await stride(from: run.add(days: -1), to: run.add(days: 10), by: 12*3600).asyncMap { step -> [GenericVariableHandle] in
+        let handles = try await stride(from: run.add(days: -1), to: run.add(days: 10), by: domain.stepHoursPerFile*3600).asyncMap { step -> [GenericVariableHandle] in
             logger.info("Downloading file with timestap \(step)")
             
-            let r = run.toComponents()
-            let url = "\(server)\(r.year)/\(r.month.zeroPadded(len: 2))/mfwamglocep_\(step.format_YYYYMMddHH)_R\(run.format_YYYYMMdd)_\(run.hh)H.nc"
+            let url = domain.getUrl(run: run, step: step)
             let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
             return try memory.withUnsafeReadableBytes({ memory in
                 guard let nc = try NetCDF.open(memory: memory) else {
@@ -91,6 +85,25 @@ struct MfWaveDownload: AsyncCommand {
                     guard let variable = ncvar.toMfVariable() else {
                         return []
                     }
+                    
+                    // Currents use floating point arrays
+                    if let ncFloat = ncvar.asType(Float.self) {
+                        return try timestamps.enumerated().map { (i,timestamp) -> GenericVariableHandle in
+                            logger.info("Process variable \(variable) timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
+                            let data = try ncFloat.read(offset: [i,0,0], count: [1, ny, nx])
+                            let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                            // Note: skipHour0 needs still to be set for solar interpolation
+                            return GenericVariableHandle(
+                                variable: variable,
+                                time: timestamp,
+                                member: 0,
+                                fn: fn,
+                                skipHour0: false
+                            )
+                        }
+                    }
+                    
+                    // Wave model use Int16 with scalefactor
                     guard let ncInt16 = ncvar.asType(Int16.self) else {
                         fatalError("Variable \(variable) is not Int16 type")
                     }
@@ -126,27 +139,48 @@ struct MfWaveDownload: AsyncCommand {
     }
 }
 
+extension MfWaveDomain {
+    func getUrl(run: Timestamp, step: Timestamp) -> String {
+        let server = "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/"
+        let r = run.toComponents()
+        let rMM = r.month.zeroPadded(len: 2)
+        switch self {
+        case .mfwave:
+            // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202311/2024/06/mfwamglocep_2024060500_R20240606_00H.nc
+            
+            return "\(server)GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202311/\(r.year)/\(rMM)/mfwamglocep_\(step.format_YYYYMMddHH)_R\(run.format_YYYYMMdd)_\(run.hh)H.nc"
+        case .mfcurrents:
+            // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/2024/06/SMOC_20240606_R20240607.nc
+            return "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/\(r.year)/\(rMM)/SMOC_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc"
+        }
+    }
+}
+
 extension Variable {
-    func toMfVariable() -> MfWaveVariable? {
+    func toMfVariable() -> GenericVariable? {
         switch name {
         case "VHM0":
-            return .wave_height
+            return MfWaveVariable.wave_height
         case "VTM10":
-            return .wave_period
+            return MfWaveVariable.wave_period
         case "VMDR":
-            return .wave_direction
+            return MfWaveVariable.wave_direction
         case "VHM0_WW":
-            return .wind_wave_height
+            return MfWaveVariable.wind_wave_height
         case "VTM01_WW":
-            return .wind_wave_period
+            return MfWaveVariable.wind_wave_period
         case "VMDR_WW":
-            return .wind_wave_direction
+            return MfWaveVariable.wind_wave_direction
         case "VHM0_SW1":
-            return .swell_wave_height
+            return MfWaveVariable.swell_wave_height
         case "VTM01_SW1":
-            return .swell_wave_period
+            return MfWaveVariable.swell_wave_period
         case "VMDR_SW1":
-            return .swell_wave_direction
+            return MfWaveVariable.swell_wave_direction
+        case "utotal":
+            return MfCurrentVariable.ocen_u_current
+        case "vtotal":
+            return MfCurrentVariable.ocen_v_current
         default:
             return nil
         }
