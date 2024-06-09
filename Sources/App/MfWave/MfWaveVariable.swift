@@ -143,3 +143,53 @@ enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         }
     }
 }
+
+
+enum MfCurrentVariableDerived: String, CaseIterable, GenericVariableMixable {
+    case ocean_current_velocity
+    case ocean_current_direction
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
+    typealias Domain = MfWaveDomain
+    typealias Variable = MfCurrentVariable
+    typealias Derived = MfCurrentVariableDerived
+    typealias MixingVar = VariableOrDerived<MfCurrentVariable, MfCurrentVariableDerived>
+    
+    let reader: GenericReaderCached<MfWaveDomain, Variable>
+    
+    func get(raw: MfCurrentVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        return try reader.get(variable: raw, time: time)
+    }
+    
+    func prefetchData(raw: MfCurrentVariable, time: TimerangeDtAndSettings) throws {
+        try reader.prefetchData(variable: raw, time: time)
+    }
+    
+    func get(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        switch derived {
+        case .ocean_current_velocity:
+            let u = try get(raw: .ocean_u_current, time: time).data
+            let v = try get(raw: .ocean_v_current, time: time).data
+            let speed = zip(u,v).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .ocean_current_direction:
+            let u = try get(raw: .ocean_u_current, time: time).data
+            let v = try get(raw: .ocean_v_current, time: time).data
+            let direction = Meteorology.windirectionFast(u: u, v: v)
+            return DataAndUnit(direction, .degreeDirection)
+        }
+    }
+    
+    func prefetchData(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) throws {
+        switch derived {
+        case .ocean_current_direction, .ocean_current_velocity:
+            try prefetchData(raw: .ocean_u_current, time: time)
+            try prefetchData(raw: .ocean_v_current, time: time)
+        }
+    }
+}
