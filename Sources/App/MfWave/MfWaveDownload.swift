@@ -185,9 +185,9 @@ extension Variable {
         case "VMDR_SW1":
             return MfWaveVariable.swell_wave_direction
         case "utotal":
-            return MfCurrentVariable.ocen_u_current
+            return MfCurrentVariable.ocean_u_current
         case "vtotal":
-            return MfCurrentVariable.ocen_v_current
+            return MfCurrentVariable.ocean_v_current
         default:
             return nil
         }
