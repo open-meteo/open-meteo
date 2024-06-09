@@ -45,7 +45,8 @@ struct MfWaveDownload: AsyncCommand {
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            //try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
     
@@ -77,6 +78,10 @@ struct MfWaveDownload: AsyncCommand {
                 guard let timestamps = try nc.getVariable(name: "time")?
                     .asType(Int32.self)?
                     .read()
+                    .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)}) ??
+                        nc.getVariable(name: "time")?
+                    .asType(Float.self)?
+                    .read()
                     .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)})
                 else {
                     fatalError("Could not read time array")
@@ -90,7 +95,9 @@ struct MfWaveDownload: AsyncCommand {
                     if let ncFloat = ncvar.asType(Float.self) {
                         return try timestamps.enumerated().map { (i,timestamp) -> GenericVariableHandle in
                             logger.info("Process variable \(variable) timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
-                            let data = try ncFloat.read(offset: [i,0,0], count: [1, ny, nx])
+                            let dimensions = ncvar.dimensions
+                            // Maybe has 4 dimensions for depth
+                            let data = dimensions.count > 3 ? try ncFloat.read(offset: [i,0,0,0], count: [1, 1, ny, nx]) : try ncFloat.read(offset: [i,0,0], count: [1, ny, nx])
                             let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
                             // Note: skipHour0 needs still to be set for solar interpolation
                             return GenericVariableHandle(
