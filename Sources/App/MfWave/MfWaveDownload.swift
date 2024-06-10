@@ -25,6 +25,9 @@ struct MfWaveDownload: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
     }
 
     var help: String {
@@ -34,11 +37,21 @@ struct MfWaveDownload: AsyncCommand {
     func run(using context: CommandContext, signature: Signature) async throws {
         let domain = try MfWaveDomain.load(rawValue: signature.domain)
         
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        
         let nConcurrent = signature.concurrent ?? 1
-                
         let logger = context.application.logger
+        
+        if let timeinterval = signature.timeinterval {
+            // MF wave has 0z and 12z run
+            // MF current only 0z
+            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 24 * 3600).with(dtSeconds: domain.stepHoursPerFile * 3600) {
+                logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+                let handles = try await download(application: context.application, domain: domain, run: run)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+            }
+            return
+        }
+        
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let handles = try await download(application: context.application, domain: domain, run: run)
@@ -64,8 +77,25 @@ struct MfWaveDownload: AsyncCommand {
         let ny = domain.grid.ny
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
+        /// Only hindcast available after 12 hours
+        let isOlderThan12Hours = run.add(hours: 12) < Timestamp.now()
+        /// Each run contains data from 1 day back
+        let startTime = run.add(days: -1)
+        /// 10 days forecast. 12z run has one timestep less -> therefore floor to 24h
+        let endTimeForecast = run.add(days: 10).floor(toNearestHour: 24)
+        let endTimeHindcastOnly = run.add(days: -1).add(hours: domain.stepHoursPerFile)
+        if isOlderThan12Hours {
+            logger.info("Run date is older than 12 hours. Downloading hindcast only.")
+        }
+        let downloadRange = TimerangeDt(
+            start: startTime,
+            to: isOlderThan12Hours ? endTimeHindcastOnly : endTimeForecast,
+            dtSeconds: domain.stepHoursPerFile*3600
+        )
+        logger.info("Downloadig timerange \(downloadRange.prettyString())")
+        
         // Iterate from d-1 to d+10 in 12 hour steps
-        let handles = try await stride(from: run.add(days: -1), to: run.add(days: 10).floor(toNearestHour: 24), by: domain.stepHoursPerFile*3600).asyncMap { step -> [GenericVariableHandle] in
+        let handles = try await downloadRange.asyncMap { step -> [GenericVariableHandle] in
             logger.info("Downloading file with timestap \(step)")
             
             let url = domain.getUrl(run: run, step: step)
