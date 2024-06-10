@@ -92,19 +92,17 @@ struct MfWaveDownload: AsyncCommand {
         
         /// For MF Wave, runs before November 2023 only offer 12z runs instead of 0z+12z. Followed by 4 days of 24h offsets
         /// Figuring this out, drives you mad....
-        let runOffset: Int
+        let runDownload: Timestamp
         switch (domain, run) {
         case (.mfwave, ..<Timestamp(2023,11,2)):
-            runOffset = run.hour == 0 ? 12 : 0
+            runDownload = run.add(hours: run.hour == 0 ? 12 : 0)
         case (.mfwave, ..<Timestamp(2023,11,8,0)):
-            runOffset = run.hour == 0 ? -12 : -24
+            runDownload = run.add(hours: run.hour == 0 ? -12 : -24)
         case (.mfwave, ...Timestamp(2023,11,12,12)):
-            runOffset = -24
+            runDownload = run.add(hours: -24)
         default:
-            runOffset = 0
+            runDownload = run
         }
-        /// Which run to use to build the download url
-        let runDownload = run.add(hours: runOffset)
         
         /// Each run contains data from 1 day back
         let startTime = run.add(days: -1)
