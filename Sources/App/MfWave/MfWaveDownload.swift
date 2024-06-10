@@ -89,6 +89,10 @@ struct MfWaveDownload: AsyncCommand {
             logger.warning("Not data for \(run.format_YYYYMMddHH)")
             return []
         }
+        if domain == .mfcurrents && [Timestamp(2022,11,30)].contains(run) {
+            logger.warning("Skipping due to NRT change \(run.format_YYYYMMddHH)")
+            return []
+        }
         
         /// For MF Wave, runs before November 2023 only offer 12z runs instead of 0z+12z. Followed by 4 days of 24h offsets
         /// Figuring this out, drives you mad....
@@ -100,15 +104,20 @@ struct MfWaveDownload: AsyncCommand {
             runDownload = run.add(hours: run.hour == 0 ? -12 : -24)
         case (.mfwave, ...Timestamp(2023,11,12,12)):
             runDownload = run.add(hours: -24)
+        case (.mfcurrents, ...Timestamp(2022, 11, 23)):
+            runDownload = run.add(hours: -24)
         default:
             runDownload = run
         }
         
+        /// Dates before 22th November 2022 are not 7 day releases, but use run-1d
+        let afterNRTSwitch = run > Timestamp(2022, 11, 23)
+        
         // Every 7th run, the past 14 days are updated with hindcast data for 7 days
-        let isNRTUpdateDate = domain == .mfcurrents && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
+        let isNRTUpdateDate = domain == .mfcurrents && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
         
         // Only NRT update days are kept on S3. Other runs can be ignored
-        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate {
+        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch {
             logger.warning("Not an NRT update date. Skipping run \(run.format_YYYYMMddHH)")
             return []
         }
