@@ -114,10 +114,10 @@ struct MfWaveDownload: AsyncCommand {
         let afterNRTSwitch = run > Timestamp(2022, 11, 23)
         
         // Every 7th run, the past 14 days are updated with hindcast data for 7 days
-        let isNRTUpdateDate = domain == .mfcurrents && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
+        let isNRTUpdateDate = domain == .mfcurrents && isOlderThan12Hours && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
         
         // Only NRT update days are kept on S3. Other runs can be ignored
-        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch {
+        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch && isOlderThan12Hours {
             logger.warning("Not an NRT update date. Skipping run \(run.format_YYYYMMddHH)")
             return []
         }
