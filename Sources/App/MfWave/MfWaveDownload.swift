@@ -82,7 +82,7 @@ struct MfWaveDownload: AsyncCommand {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         /// Only hindcast available after 12 hours
-        let isOlderThan12Hours = run.add(hours: 12) < Timestamp.now()
+        let isOlderThan12Hours = run.add(hours: 23) < Timestamp.now()
         
         /// No data for `2023-10-31`
         if domain == .mfwave && [Timestamp(2023,11,1,0), Timestamp(2023,11,1,12)].contains(run) {
@@ -130,7 +130,7 @@ struct MfWaveDownload: AsyncCommand {
         let endTimeHindcastOnly = run.add(days: isNRTUpdateDate ? (-7-1) : -1).add(hours: domain.stepHoursPerFile)
 
         if isOlderThan12Hours {
-            logger.info("Run date is older than 12 hours. Downloading hindcast only.")
+            logger.info("Run date is older than 23 hours. Downloading hindcast only.")
         }
         let downloadRange = TimerangeDt(
             start: startTime,
