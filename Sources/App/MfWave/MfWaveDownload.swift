@@ -104,11 +104,22 @@ struct MfWaveDownload: AsyncCommand {
             runDownload = run
         }
         
+        // Every 7th run, the past 14 days are updated with hindcast data for 7 days
+        let isNRTUpdateDate = domain == .mfcurrents && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
+        
+        // Only NRT update days are kept on S3. Other runs can be ignored
+        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate {
+            logger.warning("Not an NRT update date. Skipping run \(run.format_YYYYMMddHH)")
+            return []
+        }
+        
         /// Each run contains data from 1 day back
-        let startTime = run.add(days: -1)
+        let startTime = run.add(days: isNRTUpdateDate ? -14 : -1)
         /// 10 days forecast. 12z run has one timestep less -> therefore floor to 24h
         let endTimeForecast = run.add(days: 10).floor(toNearestHour: 24)
-        let endTimeHindcastOnly = run.add(days: -1).add(hours: domain.stepHoursPerFile)
+        
+        let endTimeHindcastOnly = run.add(days: isNRTUpdateDate ? (-7-1) : -1).add(hours: domain.stepHoursPerFile)
+
         if isOlderThan12Hours {
             logger.info("Run date is older than 12 hours. Downloading hindcast only.")
         }
@@ -220,7 +231,7 @@ struct MfWaveDownload: AsyncCommand {
 extension MfWaveDomain {
     func getUrl(run: Timestamp, step: Timestamp) -> String {
         let server = "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/"
-        let r = run.toComponents()
+        let r = step.toComponents()
         let rMM = r.month.zeroPadded(len: 2)
         switch self {
         case .mfwave:
