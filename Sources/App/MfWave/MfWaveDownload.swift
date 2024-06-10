@@ -65,7 +65,7 @@ struct MfWaveDownload: AsyncCommand {
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         
         // Iterate from d-1 to d+10 in 12 hour steps
-        let handles = try await stride(from: run.add(days: -1), to: run.add(days: 10), by: domain.stepHoursPerFile*3600).asyncMap { step -> [GenericVariableHandle] in
+        let handles = try await stride(from: run.add(days: -1), to: run.add(days: 10).floor(toNearestHour: 24), by: domain.stepHoursPerFile*3600).asyncMap { step -> [GenericVariableHandle] in
             logger.info("Downloading file with timestap \(step)")
             
             let url = domain.getUrl(run: run, step: step)
@@ -98,6 +98,14 @@ struct MfWaveDownload: AsyncCommand {
                             let dimensions = ncvar.dimensions
                             // Maybe has 4 dimensions for depth
                             let data = dimensions.count > 3 ? try ncFloat.read(offset: [i,0,0,0], count: [1, 1, ny, nx]) : try ncFloat.read(offset: [i,0,0], count: [1, ny, nx])
+                            if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                                // create land elevation file. 0=land, -999=sea
+                                let elevation = data.map {
+                                    return $0.isNaN ? Float(0) : -999
+                                }
+                                try domain.surfaceElevationFileOm.createDirectory()
+                                try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                            }
                             let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
                             // Note: skipHour0 needs still to be set for solar interpolation
                             return GenericVariableHandle(
@@ -127,6 +135,14 @@ struct MfWaveDownload: AsyncCommand {
                                 return Float.nan
                             }
                             return Float($0) * scaleFactor
+                        }
+                        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                            // create land elevation file. 0=land, -999=sea
+                            let elevation = data.map {
+                                return $0.isNaN ? Float(0) : -999
+                            }
+                            try domain.surfaceElevationFileOm.createDirectory()
+                            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
                         }
                         let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
                         // Note: skipHour0 needs still to be set for solar interpolation
