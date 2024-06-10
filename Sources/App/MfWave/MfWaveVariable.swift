@@ -180,7 +180,9 @@ struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
         case .ocean_current_direction:
             let u = try get(raw: .ocean_u_current, time: time).data
             let v = try get(raw: .ocean_v_current, time: time).data
-            let direction = Meteorology.windirectionFast(u: u, v: v)
+            let direction = Meteorology.windirectionFast(u: u, v: v).map {
+                ($0+180).truncatingRemainder(dividingBy: 360)
+            }
             return DataAndUnit(direction, .degreeDirection)
         }
     }
