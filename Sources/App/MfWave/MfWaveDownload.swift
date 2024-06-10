@@ -45,11 +45,13 @@ struct MfWaveDownload: AsyncCommand {
             // MF current only 0z
             let runs = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 24 * 3600).with(dtSeconds: domain.stepHoursPerFile * 3600)
             logger.info("Downloading runs \(runs.prettyString())")
-            let handles = try await runs.asyncFlatMap { run in
-                logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                return try await download(application: context.application, domain: domain, run: run)
+            for yearmonth in runs.groupedPreservedOrder(by: {$0.toComponents().toYearMonth()}) {
+                let handles = try await yearmonth.values.asyncFlatMap { run in
+                    logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+                    return try await download(application: context.application, domain: domain, run: run)
+                }
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs.range.lowerBound, handles: handles, concurrent: nConcurrent)
             }
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs.range.lowerBound, handles: handles, concurrent: nConcurrent)
             return
         }
         
@@ -82,9 +84,18 @@ struct MfWaveDownload: AsyncCommand {
         /// Only hindcast available after 12 hours
         let isOlderThan12Hours = run.add(hours: 12) < Timestamp.now()
         
+        /// No data for `2023-10-31`
+        if domain == .mfwave && [Timestamp(2023,11,1,0), Timestamp(2023,11,1,12)].contains(run) {
+            logger.warning("Not data for \(run.format_YYYYMMddHH)")
+            return []
+        }
+        
         /// For MF Wave, runs before November 2023 only offer 12z runs instead of 0z+12z. Followed by 4 days of 24h offsets
+        /// Figuring this out, drives you mad....
         let runOffset: Int
         switch (domain, run) {
+        case (.mfwave, ..<Timestamp(2023,11,2)):
+            runOffset = run.hour == 0 ? 12 : 0
         case (.mfwave, ..<Timestamp(2023,11,8,0)):
             runOffset = run.hour == 0 ? -12 : -24
         case (.mfwave, ...Timestamp(2023,11,12,12)):
