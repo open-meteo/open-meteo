@@ -53,7 +53,7 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
     
     var scalefactor: Float {
         let period: Float = 20 // 0.05s resolution
-        let height: Float = 50 // 0.002m resolution
+        let height: Float = 50 // 0.02m resolution
         let direction: Float = 1
         switch self {
         case .wave_height:
@@ -132,7 +132,7 @@ enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMi
     var scalefactor: Float {
         switch self {
         case .ocean_u_current, .ocean_v_current:
-            return 100
+            return 20 // 0.05 ms (~0.1 knots)
         }
     }
     
