@@ -43,11 +43,13 @@ struct MfWaveDownload: AsyncCommand {
         if let timeinterval = signature.timeinterval {
             // MF wave has 0z and 12z run
             // MF current only 0z
-            for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 24 * 3600).with(dtSeconds: domain.stepHoursPerFile * 3600) {
+            let runs = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 24 * 3600).with(dtSeconds: domain.stepHoursPerFile * 3600)
+            logger.info("Downloading runs \(runs.prettyString())")
+            let handles = try await runs.asyncFlatMap { run in
                 logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                let handles = try await download(application: context.application, domain: domain, run: run)
-                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+                return try await download(application: context.application, domain: domain, run: run)
             }
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs.range.lowerBound, handles: handles, concurrent: nConcurrent)
             return
         }
         
@@ -79,6 +81,20 @@ struct MfWaveDownload: AsyncCommand {
         
         /// Only hindcast available after 12 hours
         let isOlderThan12Hours = run.add(hours: 12) < Timestamp.now()
+        
+        /// For MF Wave, runs before November 2023 only offer 12z runs instead of 0z+12z. Followed by 4 days of 24h offsets
+        let runOffset: Int
+        switch (domain, run) {
+        case (.mfwave, ..<Timestamp(2023,11,8,0)):
+            runOffset = run.hour == 0 ? -12 : -24
+        case (.mfwave, ...Timestamp(2023,11,12,12)):
+            runOffset = -24
+        default:
+            runOffset = 0
+        }
+        /// Which run to use to build the download url
+        let runDownload = run.add(hours: runOffset)
+        
         /// Each run contains data from 1 day back
         let startTime = run.add(days: -1)
         /// 10 days forecast. 12z run has one timestep less -> therefore floor to 24h
@@ -96,9 +112,9 @@ struct MfWaveDownload: AsyncCommand {
         
         // Iterate from d-1 to d+10 in 12 hour steps
         let handles = try await downloadRange.asyncMap { step -> [GenericVariableHandle] in
-            logger.info("Downloading file with timestap \(step)")
+            logger.info("Downloading file with timestap \(step.iso8601_YYYY_MM_dd_HH_mm) from run \(runDownload.format_YYYYMMddHH)")
             
-            let url = domain.getUrl(run: run, step: step)
+            let url = domain.getUrl(run: runDownload, step: step)
             let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
             return try memory.withUnsafeReadableBytes({ memory in
                 guard let nc = try NetCDF.open(memory: memory) else {
