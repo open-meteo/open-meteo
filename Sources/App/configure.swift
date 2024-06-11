@@ -88,7 +88,6 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadCamsCommand(), as: "download-cams")
     app.asyncCommands.use(MeteoFranceDownload(), as: "download-meteofrance")
     app.asyncCommands.use(DownloadArpaeCommand(), as: "download-arpae")
-    app.commands.use(CronjobCommand(), as: "cronjob")
     app.asyncCommands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")
     app.asyncCommands.use(GfsGraphCastDownload(), as: "download-gfs-graphcast")
