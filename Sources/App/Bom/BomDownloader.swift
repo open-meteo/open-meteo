@@ -642,7 +642,7 @@ extension OmFileWriter {
     public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
         let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
         try FileManager.default.removeItemIfExists(at: file)
-        let fn = try FileHandle.createNewFile(file: file)
+        let fn = try FileHandle.createNewFile(file: file, exclusive: true)
         try FileManager.default.removeItem(atPath: file)
         try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, fsync: false, supplyChunk: { range in
             return ArraySlice(all)
