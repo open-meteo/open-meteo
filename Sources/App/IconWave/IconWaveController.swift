@@ -16,8 +16,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     case gwam
     case era5_ocean
     case ecmwf_wam025
-    case mfwave
-    case mfcurrents
+    case meteofrance_wave
+    case meteofrance_currents
     
     var countEnsembleMember: Int { return 1 }
     
@@ -44,9 +44,9 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ecmwf_wam025:
             return try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .mfwave:
+        case .meteofrance_wave:
             return try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .mfcurrents:
+        case .meteofrance_currents:
             return try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
             }.flatMap({[$0]}) ?? []

@@ -84,9 +84,9 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
             return .era5Ocean
         case .ecmwf_wam025:
             return .ecmwfWam025
-        case .mfwave:
+        case .meteofrance_wave:
             fatalError()
-        case .mfcurrents:
+        case .meteofrance_currents:
             fatalError()
         }
     }
