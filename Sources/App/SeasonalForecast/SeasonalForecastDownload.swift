@@ -193,7 +193,7 @@ fileprivate extension Array2DFastTime {
         let startOm = DispatchTime.now()
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: dtSeconds)
         
-        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member)", array2d: self, time: time, skipFirst: 1, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast)
+        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))", array2d: self, time: time, skipFirst: 1, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast)
         logger.info("Update om \(variable) finished in \(startOm.timeElapsedPretty())")
     }
 }
