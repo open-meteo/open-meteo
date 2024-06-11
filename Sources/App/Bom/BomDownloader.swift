@@ -644,7 +644,7 @@ extension OmFileWriter {
         try FileManager.default.removeItemIfExists(at: file)
         let fn = try FileHandle.createNewFile(file: file)
         try FileManager.default.removeItem(atPath: file)
-        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: { range in
+        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, fsync: false, supplyChunk: { range in
             return ArraySlice(all)
         })
         return fn
