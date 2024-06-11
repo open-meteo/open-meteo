@@ -29,9 +29,9 @@ extension MarineVariable: FlatBuffersVariable {
         case .swell_wave_direction:
             return .init(variable: .swellWaveDirection)
         case .ocean_current_velocity:
-            fatalError()
+            return .init(variable: .oceanCurrentVelocity)
         case .ocean_current_direction:
-            fatalError()
+            return .init(variable: .oceanCurrentDirection)
         }
     }
 }
@@ -85,9 +85,9 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
         case .ecmwf_wam025:
             return .ecmwfWam025
         case .meteofrance_wave:
-            fatalError()
+            return .meteofranceWave
         case .meteofrance_currents:
-            fatalError()
+            return .meteofranceCurrents
         }
     }
 }
