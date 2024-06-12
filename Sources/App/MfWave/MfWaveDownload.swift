@@ -45,8 +45,8 @@ struct MfWaveDownload: AsyncCommand {
             // MF current only 0z
             let runs = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 24 * 3600).with(dtSeconds: domain.stepHoursPerFile * 3600)
             logger.info("Downloading runs \(runs.prettyString())")
-            for yearmonth in runs.groupedPreservedOrder(by: {$0.toComponents().toYearMonth()}) {
-                let handles = try await yearmonth.values.asyncFlatMap { run in
+            for year in runs.groupedPreservedOrder(by: {$0.toComponents().year}) {
+                let handles = try await year.values.asyncFlatMap { run in
                     logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                     return try await download(application: context.application, domain: domain, run: run)
                 }
