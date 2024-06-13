@@ -113,11 +113,11 @@ struct MeteoFranceDownload: AsyncCommand {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
         let logger = application.logger
-        let deadLineHours: Double = 6.5
-        Process.alarm(seconds: Int(deadLineHours+2) * 3600)
+        let deadLineHours: Double = 5.5
+        Process.alarm(seconds: Int(deadLineHours+1) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         let grid = domain.grid
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let subsetGrid = domain.mfSubsetGrid
