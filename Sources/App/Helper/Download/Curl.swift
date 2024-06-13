@@ -75,7 +75,7 @@ final class Curl {
     }
     
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
-    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?) async throws -> HTTPClientResponse {
+    func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?, headers: [(String, String)] = []) async throws -> HTTPClientResponse {
         
         let deadline = deadline ?? self.deadline
         
@@ -123,6 +123,7 @@ final class Curl {
             if let auth = auth {
                 request.headers.add(name: "Authorization", value: "Basic \(auth)")
             }
+            request.headers.add(contentsOf: self.headers)
             request.headers.add(contentsOf: headers)
             return request
         }()

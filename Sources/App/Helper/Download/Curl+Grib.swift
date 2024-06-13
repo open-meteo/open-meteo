@@ -4,7 +4,7 @@ import CHelper
 
 extension Curl {
     /// Download all grib files and return an array of grib messages
-    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> [GribMessage] {
+    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> [GribMessage] {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         
@@ -13,14 +13,14 @@ extension Curl {
         if !supportMultiRange, let parts = range?.split(separator: ","), parts.count > 1 {
             var messages = [GribMessage]()
             for part in parts {
-                messages.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: bzip2Decode, range: String(part)))
+                messages.append(contentsOf: try await downloadGrib(url: url, bzip2Decode: bzip2Decode, range: String(part), headers: headers))
             }
             return messages
         }
         
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
             
             // Retry failed file transfers after this point
             do {
