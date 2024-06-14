@@ -98,6 +98,9 @@ struct MfWaveDownload: AsyncCommand {
         /// Figuring this out, drives you mad....
         let runDownload: Timestamp
         switch (domain, run) {
+        case (.mfwave, Timestamp(2023,8,1,0)), (.mfwave, Timestamp(2023,8,1,12)):
+            // 2023-07-31 uses different runs.....
+            runDownload = run.add(hours: run.hour == 0 ? -12 : -24)
         case (.mfwave, ..<Timestamp(2023,11,2)):
             runDownload = run.add(hours: run.hour == 0 ? 12 : 0)
         case (.mfwave, ..<Timestamp(2023,11,8,0)):
