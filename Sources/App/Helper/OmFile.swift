@@ -297,7 +297,7 @@ struct OmFileSplitter {
                 let omRead = try readFile.openRead()
                 try omRead?.willNeed()
 
-                let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor)
+                let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor, fsync: true)
 
                 try omWrite.writeHeader()
                 

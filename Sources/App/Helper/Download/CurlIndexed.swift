@@ -48,7 +48,7 @@ extension Curl {
     }
     
     /// Download index file and match against curl variable
-    func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: [String], variables: [Variable]) async throws -> [(matches: [Variable], range: String, minSize: Int)] {
+    func downloadIndexAndDecode<Variable: CurlIndexedVariable>(url: [String], variables: [Variable], errorOnMissing: Bool) async throws -> [(matches: [Variable], range: String, minSize: Int)] {
         let count = variables.reduce(0, { return $0 + ($1.gribIndexName == nil ? 0 : 1) })
         if count == 0 {
             return []
@@ -102,7 +102,7 @@ extension Curl {
                 missing = true
             }
         }
-        if missing {
+        if missing && errorOnMissing {
             throw CurlError.didNotFindAllVariablesInGribIndex
         }
         
@@ -112,10 +112,10 @@ extension Curl {
     
     /// Download an indexed grib file, but selects only required grib messages
     /// Data is downloaded directly into memory and GRIB decoded while iterating
-    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: [String], variables: [Variable], extension: String = ".idx") async throws -> [(variable: Variable, message: GribMessage)] {
+    func downloadIndexedGrib<Variable: CurlIndexedVariable>(url: [String], variables: [Variable], extension: String = ".idx", errorOnMissing: Bool = true) async throws -> [(variable: Variable, message: GribMessage)] {
         
         let urlIndex = url.map({"\($0)\(`extension`)"})
-        let inventories = try await downloadIndexAndDecode(url: urlIndex, variables: variables)
+        let inventories = try await downloadIndexAndDecode(url: urlIndex, variables: variables, errorOnMissing: errorOnMissing)
         guard !inventories.isEmpty else {
             return []
         }

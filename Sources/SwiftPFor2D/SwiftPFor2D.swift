@@ -64,6 +64,9 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
     
     public var writeBufferPos = 0
     
+    /// Number of bytes after data should be flushed with fsync
+    private let fsyncFlushSize: Int?
+    
     /// Position of last chunk that has been written
     public var c0: Int = 0
     
@@ -89,7 +92,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public init(fn: Backend, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, compression: CompressionType, scalefactor: Float) throws {
+    public init(fn: Backend, dim0: Int, dim1: Int, chunk0: Int, chunk1: Int, compression: CompressionType, scalefactor: Float, fsync: Bool) throws {
         self.fn = fn
         self.dim0 = dim0
         self.dim1 = dim1
@@ -97,6 +100,7 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         self.chunk1 = chunk1
         self.compression = compression
         self.scalefactor = scalefactor
+        self.fsyncFlushSize = fsync ? 32 * 1024 * 1024 : nil
         
         guard chunk0 > 0 && chunk1 > 0 && dim0 > 0 && dim1 > 0 else {
             throw SwiftPFor2DError.dimensionMustBeLargerThan0
@@ -158,8 +162,10 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
             try fn.write(contentsOf: ptr.toUnsafeRawBufferPointer(), atOffset: OmHeader.length)
         }
         
-        // ensure data is written to disk
-        try fn.synchronize()
+        if fsyncFlushSize != nil {
+            // ensure data is written to disk
+            try fn.synchronize()
+        }
     }
     
     public func write(_ uncompressedInput: ArraySlice<Float>) throws {
@@ -216,11 +222,13 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     writeBufferPos += writeLength
                     if (writeBuffer.count - writeBufferPos) < readBuffer.count {
                         try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
-                        bytesWrittenSinceLastFlush += writeBufferPos
-                        if bytesWrittenSinceLastFlush >= 32 * 1024 * 1024 {
-                            // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
-                            try fn.synchronize()
-                            bytesWrittenSinceLastFlush = 0
+                        if let fsyncFlushSize {
+                            bytesWrittenSinceLastFlush += writeBufferPos
+                            if bytesWrittenSinceLastFlush >= fsyncFlushSize {
+                                // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
+                                try fn.synchronize()
+                                bytesWrittenSinceLastFlush = 0
+                            }
                         }
                         writeBufferPos = 0
                     }
@@ -278,11 +286,13 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
                     writeBufferPos += writeLength
                     if (writeBuffer.count - writeBufferPos) < readBuffer.count {
                         try fn.write(contentsOf: UnsafeBufferPointer(start: writeBuffer.baseAddress, count: writeBufferPos))
-                        bytesWrittenSinceLastFlush += writeBufferPos
-                        if bytesWrittenSinceLastFlush >= 32 * 1024 * 1024 {
-                            // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
-                            try fn.synchronize()
-                            bytesWrittenSinceLastFlush = 0
+                        if let fsyncFlushSize {
+                            bytesWrittenSinceLastFlush += writeBufferPos
+                            if bytesWrittenSinceLastFlush >= fsyncFlushSize {
+                                // Make sure to write to disk, otherwise we get a lot of dirty pages and overload kernel page cache
+                                try fn.synchronize()
+                                bytesWrittenSinceLastFlush = 0
+                            }
                         }
                         writeBufferPos = 0
                     }
@@ -330,11 +340,13 @@ public final class OmFileWriter {
      
      One chunk should be around 2'000 to 16'000 elements. Fewer or more are not usefull!
      
+     If `fsync` is true, data will be flushed every 32MB
+     
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public func write<Backend: OmFileWriterBackend>(fn: Backend, compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    public func write<Backend: OmFileWriterBackend>(fn: Backend, compressionType: CompressionType, scalefactor: Float, fsync: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
-        let state = try OmFileWriterState<Backend>(fn: fn, dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, compression: compressionType, scalefactor: scalefactor)
+        let state = try OmFileWriterState<Backend>(fn: fn, dim0: dim0, dim1: dim1, chunk0: chunk0, chunk1: chunk1, compression: compressionType, scalefactor: scalefactor, fsync: fsync)
         
         try state.writeHeader()
         while state.c0 < state.nDim0Chunks {
@@ -355,7 +367,7 @@ public final class OmFileWriter {
         let fileTemp = "\(file)~"
         try FileManager.default.removeItemIfExists(at: fileTemp)
         let fn = try FileHandle.createNewFile(file: fileTemp)
-        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, fsync: true, supplyChunk: supplyChunk)
         try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
         return fn
     }
@@ -367,7 +379,7 @@ public final class OmFileWriter {
     /// Write to memory
     public func writeInMemory(compressionType: CompressionType, scalefactor: Float, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> Data {
         let data = DataAsClass(data: Data())
-        try write(fn: data, compressionType: compressionType, scalefactor: scalefactor, supplyChunk: supplyChunk)
+        try write(fn: data, compressionType: compressionType, scalefactor: scalefactor, fsync: true, supplyChunk: supplyChunk)
         return data.data
     }
     
