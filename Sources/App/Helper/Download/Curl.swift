@@ -149,10 +149,10 @@ final class Curl {
                     logger.error("Download failed with 4xx error, \(error)")
                     throw error
                 }
-                if let ioerror = error as? IOError, [104,54].contains(ioerror.errnoCode), i <= 2 {
+                if let ioerror = error as? IOError, [104,54].contains(ioerror.errnoCode) {
                     /// MeteoFrance API resets the connection very frequently causing large delays in downloading
-                    /// Immediately retry twice
-                    logger.info("Connection reset by peer, immediate retry \(error)")
+                    /// Immediately retry twice, 1s delay for the next 10
+                    try await timeout.check(error: error, delay: i <= 2 ? 0 : i <= 10 ? 1 : nil)
                     continue
                 }
                 try await timeout.check(error: error)
