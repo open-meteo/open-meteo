@@ -59,6 +59,7 @@ Apps:
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
+- [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration

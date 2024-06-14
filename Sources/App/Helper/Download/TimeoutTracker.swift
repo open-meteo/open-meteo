@@ -21,11 +21,11 @@ final class TimeoutTracker {
         let delay = delay ?? retryDelaySeconds
         let timeElapsed = Date().timeIntervalSince(startTime)
         if Date().timeIntervalSince(lastPrint) > 60 {
-            logger.info("Download failed, retry every \(delay) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error)'")
+            logger.info("Download failed, retry every \(delay) seconds, (\(Int(timeElapsed/60)) minutes elapsed, curl error '\(error) [\(type(of: error))]'")
             lastPrint = Date()
         }
         if Date() > deadline {
-            logger.error("Deadline reached. Last Error \(error)")
+            logger.error("Deadline reached. Last Error \(error) [\(type(of: error))]")
             throw CurlError.timeoutReached
         }
         try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
