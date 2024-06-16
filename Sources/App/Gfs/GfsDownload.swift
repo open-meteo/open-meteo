@@ -308,6 +308,19 @@ struct GfsDownload: AsyncCommand {
                 var inMemoryPressure = [GfsPressureVariable: [Float]]()
                 
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
+                    if skipMissing {
+                        // for whatever reason, the `hrrr.t10z.wrfprsf01.grib2` file uses different grib dimensions
+                        guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+                            fatalError("Could not get Nx")
+                        }
+                        guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
+                            fatalError("Could not get Ny")
+                        }
+                        if domain.grid.nx != nx || domain.grid.ny != ny {
+                            logger.warning("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(domain.grid.nx), ny=\(domain.grid.ny)). Skipping")
+                            continue
+                        }
+                    }
                     try grib2d.load(message: message)
                     if domain.isGlobal {
                         grib2d.array.shift180LongitudeAndFlipLatitude()
