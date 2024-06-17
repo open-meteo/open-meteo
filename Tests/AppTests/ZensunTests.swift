@@ -26,6 +26,29 @@ final class ZensunTests: XCTestCase {
         XCTAssertEqual(sunset[0], "2021-11-06T17:55") // supposed to be 17:55
     }
     
+    func testSunRiseSetPolar() {
+        // https://www.timeanddate.com/sun/usa/los-angeles?month=11&year=2021
+        let utcOffsetSeconds = -25200
+       // let currentTime = Timestamp(1636199223) // UTC 2021-11-06T11:47:03+00:00
+        let time = Timestamp(1636182000) ..< Timestamp(1636268400)
+        
+        let times = Zensun.calculateSunRiseSet(timeRange: time, lat: 85.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
+        XCTAssertEqual(times.rise[0], Timestamp(1636182000))
+        XCTAssertEqual(times.set[0], Timestamp(1636182000))
+        let sunset = times.set.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
+        let sunrise = times.rise.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
+        XCTAssertEqual(sunrise[0], "2021-11-06T00:00") // polar night -> 0h length
+        XCTAssertEqual(sunset[0], "2021-11-06T00:00") //
+        
+        let times2 = Zensun.calculateSunRiseSet(timeRange: time, lat: -85.05223, lon: -118.24368, utcOffsetSeconds: utcOffsetSeconds)
+        XCTAssertEqual(times2.rise[0], Timestamp(1636182000))
+        XCTAssertEqual(times2.set[0], Timestamp(1636268400))
+        let sunset2 = times2.set.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
+        let sunrise2 = times2.rise.map({$0.add(utcOffsetSeconds)}).iso8601_YYYYMMddHHmm
+        XCTAssertEqual(sunrise2[0], "2021-11-06T00:00") // polar day -> 24h length
+        XCTAssertEqual(sunset2[0], "2021-11-07T00:00") //
+    }
+    
     
     func testSunRiseSetVancouver() {
         // https://www.timeanddate.com/sun/canada/vancouver?month=11&year=2021

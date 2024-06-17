@@ -13,11 +13,11 @@ extension Zensun {
             let utc = time.add(utcOffsetSeconds)
             switch calculateSunTransit(utcMidnight: utc, lat: lat, lon: lon) {
             case .polarNight:
-                rises.append(Timestamp(0))
-                sets.append(Timestamp(0))
+                rises.append(time)
+                sets.append(time)
             case .polarDay:
-                rises.append(Timestamp(0))
-                sets.append(Timestamp(0))
+                rises.append(time)
+                sets.append(time.add(24*3600))
             case .transit(rise: let rise, set: let set):
                 rises.append(utc.add(rise))
                 sets.append(utc.add(set))
