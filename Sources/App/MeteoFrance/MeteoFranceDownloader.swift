@@ -117,7 +117,7 @@ struct MeteoFranceDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours+1) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
+        
         let grid = domain.grid
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let subsetGrid = domain.mfSubsetGrid
@@ -144,12 +144,18 @@ struct MeteoFranceDownload: AsyncCommand {
                 let period = coverage.isPeriod ? domain.dtSeconds == 900 ? "_PT15M" : is3H ? "_PT3H" : "_PT1H" : ""
                 
                 let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetPressure)\(subsetTime)&format=application%2Fwmo-grib"
+                
+                /// MeteoFrance servers close the HTTP connection unclean, resulting in `connection reset by peer` errors
+                /// Use a new HTTP client with new connections for every request
+                let client = application.makeNewHttpClient()
+                let curl = Curl(logger: logger, client: client, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
                 let message = try await curl.downloadGrib(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")])[0]
                 
                 //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
                 //message.dumpAttributes()
                 
                 try grib2d.load(message: message)
+                try await client.shutdown()
                 if domain.isGlobal {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                 } else {
@@ -166,9 +172,10 @@ struct MeteoFranceDownload: AsyncCommand {
                     fn: fn,
                     skipHour0: variable.skipHour0(domain: domain)
                 ))
+                
             }
         }
-        await curl.printStatistics()
+        //await curl.printStatistics()
         return handles
     }
 }

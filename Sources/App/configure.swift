@@ -43,6 +43,15 @@ extension Application {
         if let existing = self.storage[HttpClientKey.self] {
             return existing
         }
+        let new = makeNewHttpClient()
+        self.storage.set(HttpClientKey.self, to: new) {
+            try $0.syncShutdown()
+        }
+        return new
+    }
+    
+    /// Create a new HTTP client instance. `shutdown` must be called after using it
+    func makeNewHttpClient() -> HTTPClient {
         // try again with very high timeouts, so only the curl internal timers are used
         let configuration = HTTPClient.Configuration(
             redirectConfiguration: .follow(max: 5, allowCycles: false),
@@ -51,14 +60,10 @@ extension Application {
         // NCEP server still struggle with H2
         //configuration.httpVersion = .http1Only
         
-        let new = HTTPClient(
+        return HTTPClient(
             eventLoopGroupProvider: .shared(eventLoopGroup),
             configuration: configuration,
             backgroundActivityLogger: logger)
-        self.storage.set(HttpClientKey.self, to: new) {
-            try $0.syncShutdown()
-        }
-        return new
     }
 }
 
