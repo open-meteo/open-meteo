@@ -349,7 +349,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
         case .soil_moisture_100_to_255cm: return 1000
         case .snow_depth: return 100 // 1 cm resolution
         case .wave_height:
-            return 50 // 0.002m resolution
+            return 50 // 0.02m resolution
         case .wave_direction:
             return 1
         case .wave_period:

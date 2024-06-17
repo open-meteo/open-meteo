@@ -45,7 +45,9 @@ struct GenericVariableHandle {
             return
         }
         // `timeMinMax.min.time` has issues with `skip`
-        let time = TimerangeDt(range: run...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+        /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
+        let startTime = min(run, timeMinMax.min.time)
+        let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
         logger.info("Convert timerange \(time.prettyString())")
         
         let grid = domain.grid

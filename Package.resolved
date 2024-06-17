@@ -59,8 +59,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "04f384fbebde8ad2c16d2f42f879e103bf0ee3fb",
-        "version" : "1.11.6"
+        "revision" : "f166b8d170575c55a961da5c9fd54897de643f17",
+        "version" : "1.11.7"
       }
     },
     {
@@ -203,8 +203,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftNetCDF.git",
       "state" : {
-        "revision" : "4792741df052e0a2a4626f9e03fd66edf6417cba",
-        "version" : "1.1.1"
+        "revision" : "8ade11d1494d2661a14b624966e8966c6e36e426",
+        "version" : "1.1.2"
       }
     },
     {

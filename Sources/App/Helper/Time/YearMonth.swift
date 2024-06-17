@@ -33,3 +33,7 @@ public struct YearMonth: Strideable, Comparable {
         Timestamp(year, month, 1)
     }
 }
+
+extension YearMonth: Hashable {
+    
+}

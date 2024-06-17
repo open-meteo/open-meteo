@@ -245,7 +245,7 @@ final class Curl {
         //try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
         let cacheFile = cacheDirectory + "/" + SHA256.hash(data: (url + (range ?? "")).data(using: .utf8) ?? Data()).hex
         if !FileManager.default.fileExists(atPath: cacheFile) {
-            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: nConcurrent, headers: headers)
+            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
         }
         guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
             fatalError("Could not read cached file")

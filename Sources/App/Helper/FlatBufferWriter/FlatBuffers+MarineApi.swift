@@ -3,7 +3,7 @@ import FlatBuffers
 import OpenMeteoSdk
 
 
-extension IconWaveVariable: FlatBuffersVariable {
+extension MarineVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
         case .wave_height:
@@ -28,6 +28,10 @@ extension IconWaveVariable: FlatBuffersVariable {
             return .init(variable: .swellWavePeakPeriod)
         case .swell_wave_direction:
             return .init(variable: .swellWaveDirection)
+        case .ocean_current_velocity:
+            return .init(variable: .oceanCurrentVelocity)
+        case .ocean_current_direction:
+            return .init(variable: .oceanCurrentDirection)
         }
     }
 }
@@ -62,7 +66,7 @@ extension IconWaveVariableDaily: FlatBuffersVariable {
 }
 
 extension IconWaveDomainApi: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = IconWaveVariable
+    typealias HourlyVariable = MarineVariable
     
     typealias HourlyPressureType = ForecastPressureVariableType
     
@@ -80,6 +84,10 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
             return .era5Ocean
         case .ecmwf_wam025:
             return .ecmwfWam025
+        case .meteofrance_wave:
+            return .meteofranceWave
+        case .meteofrance_currents:
+            return .meteofranceCurrents
         }
     }
 }

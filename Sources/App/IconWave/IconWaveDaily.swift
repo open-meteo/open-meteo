@@ -15,7 +15,7 @@ enum IconWaveVariableDaily: String, RawRepresentableString, DailyVariableCalcula
     case swell_wave_period_max
     case swell_wave_peak_period_max
     
-    var aggregation: DailyAggregation<IconWaveVariable> {
+    var aggregation: DailyAggregation<MarineVariable> {
         switch self {
         case .wave_height_max:
             return .max(.wave_height)

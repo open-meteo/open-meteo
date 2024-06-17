@@ -16,6 +16,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     case gwam
     case era5_ocean
     case ecmwf_wam025
+    case meteofrance_wave
+    case meteofrance_currents
     
     var countEnsembleMember: Int { return 1 }
     
@@ -24,9 +26,16 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         case .best_match:
             let gwam = try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let ewam = try IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
+                MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
+            }
+            let mfwave = try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let readers: [(any GenericReaderProtocol)?] = [mfwave, mfcurrents, ewam, gwam]
+            return readers.compactMap({$0})
+            /*
             let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let readers: [(any GenericReaderProtocol)?] = [ewam, ecmwfWam025, gwam]
-            return readers.compactMap({$0})
+            return readers.compactMap({$0})*/
         case .ewam:
             return try IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .gwam:
@@ -35,7 +44,33 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             return [try Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ecmwf_wam025:
             return try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .meteofrance_wave:
+            return try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .meteofrance_currents:
+            return try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
+                MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
+            }.flatMap({[$0]}) ?? []
         }
+    }
+}
+
+enum MarineVariable: String, GenericVariableMixable {
+    case wave_height
+    case wave_period
+    case wave_direction
+    case wind_wave_height
+    case wind_wave_period
+    case wind_wave_peak_period
+    case wind_wave_direction
+    case swell_wave_height
+    case swell_wave_period
+    case swell_wave_peak_period
+    case swell_wave_direction
+    case ocean_current_velocity
+    case ocean_current_direction
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
     }
 }
 
@@ -53,8 +88,8 @@ struct IconWaveController {
             throw ForecastapiError.generic(message: "Bounding box not supported")
         }
         let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
-        let paramsHourly = try IconWaveVariable.load(commaSeparatedOptional: params.hourly)
-        let paramsCurrent = try IconWaveVariable.load(commaSeparatedOptional: params.current)
+        let paramsHourly = try MarineVariable.load(commaSeparatedOptional: params.hourly)
+        let paramsCurrent = try MarineVariable.load(commaSeparatedOptional: params.current)
         let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
         let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.count
         
@@ -66,7 +101,7 @@ struct IconWaveController {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
             let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<IconWaveVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
+                guard let reader = try GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                     return nil
                 }
                 

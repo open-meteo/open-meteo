@@ -57,6 +57,8 @@ public final class MmapFile {
         let pageStart = offset.floor(to: 4096)
         let pageEnd = (offset + count).ceil(to: 4096)
         let length = pageEnd - pageStart
+        // Note: length can be greater than data size, due to page cache alignment
+        //precondition(length <= data.count, "Prefetch read exceeds length. Length=\(length) data count=\(data.count)")
         let ret = madvise(UnsafeMutableRawPointer(mutating: data.baseAddress!.advanced(by: pageStart)), length, advice.mode)
         guard ret == 0 else {
             let error = String(cString: strerror(errno))
