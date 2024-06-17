@@ -71,6 +71,7 @@ Repositories:
 
 Other:
 - [Menubar Weather](https://www.raycast.com/koinzhang/menubar-weather) A Raycast extension that displays live weather information in your menu bar
+- [MiniPavi](https://www.minipavi.fr/emulminitel/) Vintage French Minitel (a kind of BBS) weather forecast service (type "METEO" keyword on welcome Minitel screen)
 - Contributions welcome!
 
 Do you use Open-Meteo? Please open a pull request and add your repository or app to the list!
