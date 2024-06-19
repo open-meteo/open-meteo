@@ -8,6 +8,17 @@ struct RegularGrid: Gridable {
     let lonMin: Float
     let dx: Float
     let dy: Float
+    let searchRadius: Int
+    
+    public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
+        self.nx = nx
+        self.ny = ny
+        self.latMin = latMin
+        self.lonMin = lonMin
+        self.dx = dx
+        self.dy = dy
+        self.searchRadius = searchRadius
+    }
     
     var isGlobal: Bool {
         return (Float(nx) * dx) >= 360 && (Float(ny) * dy) >= 180

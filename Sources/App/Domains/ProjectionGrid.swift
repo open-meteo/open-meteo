@@ -13,6 +13,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     let xrange: ClosedRange<Float>
     let yrange: ClosedRange<Float>
     
+    var searchRadius: Int {
+        return 1
+    }
+    
     public init(nx: Int, ny: Int, latitude: ClosedRange<Float>, longitude: ClosedRange<Float>, projection: Projection) {
         self.nx = nx
         self.ny = ny
