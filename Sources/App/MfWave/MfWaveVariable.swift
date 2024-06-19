@@ -232,7 +232,7 @@ struct MfWaveReader: GenericReaderProtocol {
         switch variable {
         case .wave_direction, .wind_wave_direction, .swell_wave_direction:
             let direction = data.data.map {
-                ($0+360).truncatingRemainder(dividingBy: 360)
+                ($0+180).truncatingRemainder(dividingBy: 360)
             }
             return DataAndUnit(direction, .degreeDirection)
         default:
