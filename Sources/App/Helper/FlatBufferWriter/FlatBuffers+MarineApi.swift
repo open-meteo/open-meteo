@@ -91,6 +91,12 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
             return .meteofranceWave
         case .meteofrance_currents:
             return .meteofranceCurrents
+        case .ncep_gfswave025:
+            // TODO register domain
+            return .ecmwfWam025
+        case .ncep_gefswave025:
+            // TODO register domain
+            return .ecmwfWam025
         }
     }
 }

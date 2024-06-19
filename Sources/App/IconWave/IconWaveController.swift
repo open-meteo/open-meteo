@@ -17,6 +17,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     case era5_ocean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
+    case ncep_gfswave025
+    case ncep_gefswave025
     case meteofrance_wave
     case meteofrance_currents
     
@@ -24,6 +26,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         switch self {
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble.ensembleMembers
+        case .ncep_gefswave025:
+            return GfsDomain.gfswave025_ens.ensembleMembers
         default:
             return 1
         }
@@ -62,6 +66,10 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             return try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
             }.flatMap({[$0]}) ?? []
+        case .ncep_gfswave025:
+            return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ncep_gefswave025:
+            return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }
