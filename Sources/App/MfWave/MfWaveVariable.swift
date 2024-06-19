@@ -195,3 +195,54 @@ struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
 }
+
+/// Converts negative wave direction to positive
+struct MfWaveReader: GenericReaderProtocol {
+    typealias Domain = MfWaveDomain
+    typealias MixingVar = MfWaveVariable
+    
+    let reader: GenericReader<MfWaveDomain, MfWaveVariable>
+    
+    var modelLat: Float {
+        return reader.modelLat
+    }
+    
+    var modelLon: Float {
+        return reader.modelLon
+    }
+    
+    var modelElevation: ElevationOrSea {
+        return reader.modelElevation
+    }
+    
+    var targetElevation: Float {
+        return reader.targetElevation
+    }
+    
+    var modelDtSeconds: Int {
+        return reader.modelDtSeconds
+    }
+    
+    func getStatic(type: ReaderStaticVariable) throws -> Float? {
+        return try reader.getStatic(type: type)
+    }
+    
+    func get(variable: MfWaveVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        let data = try reader.get(variable: variable, time: time)
+        switch variable {
+        case .wave_direction, .wind_wave_direction, .swell_wave_direction:
+            let direction = data.data.map {
+                ($0+360).truncatingRemainder(dividingBy: 360)
+            }
+            return DataAndUnit(direction, .degreeDirection)
+        default:
+            return data
+        }
+    }
+    
+    func prefetchData(variable: MfWaveVariable, time: TimerangeDtAndSettings) throws {
+        try reader.prefetchData(variable: variable, time: time)
+    }
+}
+
+
