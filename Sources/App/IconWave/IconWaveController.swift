@@ -101,7 +101,7 @@ struct IconWaveController {
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try await req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
+        let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 17)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         guard case .coordinates(let prepared) = prepared else {
@@ -116,7 +116,7 @@ struct IconWaveController {
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
