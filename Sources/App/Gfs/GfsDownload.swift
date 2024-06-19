@@ -119,6 +119,9 @@ struct GfsDownload: AsyncCommand {
             
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+        case .gfswave025:
+            variables=[]
+            break
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -200,7 +203,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs013:
             deadLineHours = 6
-        case .gfs025:
+        case .gfs025, .gfswave025:
             deadLineHours = 5
         case .hrrr_conus_15min:
             deadLineHours = 2

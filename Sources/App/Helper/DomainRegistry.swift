@@ -31,6 +31,7 @@ enum DomainRegistry: String, CaseIterable {
     
     case ncep_gfs013
     case ncep_gfs025
+    case ncep_gfswave025
     case ncep_gefs025
     case ncep_gefs025_probability
     case ncep_gefs05
