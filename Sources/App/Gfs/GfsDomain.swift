@@ -30,6 +30,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// 0.5° ensemble version for up to 25 days of forecast... Low forecast skill obviously.
     case gfs05_ens
     
+    case gfswave025
+    
+    case gfswave025_ens
+    
     var domainRegistry: DomainRegistry {
         switch self {
         case .gfs013:
@@ -46,6 +50,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return .ncep_gefs025
         case .gfs05_ens:
             return .ncep_gefs05
+        case .gfswave025:
+            return .ncep_gfswave025
+        case .gfswave025_ens:
+            return .ncep_gefswave025
         }
     }
     
@@ -53,7 +61,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .hrrr_conus_15min:
             return .ncep_hrrr_conus
-        case .gfs025_ensemble:
+        case .gfs025_ensemble, .gfswave025, .gfswave025_ens:
             return .ncep_gefs025
         default:
             return domainRegistry
@@ -84,6 +92,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 4
         case .gfs05_ens:
             return 4
+        case .gfswave025:
+            return 4
+        case .gfswave025_ens:
+            return 4
         }
     }
     
@@ -97,12 +109,14 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .gfs025_ensemble:
             return 3*3600
-        case .gfs025_ens:
+        case .gfs025_ens, .gfswave025_ens:
             return 3*3600
         case .gfs05_ens:
             return 3*3600
         case .hrrr_conus_15min:
             return 3600/4
+        case .gfswave025:
+            return 3600
         }
     }
     
@@ -116,12 +130,14 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return false
         case .gfs025_ensemble:
             return true
-        case .gfs025_ens:
+        case .gfs025_ens, .gfswave025_ens:
             return true
         case .gfs05_ens:
             return true
         case .hrrr_conus_15min:
             return false
+        case .gfswave025:
+            return true
         }
     }
     
@@ -131,13 +147,13 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs05_ens:
             fallthrough
-        case .gfs025_ens:
+        case .gfs025_ens, .gfswave025_ens:
             fallthrough
         case .gfs025_ensemble:
             fallthrough
         case .gfs013:
             fallthrough
-        case .gfs025:
+        case .gfs025, .gfswave025:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
             return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
         //case .nam_conus:
@@ -156,7 +172,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs05_ens:
             return 30+1
-        case .gfs025_ens:
+        case .gfs025_ens, .gfswave025_ens:
             return 30+1
         default:
             return 1
@@ -175,6 +191,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             fallthrough
         case .gfs025_ensemble:
             return Array(stride(from: 0, through: 240, by: 3))
+        case .gfswave025_ens:
+            return Array(stride(from: 0, through: 384, by: 3))
         case .gfs013:
             fallthrough
         case .gfs025:
@@ -185,6 +203,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return (run % 6 == 0) ? Array(0...48) : Array(0...18)
         case .hrrr_conus_15min:
             return Array(0...18*4)
+        case .gfswave025:
+            return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
         }
     }
     
@@ -218,6 +238,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         case .hrrr_conus_15min:
             return []
+        case .gfswave025, .gfswave025_ens:
+            return []
         }
         
     }
@@ -240,6 +262,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 48 + 1 + 4*24
         case .hrrr_conus_15min:
             return 48*4*2
+        case .gfswave025:
+            return 384 + 1 + 4*24
+        case .gfswave025_ens:
+            return (384 + 4*24)/3 + 1
         }
     }
     
@@ -254,7 +280,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             fallthrough
         case .gfs025_ensemble:
             fallthrough
-        case .gfs025:
+        case .gfs025, .gfswave025, .gfswave025_ens:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         /*case .nam_conus:
             /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
@@ -307,6 +333,14 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs025:
             let base = "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/atmos"
             return ["\(base)/gfs.t\(hh)z.pgrb2.0p25.f\(fHHH)", "\(base)/gfs.t\(hh)z.pgrb2b.0p25.f\(fHHH)"]
+        case .gfswave025:
+            // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20240619/00/wave/gridded/gfswave.t00z.global.0p25.f000.grib2
+            let base = "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/wave/gridded"
+            return ["\(base)/gfswave.t\(hh)z.global.0p25.f\(fHHH).grib2"]
+        case .gfswave025_ens:
+            // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20240619/00/wave/gridded/gefs.wave.t00z.c00.global.0p25.f000.grib2
+            let memberString = member == 0 ? "c00" : "p\(member.zeroPadded(len: 2))"
+            return ["\(gefsServer)gefs.\(yyyymmdd)/\(hh)/wave/gridded/gefs.wave.t\(hh)z.\(memberString).global.0p25.f\(fHHH).grib2"]
         //case .nam_conus:
         //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
         case .hrrr_conus:

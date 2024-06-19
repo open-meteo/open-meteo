@@ -17,6 +17,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     case era5_ocean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
+    case ncep_gfswave025
+    case ncep_gefswave025
     case meteofrance_wave
     case meteofrance_currents
     
@@ -24,6 +26,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         switch self {
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble.ensembleMembers
+        case .ncep_gefswave025:
+            return GfsDomain.gfswave025_ens.ensembleMembers
         default:
             return 1
         }
@@ -62,6 +66,10 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             return try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
             }.flatMap({[$0]}) ?? []
+        case .ncep_gfswave025:
+            return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ncep_gefswave025:
+            return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }
@@ -93,7 +101,7 @@ struct IconWaveController {
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try await req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 11)
+        let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 17)
         
         let prepared = try params.prepareCoordinates(allowTimezones: true)
         guard case .coordinates(let prepared) = prepared else {
@@ -108,7 +116,7 @@ struct IconWaveController {
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             

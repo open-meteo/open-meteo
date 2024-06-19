@@ -142,11 +142,16 @@ Note:
 # ECMWF WAM
 45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025 > ~/log/ecmwf_wam025.log 2>&1 || cat ~/log/ecmwf_wam025.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025 > ~/log/ecmwf_wam025.log 2>&1 || cat ~/log/ecmwf_wam025.log
+45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025_ens > ~/log/ecmwf_wam025_ens.log 2>&1 || cat ~/log/ecmwf_wam025_ens.log
+0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025_ens > ~/log/ecmwf_wam025_ens.log 2>&1 || cat ~/log/ecmwf_wam025_ens.log
 
 # MeteoFrance
 0  0,12 * * * /usr/local/bin/openmeteo-api download-mfwave mfwave --concurrent 4 > ~/log/mfwave.log 2>&1 || cat ~/log/mfwave.log
 0    12 * * * /usr/local/bin/openmeteo-api download-mfwave mfcurrents --concurrent 4 > ~/log/mfcurrents.log 2>&1 || cat ~/log/mfcurrents.log
 
+# GFS Wave
+40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfswave025 > ~/log/gfswave025.log 2>&1 || cat ~/log/gfswave025.log
+40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfswave025_gfs > ~/log/gfswave025_gfs.log 2>&1 || cat ~/log/gfswave025_gfs.log
 ```
 
 ## Air Quality

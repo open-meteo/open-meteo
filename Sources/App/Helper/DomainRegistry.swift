@@ -31,6 +31,8 @@ enum DomainRegistry: String, CaseIterable {
     
     case ncep_gfs013
     case ncep_gfs025
+    case ncep_gfswave025
+    case ncep_gefswave025
     case ncep_gefs025
     case ncep_gefs025_probability
     case ncep_gefs05
@@ -241,6 +243,10 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble
+        case .ncep_gfswave025:
+            return GfsDomain.gfswave025
+        case .ncep_gefswave025:
+            return GfsDomain.gfswave025_ens
         }
     }
 }
