@@ -85,6 +85,10 @@ struct GaussianGrid: Gridable {
     
     var ny: Int { 1 }
     
+    var searchRadius: Int {
+        return 1
+    }
+    
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
         fatalError("fractional grid position not possible with Gaussian Grid")
     }

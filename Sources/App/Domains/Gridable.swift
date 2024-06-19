@@ -6,6 +6,9 @@ public protocol Gridable {
     var nx: Int { get }
     var ny: Int { get }
     
+    /// Typically `1` to seach in a `3x3` grid. Use `2` for `5x5`. E.g. MF Wave has large boarders around the coast
+    var searchRadius: Int { get }
+    
     func findPoint(lat: Float, lon: Float) -> Int?
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction?
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>>
@@ -135,8 +138,8 @@ extension Gridable {
         let x = center % nx
         let y = center / nx
         
-        let xrange = (x-1..<x+2).clamped(to: 0..<nx)
-        let yrange = (y-1..<y+2).clamped(to: 0..<ny)
+        let xrange = (x-searchRadius..<x+searchRadius+1).clamped(to: 0..<nx)
+        let yrange = (y-searchRadius..<y+searchRadius+1).clamped(to: 0..<ny)
         
         // TODO find a solution to reuse buffers inside read... maybe allocate buffers in a pool per eventloop?
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
@@ -173,8 +176,8 @@ extension Gridable {
         let x = center % nx
         let y = center / nx
         
-        let xrange = (x-1..<x+2).clamped(to: 0..<nx)
-        let yrange = (y-1..<y+2).clamped(to: 0..<ny)
+        let xrange = (x-searchRadius..<x+searchRadius+1).clamped(to: 0..<nx)
+        let yrange = (y-searchRadius..<y+searchRadius+1).clamped(to: 0..<ny)
         
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
         let elevationSurrounding = try elevationFile.read(dim0Slow: yrange, dim1: xrange)
