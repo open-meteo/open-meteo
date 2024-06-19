@@ -84,6 +84,9 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
             return .era5Ocean
         case .ecmwf_wam025:
             return .ecmwfWam025
+        case .ecmwf_wam025_ensemble:
+            // TODO register ensemble
+            return .ecmwfWam025
         case .meteofrance_wave:
             return .meteofranceWave
         case .meteofrance_currents:
