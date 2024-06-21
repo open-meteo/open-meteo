@@ -195,6 +195,16 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
                 return false
             }
         }
+        
+        if domain == .arome_france {
+            switch self {
+            case .shortwave_radiation:
+                return false
+            default:
+                return true
+            }
+        }
+        
         return true
     }
     
