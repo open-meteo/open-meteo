@@ -86,7 +86,9 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
     
     func availableFor(domain: MeteoFranceDomain, forecastSecond: Int) -> Bool {
         let forecastHour = forecastSecond / 3600
-        if domain == .arpege_europe && forecastHour % 3 != 0 && forecastHour > 48 {
+        
+        switch domain {
+        case .arpege_europe:
             switch self {
                 /// upper level variables after hour 48 only 3 hourly data
             case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
@@ -100,31 +102,62 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
                     return false
                 }
                 return true
+            case .shortwave_radiation:
+                // Note: 2024-06-21 MeteoFrance removed shortwave radiation
+                return false
             default:
                 return true
             }
-        }
-        
-        if domain == .arome_france_hd_15min {
+        case .arpege_world:
             switch self {
-            case .cape:
+            case .shortwave_radiation:
+                // Note: 2024-06-21 MeteoFrance removed shortwave radiation
+                return false
+            default:
+                return true
+            }
+        case .arome_france:
+            switch self {
+            case .shortwave_radiation:
+                // Note: 2024-06-21 MeteoFrance removed shortwave radiation
+                return false
+            default:
+                return true
+            }
+        case .arome_france_hd:
+            switch self {
+            case .temperature_2m:
+                return true
+            case .relative_humidity_2m:
+                return true
+            case .wind_v_component_10m:
+                return true
+            case .wind_u_component_10m:
+                return true
+            case .wind_v_component_20m:
+                return true
+            case .wind_u_component_20m:
+                return true
+            case .wind_v_component_50m:
+                return true
+            case .wind_u_component_50m:
+                return true
+            case .wind_v_component_100m:
+                return true
+            case .wind_u_component_100m:
                 return true
             case .precipitation:
                 return true
             case .snowfall_water_equivalent:
                 return true
-           //case .wind_gusts_10m:
-                //return true
-            case .relative_humidity_2m:
+            case .wind_gusts_10m:
                 return true
-            case .temperature_2m:
+            case .cape:
                 return true
             default:
                 return false
             }
-        }
-        
-        if domain == .arome_france_15min {
+        case .arome_france_15min:
             switch self {
             //case .temperature_2m:
             //    return true
@@ -159,53 +192,24 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             default:
                 return false
             }
-        }
-        
-        if domain == .arome_france_hd {
+        case .arome_france_hd_15min:
             switch self {
-            case .temperature_2m:
-                return true
-            case .relative_humidity_2m:
-                return true
-            case .wind_v_component_10m:
-                return true
-            case .wind_u_component_10m:
-                return true
-            case .wind_v_component_20m:
-                return true
-            case .wind_u_component_20m:
-                return true
-            case .wind_v_component_50m:
-                return true
-            case .wind_u_component_50m:
-                return true
-            case .wind_v_component_100m:
-                return true
-            case .wind_u_component_100m:
+            case .cape:
                 return true
             case .precipitation:
                 return true
             case .snowfall_water_equivalent:
                 return true
-            case .wind_gusts_10m:
+           //case .wind_gusts_10m:
+                //return true
+            case .relative_humidity_2m:
                 return true
-            case .cape:
+            case .temperature_2m:
                 return true
             default:
                 return false
             }
         }
-        
-        if domain == .arome_france {
-            switch self {
-            case .shortwave_radiation:
-                return false
-            default:
-                return true
-            }
-        }
-        
-        return true
     }
     
     func skipHour0(domain: MeteoFranceDomain) -> Bool {
