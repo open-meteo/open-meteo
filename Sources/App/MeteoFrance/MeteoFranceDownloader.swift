@@ -25,6 +25,9 @@ struct MeteoFranceDownload: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
     }
 
     var help: String {
@@ -61,6 +64,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let variablesAll = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
         
         let variables = variablesAll.filter({ $0.availableFor(domain: domain, forecastSecond: 0) })
+        
+        let nConcurrent = signature.concurrent ?? 1
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 
@@ -118,25 +123,24 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
         var handles = [GenericVariableHandle]()
         
         let previous = GribDeaverager()
+        let client = application.makeNewHttpClient(httpVersion: .http1Only)
         
-        let packages = ["IP1"]//"SP1", "SP2", "SP3", "HP1"]
-        let packageTimes = ["00H06H","07H12H","13H18H","19H24H","25H30H","31H36H","37H42H","43H48H","49H51H"]
+        let packages = ["SP1"]//"IP1","SP1", "SP2", "SP3", "HP1"]
+        
         //https://public-api.meteofrance.fr/previnum/DPPaquetAROME/v1/models/AROME/grids/0.025/packages/SP2/productARO?referencetime=2024-06-20T21%3A00%3A00Z&time=00H06H&format=grib2
         
-        for packageTime in packageTimes {
+        for packageTime in domain.mfApiPackageTimes {
             for package in packages {
-                let url = "https://public-api.meteofrance.fr/previnum/DPPaquetAROME/v1/models/AROME/grids/0.025/packages/\(package)/productARO?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
+                let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
                 
                 /// MeteoFrance servers close the HTTP connection unclean, resulting in `connection reset by peer` errors
                 /// Use a new HTTP client with new connections for every request
-                let client = application.makeNewHttpClient()
+                
                 let curl = Curl(logger: logger, client: client, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
                 let h = try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                     return stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
@@ -148,13 +152,14 @@ struct MeteoFranceDownload: AsyncCommand {
                               let parameterName = message.get(attribute: "parameterName"),
                               let parameterUnits = message.get(attribute: "parameterUnits"),
                               let validityTime = message.get(attribute: "validityTime"),
-                              let validityDate = message.get(attribute: "validityDate")
+                              let validityDate = message.get(attribute: "validityDate"),
+                              let paramId = message.get(attribute: "paramId")
                         else {
                             fatalError("could not get attributes")
                         }
                         let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                         guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
-                            logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)")
+                            logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
                             return nil
                         }
                         
@@ -184,9 +189,11 @@ struct MeteoFranceDownload: AsyncCommand {
                     }
                 }.collect().compactMap({$0})
                 handles.append(contentsOf: h)
+                
             }
         }
         //await curl.printStatistics()
+        try await client.shutdown()
         return handles
     }
     
@@ -291,7 +298,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
     
     func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
-        if [MeteoFranceDomain.arome_france].contains(domain) {
+        if [MeteoFranceDomain.arome_france, .arome_france_hd, .arpege_europe, .arpege_world].contains(domain) {
             return try await download3(application: application, domain: domain, run: run, variables: variables, concurrent: 4)
         }
         
