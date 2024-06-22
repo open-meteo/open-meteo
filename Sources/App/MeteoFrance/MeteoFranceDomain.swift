@@ -151,14 +151,29 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     
     var mfApiPackagesSurface: [String] {
         switch self {
-        case .arpege_europe:
-            return []
-        case .arpege_world:
-            return []
+        case .arpege_europe, .arpege_world:
+            return ["SP1", "SP2", "HP1"]
         case .arome_france:
             return ["SP1", "SP2", "SP3", "HP1"] // "IP1"
         case .arome_france_hd:
             return ["SP1", "SP2", "HP1"]
+        case .arome_france_15min:
+            return []
+        case .arome_france_hd_15min:
+            return []
+        }
+    }
+    
+    var mfApiPackagesPressure: [String] {
+        switch self {
+        case .arpege_europe:
+            return ["IP1"]
+        case .arpege_world:
+            return ["IP1"]
+        case .arome_france:
+            return ["IP1"]
+        case .arome_france_hd:
+            return []
         case .arome_france_15min:
             return []
         case .arome_france_hd_15min:
@@ -174,7 +189,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         var mfApiDDP: String {
             switch self {
             case .arpege:
-                return "ARPAGE"
+                return "ARPEGE"
             case .arome:
                 return "AROME"
             case .aromepi:

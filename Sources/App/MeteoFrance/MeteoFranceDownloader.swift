@@ -68,10 +68,15 @@ struct MeteoFranceDownload: AsyncCommand {
         let nConcurrent = signature.concurrent ?? 1
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        
+        let useGribPackagesDownload = signature.onlyVariables == nil && domain.mfApiPackagesSurface != []
                 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
-        let handles = try await download2(application: context.application, domain: domain, run: run, variables: variables)
-        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
+        let handles = useGribPackagesDownload ?
+            try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel) :
+            try await download2(application: context.application, domain: domain, run: run, variables: variables)
+        
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
@@ -113,7 +118,8 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
     }
     
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable], concurrent: Int) async throws -> [GenericVariableHandle] {
+    /// Download packages
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -123,14 +129,12 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
-        
         let previous = GribDeaverager()
         let client = application.makeNewHttpClient(httpVersion: .http1Only)
-        
-        let packages = ["SP1"]//"IP1","SP1", "SP2", "SP3", "HP1"]
+        let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
+        let curl = Curl(logger: logger, client: client, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
         //https://public-api.meteofrance.fr/previnum/DPPaquetAROME/v1/models/AROME/grids/0.025/packages/SP2/productARO?referencetime=2024-06-20T21%3A00%3A00Z&time=00H06H&format=grib2
         
@@ -138,12 +142,9 @@ struct MeteoFranceDownload: AsyncCommand {
             for package in packages {
                 let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
                 
-                /// MeteoFrance servers close the HTTP connection unclean, resulting in `connection reset by peer` errors
-                /// Use a new HTTP client with new connections for every request
-                
-                let curl = Curl(logger: logger, client: client, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
                 let h = try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
-                    return stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    // process sequentialy, as precipitation need to be in order for deaveraging
+                    return stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
                               let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType"),
@@ -163,8 +164,8 @@ struct MeteoFranceDownload: AsyncCommand {
                             return nil
                         }
                         
-                        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                         //message.dumpAttributes()
                         try grib2d.load(message: message)
                         if domain.isGlobal {
@@ -189,10 +190,9 @@ struct MeteoFranceDownload: AsyncCommand {
                     }
                 }.collect().compactMap({$0})
                 handles.append(contentsOf: h)
-                
             }
         }
-        //await curl.printStatistics()
+        await curl.printStatistics()
         try await client.shutdown()
         return handles
     }
@@ -297,11 +297,8 @@ struct MeteoFranceDownload: AsyncCommand {
         }
     }
     
+    /// Download one field at a time
     func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
-        if [MeteoFranceDomain.arome_france, .arome_france_hd, .arpege_europe, .arpege_world].contains(domain) {
-            return try await download3(application: application, domain: domain, run: run, variables: variables, concurrent: 4)
-        }
-        
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
