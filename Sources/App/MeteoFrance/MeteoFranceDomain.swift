@@ -154,7 +154,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_europe, .arpege_world:
             return ["SP1", "SP2", "HP1"]
         case .arome_france:
-            return ["SP1", "SP2", "SP3", "HP1"] // "IP1"
+            return ["SP1", "SP2", "SP3", "HP1"]
         case .arome_france_hd:
             return ["SP1", "SP2", "HP1"]
         case .arome_france_15min:

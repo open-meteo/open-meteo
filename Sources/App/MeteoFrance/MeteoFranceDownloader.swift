@@ -23,6 +23,9 @@ struct MeteoFranceDownload: AsyncCommand {
         @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
         var upperLevel: Bool
         
+        @Flag(name: "use-grib-packages", help: "If true, download GRIB packages (SP1, SP2, ...) instead of individual records")
+        var useGribPackages: Bool
+        
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
         
@@ -69,7 +72,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        let useGribPackagesDownload = signature.onlyVariables == nil && domain.mfApiPackagesSurface != []
+        let useGribPackagesDownload = signature.useGribPackages && domain.mfApiPackagesSurface != []
                 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = useGribPackagesDownload ?
@@ -118,7 +121,14 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
     }
     
-    /// Download packages
+    /**
+     Download GRIB packaegs SP1, SP2,....
+     Issues:
+     - MF does not publish 15minutely data via GRIB packages
+     - There is no GRIB inventory, so we have to download the entire GRIB file
+     - Arome HD has snowfall & rain, but no precipitation field. Need post processing to sum up rain+snow and emit precip field
+     - Arome HD has no wind gust field, but UV gust components -> need post process
+     */
     func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
@@ -132,9 +142,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
         let previous = GribDeaverager()
-        let client = application.makeNewHttpClient(httpVersion: .http1Only)
         let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
-        let curl = Curl(logger: logger, client: client, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
         //https://public-api.meteofrance.fr/previnum/DPPaquetAROME/v1/models/AROME/grids/0.025/packages/SP2/productARO?referencetime=2024-06-20T21%3A00%3A00Z&time=00H06H&format=grib2
         
@@ -144,7 +153,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 
                 let h = try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                     // process sequentialy, as precipitation need to be in order for deaveraging
-                    return stream.compactMap { message -> GenericVariableHandle? in
+                    return try await stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
                               let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType"),
@@ -160,7 +169,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
                         let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                         guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
-                            logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                            logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
                             return nil
                         }
                         
@@ -187,13 +196,12 @@ struct MeteoFranceDownload: AsyncCommand {
                         logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                         let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
-                    }
-                }.collect().compactMap({$0})
+                    }.collect()
+                }
                 handles.append(contentsOf: h)
             }
         }
         await curl.printStatistics()
-        try await client.shutdown()
         return handles
     }
     
