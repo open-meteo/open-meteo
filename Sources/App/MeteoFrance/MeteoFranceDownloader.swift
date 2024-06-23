@@ -230,6 +230,9 @@ struct MeteoFranceDownload: AsyncCommand {
             guard let level = Int(levelStr) else {
                 fatalError("Could not parse level str \(levelStr)")
             }
+            if level < 10 {
+                return nil
+            }
             switch shortName {
             case "t":
                 return MeteoFrancePressureVariable(variable: .temperature, level: level)
