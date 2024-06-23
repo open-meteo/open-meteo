@@ -26,6 +26,9 @@ struct MeteoFranceDownload: AsyncCommand {
         @Flag(name: "use-grib-packages", help: "If true, download GRIB packages (SP1, SP2, ...) instead of individual records")
         var useGribPackages: Bool
         
+        @Flag(name: "use-gov-server", help: "Use france gov server instead of meteofrance API")
+        var useGovServer: Bool
+        
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
         
@@ -76,7 +79,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = useGribPackagesDownload ?
-            try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel) :
+            try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer) :
             try await download2(application: context.application, domain: domain, run: run, variables: variables)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
@@ -129,7 +132,7 @@ struct MeteoFranceDownload: AsyncCommand {
      - Arome HD has snowfall & rain, but no precipitation field. Need post processing to sum up rain+snow and emit precip field
      - Arome HD has no wind gust field, but UV gust components -> need post process
      */
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool) async throws -> [GenericVariableHandle] {
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -146,12 +149,21 @@ struct MeteoFranceDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
         //https://public-api.meteofrance.fr/previnum/DPPaquetAROME/v1/models/AROME/grids/0.025/packages/SP2/productARO?referencetime=2024-06-20T21%3A00%3A00Z&time=00H06H&format=grib2
+        //https://object.data.gouv.fr/meteofrance-pnt/pnt/2024-06-23T03:00:00Z/arome/0025/SP1/arome__0025__SP1__00H06H__2024-06-23T03:00:00Z.grib2
+        //https://object.data.gouv.fr/meteofrance-pnt/pnt/2024-06-23T00:00:00Z/arpege/01/HP1/arpege__01__HP1__000H012H__2024-06-23T00:00:00Z.grib2
         
         for packageTime in domain.mfApiPackageTimes {
             for package in packages {
                 let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
                 
-                let h = try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+                let gridRes = domain.mfApiGridName.replacingOccurrences(of: ".", with: "")
+                let urlGov = "https://object.data.gouv.fr/meteofrance-pnt/pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
+                
+                // gov server misses those 2 timesteps for packages SP1,SP2,SP2,HP1... they really must be doing such non-sense on purpose https://object.data.gouv.fr/meteofrance-pnt/?list-type=2&delimiter=%2F&prefix=pnt%2F2024-06-23T00:00:00Z/arome/0025/SP1/
+                // Reported here: https://www.data.gouv.fr/fr/datasets/paquets-arome-resolution-0-01deg/#/discussions/662c255f53d52ec22bf5dcf6
+                let forceMfApi = domain == .arome_france && ["37H42H","43H48H"].contains(packageTime) && package != "IP1"
+                
+                let h = try await curl.withGribStream(url: (useGovServer && !forceMfApi) ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                     // process sequentialy, as precipitation need to be in order for deaveraging
                     return try await stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
