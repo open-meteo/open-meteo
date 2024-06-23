@@ -146,7 +146,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var mfApiPackageTimes: [String] {
         switch self {
         case .arpege_europe:
-            return ["000H012H", "013H024H", "025H036H", "025H036H", "049H060H", "061H072H", "073H084H", "085H096H", "097H102H"]
+            return ["000H012H", "013H024H", "025H036H", "037H048H", "049H060H", "061H072H", "073H084H", "085H096H", "097H102H"]
         case .arpege_world:
             return ["000H024H", "025H048H", "049H072H", "073H102H"]
         case .arome_france:

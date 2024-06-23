@@ -34,6 +34,9 @@ struct MeteoFranceDownload: AsyncCommand {
         
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
+        var maxForecastHour: Int?
     }
 
     var help: String {
@@ -79,7 +82,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = useGribPackagesDownload ?
-            try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer) :
+        try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour) :
             try await download2(application: context.application, domain: domain, run: run, variables: variables)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
@@ -132,7 +135,7 @@ struct MeteoFranceDownload: AsyncCommand {
      - Arome HD has snowfall & rain, but no precipitation field. Need post processing to sum up rain+snow and emit precip field
      - Arome HD has no wind gust field, but UV gust components -> need post process
      */
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool) async throws -> [GenericVariableHandle] {
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -153,6 +156,14 @@ struct MeteoFranceDownload: AsyncCommand {
         //https://object.data.gouv.fr/meteofrance-pnt/pnt/2024-06-23T00:00:00Z/arpege/01/HP1/arpege__01__HP1__000H012H__2024-06-23T00:00:00Z.grib2
         
         for packageTime in domain.mfApiPackageTimes {
+            if let maxForecastHour {
+                if let start = packageTime.split(separator: "H").first.map(String.init).map(Int.init) ?? nil {
+                    if start > maxForecastHour {
+                        continue
+                    }
+                }
+            }
+            
             for package in packages {
                 let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
                 
