@@ -144,7 +144,7 @@ struct MeteoFranceDownload: AsyncCommand {
         let grid = domain.grid
         let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
-        let previous = GribDeaverager()
+        var previous = GribDeaverager()
         let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
@@ -163,6 +163,8 @@ struct MeteoFranceDownload: AsyncCommand {
                 // Reported here: https://www.data.gouv.fr/fr/datasets/paquets-arome-resolution-0-01deg/#/discussions/662c255f53d52ec22bf5dcf6
                 let forceMfApi = domain == .arome_france && ["37H42H","43H48H"].contains(packageTime) && package != "IP1"
                 
+                /// In case the stream is restarted, keep the old version the deaverager
+                let previousScoped = await previous.copy()
                 let h = try await curl.withGribStream(url: (useGovServer && !forceMfApi) ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                     // process sequentialy, as precipitation need to be in order for deaveraging
                     return try await stream.compactMap { message -> GenericVariableHandle? in
@@ -201,7 +203,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
                         
                         // Deaccumulate precipitation
-                        guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        guard await previousScoped.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                             return nil
                         }
                         
@@ -210,6 +212,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
                     }.collect()
                 }
+                previous = previousScoped
                 handles.append(contentsOf: h)
             }
         }

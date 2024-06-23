@@ -182,7 +182,7 @@ actor VariablePerMemberStorage<V: Hashable> {
 
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {
-    var data = [String: (step: Int, data: [Float])]()
+    var data: [String: (step: Int, data: [Float])]
     
     /// Set new value and get previous value out
     func set(variable: GenericVariable, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
@@ -190,6 +190,15 @@ actor GribDeaverager {
         let previous = data[key]
         data[key] = (step, d)
         return previous
+    }
+    
+    /// Make a deep copy
+    func copy() -> GribDeaverager {
+        return .init(data: data)
+    }
+    
+    public init(data: [String : (step: Int, data: [Float])] = [String: (step: Int, data: [Float])]()) {
+        self.data = data
     }
     
     /// Returns false if step should be skipped
