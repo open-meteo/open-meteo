@@ -205,7 +205,7 @@ actor GribDeaverager {
     func deaccumulateIfRequired(variable: GenericVariable, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
         // Deaccumulate precipitation
         if stepType == "accum" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
                 return false
             }
             // Store data for next timestep
@@ -220,7 +220,7 @@ actor GribDeaverager {
         
         // Deaverage data
         if stepType == "avg" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
                 return false
             }
             // Store data for next timestep
