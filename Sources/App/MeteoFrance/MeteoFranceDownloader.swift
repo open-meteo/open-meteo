@@ -137,8 +137,8 @@ struct MeteoFranceDownload: AsyncCommand {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
         let logger = application.logger
-        let deadLineHours: Double = 5.5
-        Process.alarm(seconds: Int(deadLineHours+1) * 3600)
+        let deadLineHours = domain.timeoutHours
+        Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
@@ -323,7 +323,7 @@ struct MeteoFranceDownload: AsyncCommand {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
         let logger = application.logger
-        let deadLineHours: Double = 5.5
+        let deadLineHours = domain.timeoutHours
         Process.alarm(seconds: Int(deadLineHours+1) * 3600)
         defer { Process.alarm(seconds: 0) }
         
