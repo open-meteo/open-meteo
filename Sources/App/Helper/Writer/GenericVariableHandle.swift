@@ -182,7 +182,7 @@ actor VariablePerMemberStorage<V: Hashable> {
 
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {
-    var data = [String: (step: Int, data: [Float])]()
+    var data: [String: (step: Int, data: [Float])]
     
     /// Set new value and get previous value out
     func set(variable: GenericVariable, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
@@ -192,11 +192,20 @@ actor GribDeaverager {
         return previous
     }
     
+    /// Make a deep copy
+    func copy() -> GribDeaverager {
+        return .init(data: data)
+    }
+    
+    public init(data: [String : (step: Int, data: [Float])] = [String: (step: Int, data: [Float])]()) {
+        self.data = data
+    }
+    
     /// Returns false if step should be skipped
     func deaccumulateIfRequired(variable: GenericVariable, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
         // Deaccumulate precipitation
         if stepType == "accum" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
                 return false
             }
             // Store data for next timestep
@@ -211,7 +220,7 @@ actor GribDeaverager {
         
         // Deaverage data
         if stepType == "avg" {
-            guard let (startStep, currentStep) = stepRange.splitTo2Integer() else {
+            guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
                 return false
             }
             // Store data for next timestep

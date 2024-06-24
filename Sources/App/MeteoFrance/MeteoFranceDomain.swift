@@ -98,6 +98,17 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var timeoutHours: Double {
+        switch self {
+        case .arpege_europe, .arpege_world:
+            return 5.5
+        case .arome_france, .arome_france_hd:
+            return 2.5
+        case .arome_france_15min, .arome_france_hd_15min:
+            return 1.5
+        }
+    }
+    
     var mfApiName: String {
         switch self {
         case .arpege_europe:
@@ -115,10 +126,98 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var mfApiGridName: String {
+        switch self {
+        case .arpege_europe:
+            return "0.1"
+        case .arpege_world:
+            return "0.25"
+        case .arome_france:
+            return "0.025"
+        case .arome_france_hd:
+            return "0.01"
+        case .arome_france_15min:
+            return ""
+        case .arome_france_hd_15min:
+            return ""
+        }
+    }
+    
+    var mfApiPackageTimes: [String] {
+        switch self {
+        case .arpege_europe:
+            return ["000H012H", "013H024H", "025H036H", "037H048H", "049H060H", "061H072H", "073H084H", "085H096H", "097H102H"]
+        case .arpege_world:
+            return ["000H024H", "025H048H", "049H072H", "073H102H"]
+        case .arome_france:
+            return ["00H06H","07H12H","13H18H","19H24H","25H30H","31H36H","37H42H","43H48H","49H51H"]
+        case .arome_france_hd:
+            return (0...51).map{"\($0.zeroPadded(len: 2))H"}
+        case .arome_france_15min:
+            return []
+        case .arome_france_hd_15min:
+            return []
+        }
+    }
+    
+    var mfApiPackagesSurface: [String] {
+        switch self {
+        case .arpege_europe, .arpege_world:
+            return ["SP1", "SP2", "HP1"]
+        case .arome_france:
+            return ["SP1", "SP2", "SP3", "HP1"]
+        case .arome_france_hd:
+            return ["SP1", "SP2", "HP1"]
+        case .arome_france_15min:
+            return []
+        case .arome_france_hd_15min:
+            return []
+        }
+    }
+    
+    var mfApiPackagesPressure: [String] {
+        switch self {
+        case .arpege_europe:
+            return ["IP1"]
+        case .arpege_world:
+            return ["IP1"]
+        case .arome_france:
+            return ["IP1"]
+        case .arome_france_hd:
+            return []
+        case .arome_france_15min:
+            return []
+        case .arome_france_hd_15min:
+            return []
+        }
+    }
+    
     enum Family: String {
         case arpege
         case arome
         case aromepi
+        
+        var mfApiDDP: String {
+            switch self {
+            case .arpege:
+                return "ARPEGE"
+            case .arome:
+                return "AROME"
+            case .aromepi:
+                return ""
+            }
+        }
+        
+        var mfApiProductName: String {
+            switch self {
+            case .arpege:
+                return "productARP"
+            case .arome:
+                return "productARO"
+            case .aromepi:
+                return ""
+            }
+        }
     }
     
     var family: Family {
