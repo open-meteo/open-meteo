@@ -83,7 +83,7 @@ final class ArrayTests: XCTestCase {
         // this location is exactly at a point where sofac is diverging to 0 on the first step to interpolate
         let coords = IconDomains.icon.grid.getCoordinates(gridpoint: 1256 + 2879 * 1132)
         let grid = RegularGrid(nx: 1, ny: 1, latMin: coords.latitude, lonMin: coords.longitude, dx: 1, dy: 1)
-        let time = TimerangeDt(start: Timestamp(2022,08,16), nTime: data.count, dtSeconds: 3600)
+        var time = TimerangeDt(start: Timestamp(2022,08,16), nTime: data.count, dtSeconds: 3600)
         data.interpolateInplaceSolarBackwards(skipFirst: 1, time: time, grid: grid, locationRange: 0..<1)
         
         XCTAssertEqualArray(data[79..<181], [2.7751129, 12.565333, 29.92181, 68.30576, 131.8756, 208.47153, 294.43616, 375.1984, 409.64493, 379.91507, 308.65784, 221.19334, 128.86157, 52.262794, 9.649313, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.114281915, 0.58105505, 1.2083836, 2.049771, 3.058337, 3.6581643, 3.113253, 1.8148575, 0.87113553, 0.9296356, 1.2847356, 1.2012333, 0.62843615, 0.14723891, 0.0017813047, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.024401145, 0.0, 3.7263098, 48.388783, 136.54715, 215.34631, 230.58772, 197.1857, 151.3438, 107.45953, 63.816956, 32.818916, 16.335684, 7.1231337, 1.4328097, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.870412, 13.837922, 38.44829, 115.605644, 251.0613, 378.11237, 428.5317, 416.82214, 379.8396, 334.78162, 273.56696, 201.93892, 125.62505, 57.04836, 11.268686, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.6770487, 39.30699, 84.17851, 133.38658, 185.12206, 228.63828], accuracy: 0.001)
@@ -94,6 +94,11 @@ final class ArrayTests: XCTestCase {
         data.interpolateInplaceSolarBackwards(skipFirst: 1, time: time, grid: grid, locationRange: 0..<1)
         XCTAssertEqualArray(data[79..<181], [2.7751129, 12.565333, 29.92181, 68.30576, 131.8756, 208.47153, 294.43616, 375.1984, 409.64493, 379.91507, 308.65784, 221.19334, 128.86157, 52.262794, 9.649313, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.114281915, 0.58105505, 1.2083836, 2.049771, 3.058337, 3.6581643, 3.113253, 1.8148575, 0.87113553, 0.9296356, 1.2847356, 1.2012333, 0.62843615, 0.14723891, 0.0017813047, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.024401145, 0.0, 3.7263098, 48.388783, 136.54715, 215.34631, 230.58772, 197.1857, 151.3438, 107.45953, 63.816956, 32.818916, 16.335684, 7.1231337, 1.4328097, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 12.024332, 67.70339, 140.62544, 208.97667, 268.2166, 314.4697, 346.27148, 361.9829, 358.3321, 333.28455, 287.1204, 223.18909, 147.80145, 71.60986, 14.433392, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.8246827, 46.422653, 97.88847, 146.12347, 187.83421, 220.17207], accuracy: 0.001)
         
+        /// Immediately 3 hourly data. Note: the left-most values only rely on the clearness index of the first point
+        data = [.nan, .nan, .nan, 320.9375, .nan, .nan, 246.95312, .nan, .nan, 2.578125, .nan, .nan, 0.0, .nan, .nan, 0.0]
+        time = TimerangeDt(start: Timestamp(2022,08,16,12), nTime: data.count, dtSeconds: 3600)
+        data.interpolateInplaceSolarBackwards(skipFirst: 1, time: time, grid: grid, locationRange: 0..<1)
+        XCTAssertEqualArray(data, [.nan, 316.6924, 327.28204, 319.8192, 304.3659, 271.0651, 201.56267, 101.99449, 25.591284, 0.6671406, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
     }
     
     func testRangeFraction() {

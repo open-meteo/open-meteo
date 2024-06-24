@@ -297,8 +297,8 @@ extension Array where Element == Float {
 
                 /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
                 var ktC = solC <= 0.005 ? .nan : Swift.min(C / solC, 1100)
-                /// Clearness index at point B, or use `ktC` for low radiation levels
-                var ktB = solB <= 0.005 ? ktC : Swift.min(B / solB, 1100)
+                /// Clearness index at point B, or use `ktC` for low radiation levels. B could be NaN if data is immediately missing in the bedinning of a time-series
+                var ktB = solB <= 0.005 || B.isNaN ? ktC : Swift.min(B / solB, 1100)
                 if ktC.isNaN && ktB > 0 {
                     ktC = ktB
                 }
@@ -311,7 +311,8 @@ extension Array where Element == Float {
                     let posA = posB - width
                     /// Solar factor for point A is already deaveraged unlike point C and D
                     let solA = solar2d[sPos, posA - sLow]
-                    ktA = solA <= 0.005 ? ktB : Swift.min(self[l * nTime + posA] / solA, 1100)
+                    let A = self[l * nTime + posA]
+                    ktA = solA <= 0.005 || A.isNaN ? ktB : Swift.min(A / solA, 1100)
                 }
 
                 if ktC.isNaN && ktA > 0 {
