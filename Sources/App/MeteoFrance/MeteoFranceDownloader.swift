@@ -172,7 +172,8 @@ struct MeteoFranceDownload: AsyncCommand {
                 
                 // gov server misses those 2 timesteps for packages SP1,SP2,SP2,HP1... they really must be doing such non-sense on purpose https://object.data.gouv.fr/meteofrance-pnt/?list-type=2&delimiter=%2F&prefix=pnt%2F2024-06-23T00:00:00Z/arome/0025/SP1/
                 // Reported here: https://www.data.gouv.fr/fr/datasets/paquets-arome-resolution-0-01deg/#/discussions/662c255f53d52ec22bf5dcf6
-                let forceMfApi = domain == .arome_france && ["37H42H","43H48H"].contains(packageTime) && package != "IP1"
+                // Arpege 0.1° SP2 packages are "sometimes" missing
+                let forceMfApi = (domain == .arome_france && ["37H42H","43H48H"].contains(packageTime) && package != "IP1") || (domain == .arpege_europe && package == "SP2")
                 
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
