@@ -93,6 +93,8 @@ enum DomainRegistry: String, CaseIterable {
     case arpae_cosmo_2i_ruc
     case arpae_cosmo_5m
     
+    case knmi_harmonie_arome_europe
+    
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
@@ -247,6 +249,8 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.gfswave025
         case .ncep_gefswave025:
             return GfsDomain.gfswave025_ens
+        case .knmi_harmonie_arome_europe:
+            return KnmiDomain.harmonie_arome_europe
         }
     }
 }

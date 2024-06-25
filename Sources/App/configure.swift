@@ -91,6 +91,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadDemCommand(), as: "download-dem")
     app.asyncCommands.use(DownloadCamsCommand(), as: "download-cams")
     app.asyncCommands.use(MeteoFranceDownload(), as: "download-meteofrance")
+    app.asyncCommands.use(KnmiDownload(), as: "download-knmi")
     app.asyncCommands.use(DownloadArpaeCommand(), as: "download-arpae")
     app.asyncCommands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")
