@@ -146,6 +146,13 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
     }
     
     func get(raw: MeteoFranceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        if case let .surface(variable) = raw, variable == .shortwave_radiation {
+            // Note: Shortwave radiation was wrongly converted from Joules to Watt. Correct the value here.
+            // Exact error is 125/162 = 0.771
+            let ssrd = try reader.get(variable: raw, time: time)
+            return DataAndUnit(ssrd.data.map{$0 / (3600/10_000_000) * (1/3600)}, ssrd.unit)
+        }
+        
         return try reader.get(variable: raw, time: time)
     }
     
