@@ -586,6 +586,10 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .gfs025
         case .gfs013:
             return .gfs013
+        case .harmonie_arome_europe:
+            fatalError()
+        case .harmonie_arome_netherlands:
+            fatalError()
         }
     }
 }

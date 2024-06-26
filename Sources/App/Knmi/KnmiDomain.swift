@@ -1,5 +1,9 @@
 import Foundation
 
+/**
+ https://english.knmidata.nl/latest/newsletters/open-data-newsletter/2024/open-data-march-2024
+ 
+ */
 enum KnmiDomain: String, GenericDomain, CaseIterable {
     case harmonie_arome_europe
     case harmonie_arome_netherlands
@@ -16,10 +20,10 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
             )
         case .harmonie_arome_netherlands:
             return ProjectionGrid(
-                nx: 676,
-                ny: 564,
-                latitude: 39.740627...62.619324,
-                longitude: -25.162262...38.75702,
+                nx: 390,
+                ny: 390,
+                latitude: 49.0...56.002,
+                longitude: 0.0...11.281006,
                 projection: RotatedLatLonProjection(latitude: -35, longitude: -8)
             )
         }
