@@ -184,7 +184,7 @@ struct KnmiDownload: AsyncCommand {
                 case "Pa":
                     grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0) // to hPa
                 case "J m**-2":
-                    grib2d.array.data.multiplyAdd(multiply: 3600/10_000_000, add: 0) // to W/m2
+                    grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0) // to W/m2
                 default:
                     break
                 }
