@@ -32,7 +32,7 @@ struct KnmiDownload: AsyncCommand {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
-        let nConcurrent = signature.concurrent ?? 1
+        let nConcurrent = signature.concurrent ?? System.coreCount
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 
@@ -75,6 +75,7 @@ struct KnmiDownload: AsyncCommand {
     /**
      TODO:
      - model elevation and land/sea mask
+     - support ensemble models
      */
     func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
@@ -160,26 +161,15 @@ struct KnmiDownload: AsyncCommand {
                 if domain == .harmonie_arome_netherlands && typeOfLevel == "isobaricInhPa" {
                     return nil // NL nest has 100,200,300 hPa levels.... not sure what the point is with those levels
                 }
-                
                 if stepType == "accum" && timestamp == run {
                     return nil // skip precipitation at timestep 0
                 }
                 
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
-                //message.dumpAttributes()
                 try grib2d.load(message: message)
-                /*if domain.isGlobal {
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
-                } else {
-                    grib2d.array.flipLatitude()
-                }*/
                 
                 //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
-                
-                // keep lsm and gph/z surface
-                
-
                 
                 switch unit {
                 case "K":

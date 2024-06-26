@@ -42,9 +42,14 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .rain, .snowfall_water_equivalent: return true
+        case .wind_u_component_10m, .wind_v_component_10m: return true
+        case .wind_u_component_100m, .wind_v_component_100m: return true
+        case .wind_u_component_200m, .wind_v_component_200m: return true
+        case .wind_u_component_300m, .wind_v_component_300m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation: return true
+        case .wind_gusts_10m: return true
         default: return false
         }
     }

@@ -60,21 +60,13 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// Last forecast hour per run
-    func forecastHours(run: Int) -> Int {
-        switch self {
-        case .harmonie_arome_europe, .harmonie_arome_netherlands:
-            return (run % 12 == 6) ? 120 : 240
-        }
-    }
-    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
         case .harmonie_arome_europe, .harmonie_arome_netherlands:
-            // Delay of 4:20 hours after initialisation with 4 runs a day
-            return t.with(hour: ((t.hour - 4 + 24) % 24) / 6 * 6)
+            // Delay of 2:30 hours after initialisation, updates every hour. Cronjob every x:35
+            return t.add(hours: -2).floor(toNearestHour: 1)
         }
     }
 }
