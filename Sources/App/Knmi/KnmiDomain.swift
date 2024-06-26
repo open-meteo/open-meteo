@@ -49,8 +49,8 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
     }
     
     var omFileLength: Int {
-        // TODO check!
-        return 120
+        // 60 timesteps
+        return 90
     }
     
     var ensembleMembers: Int {
