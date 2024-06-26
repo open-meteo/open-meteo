@@ -43,7 +43,8 @@ struct KnmiDownload: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            //try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
+            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
 
@@ -72,7 +73,8 @@ struct KnmiDownload: AsyncCommand {
     }
     
     /**
-
+     TODO:
+     - model elevation and land/sea mask
      */
     func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
@@ -154,7 +156,10 @@ struct KnmiDownload: AsyncCommand {
                     logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                     return nil
                 }
-                logger.info("GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
+                
+                if domain == .harmonie_arome_netherlands && typeOfLevel == "isobaricInhPa" {
+                    return nil // NL nest has 100,200,300 hPa levels.... not sure what the point is with those levels
+                }
                 
                 if stepType == "accum" && timestamp == run {
                     return nil // skip precipitation at timestep 0
@@ -168,11 +173,6 @@ struct KnmiDownload: AsyncCommand {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                 } else {
                     grib2d.array.flipLatitude()
-                }*/
-                
-                // Scaling before compression with scalefactor
-                /*if let fma = variable.multiplyAdd {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }*/
                 
                 //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
@@ -207,7 +207,7 @@ struct KnmiDownload: AsyncCommand {
             }.collect().compactMap({$0})
             
             let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-            let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: IconSurfaceVariable.wind_gusts_10m, writer: writer)
+            let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, writer: writer)
             
             return h + gustHandles
         }
@@ -225,15 +225,15 @@ struct KnmiDownload: AsyncCommand {
             }
             switch shortName {
             case "t":
-                return MeteoFrancePressureVariable(variable: .temperature, level: level)
+                return KnmiPressureVariable(variable: .temperature, level: level)
             case "u":
-                return MeteoFrancePressureVariable(variable: .wind_u_component, level: level)
+                return KnmiPressureVariable(variable: .wind_u_component, level: level)
             case "v":
-                return MeteoFrancePressureVariable(variable: .wind_v_component, level: level)
+                return KnmiPressureVariable(variable: .wind_v_component, level: level)
             case "r":
-                return MeteoFrancePressureVariable(variable: .relative_humidity, level: level)
+                return KnmiPressureVariable(variable: .relative_humidity, level: level)
             case "z":
-                return MeteoFrancePressureVariable(variable: .geopotential_height, level: level)
+                return KnmiPressureVariable(variable: .geopotential_height, level: level)
             default:
                 break
             }
@@ -245,47 +245,51 @@ struct KnmiDownload: AsyncCommand {
         case ("t", "heightAboveGround", "0"):
             return GfsSurfaceVariable.surface_temperature
         case ("t", "heightAboveGround", "2"):
-            return MeteoFranceSurfaceVariable.temperature_2m
+            return KnmiSurfaceVariable.temperature_2m
         case ("u", "heightAboveGround", "10"):
-            return MeteoFranceSurfaceVariable.wind_u_component_10m
+            return KnmiSurfaceVariable.wind_u_component_10m
         case ("v", "heightAboveGround", "10"):
-            return MeteoFranceSurfaceVariable.wind_v_component_10m
+            return KnmiSurfaceVariable.wind_v_component_10m
         case ("r", "heightAboveGround", "2"):
-            return MeteoFranceSurfaceVariable.relative_humidity_2m
+            return KnmiSurfaceVariable.relative_humidity_2m
         case ("pres", "heightAboveSea", "0"):
-            return MeteoFranceSurfaceVariable.pressure_msl
-            
-            
-        case ("t", "heightAboveGround", "20"):
-            return MeteoFranceSurfaceVariable.temperature_20m
+            return KnmiSurfaceVariable.pressure_msl
         case ("t", "heightAboveGround", "50"):
-            return MeteoFranceSurfaceVariable.temperature_50m
+            return KnmiSurfaceVariable.temperature_50m
         case ("t", "heightAboveGround", "100"):
-            return MeteoFranceSurfaceVariable.temperature_100m
-        case ("t", "heightAboveGround", "150"):
-            return MeteoFranceSurfaceVariable.temperature_150m
+            return KnmiSurfaceVariable.temperature_100m
         case ("t", "heightAboveGround", "200"):
-            return MeteoFranceSurfaceVariable.temperature_200m
-        case ("u", "heightAboveGround", "20"):
-            return MeteoFranceSurfaceVariable.wind_u_component_20m
+            return KnmiSurfaceVariable.temperature_200m
+        case ("t", "heightAboveGround", "300"):
+            return KnmiSurfaceVariable.temperature_300m
         case ("u", "heightAboveGround", "50"):
-            return MeteoFranceSurfaceVariable.wind_u_component_50m
-        case ("100u", "heightAboveGround", "100"):
-            return MeteoFranceSurfaceVariable.wind_u_component_100m
-        case ("u", "heightAboveGround", "150"):
-            return MeteoFranceSurfaceVariable.wind_u_component_150m
-        case ("200u", "heightAboveGround", "200"):
-            return MeteoFranceSurfaceVariable.wind_u_component_200m
-        case ("v", "heightAboveGround", "20"):
-            return MeteoFranceSurfaceVariable.wind_v_component_20m
+            return KnmiSurfaceVariable.wind_u_component_50m
+        case ("u", "heightAboveGround", "100"):
+            return KnmiSurfaceVariable.wind_u_component_100m
+        case ("u", "heightAboveGround", "200"):
+            return KnmiSurfaceVariable.wind_u_component_200m
+        case ("u", "heightAboveGround", "300"):
+            return KnmiSurfaceVariable.wind_u_component_300m
         case ("v", "heightAboveGround", "50"):
-            return MeteoFranceSurfaceVariable.wind_v_component_50m
-        case ("100v", "heightAboveGround", "100"):
-            return MeteoFranceSurfaceVariable.wind_v_component_100m
-        case ("v", "heightAboveGround", "150"):
-            return MeteoFranceSurfaceVariable.wind_v_component_150m
-        case ("200v", "heightAboveGround", "200"):
-            return MeteoFranceSurfaceVariable.wind_v_component_200m
+            return KnmiSurfaceVariable.wind_v_component_50m
+        case ("v", "heightAboveGround", "100"):
+            return KnmiSurfaceVariable.wind_v_component_100m
+        case ("v", "heightAboveGround", "200"):
+            return KnmiSurfaceVariable.wind_v_component_200m
+        case ("v", "heightAboveGround", "300"):
+            return KnmiSurfaceVariable.wind_v_component_200m
+            
+        case ("t", "heightAboveGround", "50"):
+            return KnmiSurfaceVariable.temperature_50m
+        case ("t", "heightAboveGround", "100"):
+            return KnmiSurfaceVariable.temperature_100m
+        case ("t", "heightAboveGround", "200"):
+            return KnmiSurfaceVariable.temperature_200m
+        case ("t", "heightAboveGround", "300"):
+            return KnmiSurfaceVariable.temperature_200m
+            
+        case ("sdwe", "heightAboveGround", "0"):
+            return KnmiSurfaceVariable.snow_depth_water_equivalent
             
         default:
             break
@@ -293,42 +297,29 @@ struct KnmiDownload: AsyncCommand {
         
         switch (shortName, levelStr) {
         case ("rain", "0"):
-            return IconSurfaceVariable.rain
+            return KnmiSurfaceVariable.rain
         case ("snow", "0"):
-            return IconSurfaceVariable.snowfall_water_equivalent
-            
+            return KnmiSurfaceVariable.snowfall_water_equivalent
         case ("2t", "2"):
-            return MeteoFranceSurfaceVariable.temperature_2m
+            return KnmiSurfaceVariable.temperature_2m
         case ("2r", "2"):
-            return MeteoFranceSurfaceVariable.relative_humidity_2m
-        case ("tp", "0"):
-            return MeteoFranceSurfaceVariable.precipitation
+            return KnmiSurfaceVariable.relative_humidity_2m
         case ("prmsl", "0"):
-              return MeteoFranceSurfaceVariable.pressure_msl
-        case ("10v", "10"):
-              return MeteoFranceSurfaceVariable.wind_v_component_10m
-        case ("10u", "10"):
-              return MeteoFranceSurfaceVariable.wind_u_component_10m
+              return KnmiSurfaceVariable.pressure_msl
         case ("clct", "0"):
-              return MeteoFranceSurfaceVariable.cloud_cover
-        case ("snow_gsp", "0"):
-              return MeteoFranceSurfaceVariable.snowfall_water_equivalent
-        case ("10fg", "10"):
-            return MeteoFranceSurfaceVariable.wind_gusts_10m
+              return KnmiSurfaceVariable.cloud_cover
         case ("grad", "0"):
-            return MeteoFranceSurfaceVariable.shortwave_radiation
+            return KnmiSurfaceVariable.shortwave_radiation
         case ("tcc", "0"):
-            return MeteoFranceSurfaceVariable.cloud_cover
+            return KnmiSurfaceVariable.cloud_cover
         case ("lcc", "0"):
-            return MeteoFranceSurfaceVariable.cloud_cover_low
+            return KnmiSurfaceVariable.cloud_cover_low
         case ("mcc", "0"):
-            return MeteoFranceSurfaceVariable.cloud_cover_mid
+            return KnmiSurfaceVariable.cloud_cover_mid
         case ("hcc", "0"):
-            return MeteoFranceSurfaceVariable.cloud_cover_high
-        case ("CAPE_INS", "0"):
-            return MeteoFranceSurfaceVariable.cape
+            return KnmiSurfaceVariable.cloud_cover_high
         case ("tsnowp", "0"):
-            return MeteoFranceSurfaceVariable.snowfall_water_equivalent
+            return KnmiSurfaceVariable.snowfall_water_equivalent
         default: return nil
         }
     }
