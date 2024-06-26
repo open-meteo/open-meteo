@@ -28,7 +28,9 @@ extension GribMessage {
         for atr in self.iterate(namespace: .geography) {
             print(atr)
         }
-        //print(get(attribute: "projString")!)
+        /*if let proj = get(attribute: "projString") {
+            print("Projection string: \(proj)")
+        }*/
         
         var coords = [Coords]()
         //var lat = 0.0

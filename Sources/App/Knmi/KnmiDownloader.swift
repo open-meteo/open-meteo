@@ -82,6 +82,7 @@ struct KnmiDownload: AsyncCommand {
                       let parameterUnits = message.get(attribute: "parameterUnits"),
                       let validityTime = message.get(attribute: "validityTime"),
                       let validityDate = message.get(attribute: "validityDate"),
+                      let unit = message.get(attribute: "units"),
                       let paramId = message.getLong(attribute: "paramId")
                       //let parameterCategory = message.getLong(attribute: "parameterCategory"),
                       //let parameterNumber = message.getLong(attribute: "parameterNumber")
@@ -91,9 +92,10 @@ struct KnmiDownload: AsyncCommand {
                 }
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
-                    logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                    logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit)")
                     return nil
                 }
+                logger.info("GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit)")
                 
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
@@ -106,8 +108,35 @@ struct KnmiDownload: AsyncCommand {
                 }*/
                 
                 // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd {
+                /*if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }*/
+                
+                //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
+                
+                // keep lsm and gph/z surface
+                
+                // keep gust U/V in memory ugst/vgst
+                
+                // unset rain at step0... there is instant and accum
+                
+                if stepType == "accum" && timestamp == run {
+                    return nil // skip precipitation at timestep 0
+                }
+                
+                switch unit {
+                case "K":
+                    grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
+                case "m**2 s**-2": // gph to metre
+                    grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
+                case "(0-1)":
+                    grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
+                case "Pa":
+                    grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0) // to hPa
+                case "J m**-2":
+                    grib2d.array.data.multiplyAdd(multiply: 3600/10_000_000, add: 0) // to W/m2
+                default:
+                    break
                 }
                 
                 // Deaccumulate precipitation
@@ -124,7 +153,7 @@ struct KnmiDownload: AsyncCommand {
         return handles
     }
     
-    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> MeteoFranceVariableDownloadable? {
+    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
         
         switch (parameterName, levelStr) {
         case ("Total cloud cover", "0"):
@@ -157,6 +186,22 @@ struct KnmiDownload: AsyncCommand {
         }
         
         switch (shortName, typeOfLevel, levelStr) {
+        case ("vis", "heightAboveGround", "0"):
+            return GfsSurfaceVariable.visibility
+        case ("t", "heightAboveGround", "0"):
+            return GfsSurfaceVariable.surface_temperature
+        case ("t", "heightAboveGround", "2"):
+            return MeteoFranceSurfaceVariable.temperature_2m
+        case ("u", "heightAboveGround", "10"):
+            return MeteoFranceSurfaceVariable.wind_u_component_10m
+        case ("v", "heightAboveGround", "10"):
+            return MeteoFranceSurfaceVariable.wind_v_component_10m
+        case ("r", "heightAboveGround", "2"):
+            return MeteoFranceSurfaceVariable.relative_humidity_2m
+        case ("pres", "heightAboveGround", "0"):
+            return MeteoFranceSurfaceVariable.pressure_msl
+            
+            
         case ("t", "heightAboveGround", "20"):
             return MeteoFranceSurfaceVariable.temperature_20m
         case ("t", "heightAboveGround", "50"):
@@ -193,6 +238,11 @@ struct KnmiDownload: AsyncCommand {
         }
         
         switch (shortName, levelStr) {
+        case ("rain", "0"):
+            return IconSurfaceVariable.rain
+        case ("snow", "0"):
+            return IconSurfaceVariable.snowfall_water_equivalent
+            
         case ("2t", "2"):
             return MeteoFranceSurfaceVariable.temperature_2m
         case ("2r", "2"):
@@ -211,8 +261,10 @@ struct KnmiDownload: AsyncCommand {
               return MeteoFranceSurfaceVariable.snowfall_water_equivalent
         case ("10fg", "10"):
             return MeteoFranceSurfaceVariable.wind_gusts_10m
-        case ("ssrd", "0"):
+        case ("grad", "0"):
             return MeteoFranceSurfaceVariable.shortwave_radiation
+        case ("tcc", "0"):
+            return MeteoFranceSurfaceVariable.cloud_cover
         case ("lcc", "0"):
             return MeteoFranceSurfaceVariable.cloud_cover_low
         case ("mcc", "0"):

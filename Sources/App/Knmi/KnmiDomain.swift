@@ -6,7 +6,13 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
     var grid: Gridable {
         switch self {
         case .harmonie_arome_europe:
-            return RegularGrid(nx: 676, ny: 564, latMin: -89.9375, lonMin: -180, dx: 0.125, dy: 0.125)
+            return ProjectionGrid(
+                nx: 676,
+                ny: 564,
+                latitude: 39.740627...62.619324,
+                longitude: -25.162262...38.75702,
+                projection: RotatedLatLonProjection(latitude: -35, longitude: -8)
+            )
         }
     }
     
