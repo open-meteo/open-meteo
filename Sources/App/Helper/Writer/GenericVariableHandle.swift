@@ -159,6 +159,15 @@ actor VariablePerMemberStorage<V: Hashable> {
         func with(variable: V, timestamp: Timestamp? = nil) -> VariableAndMember {
             .init(variable: variable, timestamp: timestamp ?? self.timestamp, member: self.member)
         }
+        
+        var timestampAndMember: TimestampAndMember {
+            return .init(timestamp: timestamp, member: member)
+        }
+    }
+    
+    struct TimestampAndMember: Equatable {
+        let timestamp: Timestamp
+        let member: Int
     }
     
     var data = [VariableAndMember: Array2D]()
@@ -179,6 +188,31 @@ actor VariablePerMemberStorage<V: Hashable> {
         return data[variable]
     }
 }
+
+
+extension VariablePerMemberStorage {
+    // Calculate wind speed and return handles for all available members an timesteps
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+        return try self.data
+            .groupedPreservedOrder(by: {$0.key.timestampAndMember})
+            .compactMap({ (t, handles) -> GenericVariableHandle? in
+                guard let u = handles.first(where: {$0.key.variable == u}), let v = handles.first(where: {$0.key.variable == v})  else {
+                    return nil
+                }
+                let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
+                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outSpeedVariable.scalefactor, all: speed)
+                return GenericVariableHandle(
+                    variable: outSpeedVariable,
+                    time: t.timestamp,
+                    member: t.member,
+                    fn: fn,
+                    skipHour0: false
+                )
+            }
+        )
+    }
+}
+
 
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {

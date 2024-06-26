@@ -46,7 +46,23 @@ struct KnmiDownload: AsyncCommand {
             //try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
-    
+
+    /// Temporarily keep those varibles to derive others
+    enum KnmiVariableTemporary: String {
+        case ugst
+        case vgst
+        
+        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
+            switch (shortName, typeOfLevel, levelStr) {
+            case ("ugst", "heightAboveGround", "10"):
+                return .ugst
+            case ("vgst", "heightAboveGround", "10"):
+                return .vgst
+            default:
+                return nil
+            }
+        }
+    }
     
     /**
 
@@ -70,9 +86,10 @@ struct KnmiDownload: AsyncCommand {
         let handles = try await curl.withGribStream(url: url, bzip2Decode: false) { stream in
             
             let previous = GribDeaverager()
+            let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
             
             // process sequentialy, as precipitation need to be in order for deaveraging
-            return try await stream.compactMap { message -> GenericVariableHandle? in
+            let h = try await stream.compactMap { message -> GenericVariableHandle? in
                 guard let shortName = message.get(attribute: "shortName"),
                       let stepRange = message.get(attribute: "stepRange"),
                       let stepType = message.get(attribute: "stepType"),
@@ -91,6 +108,15 @@ struct KnmiDownload: AsyncCommand {
                     return nil
                 }
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                
+                
+                if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    try grib2d.load(message: message)
+                    await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                    return nil
+                }
+                
                 guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
                     logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit)")
                     return nil
@@ -115,10 +141,6 @@ struct KnmiDownload: AsyncCommand {
                 //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                 
                 // keep lsm and gph/z surface
-                
-                // keep gust U/V in memory ugst/vgst
-                
-                // unset rain at step0... there is instant and accum
                 
                 if stepType == "accum" && timestamp == run {
                     return nil // skip precipitation at timestep 0
@@ -148,20 +170,17 @@ struct KnmiDownload: AsyncCommand {
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
             }.collect()
+            
+            let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+            let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: IconSurfaceVariable.wind_gusts_10m, writer: writer)
+            
+            return h + gustHandles
         }
         await curl.printStatistics()
         return handles
     }
     
     func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
-        
-        switch (parameterName, levelStr) {
-        case ("Total cloud cover", "0"):
-            return MeteoFranceSurfaceVariable.cloud_cover
-        default:
-            break
-        }
-        
         if typeOfLevel == "isobaricInhPa" {
             guard let level = Int(levelStr) else {
                 fatalError("Could not parse level str \(levelStr)")
@@ -198,7 +217,7 @@ struct KnmiDownload: AsyncCommand {
             return MeteoFranceSurfaceVariable.wind_v_component_10m
         case ("r", "heightAboveGround", "2"):
             return MeteoFranceSurfaceVariable.relative_humidity_2m
-        case ("pres", "heightAboveGround", "0"):
+        case ("pres", "heightAboveSea", "0"):
             return MeteoFranceSurfaceVariable.pressure_msl
             
             
