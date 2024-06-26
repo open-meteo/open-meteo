@@ -76,6 +76,7 @@ struct KnmiDownload: AsyncCommand {
      TODO:
      - model elevation and land/sea mask
      - support ensemble models
+     - check if wind direction needs to be corrected for projection
      */
     func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
