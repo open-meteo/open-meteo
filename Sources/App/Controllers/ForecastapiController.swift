@@ -333,8 +333,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case arpae_cosmo_2i_ruc
     case arpae_cosmo_5m
     
-    case harmonie_arome_europe
-    case harmonie_arome_netherlands
+    case knmi_harmonie_arome_europe
+    case knmi_harmonie_arome_netherlands
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -483,10 +483,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try ArpaeReader(domain: .cosmo_2i_ruc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .arpae_cosmo_5m:
             return try ArpaeReader(domain: .cosmo_5m, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .harmonie_arome_europe:
-            return try GenericReader<KnmiDomain, IconVariable>(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
-        case .harmonie_arome_netherlands:
-            return try GenericReader<KnmiDomain, IconVariable>(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .knmi_harmonie_arome_europe:
+            return try GenericReader<KnmiDomain, KnmiVariable>(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .knmi_harmonie_arome_netherlands:
+            return try GenericReader<KnmiDomain, KnmiVariable>(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
     

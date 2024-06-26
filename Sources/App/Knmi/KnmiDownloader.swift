@@ -186,8 +186,10 @@ struct KnmiDownload: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                 case "m**2 s**-2": // gph to metre
                     grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
-                case "(0-1)":
-                    grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
+                case "(0 - 1)":
+                    if variable.unit == .percentage {
+                        grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
+                    }
                 case "Pa":
                     grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0) // to hPa
                 case "J m**-2":
