@@ -64,13 +64,20 @@ struct KnmiDownload: AsyncCommand {
         }
     }
     
+    struct MetaUrlResponse: Decodable {
+        let size: String
+        let temporaryDownloadUrl: String
+        let lastModified: String
+        let contentType: String
+    }
+    
     /**
 
      */
     func download(application: Application, domain: KnmiDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
-        /*guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
+        guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'KNMI_API_KEY'")
-        }*/
+        }
         let logger = application.logger
         let deadLineHours = Double(2)
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
@@ -81,10 +88,32 @@ struct KnmiDownload: AsyncCommand {
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
-
-        let url = "https://knmi-kdp-datasets-eu-west-1.s3.eu-west-1.amazonaws.com/harmonie_arome_cy43_p3/1.0/HARM43_V1_P3_2024062517.tar?response-content-disposition=attachment%3B%20filename%3D%22HARM43_V1_P3_2024062517.tar%22&x-user=smoke_test_developer_id&X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=ASIAZWFCFU66KK5PR5F5%2F20240625%2Feu-west-1%2Fs3%2Faws4_request&X-Amz-Date=20240625T202539Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host&X-Amz-Security-Token=IQoJb3JpZ2luX2VjEBsaCWV1LXdlc3QtMSJIMEYCIQDXXro6DnjRaivFGVTzVsquvcOHF4kVrnd83nf%2Feo3NzAIhANead1YAc0bUzyxMAcgBXdAT7eVVluxaL4Z%2B1vEhU8TeKqQDCMP%2F%2F%2F%2F%2F%2F%2F%2F%2F%2FwEQBBoMNjY2MDYwMDQwMTI0IgytL5AhX5%2BdmKFgn7Mq%2BAJ5H05vavWt2j9DSXNuAgBjmC8saqgfL5Ghq5GnlLod%2BO3opSs9xqSaZXek%2B%2BeY7m2FhyIPjaQUsMKDNM%2BdsJQdf9ILUlFN6xmzRbf%2F6Msh1Sl2nTe1iYD5YTkpEyby1sKpcn7tO4bDMQCnhi8I%2FvoklJ5egkUqEWUUpBKuwhHrPZ6n0dmy%2FBONyTqJJ6gb6WAAkLbMahxgD%2Btl8qOicu8Pwc8G6OxF7rvgamPiPBRU6k9cxqaizokr99YHWBUR9a%2FY0Bac%2BrL3TbxO4MsNCi76B1Iaz3oVEiEBl038fSWB6cPh7gWFGZbSuDdICDJo3v8xogbsa1%2BQgQhUrUbjVzJR0bUFMmqN%2BMch4jF62y8ZsmBotyYzT%2BS3GJ%2BZKgjc0lKuBhgl6Wj1pQa7%2B6fht8IuLPIZH9Kp0nn1ZIAq45R38P%2Fndo9G9arWTESrxO1yvUuufwkIj4nI2KtYYKvLIxNmJGjCv8RYEJWj6sxmh9hHsih8gY2cBgMHMNCU7LMGOpwBgK80AUQpHXjT%2B12ioD87yV0BkrCkz932LkiTacoKa7Jb9GsZw84UTxjGIAZ6XA4m7FE4cEmZ%2Fd1YGYkoOcgVGtK%2BkNCjcGdKrJnHJRPA2lY2LQiAjlkS%2FwO8Ur19SqmxIiXqQtjsdkofxFGqU9oae5byKszi9mZB5NLxHViXWm%2Bvq5nIlfRe77IFsCfmVpfRH%2BjUlQvwHkL15Z0G&X-Amz-Signature=fedae2f3361238d441fac97820996c24fc7797786985bc74ab00fb528cdc25e7"
         
-        let handles = try await curl.withGribStream(url: url, bzip2Decode: false) { stream in
+        // det EU surface: harmonie_arome_cy43_p3/versions/1.0/files/HARM43_V1_P3_2024062607.tar (2.8 GB surface, radiation, some pressure)
+        // det EU model:   harmonie_arome_cy43_p5/versions/1.0/files/HARM43_V1_P5_2024062607.tar (16.7 GB only hybrid levels)
+        // eps EU surface: harmonie_arome_cy43_p4a/versions/1.0/files/harm43_v1_P4a_2024062607.tar (5,3 GB, varying members???, surface, clouds
+        // eps EU renew:   harmonie_arome_cy43_p4b/versions/1.0/files/harm43_v1_P4b_2024062607.tar (2.8 GB, varying members???, 10, 100, 200, 300 wind, tcc + radiation)
+        // det NL surface: harmonie_arome_cy43_p1/versions/1.0/files/HARM43_V1_P1_2024062607.tar (900 MB, )
+        // eps NL surface: harmonie_arome_cy43_p2a/versions/1.0/files/harm43_v1_P2a_2024062607.tar
+        // eps NL renew:   harmonie_arome_cy43_p2b/versions/1.0/files/harm43_v1_P2b_2024062607.tar
+        // det DK avaiation:  uwcw_extra_lv_ha43_nl_2km/versions/1.0/files/*.nc
+        
+        let dataset: String
+        switch domain {
+        case .harmonie_arome_europe:
+            dataset = "harmonie_arome_cy43_p3/versions/1.0/files/HARM43_V1_P3"
+        case .harmonie_arome_netherlands:
+            dataset = "harmonie_arome_cy43_p1/versions/1.0/files/HARM43_V1_P1"
+        }
+        
+        let metaUrl = "https://api.dataplatform.knmi.nl/open-data/v1/datasets/\(dataset)_\(run.format_YYYYMMddHH).tar/url"
+        
+        
+        guard let metaData = try await curl.downloadInMemoryAsync(url: metaUrl, minSize: nil, headers: [("Authorization", "Bearer \(apikey.randomElement() ?? "")")]).readJSONDecodable(MetaUrlResponse.self) else {
+            fatalError("Could not decode meta response")
+        }
+        
+        let handles = try await curl.withGribStream(url: metaData.temporaryDownloadUrl, bzip2Decode: false) { stream in
             
             let previous = GribDeaverager()
             let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
@@ -108,6 +137,7 @@ struct KnmiDownload: AsyncCommand {
                     logger.warning("could not get attributes")
                     return nil
                 }
+                /// NOTE: KNMI does not ssem to set this field. Only way to decode member number would be file name which is not accessible while streaming
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 
