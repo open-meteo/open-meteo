@@ -36,7 +36,7 @@ struct KnmiDownload: AsyncCommand {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 
-        let handles = try await download(application: context.application, domain: domain, run: run)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
@@ -74,7 +74,7 @@ struct KnmiDownload: AsyncCommand {
     /**
 
      */
-    func download(application: Application, domain: KnmiDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'KNMI_API_KEY'")
         }
@@ -89,6 +89,7 @@ struct KnmiDownload: AsyncCommand {
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
+        // https://english.knmidata.nl/latest/newsletters/open-data-newsletter/2024/open-data-june-2024
         // det EU surface: harmonie_arome_cy43_p3/versions/1.0/files/HARM43_V1_P3_2024062607.tar (2.8 GB surface, radiation, some pressure)
         // det EU model:   harmonie_arome_cy43_p5/versions/1.0/files/HARM43_V1_P5_2024062607.tar (16.7 GB only hybrid levels)
         // eps EU surface: harmonie_arome_cy43_p4a/versions/1.0/files/harm43_v1_P4a_2024062607.tar (5,3 GB, varying members???, surface, clouds
@@ -119,7 +120,7 @@ struct KnmiDownload: AsyncCommand {
             let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
             
             // process sequentialy, as precipitation need to be in order for deaveraging
-            let h = try await stream.compactMap { message -> GenericVariableHandle? in
+            let h = try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                 guard let shortName = message.get(attribute: "shortName"),
                       let stepRange = message.get(attribute: "stepRange"),
                       let stepType = message.get(attribute: "stepType"),
@@ -155,6 +156,10 @@ struct KnmiDownload: AsyncCommand {
                 }
                 logger.info("GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                 
+                if stepType == "accum" && timestamp == run {
+                    return nil // skip precipitation at timestep 0
+                }
+                
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                 //message.dumpAttributes()
@@ -174,9 +179,7 @@ struct KnmiDownload: AsyncCommand {
                 
                 // keep lsm and gph/z surface
                 
-                if stepType == "accum" && timestamp == run {
-                    return nil // skip precipitation at timestep 0
-                }
+
                 
                 switch unit {
                 case "K":
@@ -201,7 +204,7 @@ struct KnmiDownload: AsyncCommand {
                 logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
-            }.collect()
+            }.collect().compactMap({$0})
             
             let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
             let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: IconSurfaceVariable.wind_gusts_10m, writer: writer)
