@@ -43,6 +43,13 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
         return 120
     }
     
+    var ensembleMembers: Int {
+        switch self {
+        case .harmonie_arome_europe:
+            return 1
+        }
+    }
+    
     /// Last forecast hour per run
     func forecastHours(run: Int) -> Int {
         switch self {

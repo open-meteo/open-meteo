@@ -77,7 +77,8 @@ struct KnmiDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
+        let nMembers = domain.ensembleMembers
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
 
@@ -107,21 +108,22 @@ struct KnmiDownload: AsyncCommand {
                     logger.warning("could not get attributes")
                     return nil
                 }
+                let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 
                 
                 if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                     var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                     try grib2d.load(message: message)
-                    await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                    await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
                     return nil
                 }
                 
                 guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
-                    logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit)")
+                    logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                     return nil
                 }
-                logger.info("GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit)")
+                logger.info("GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                 
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
@@ -168,7 +170,7 @@ struct KnmiDownload: AsyncCommand {
                 
                 logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
+                return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
             }.collect()
             
             let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
