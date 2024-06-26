@@ -32,6 +32,13 @@ extension GribMessage {
             print("Projection string: \(proj)")
         }*/
         
+        if let gridType = get(attribute: "gridType") {
+            // https://rdrr.io/github/nawendt/gribr/src/R/grib_proj4str.R
+            print("\(gridType)")
+            print("latitudeOfSouthernPoleInDegrees \(get(attribute: "latitudeOfSouthernPoleInDegrees") ?? "nil")")
+            print("longitudeOfSouthernPoleInDegrees \(get(attribute: "longitudeOfSouthernPoleInDegrees") ?? "nil")")
+        }
+        
         var coords = [Coords]()
         //var lat = 0.0
         for (i,(latitude, longitude,_)) in try iterateCoordinatesAndValues().enumerated() {

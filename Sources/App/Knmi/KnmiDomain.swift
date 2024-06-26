@@ -19,13 +19,7 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
                 projection: RotatedLatLonProjection(latitude: -35, longitude: -8)
             )
         case .harmonie_arome_netherlands:
-            return ProjectionGrid(
-                nx: 390,
-                ny: 390,
-                latitude: 49.0...56.002,
-                longitude: 0.0...11.281006,
-                projection: RotatedLatLonProjection(latitude: -35, longitude: -8)
-            )
+            return RegularGrid(nx: 390, ny: 390, latMin: 49, lonMin: 0, dx: 0.029, dy: 0.018)
         }
     }
     
