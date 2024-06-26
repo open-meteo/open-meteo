@@ -82,9 +82,12 @@ struct KnmiDownload: AsyncCommand {
                       let parameterUnits = message.get(attribute: "parameterUnits"),
                       let validityTime = message.get(attribute: "validityTime"),
                       let validityDate = message.get(attribute: "validityDate"),
-                      let paramId = message.get(attribute: "paramId")
+                      let paramId = message.getLong(attribute: "paramId")
+                      //let parameterCategory = message.getLong(attribute: "parameterCategory"),
+                      //let parameterNumber = message.getLong(attribute: "parameterNumber")
                 else {
-                    fatalError("could not get attributes")
+                    logger.warning("could not get attributes")
+                    return nil
                 }
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
