@@ -11,7 +11,7 @@ extension FileHandle {
         let fn = open(file, flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
         guard fn > 0 else {
             let error = String(cString: strerror(errno))
-            throw SwiftPFor2DError.cannotOpenFile(filename: file, errno: errno, error: error)
+            throw SwiftPFor2DError.cannotCreateFile(filename: file, errno: errno, error: error)
         }
         
         let handle = FileHandle(fileDescriptor: fn, closeOnDealloc: true)

@@ -289,6 +289,16 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .hrrr_conus_15min:
             fallthrough
         case .hrrr_conus:
+            /*
+             (key: "Nx", value: "1799")
+             (key: "Ny", value: "1059")
+             (key: "latitudeOfFirstGridPointInDegrees", value: "21.1381")
+             (key: "longitudeOfFirstGridPointInDegrees", value: "237.28")
+             (key: "LaDInDegrees", value: "38.5")
+             (key: "LoVInDegrees", value: "262.5") 262.5-360=-97.5
+             (key: "Latin1InDegrees", value: "38.5")
+             (key: "Latin2InDegrees", value: "38.5")
+             */
             let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
             return ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         }
