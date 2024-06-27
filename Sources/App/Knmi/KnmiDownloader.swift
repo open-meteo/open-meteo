@@ -270,16 +270,7 @@ struct KnmiDownload: AsyncCommand {
         case ("v", "heightAboveGround", "200"):
             return KnmiSurfaceVariable.wind_v_component_200m
         case ("v", "heightAboveGround", "300"):
-            return KnmiSurfaceVariable.wind_v_component_200m
-            
-        case ("t", "heightAboveGround", "50"):
-            return KnmiSurfaceVariable.temperature_50m
-        case ("t", "heightAboveGround", "100"):
-            return KnmiSurfaceVariable.temperature_100m
-        case ("t", "heightAboveGround", "200"):
-            return KnmiSurfaceVariable.temperature_200m
-        case ("t", "heightAboveGround", "300"):
-            return KnmiSurfaceVariable.temperature_200m
+            return KnmiSurfaceVariable.wind_v_component_300m
             
         case ("sdwe", "heightAboveGround", "0"):
             return KnmiSurfaceVariable.snow_depth_water_equivalent

@@ -188,6 +188,7 @@ struct DmiDownload: AsyncCommand {
                 previous = previousScoped
                 
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                // can be removed
                 let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: DmiSurfaceVariable.wind_gusts_10m, writer: writer)
                 
                 return h + gustHandles
@@ -222,57 +223,60 @@ struct DmiDownload: AsyncCommand {
             }
         }
         
+        /* missing:
+         - temp 150, 250
+         - wind 150, 250, 350, 450
+         - precip tp level=0 [surface] 0 accum
+         - freezing level height
+         - cape
+         - cin
+         - direct rad? " unknown level=0 [heightAboveGround] 0-1 accum 'Direct solar exposure' J m-2  id=0 unit=unknown member=0"
+         */
+        
         switch (shortName, typeOfLevel, levelStr) {
         case ("vis", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.visibility
+            return GfsSurfaceVariable.visibility // ok
         case ("t", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.surface_temperature
-        case ("t", "heightAboveGround", "2"):
-            return DmiSurfaceVariable.temperature_2m
-        case ("u", "heightAboveGround", "10"):
-            return DmiSurfaceVariable.wind_u_component_10m
-        case ("v", "heightAboveGround", "10"):
-            return DmiSurfaceVariable.wind_v_component_10m
-        case ("r", "heightAboveGround", "2"):
-            return DmiSurfaceVariable.relative_humidity_2m
+            return GfsSurfaceVariable.surface_temperature // ok
+        case ("2t", "heightAboveGround", "2"):
+            return DmiSurfaceVariable.temperature_2m // ok
+        case ("10fg", "heightAboveGround", "10"):
+            return DmiSurfaceVariable.wind_gusts_10m // ok
+        case ("10u", "heightAboveGround", "10"):
+            return DmiSurfaceVariable.wind_u_component_10m // ok
+        case ("10v", "heightAboveGround", "10"):
+            return DmiSurfaceVariable.wind_v_component_10m // ok
+        case ("2r", "heightAboveGround", "2"):
+            return DmiSurfaceVariable.relative_humidity_2m // ok
         case ("pres", "heightAboveSea", "0"):
-            return DmiSurfaceVariable.pressure_msl
+            return DmiSurfaceVariable.pressure_msl // ok
         case ("t", "heightAboveGround", "50"):
-            return DmiSurfaceVariable.temperature_50m
+            return DmiSurfaceVariable.temperature_50m // ok
         case ("t", "heightAboveGround", "100"):
-            return DmiSurfaceVariable.temperature_100m
+            return DmiSurfaceVariable.temperature_100m // ok
         case ("t", "heightAboveGround", "200"):
             return DmiSurfaceVariable.temperature_200m
         case ("t", "heightAboveGround", "300"):
             return DmiSurfaceVariable.temperature_300m
         case ("u", "heightAboveGround", "50"):
-            return DmiSurfaceVariable.wind_u_component_50m
-        case ("u", "heightAboveGround", "100"):
-            return DmiSurfaceVariable.wind_u_component_100m
+            return DmiSurfaceVariable.wind_u_component_50m // ok
+        case ("100u", "heightAboveGround", "100"):
+            return DmiSurfaceVariable.wind_u_component_100m // ok
         case ("u", "heightAboveGround", "200"):
             return DmiSurfaceVariable.wind_u_component_200m
         case ("u", "heightAboveGround", "300"):
             return DmiSurfaceVariable.wind_u_component_300m
         case ("v", "heightAboveGround", "50"):
-            return DmiSurfaceVariable.wind_v_component_50m
-        case ("v", "heightAboveGround", "100"):
-            return DmiSurfaceVariable.wind_v_component_100m
+            return DmiSurfaceVariable.wind_v_component_50m // ok
+        case ("100v", "heightAboveGround", "100"):
+            return DmiSurfaceVariable.wind_v_component_100m // ok
         case ("v", "heightAboveGround", "200"):
             return DmiSurfaceVariable.wind_v_component_200m
         case ("v", "heightAboveGround", "300"):
-            return DmiSurfaceVariable.wind_v_component_200m
+            return DmiSurfaceVariable.wind_v_component_300m
             
-        case ("t", "heightAboveGround", "50"):
-            return DmiSurfaceVariable.temperature_50m
-        case ("t", "heightAboveGround", "100"):
-            return DmiSurfaceVariable.temperature_100m
-        case ("t", "heightAboveGround", "200"):
-            return DmiSurfaceVariable.temperature_200m
-        case ("t", "heightAboveGround", "300"):
-            return DmiSurfaceVariable.temperature_200m
-            
-        case ("sdwe", "heightAboveGround", "0"):
-            return DmiSurfaceVariable.snow_depth_water_equivalent
+        case ("sd", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.snow_depth_water_equivalent // ok
             
         default:
             break
@@ -281,26 +285,18 @@ struct DmiDownload: AsyncCommand {
         switch (shortName, levelStr) {
         case ("rain", "0"):
             return DmiSurfaceVariable.rain
-        case ("snow", "0"):
-            return DmiSurfaceVariable.snowfall_water_equivalent
-        case ("2t", "2"):
-            return DmiSurfaceVariable.temperature_2m
-        case ("2r", "2"):
-            return DmiSurfaceVariable.relative_humidity_2m
-        case ("prmsl", "0"):
-              return DmiSurfaceVariable.pressure_msl
-        case ("clct", "0"):
-              return DmiSurfaceVariable.cloud_cover
+        case ("tsrwe", "0"):
+            return DmiSurfaceVariable.snowfall_water_equivalent // ok
         case ("grad", "0"):
-            return DmiSurfaceVariable.shortwave_radiation
-        case ("tcc", "0"), ("cc", "0"):
-            return DmiSurfaceVariable.cloud_cover
+            return DmiSurfaceVariable.shortwave_radiation // ok
+        case ("cc", "2"): // for some reason this is 2 in GRIB files
+            return DmiSurfaceVariable.cloud_cover // ok
         case ("lcc", "0"):
-            return DmiSurfaceVariable.cloud_cover_low
+            return DmiSurfaceVariable.cloud_cover_low // ok
         case ("mcc", "0"):
-            return DmiSurfaceVariable.cloud_cover_mid
+            return DmiSurfaceVariable.cloud_cover_mid // ok
         case ("hcc", "0"):
-            return DmiSurfaceVariable.cloud_cover_high
+            return DmiSurfaceVariable.cloud_cover_high // ok
         case ("tsnowp", "0"):
             return DmiSurfaceVariable.snowfall_water_equivalent
         default: return nil
