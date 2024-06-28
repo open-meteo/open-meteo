@@ -193,7 +193,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .weather_code, .weathercode:
                 try prefetchData(variable: .cloud_cover, time: time)
-                try prefetchData(variable: .rain, time: time)
+                try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(derived: .surface(.snowfall), time: time)
                 //try prefetchData(variable: .cape, time: time)
                 try prefetchData(variable: .wind_gusts_10m, time: time)
@@ -203,17 +203,17 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .wind_u_component_100m, time: time)
                 try prefetchData(variable: .wind_v_component_100m, time: time)
             case .windspeed_180m, .wind_speed_180m, .winddirection_180m, .wind_direction_180m, .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m:
-                try prefetchData(variable: .wind_u_component_200m, time: time)
-                try prefetchData(variable: .wind_v_component_200m, time: time)
+                try prefetchData(variable: .wind_u_component_150m, time: time)
+                try prefetchData(variable: .wind_v_component_150m, time: time)
             case .windspeed_300m, .wind_speed_300m, .winddirection_300m, .wind_direction_300m:
-                try prefetchData(variable: .wind_u_component_300m, time: time)
-                try prefetchData(variable: .wind_v_component_300m, time: time)
+                try prefetchData(variable: .wind_u_component_250m, time: time)
+                try prefetchData(variable: .wind_v_component_250m, time: time)
             case .temperature_80m:
                 try prefetchData(variable: .temperature_100m, time: time)
             case .temperature_120m:
                 try prefetchData(variable: .temperature_100m, time: time)
             case .temperature_180m:
-                try prefetchData(variable: .temperature_200m, time: time)
+                try prefetchData(variable: .temperature_150m, time: time)
             case .wet_bulb_temperature_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -230,10 +230,10 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .sunshine_duration:
                 try prefetchData(derived: .surface(.direct_radiation), time: time)
             case .precipitation:
-                try prefetchData(variable: .rain, time: time)
+                try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .showers:
-                try prefetchData(variable: .rain, time: time)
+                try prefetchData(variable: .precipitation, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -390,32 +390,32 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
             case .windspeed_180m, .wind_speed_180m:
-                let u = try get(raw: .wind_u_component_200m, time: time).data
-                let v = try get(raw: .wind_v_component_200m, time: time).data
+                let u = try get(raw: .wind_u_component_150m, time: time).data
+                let v = try get(raw: .wind_v_component_150m, time: time).data
                 let scalefactor = Meteorology.scaleWindFactor(from: 200, to: 180)
                 var speed = zip(u,v).map(Meteorology.windspeed)
                 speed.multiplyAdd(multiply: scalefactor, add: 0)
                 return DataAndUnit(speed, .metrePerSecond)
             case .windspeed_200m, .wind_speed_200m:
-                let u = try get(raw: .wind_u_component_200m, time: time).data
-                let v = try get(raw: .wind_v_component_200m, time: time).data
+                let u = try get(raw: .wind_u_component_150m, time: time).data
+                let v = try get(raw: .wind_v_component_150m, time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_180m, .wind_direction_180m:
                 fallthrough
             case .winddirection_200m, .wind_direction_200m:
-                let u = try get(raw: .wind_u_component_200m, time: time).data
-                let v = try get(raw: .wind_v_component_200m, time: time).data
+                let u = try get(raw: .wind_u_component_150m, time: time).data
+                let v = try get(raw: .wind_v_component_150m, time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
             case .windspeed_300m, .wind_speed_300m:
-                let u = try get(raw: .wind_u_component_300m, time: time).data
-                let v = try get(raw: .wind_v_component_300m, time: time).data
+                let u = try get(raw: .wind_u_component_250m, time: time).data
+                let v = try get(raw: .wind_v_component_250m, time: time).data
                 let speed = zip(u,v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_300m, .wind_direction_300m:
-                let u = try get(raw: .wind_u_component_300m, time: time).data
-                let v = try get(raw: .wind_v_component_300m, time: time).data
+                let u = try get(raw: .wind_u_component_250m, time: time).data
+                let v = try get(raw: .wind_v_component_250m, time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
             case .temperature_80m:
@@ -423,9 +423,9 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .temperature_120m:
                 return try get(raw: .temperature_100m, time: time)
             case .temperature_180m:
-                return try get(raw: .temperature_200m, time: time)
+                return try get(raw: .temperature_150m, time: time)
             case .showers:
-                let precipitation = try get(raw: .rain, time: time)
+                let precipitation = try get(raw: .precipitation, time: time)
                 return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
@@ -446,7 +446,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(duration, .seconds)
             case .precipitation:
-                let rain = try get(raw: .rain, time: time)
+                let rain = try get(raw: .precipitation, time: time)
                 let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
                 return DataAndUnit(zip(rain.data, snoweq.data).map(+), rain.unit)
             case .global_tilted_irradiance:

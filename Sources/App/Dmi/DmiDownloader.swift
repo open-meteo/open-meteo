@@ -146,6 +146,7 @@ struct DmiDownload: AsyncCommand {
                         logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                         return nil
                     }
+                    logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)]")
 
                     if stepType == "accum" && timestamp == run {
                         return nil // skip precipitation at timestep 0
@@ -158,6 +159,11 @@ struct DmiDownload: AsyncCommand {
                     //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     //fatalError()
                     
+                    if let variable = variable as? DmiSurfaceVariable, [DmiSurfaceVariable.shortwave_radiation, .direct_radiation].contains(variable) {
+                        // GRIB unit says W/m2, but it's J/s
+                        grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0)
+                    }
+                    
                     switch unit {
                     case "K":
                         grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
@@ -169,8 +175,8 @@ struct DmiDownload: AsyncCommand {
                         }
                     case "Pa":
                         grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0) // to hPa
-                    case "J m**-2":
-                        grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0) // to W/m2
+                    //case "J m**-2":
+                        //grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0) // to W/m2
                     default:
                         break
                     }
@@ -180,7 +186,6 @@ struct DmiDownload: AsyncCommand {
                         return nil
                     }
                     
-                    logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
                 }.collect().compactMap({$0})
@@ -200,6 +205,10 @@ struct DmiDownload: AsyncCommand {
     }
     
     func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
+        if parameterName == "Direct solar exposure" {
+            return DmiSurfaceVariable.direct_radiation
+        }
+        
         if typeOfLevel == "isobaricInhPa" {
             guard let level = Int(levelStr) else {
                 fatalError("Could not parse level str \(levelStr)")
@@ -224,23 +233,20 @@ struct DmiDownload: AsyncCommand {
         }
         
         /* missing:
-         - temp 150, 250
-         - wind 150, 250, 350, 450
-         - precip tp level=0 [surface] 0 accum
-         - freezing level height
-         - cape
-         - cin
-         - direct rad? " unknown level=0 [heightAboveGround] 0-1 accum 'Direct solar exposure' J m-2  id=0 unit=unknown member=0"
+         - wind 350, 450
          */
         
         switch (shortName, typeOfLevel, levelStr) {
+        case ("tp", "surface", "0"):
+            return DmiSurfaceVariable.precipitation
         case ("vis", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.visibility // ok
+            return DmiSurfaceVariable.visibility
         case ("t", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.surface_temperature // ok
+            return DmiSurfaceVariable.surface_temperature
         case ("2t", "heightAboveGround", "2"):
             return DmiSurfaceVariable.temperature_2m // ok
         case ("10fg", "heightAboveGround", "10"):
+        //case ("10wdir", "heightAboveGround", "10"): // testing wdir
             return DmiSurfaceVariable.wind_gusts_10m // ok
         case ("10u", "heightAboveGround", "10"):
             return DmiSurfaceVariable.wind_u_component_10m // ok
@@ -254,29 +260,39 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.temperature_50m // ok
         case ("t", "heightAboveGround", "100"):
             return DmiSurfaceVariable.temperature_100m // ok
-        case ("t", "heightAboveGround", "200"):
-            return DmiSurfaceVariable.temperature_200m
-        case ("t", "heightAboveGround", "300"):
-            return DmiSurfaceVariable.temperature_300m
+        case ("t", "heightAboveGround", "150"):
+            return DmiSurfaceVariable.temperature_150m
+        case ("t", "heightAboveGround", "250"):
+            return DmiSurfaceVariable.temperature_250m
         case ("u", "heightAboveGround", "50"):
             return DmiSurfaceVariable.wind_u_component_50m // ok
         case ("100u", "heightAboveGround", "100"):
             return DmiSurfaceVariable.wind_u_component_100m // ok
-        case ("u", "heightAboveGround", "200"):
-            return DmiSurfaceVariable.wind_u_component_200m
-        case ("u", "heightAboveGround", "300"):
-            return DmiSurfaceVariable.wind_u_component_300m
+        case ("u", "heightAboveGround", "150"):
+            return DmiSurfaceVariable.wind_u_component_150m
+        case ("u", "heightAboveGround", "250"):
+            return DmiSurfaceVariable.wind_u_component_250m
         case ("v", "heightAboveGround", "50"):
             return DmiSurfaceVariable.wind_v_component_50m // ok
         case ("100v", "heightAboveGround", "100"):
             return DmiSurfaceVariable.wind_v_component_100m // ok
-        case ("v", "heightAboveGround", "200"):
-            return DmiSurfaceVariable.wind_v_component_200m
-        case ("v", "heightAboveGround", "300"):
-            return DmiSurfaceVariable.wind_v_component_300m
+        case ("v", "heightAboveGround", "150"):
+            return DmiSurfaceVariable.wind_v_component_150m
+        case ("v", "heightAboveGround", "250"):
+            return DmiSurfaceVariable.wind_v_component_250m
             
         case ("sd", "heightAboveGround", "0"):
             return DmiSurfaceVariable.snow_depth_water_equivalent // ok
+            
+        case ("grad", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.shortwave_radiation // ok
+            
+        case ("h", "isothermZero", "0"):
+            return DmiSurfaceVariable.freezing_level_height
+        case ("cape", "entireAtmosphere", "0"):
+            return DmiSurfaceVariable.cape
+        case ("cin", "entireAtmosphere", "0"):
+            return DmiSurfaceVariable.convective_inhibition
             
         default:
             break
@@ -284,11 +300,9 @@ struct DmiDownload: AsyncCommand {
         
         switch (shortName, levelStr) {
         case ("rain", "0"):
-            return DmiSurfaceVariable.rain
+            return DmiSurfaceVariable.precipitation
         case ("tsrwe", "0"):
             return DmiSurfaceVariable.snowfall_water_equivalent // ok
-        case ("grad", "0"):
-            return DmiSurfaceVariable.shortwave_radiation // ok
         case ("cc", "2"): // for some reason this is 2 in GRIB files
             return DmiSurfaceVariable.cloud_cover // ok
         case ("lcc", "0"):

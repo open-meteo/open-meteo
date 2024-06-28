@@ -19,37 +19,45 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_u_component_50m
     case wind_v_component_100m
     case wind_u_component_100m
-    case wind_v_component_200m
-    case wind_u_component_200m
-    case wind_v_component_300m
-    case wind_u_component_300m
+    case wind_v_component_150m
+    case wind_u_component_150m
+    case wind_v_component_250m
+    case wind_u_component_250m
     
     case temperature_50m
     case temperature_100m
-    case temperature_200m
-    case temperature_300m
+    case temperature_150m
+    case temperature_250m
     
     case snowfall_water_equivalent
-    case rain
+    case precipitation
     
     case snow_depth_water_equivalent
     
     case wind_gusts_10m
 
     case shortwave_radiation
+    case direct_radiation
+    
+    case surface_temperature
+    case convective_inhibition
+    case cape
+    case visibility
+    case freezing_level_height
     
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .rain, .snowfall_water_equivalent: return true
+        case .precipitation, .snowfall_water_equivalent: return true
         case .wind_u_component_10m, .wind_v_component_10m: return true
         case .wind_u_component_100m, .wind_v_component_100m: return true
-        case .wind_u_component_200m, .wind_v_component_200m: return true
-        case .wind_u_component_300m, .wind_v_component_300m: return true
+        case .wind_u_component_150m, .wind_v_component_150m: return true
+        case .wind_u_component_250m, .wind_v_component_250m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
-        case .shortwave_radiation: return true
+        case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m: return true
+        case .cape: return true
         default: return false
         }
     }
@@ -64,7 +72,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var scalefactor: Float {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return 20
         case .cloud_cover:
             return 1
@@ -76,13 +84,13 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         case .relative_humidity_2m:
             return 1
-        case .rain:
+        case .precipitation:
             return 10
         case .wind_gusts_10m:
             return 10
         case .pressure_msl:
             return 10
-        case .shortwave_radiation:
+        case .shortwave_radiation, .direct_radiation:
             return 1
         case .snowfall_water_equivalent:
             return 10
@@ -90,18 +98,26 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 10
         case .wind_u_component_10m:
             return 10
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_200m,  .wind_u_component_200m, .wind_v_component_300m, .wind_u_component_300m:
+        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m,  .wind_u_component_150m, .wind_v_component_250m, .wind_u_component_250m:
             return 10
-        case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
+        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return 20
         case .snow_depth_water_equivalent:
             return 10
+        case .convective_inhibition:
+            return 1
+        case .cape:
+            return 0.1
+        case .visibility:
+            return 0.05 // 50 meter
+        case .freezing_level_height:
+            return 0.1 // zero height 10 meter resolution
         }
     }
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
         case .cloud_cover:
             return .hermite(bounds: 0...100)
@@ -119,24 +135,32 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .wind_u_component_10m:
             return .hermite(bounds: nil)
-        case .rain:
+        case .precipitation:
             return .backwards_sum
         case .snowfall_water_equivalent, .snow_depth_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
-        case .shortwave_radiation:
+        case .shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_200m,  .wind_u_component_200m, .wind_v_component_300m, .wind_u_component_300m:
+        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m,  .wind_u_component_150m, .wind_v_component_250m, .wind_u_component_250m:
             return .hermite(bounds: nil)
-        case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
+        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return .hermite(bounds: nil)
+        case .convective_inhibition:
+            return .hermite(bounds: nil)
+        case .cape:
+            return .hermite(bounds: 0...10e9)
+        case .visibility:
+            return .linear
+        case .freezing_level_height:
+            return .linear
         }
     }
     
     var unit: SiUnit {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return .celsius
         case .cloud_cover:
             return .percentage
@@ -148,13 +172,13 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .rain, .snow_depth_water_equivalent:
+        case .precipitation, .snow_depth_water_equivalent:
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond
         case .pressure_msl:
             return .hectopascal
-        case .shortwave_radiation:
+        case .shortwave_radiation, .direct_radiation:
             return .wattPerSquareMetre
         case .snowfall_water_equivalent:
             return .millimetre
@@ -162,10 +186,18 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .metrePerSecond
         case .wind_u_component_10m:
             return .metrePerSecond
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_200m,  .wind_u_component_200m, .wind_v_component_300m, .wind_u_component_300m:
+        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m,  .wind_u_component_150m, .wind_v_component_250m, .wind_u_component_250m:
             return .metrePerSecond
-        case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
+        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return .celsius
+        case .convective_inhibition:
+            return .joulePerKilogram
+        case .cape:
+            return .joulePerKilogram
+        case .visibility:
+            return .metre
+        case .freezing_level_height:
+            return .metre
         }
     }
     
@@ -173,7 +205,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m:
             fallthrough
-        case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
+        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return true
         default:
             return false
