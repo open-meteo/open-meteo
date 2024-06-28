@@ -191,6 +191,11 @@ struct KnmiDownload: AsyncCommand {
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 
+                /// NL nest has 100,200,300 hPa levels.... not sure what the point is with those levels
+                if domain == .harmonie_arome_netherlands && typeOfLevel == "isobaricInhPa" {
+                    return nil
+                }
+                
                 /// Keep wind u/v in memory
                 if let temporary = KnmiWindVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                     logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
@@ -213,9 +218,6 @@ struct KnmiDownload: AsyncCommand {
                     return nil
                 }
                 
-                if domain == .harmonie_arome_netherlands && typeOfLevel == "isobaricInhPa" {
-                    return nil // NL nest has 100,200,300 hPa levels.... not sure what the point is with those levels
-                }
                 if stepType == "accum" && timestamp == run {
                     return nil // skip precipitation at timestep 0
                 }
