@@ -335,6 +335,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case knmi_harmonie_arome_europe
     case knmi_harmonie_arome_netherlands
+    case dmi_harmonie_arome_europe
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -487,6 +488,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .knmi_harmonie_arome_netherlands:
             return try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .dmi_harmonie_arome_europe:
+            return try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         }
     }
     

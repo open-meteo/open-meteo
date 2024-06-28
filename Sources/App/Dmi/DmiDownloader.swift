@@ -85,7 +85,7 @@ struct DmiDownload: AsyncCommand {
             fatalError("Please specify environment variable 'DMI_API_KEY'")
         }
         let logger = application.logger
-        let deadLineHours = Double(2)
+        let deadLineHours = Double(6)
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
@@ -297,8 +297,6 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.cloud_cover_mid // ok
         case ("hcc", "0"):
             return DmiSurfaceVariable.cloud_cover_high // ok
-        case ("tsnowp", "0"):
-            return DmiSurfaceVariable.snowfall_water_equivalent
         default: return nil
         }
     }

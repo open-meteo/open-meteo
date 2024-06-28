@@ -592,6 +592,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .knmi_harmonie_arome_netherlands:
             // TODO register domain
             return .bestMatch
+        case .dmi_harmonie_arome_europe:
+            // TODO register domain
+            return .bestMatch
         }
     }
 }
