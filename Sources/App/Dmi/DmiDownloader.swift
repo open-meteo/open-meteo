@@ -55,6 +55,18 @@ struct DmiDownload: AsyncCommand {
     enum DmiVariableTemporary: String {
         case ugst
         case vgst
+        case u50
+        case v50
+        case u100
+        case v100
+        case u150
+        case v150
+        case u250
+        case v250
+        case u350
+        case v350
+        case u450
+        case v450
         
         static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
             switch (shortName, typeOfLevel, levelStr) {
@@ -62,6 +74,30 @@ struct DmiDownload: AsyncCommand {
                 return .ugst
             case ("vgst", "heightAboveGround", "10"):
                 return .vgst
+            case ("u", "heightAboveGround", "50"):
+                return .u50
+            case ("u", "heightAboveGround", "50"):
+                return .v50
+            case ("100u", "heightAboveGround", "100"):
+                return .u100
+            case ("100v", "heightAboveGround", "100"):
+                return .v100
+            case ("u", "heightAboveGround", "150"):
+                return .u150
+            case ("u", "heightAboveGround", "150"):
+                return .v150
+            case ("u", "heightAboveGround", "250"):
+                return .u250
+            case ("u", "heightAboveGround", "250"):
+                return .v250
+            case ("u", "heightAboveGround", "350"):
+                return .u350
+            case ("u", "heightAboveGround", "350"):
+                return .v350
+            case ("u", "heightAboveGround", "450"):
+                return .u450
+            case ("u", "heightAboveGround", "450"):
+                return .v450
             default:
                 return nil
             }
@@ -78,7 +114,6 @@ struct DmiDownload: AsyncCommand {
     /**
      TODO:
      - model elevation and land/sea mask
-     - check if wind direction needs to be corrected for projection
      */
     func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
@@ -100,6 +135,9 @@ struct DmiDownload: AsyncCommand {
         case .harmonie_arome_europe:
             dataset = "HARMONIE_DINI_SF"
         }
+        
+        // Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
+        let trueNorth = (grid as! ProjectionGrid<LambertConformalConicProjection>).getTrueNorthDirection()
         
         var previous = GribDeaverager()
         let timerange = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600)
@@ -193,10 +231,16 @@ struct DmiDownload: AsyncCommand {
                 previous = previousScoped
                 
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                // can be removed
-                let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: DmiSurfaceVariable.wind_gusts_10m, writer: writer)
+                let windHandles = [
+                    try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth),
+                    try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth),
+                    try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth),
+                    try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth),
+                    try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth),
+                    try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth),
+                ].flatMap({$0})
                 
-                return h + gustHandles
+                return h + windHandles
             }
         }
         
@@ -209,7 +253,8 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.direct_radiation
         }
         
-        if typeOfLevel == "isobaricInhPa" {
+        // Note: Pressure level wind requires U/V projection direction correction
+        /*if typeOfLevel == "isobaricInhPa" {
             guard let level = Int(levelStr) else {
                 fatalError("Could not parse level str \(levelStr)")
             }
@@ -230,11 +275,7 @@ struct DmiDownload: AsyncCommand {
             default:
                 break
             }
-        }
-        
-        /* missing:
-         - wind 350, 450
-         */
+        }*/
         
         switch (shortName, typeOfLevel, levelStr) {
         case ("tp", "surface", "0"):
@@ -246,12 +287,11 @@ struct DmiDownload: AsyncCommand {
         case ("2t", "heightAboveGround", "2"):
             return DmiSurfaceVariable.temperature_2m // ok
         case ("10fg", "heightAboveGround", "10"):
-        //case ("10wdir", "heightAboveGround", "10"): // testing wdir
             return DmiSurfaceVariable.wind_gusts_10m // ok
-        case ("10u", "heightAboveGround", "10"):
-            return DmiSurfaceVariable.wind_u_component_10m // ok
-        case ("10v", "heightAboveGround", "10"):
-            return DmiSurfaceVariable.wind_v_component_10m // ok
+        case ("10wdir", "heightAboveGround", "10"): // testing wdir
+            return DmiSurfaceVariable.wind_direction_10m // ok
+        case ("10si", "heightAboveGround", "10"): // testing wdir
+            return DmiSurfaceVariable.wind_speed_10m // ok
         case ("2r", "heightAboveGround", "2"):
             return DmiSurfaceVariable.relative_humidity_2m // ok
         case ("pres", "heightAboveSea", "0"):
@@ -264,36 +304,16 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.temperature_150m
         case ("t", "heightAboveGround", "250"):
             return DmiSurfaceVariable.temperature_250m
-        case ("u", "heightAboveGround", "50"):
-            return DmiSurfaceVariable.wind_u_component_50m // ok
-        case ("100u", "heightAboveGround", "100"):
-            return DmiSurfaceVariable.wind_u_component_100m // ok
-        case ("u", "heightAboveGround", "150"):
-            return DmiSurfaceVariable.wind_u_component_150m
-        case ("u", "heightAboveGround", "250"):
-            return DmiSurfaceVariable.wind_u_component_250m
-        case ("v", "heightAboveGround", "50"):
-            return DmiSurfaceVariable.wind_v_component_50m // ok
-        case ("100v", "heightAboveGround", "100"):
-            return DmiSurfaceVariable.wind_v_component_100m // ok
-        case ("v", "heightAboveGround", "150"):
-            return DmiSurfaceVariable.wind_v_component_150m
-        case ("v", "heightAboveGround", "250"):
-            return DmiSurfaceVariable.wind_v_component_250m
-            
         case ("sd", "heightAboveGround", "0"):
             return DmiSurfaceVariable.snow_depth_water_equivalent // ok
-            
         case ("grad", "heightAboveGround", "0"):
             return DmiSurfaceVariable.shortwave_radiation // ok
-            
         case ("h", "isothermZero", "0"):
             return DmiSurfaceVariable.freezing_level_height
         case ("cape", "entireAtmosphere", "0"):
             return DmiSurfaceVariable.cape
         case ("cin", "entireAtmosphere", "0"):
             return DmiSurfaceVariable.convective_inhibition
-            
         default:
             break
         }

@@ -12,17 +12,22 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case pressure_msl
     case relative_humidity_2m
     
-    case wind_v_component_10m
-    case wind_u_component_10m
+    case wind_speed_10m
+    case wind_speed_50m
+    case wind_speed_100m
+    case wind_speed_150m
+    case wind_speed_250m
+    case wind_speed_350m
+    case wind_speed_450m
     
-    case wind_v_component_50m
-    case wind_u_component_50m
-    case wind_v_component_100m
-    case wind_u_component_100m
-    case wind_v_component_150m
-    case wind_u_component_150m
-    case wind_v_component_250m
-    case wind_u_component_250m
+    /// Wind direction has been corrected due to grid projection
+    case wind_direction_10m
+    case wind_direction_50m
+    case wind_direction_100m
+    case wind_direction_150m
+    case wind_direction_250m
+    case wind_direction_350m
+    case wind_direction_450m
     
     case temperature_50m
     case temperature_100m
@@ -49,10 +54,11 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .precipitation, .snowfall_water_equivalent: return true
-        case .wind_u_component_10m, .wind_v_component_10m: return true
-        case .wind_u_component_100m, .wind_v_component_100m: return true
-        case .wind_u_component_150m, .wind_v_component_150m: return true
-        case .wind_u_component_250m, .wind_v_component_250m: return true
+        case .wind_speed_10m, .wind_direction_10m: return true
+        case .wind_speed_50m, .wind_direction_50m: return true
+        case .wind_speed_100m, .wind_direction_100m: return true
+        case .wind_speed_150m, .wind_direction_150m: return true
+        case .wind_speed_250m, .wind_direction_250m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation, .direct_radiation: return true
@@ -94,11 +100,9 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         case .snowfall_water_equivalent:
             return 10
-        case .wind_v_component_10m:
-            return 10
-        case .wind_u_component_10m:
-            return 10
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m,  .wind_u_component_150m, .wind_v_component_250m, .wind_u_component_250m:
+        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
+            return 1
+        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
             return 10
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return 20
@@ -131,10 +135,6 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .wind_v_component_10m:
-            return .hermite(bounds: nil)
-        case .wind_u_component_10m:
-            return .hermite(bounds: nil)
         case .precipitation:
             return .backwards_sum
         case .snowfall_water_equivalent, .snow_depth_water_equivalent:
@@ -143,8 +143,6 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m,  .wind_u_component_150m, .wind_v_component_250m, .wind_u_component_250m:
-            return .hermite(bounds: nil)
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return .hermite(bounds: nil)
         case .convective_inhibition:
@@ -155,6 +153,10 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linear
         case .freezing_level_height:
             return .linear
+        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
+            return .linearDegrees
+        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
+            return .hermite(bounds: 0...10e9)
         }
     }
     
@@ -182,12 +184,6 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .wattPerSquareMetre
         case .snowfall_water_equivalent:
             return .millimetre
-        case .wind_v_component_10m:
-            return .metrePerSecond
-        case .wind_u_component_10m:
-            return .metrePerSecond
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m,  .wind_u_component_150m, .wind_v_component_250m, .wind_u_component_250m:
-            return .metrePerSecond
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return .celsius
         case .convective_inhibition:
@@ -198,6 +194,10 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .metre
         case .freezing_level_height:
             return .metre
+        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
+            return .degreeDirection
+        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
+            return .metrePerSecond
         }
     }
     

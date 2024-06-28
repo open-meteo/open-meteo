@@ -191,23 +191,39 @@ actor VariablePerMemberStorage<V: Hashable> {
 
 
 extension VariablePerMemberStorage {
-    // Calculate wind speed and return handles for all available members an timesteps
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+    /// Calculate wind speed and direction from U/V components for all available members an timesteps.
+    /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriter, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
-            .compactMap({ (t, handles) -> GenericVariableHandle? in
-                guard let u = handles.first(where: {$0.key.variable == u}), let v = handles.first(where: {$0.key.variable == v})  else {
-                    return nil
+            .flatMap({ (t, handles) -> [GenericVariableHandle] in
+                guard let u = handles.first(where: {$0.key.variable == u}), let v = handles.first(where: {$0.key.variable == v}) else {
+                    return []
                 }
                 let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outSpeedVariable.scalefactor, all: speed)
-                return GenericVariableHandle(
+                let speedHandle = GenericVariableHandle(
                     variable: outSpeedVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: fn,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outSpeedVariable.scalefactor, all: speed),
                     skipHour0: false
                 )
+                
+                if let outDirectionVariable {
+                    var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
+                    if let trueNorth {
+                        direction = zip(direction, trueNorth).map({($0-$1+360).truncatingRemainder(dividingBy: 360)})
+                    }
+                    let directionHandle = GenericVariableHandle(
+                        variable: outDirectionVariable,
+                        time: t.timestamp,
+                        member: t.member,
+                        fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outDirectionVariable.scalefactor, all: direction),
+                        skipHour0: false
+                    )
+                    return [speedHandle, directionHandle]
+                }
+                return [speedHandle]
             }
         )
     }
