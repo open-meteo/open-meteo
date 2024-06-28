@@ -67,8 +67,14 @@ struct DmiDownload: AsyncCommand {
         case v350
         case u450
         case v450
+        case landmask
+        case elevation
         
         static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
+            if parameterName == "Land cover (0 = sea, 1 = land)" {
+                return .landmask
+            }
+            
             switch (shortName, typeOfLevel, levelStr) {
             case ("ugst", "heightAboveGround", "10"):
                 return .ugst
@@ -76,7 +82,7 @@ struct DmiDownload: AsyncCommand {
                 return .vgst
             case ("u", "heightAboveGround", "50"):
                 return .u50
-            case ("u", "heightAboveGround", "50"):
+            case ("v", "heightAboveGround", "50"):
                 return .v50
             case ("100u", "heightAboveGround", "100"):
                 return .u100
@@ -84,36 +90,31 @@ struct DmiDownload: AsyncCommand {
                 return .v100
             case ("u", "heightAboveGround", "150"):
                 return .u150
-            case ("u", "heightAboveGround", "150"):
+            case ("v", "heightAboveGround", "150"):
                 return .v150
             case ("u", "heightAboveGround", "250"):
                 return .u250
-            case ("u", "heightAboveGround", "250"):
+            case ("v", "heightAboveGround", "250"):
                 return .v250
             case ("u", "heightAboveGround", "350"):
                 return .u350
-            case ("u", "heightAboveGround", "350"):
+            case ("v", "heightAboveGround", "350"):
                 return .v350
             case ("u", "heightAboveGround", "450"):
                 return .u450
-            case ("u", "heightAboveGround", "450"):
+            case ("v", "heightAboveGround", "450"):
                 return .v450
+            case ("z", "heightAboveGround", "0"):
+                return .elevation
             default:
                 return nil
             }
         }
     }
     
-    struct MetaUrlResponse: Decodable {
-        let size: String
-        let temporaryDownloadUrl: String
-        let lastModified: String
-        let contentType: String
-    }
-    
     /**
-     TODO:
-     - model elevation and land/sea mask
+     Download GRIB file for each timestamp, decode, generate some derived variables.
+     Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
      */
     func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
@@ -135,6 +136,8 @@ struct DmiDownload: AsyncCommand {
         case .harmonie_arome_europe:
             dataset = "HARMONIE_DINI_SF"
         }
+        
+        let generateElevationFile = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath())
         
         // Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
         let trueNorth = (grid as! ProjectionGrid<LambertConformalConicProjection>).getTrueNorthDirection()
@@ -174,8 +177,18 @@ struct DmiDownload: AsyncCommand {
                     
                     
                     if let temporary = DmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                        if !generateElevationFile && [DmiVariableTemporary.elevation, .landmask].contains(temporary) {
+                            return nil
+                        }
+                        logger.warning("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                         try grib2d.load(message: message)
+                        switch unit {
+                        case "m**2 s**-2": // gph to metre
+                            grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
+                        default:
+                            break
+                        }
                         await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
                         return nil
                     }
@@ -230,6 +243,7 @@ struct DmiDownload: AsyncCommand {
                 
                 previous = previousScoped
                 
+                logger.info("Calculating wind speed and direction from U/V components and correcting for true north")
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 let windHandles = [
                     try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth),
@@ -239,6 +253,10 @@ struct DmiDownload: AsyncCommand {
                     try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth),
                     try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth),
                 ].flatMap({$0})
+                
+                if generateElevationFile {
+                    try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+                }
                 
                 return h + windHandles
             }

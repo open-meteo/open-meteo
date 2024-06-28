@@ -227,6 +227,36 @@ extension VariablePerMemberStorage {
             }
         )
     }
+    
+    /// Generate elevation file
+    /// - `elevation`: in metres
+    /// - `landMask` 0 = sea, 1 = land. Fractions below 0.5 are considered sea.
+    func generateElevationFile(elevation: V, landmask: V, domain: GenericDomain) throws {
+        let elevationFile = domain.surfaceElevationFileOm
+        if FileManager.default.fileExists(atPath: elevationFile.getFilePath()) {
+            return
+        }
+        guard var elevation = self.data.first(where: {$0.key.variable == elevation})?.value.data,
+              let landMask = self.data.first(where: {$0.key.variable == landmask})?.value.data else {
+            return
+        }
+        
+        try elevationFile.createDirectory()
+        for i in elevation.indices {
+            if elevation[i] >= 9000 {
+                fatalError("Elevation greater 90000")
+            }
+            if landMask[i] < 0.5 {
+                // mask sea
+                elevation[i] = -999
+            }
+        }
+        #if Xcode
+        try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
+        #endif
+        
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: elevationFile.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+    }
 }
 
 
