@@ -7,6 +7,7 @@ enum KnmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case relativehumidity_2m
     case dewpoint_2m
     case dew_point_2m
+    
     case windspeed_10m
     case winddirection_10m
     case windspeed_100m
@@ -24,14 +25,7 @@ enum KnmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     /// Is using 200m wind
     case windspeed_180m
     case winddirection_180m
-    case wind_speed_10m
-    case wind_direction_10m
-    case wind_speed_100m
-    case wind_direction_100m
-    case wind_speed_200m
-    case wind_direction_200m
-    case wind_speed_300m
-    case wind_direction_300m
+    
     /// Is using 100m wind
     case wind_speed_80m
     case wind_direction_80m
@@ -41,6 +35,7 @@ enum KnmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     /// Is using 200m wind
     case wind_speed_180m
     case wind_direction_180m
+    
     case temperature_80m
     case temperature_120m
     case temperature_180m
@@ -86,8 +81,6 @@ enum KnmiPressureVariableDerivedType: String, CaseIterable {
     case windspeed
     case winddirection
     case dewpoint
-    case wind_speed
-    case wind_direction
     case dew_point
     case cloudcover
     case relativehumidity
@@ -159,15 +152,27 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
             switch surface {
             case .apparent_temperature:
                 try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .wind_speed_10m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .relativehumidity_2m:
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .wind_speed_10m, .windspeed_10m, .wind_direction_10m, .winddirection_10m:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+            case .windspeed_10m:
+                try prefetchData(variable: .wind_speed_10m, time: time)
+            case .windspeed_80m, .wind_speed_80m, .windspeed_100m, .windspeed_120m, .wind_speed_120m:
+                try prefetchData(variable: .wind_speed_100m, time: time)
+            case .windspeed_200m, .windspeed_180m, .wind_speed_180m:
+                try prefetchData(variable: .wind_speed_200m, time: time)
+            case .winddirection_10m:
+                try prefetchData(variable: .wind_direction_10m, time: time)
+            case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
+                try prefetchData(variable: .wind_direction_100m, time: time)
+            case .winddirection_200m, .winddirection_180m, .wind_direction_180m:
+                try prefetchData(variable: .wind_direction_200m, time: time)
+            case .windspeed_300m:
+                try prefetchData(variable: .wind_speed_300m, time: time)
+            case .winddirection_300m:
+                try prefetchData(variable: .wind_direction_300m, time: time)
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -175,8 +180,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .shortwave_radiation, time: time)
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .wind_speed_10m, time: time)
             case .snowfall:
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .surface_pressure:
@@ -199,15 +203,6 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .is_day:
                 break
-            case .windspeed_80m, .wind_speed_80m, .winddirection_80m, .wind_direction_80m, .windspeed_100m, .wind_speed_100m, .winddirection_100m, .wind_direction_100m, .windspeed_120m, .wind_speed_120m, .winddirection_120m, .wind_direction_120m:
-                try prefetchData(variable: .wind_u_component_100m, time: time)
-                try prefetchData(variable: .wind_v_component_100m, time: time)
-            case .windspeed_180m, .wind_speed_180m, .winddirection_180m, .wind_direction_180m, .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m:
-                try prefetchData(variable: .wind_u_component_200m, time: time)
-                try prefetchData(variable: .wind_v_component_200m, time: time)
-            case .windspeed_300m, .wind_speed_300m, .winddirection_300m, .wind_direction_300m:
-                try prefetchData(variable: .wind_u_component_300m, time: time)
-                try prefetchData(variable: .wind_v_component_300m, time: time)
             case .temperature_80m:
                 try prefetchData(variable: .temperature_100m, time: time)
             case .temperature_120m:
@@ -237,11 +232,10 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                fallthrough
-            case .winddirection, .wind_direction:
-                try prefetchData(raw: .pressure(KnmiPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
-                try prefetchData(raw: .pressure(KnmiPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
+            case .windspeed:
+                try prefetchData(raw: .pressure(KnmiPressureVariable(variable: .wind_speed, level: v.level)), time: time)
+            case .winddirection:
+                try prefetchData(raw: .pressure(KnmiPressureVariable(variable: .wind_direction, level: v.level)), time: time)
             case .dewpoint, .dew_point, .relativehumidity:
                 try prefetchData(raw: .pressure(KnmiPressureVariable(variable: .temperature, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(KnmiPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
@@ -255,18 +249,36 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
         switch derived {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
-            case .windspeed_10m, .wind_speed_10m:
-                let u = try get(raw: .wind_u_component_10m, time: time).data
-                let v = try get(raw: .wind_v_component_10m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .winddirection_10m, .wind_direction_10m:
-                let u = try get(raw: .wind_u_component_10m, time: time).data
-                let v = try get(raw: .wind_v_component_10m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed_10m:
+                return try get(raw: .wind_speed_100m, time: time)
+            case .windspeed_80m, .wind_speed_80m:
+                let data = try get(raw: .wind_speed_100m, time: time)
+                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 80)
+                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+            case .windspeed_100m:
+                return try get(raw: .wind_speed_100m, time: time)
+            case .windspeed_120m, .wind_speed_120m:
+                let data = try get(raw: .wind_speed_100m, time: time)
+                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
+                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+            case .windspeed_180m, .wind_speed_180m:
+                let data = try get(raw: .wind_speed_200m, time: time)
+                let scalefactor = Meteorology.scaleWindFactor(from: 200, to: 180)
+                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+            case .windspeed_200m:
+                return try get(raw: .wind_speed_200m, time: time)
+            case .windspeed_300m:
+                return try get(raw: .wind_speed_300m, time: time)
+            case .winddirection_10m:
+                return try get(raw: .wind_direction_10m, time: time)
+            case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
+                return try get(raw: .wind_direction_100m, time: time)
+            case .winddirection_200m, .winddirection_180m, .wind_direction_180m:
+                return try get(raw: .wind_direction_200m, time: time)
+            case .winddirection_300m:
+                return try get(raw: .wind_direction_300m, time: time)
             case .apparent_temperature:
-                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
+                let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let relhum = try get(raw: .relative_humidity_2m, time: time).data
                 let radiation = try get(raw: .shortwave_radiation, time: time).data
@@ -280,7 +292,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
-                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
+                let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 
@@ -358,66 +370,6 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
-            case .windspeed_80m, .wind_speed_80m:
-                let u = try get(raw: .wind_u_component_100m, time: time).data
-                let v = try get(raw: .wind_v_component_100m, time: time).data
-                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 80)
-                var speed = zip(u,v).map(Meteorology.windspeed)
-                speed.multiplyAdd(multiply: scalefactor, add: 0)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .windspeed_100m, .wind_speed_100m:
-                let u = try get(raw: .wind_u_component_100m, time: time).data
-                let v = try get(raw: .wind_v_component_100m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .winddirection_80m, .wind_direction_80m:
-                fallthrough
-            case .winddirection_100m, .wind_direction_100m:
-                let u = try get(raw: .wind_u_component_100m, time: time).data
-                let v = try get(raw: .wind_v_component_100m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_120m, .wind_speed_120m:
-                let u = try get(raw: .wind_u_component_100m, time: time).data
-                let v = try get(raw: .wind_v_component_10m, time: time).data
-                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
-                var speed = zip(u,v).map(Meteorology.windspeed)
-                speed.multiplyAdd(multiply: scalefactor, add: 0)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .winddirection_120m, .wind_direction_120m:
-                let u = try get(raw: .wind_u_component_100m, time: time).data
-                let v = try get(raw: .wind_v_component_100m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_180m, .wind_speed_180m:
-                let u = try get(raw: .wind_u_component_200m, time: time).data
-                let v = try get(raw: .wind_v_component_200m, time: time).data
-                let scalefactor = Meteorology.scaleWindFactor(from: 200, to: 180)
-                var speed = zip(u,v).map(Meteorology.windspeed)
-                speed.multiplyAdd(multiply: scalefactor, add: 0)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .windspeed_200m, .wind_speed_200m:
-                let u = try get(raw: .wind_u_component_200m, time: time).data
-                let v = try get(raw: .wind_v_component_200m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .winddirection_180m, .wind_direction_180m:
-                fallthrough
-            case .winddirection_200m, .wind_direction_200m:
-                let u = try get(raw: .wind_u_component_200m, time: time).data
-                let v = try get(raw: .wind_v_component_200m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
-            case .windspeed_300m, .wind_speed_300m:
-                let u = try get(raw: .wind_u_component_300m, time: time).data
-                let v = try get(raw: .wind_v_component_300m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
-                return DataAndUnit(speed, .metrePerSecond)
-            case .winddirection_300m, .wind_direction_300m:
-                let u = try get(raw: .wind_u_component_300m, time: time).data
-                let v = try get(raw: .wind_v_component_300m, time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
             case .temperature_80m:
                 return try get(raw: .temperature_100m, time: time)
             case .temperature_120m:
@@ -462,16 +414,10 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                let u = try get(raw: .pressure(KnmiPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
-                let v = try get(raw: .pressure(KnmiPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-                return DataAndUnit(speed, u.unit)
-            case .winddirection, .wind_direction:
-                let u = try get(raw: .pressure(KnmiPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
-                let v = try get(raw: .pressure(KnmiPressureVariable(variable: .wind_v_component, level: v.level)), time: time).data
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                return DataAndUnit(direction, .degreeDirection)
+            case .windspeed:
+                return try get(raw: .pressure(KnmiPressureVariable(variable: .wind_speed, level: v.level)), time: time)
+            case .winddirection:
+                return try get(raw: .pressure(KnmiPressureVariable(variable: .wind_direction, level: v.level)), time: time)
             case .dewpoint, .dew_point:
                 let temperature = try get(raw: .pressure(KnmiPressureVariable(variable: .temperature, level: v.level)), time: time)
                 let rh = try get(raw: .pressure(KnmiPressureVariable(variable: .relative_humidity, level: v.level)), time: time)

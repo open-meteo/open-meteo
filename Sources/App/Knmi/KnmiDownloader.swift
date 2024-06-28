@@ -65,6 +65,51 @@ struct KnmiDownload: AsyncCommand {
         }
     }
     
+    struct KnmiWindVariableTemporary: Hashable {
+        enum Variable: Hashable {
+            case u
+            case v
+        }
+        enum Level: Hashable {
+            case isobaricInhPa(Int)
+            case heightAboveGround(Int)
+            
+            var asIsobaricInhPa: Int? {
+                switch self {
+                case .isobaricInhPa(let int):
+                    return int
+                case .heightAboveGround(_):
+                    return nil
+                }
+            }
+        }
+        let variable: Variable
+        let level: Level
+        
+        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
+            guard let levelInt = Int(levelStr) else {
+                return nil
+            }
+            let level: Level
+            switch typeOfLevel {
+            case "isobaricInhPa":
+                level = .isobaricInhPa(levelInt)
+            case "heightAboveGround":
+                level = .heightAboveGround(levelInt)
+            default:
+                return nil
+            }
+            switch (shortName) {
+            case "u", "10u", "100u":
+                return KnmiWindVariableTemporary(variable: .u, level: level)
+            case "v", "10v", "100v":
+                return KnmiWindVariableTemporary(variable: .v, level: level)
+            default:
+                return nil
+            }
+        }
+    }
+    
     struct MetaUrlResponse: Decodable {
         let size: String
         let temporaryDownloadUrl: String
@@ -76,7 +121,8 @@ struct KnmiDownload: AsyncCommand {
      TODO:
      - model elevation and land/sea mask
      - support ensemble models
-     - check if wind direction needs to be corrected for projection
+     
+     Important: Wind U/V components are defined on a Rotated LatLon  projection. They need to be corrected for true north.
      */
     func download(application: Application, domain: KnmiDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("KNMI_API_KEY")?.split(separator: ",").map(String.init) else {
@@ -110,18 +156,17 @@ struct KnmiDownload: AsyncCommand {
         case .harmonie_arome_netherlands:
             dataset = "harmonie_arome_cy43_p1/versions/1.0/files/HARM43_V1_P1"
         }
-        
         let metaUrl = "https://api.dataplatform.knmi.nl/open-data/v1/datasets/\(dataset)_\(run.format_YYYYMMddHH).tar/url"
-        
+        let trueNorth = (grid as? ProjectionGrid<RotatedLatLonProjection>)?.getTrueNorthDirection()
         
         guard let metaData = try await curl.downloadInMemoryAsync(url: metaUrl, minSize: nil, headers: [("Authorization", "Bearer \(apikey.randomElement() ?? "")")]).readJSONDecodable(MetaUrlResponse.self) else {
             fatalError("Could not decode meta response")
         }
         
         let handles = try await curl.withGribStream(url: metaData.temporaryDownloadUrl, bzip2Decode: false) { stream in
-            
             let previous = GribDeaverager()
             let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
+            let winds = VariablePerMemberStorage<KnmiWindVariableTemporary>()
             
             // process sequentialy, as precipitation need to be in order for deaveraging
             let h = try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
@@ -146,8 +191,17 @@ struct KnmiDownload: AsyncCommand {
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 
+                /// Keep wind u/v in memory
+                if let temporary = KnmiWindVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                    logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
+                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    try grib2d.load(message: message)
+                    await winds.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
+                    return nil
+                }
                 
                 if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                    logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                     var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                     try grib2d.load(message: message)
                     await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
@@ -202,7 +256,59 @@ struct KnmiDownload: AsyncCommand {
             let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
             let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
             
-            return h + gustHandles
+            let windHandles = [
+                try await winds.calculateWindSpeed(
+                    u: .init(variable: .u, level: .heightAboveGround(10)),
+                    v: .init(variable: .v, level: .heightAboveGround(10)),
+                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_10m,
+                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_10m,
+                    writer: writer,
+                    trueNorth: trueNorth
+                ),
+                try await winds.calculateWindSpeed(
+                    u: .init(variable: .u, level: .heightAboveGround(50)),
+                    v: .init(variable: .v, level: .heightAboveGround(50)),
+                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_50m,
+                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_50m,
+                    writer: writer,
+                    trueNorth: trueNorth
+                ),
+                try await winds.calculateWindSpeed(
+                    u: .init(variable: .u, level: .heightAboveGround(100)),
+                    v: .init(variable: .v, level: .heightAboveGround(100)),
+                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_100m,
+                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_100m,
+                    writer: writer,
+                    trueNorth: trueNorth
+                ),
+                try await winds.calculateWindSpeed(
+                    u: .init(variable: .u, level: .heightAboveGround(200)),
+                    v: .init(variable: .v, level: .heightAboveGround(200)),
+                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_200m,
+                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_200m,
+                    writer: writer,
+                    trueNorth: trueNorth
+                ),
+                try await winds.calculateWindSpeed(
+                    u: .init(variable: .u, level: .heightAboveGround(300)),
+                    v: .init(variable: .v, level: .heightAboveGround(300)),
+                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_300m,
+                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_300m,
+                    writer: writer,
+                    trueNorth: trueNorth
+                ),
+            ].flatMap({$0})            
+            let windPressureHandles = try await Set(winds.data.compactMap({ $0.key.variable.level.asIsobaricInhPa })).asyncFlatMap({hPa in
+                try await winds.calculateWindSpeed(
+                    u: .init(variable: .u, level: .isobaricInhPa(hPa)),
+                    v: .init(variable: .v, level: .isobaricInhPa(hPa)),
+                    outSpeedVariable: KnmiPressureVariable(variable: .wind_speed, level: hPa),
+                    outDirectionVariable: KnmiPressureVariable(variable: .wind_direction, level: hPa),
+                    writer: writer,
+                    trueNorth: trueNorth
+                )
+            })
+            return h + gustHandles + windHandles + windPressureHandles
         }
         await curl.printStatistics()
         return handles
@@ -219,10 +325,10 @@ struct KnmiDownload: AsyncCommand {
             switch shortName {
             case "t":
                 return KnmiPressureVariable(variable: .temperature, level: level)
-            case "u":
+            /*case "u": Wind is converted in a separate step to speed and direction with true north correction
                 return KnmiPressureVariable(variable: .wind_u_component, level: level)
             case "v":
-                return KnmiPressureVariable(variable: .wind_v_component, level: level)
+                return KnmiPressureVariable(variable: .wind_v_component, level: level)*/
             case "r":
                 return KnmiPressureVariable(variable: .relative_humidity, level: level)
             case "z":
@@ -239,10 +345,6 @@ struct KnmiDownload: AsyncCommand {
             return GfsSurfaceVariable.surface_temperature
         case ("t", "heightAboveGround", "2"):
             return KnmiSurfaceVariable.temperature_2m
-        case ("u", "heightAboveGround", "10"):
-            return KnmiSurfaceVariable.wind_u_component_10m
-        case ("v", "heightAboveGround", "10"):
-            return KnmiSurfaceVariable.wind_v_component_10m
         case ("r", "heightAboveGround", "2"):
             return KnmiSurfaceVariable.relative_humidity_2m
         case ("pres", "heightAboveSea", "0"):
@@ -255,26 +357,8 @@ struct KnmiDownload: AsyncCommand {
             return KnmiSurfaceVariable.temperature_200m
         case ("t", "heightAboveGround", "300"):
             return KnmiSurfaceVariable.temperature_300m
-        case ("u", "heightAboveGround", "50"):
-            return KnmiSurfaceVariable.wind_u_component_50m
-        case ("u", "heightAboveGround", "100"):
-            return KnmiSurfaceVariable.wind_u_component_100m
-        case ("u", "heightAboveGround", "200"):
-            return KnmiSurfaceVariable.wind_u_component_200m
-        case ("u", "heightAboveGround", "300"):
-            return KnmiSurfaceVariable.wind_u_component_300m
-        case ("v", "heightAboveGround", "50"):
-            return KnmiSurfaceVariable.wind_v_component_50m
-        case ("v", "heightAboveGround", "100"):
-            return KnmiSurfaceVariable.wind_v_component_100m
-        case ("v", "heightAboveGround", "200"):
-            return KnmiSurfaceVariable.wind_v_component_200m
-        case ("v", "heightAboveGround", "300"):
-            return KnmiSurfaceVariable.wind_v_component_300m
-            
         case ("sdwe", "heightAboveGround", "0"):
             return KnmiSurfaceVariable.snow_depth_water_equivalent
-            
         default:
             break
         }

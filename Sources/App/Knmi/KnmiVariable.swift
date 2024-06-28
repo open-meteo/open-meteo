@@ -12,17 +12,18 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     case pressure_msl
     case relative_humidity_2m
     
-    case wind_v_component_10m
-    case wind_u_component_10m
+    case wind_speed_10m
+    case wind_speed_50m
+    case wind_speed_100m
+    case wind_speed_200m
+    case wind_speed_300m
     
-    case wind_v_component_50m
-    case wind_u_component_50m
-    case wind_v_component_100m
-    case wind_u_component_100m
-    case wind_v_component_200m
-    case wind_u_component_200m
-    case wind_v_component_300m
-    case wind_u_component_300m
+    /// Wind direction has been corrected due to grid projection
+    case wind_direction_10m
+    case wind_direction_50m
+    case wind_direction_100m
+    case wind_direction_200m
+    case wind_direction_300m
     
     case temperature_50m
     case temperature_100m
@@ -42,10 +43,11 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .rain, .snowfall_water_equivalent: return true
-        case .wind_u_component_10m, .wind_v_component_10m: return true
-        case .wind_u_component_100m, .wind_v_component_100m: return true
-        case .wind_u_component_200m, .wind_v_component_200m: return true
-        case .wind_u_component_300m, .wind_v_component_300m: return true
+        case .wind_speed_10m, .wind_direction_10m: return true
+        case .wind_speed_50m, .wind_direction_50m: return true
+        case .wind_speed_100m, .wind_direction_100m: return true
+        case .wind_speed_200m, .wind_direction_200m: return true
+        case .wind_speed_300m, .wind_direction_300m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation: return true
@@ -86,16 +88,14 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return 1
         case .snowfall_water_equivalent:
             return 10
-        case .wind_v_component_10m:
-            return 10
-        case .wind_u_component_10m:
-            return 10
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_200m,  .wind_u_component_200m, .wind_v_component_300m, .wind_u_component_300m:
+        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_200m, .wind_speed_300m:
             return 10
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return 20
         case .snow_depth_water_equivalent:
             return 10
+        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
+            return 1
         }
     }
     
@@ -115,10 +115,8 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .wind_v_component_10m:
-            return .hermite(bounds: nil)
-        case .wind_u_component_10m:
-            return .hermite(bounds: nil)
+        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_200m, .wind_speed_300m:
+            return .hermite(bounds: 0...1000)
         case .rain:
             return .backwards_sum
         case .snowfall_water_equivalent, .snow_depth_water_equivalent:
@@ -127,10 +125,10 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .hermite(bounds: nil)
         case .shortwave_radiation:
             return .solar_backwards_averaged
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_200m,  .wind_u_component_200m, .wind_v_component_300m, .wind_u_component_300m:
-            return .hermite(bounds: nil)
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return .hermite(bounds: nil)
+        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
+            return .linearDegrees
         }
     }
     
@@ -158,14 +156,12 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .wattPerSquareMetre
         case .snowfall_water_equivalent:
             return .millimetre
-        case .wind_v_component_10m:
-            return .metrePerSecond
-        case .wind_u_component_10m:
-            return .metrePerSecond
-        case .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_200m,  .wind_u_component_200m, .wind_v_component_300m, .wind_u_component_300m:
+        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_200m, .wind_speed_300m:
             return .metrePerSecond
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return .celsius
+        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
+            return .percentage
         }
     }
     
@@ -186,8 +182,8 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
  */
 enum KnmiPressureVariableType: String, CaseIterable {
     case temperature
-    case wind_u_component
-    case wind_v_component
+    case wind_speed
+    case wind_direction
     case geopotential_height
     case relative_humidity
 }
@@ -218,11 +214,11 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_speed:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
+        case .wind_direction:
+            return (0.2..<0.5).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         case .relative_humidity:
@@ -234,10 +230,10 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         switch variable {
         case .temperature:
             return .hermite(bounds: nil)
-        case .wind_u_component:
-            return .hermite(bounds: nil)
-        case .wind_v_component:
-            return .hermite(bounds: nil)
+        case .wind_speed:
+            return .hermite(bounds: 0...1000)
+        case .wind_direction:
+            return .linearDegrees
         case .geopotential_height:
             return .hermite(bounds: nil)
         case .relative_humidity:
@@ -249,10 +245,10 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         switch variable {
         case .temperature:
             return .celsius
-        case .wind_u_component:
+        case .wind_speed:
             return .metrePerSecond
-        case .wind_v_component:
-            return .metrePerSecond
+        case .wind_direction:
+            return .percentage
         case .geopotential_height:
             return .metre
         case .relative_humidity:
