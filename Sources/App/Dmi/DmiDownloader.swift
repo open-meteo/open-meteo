@@ -42,7 +42,6 @@ struct DmiDownload: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
-        //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -74,7 +73,6 @@ struct DmiDownload: AsyncCommand {
             if parameterName == "Land cover (0 = sea, 1 = land)" {
                 return .landmask
             }
-            
             switch (shortName, typeOfLevel, levelStr) {
             case ("ugst", "heightAboveGround", "10"):
                 return .ugst
@@ -121,7 +119,7 @@ struct DmiDownload: AsyncCommand {
             fatalError("Please specify environment variable 'DMI_API_KEY'")
         }
         let logger = application.logger
-        let deadLineHours = Double(6)
+        let deadLineHours = Double(4)
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
@@ -138,10 +136,8 @@ struct DmiDownload: AsyncCommand {
         }
         
         let generateElevationFile = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath())
-        
         // Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
         let trueNorth = (grid as! ProjectionGrid<LambertConformalConicProjection>).getTrueNorthDirection()
-        
         var previous = GribDeaverager()
         let timerange = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600)
         
@@ -180,7 +176,7 @@ struct DmiDownload: AsyncCommand {
                         if !generateElevationFile && [DmiVariableTemporary.elevation, .landmask].contains(temporary) {
                             return nil
                         }
-                        logger.warning("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
+                        logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                         try grib2d.load(message: message)
                         switch unit {
@@ -220,7 +216,7 @@ struct DmiDownload: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                     case "m**2 s**-2": // gph to metre
                         grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
-                    case "(0 - 1)":
+                    case "(0 - 1)", "(0-1)":
                         if variable.unit == .percentage {
                             grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
                         }
@@ -257,7 +253,6 @@ struct DmiDownload: AsyncCommand {
                 if generateElevationFile {
                     try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
                 }
-                
                 return h + windHandles
             }
         }
@@ -267,9 +262,10 @@ struct DmiDownload: AsyncCommand {
     }
     
     func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
-        if parameterName == "Direct solar exposure" {
-            return DmiSurfaceVariable.direct_radiation
-        }
+        //if parameterName == "Direct solar exposure" {
+            //This contains DNI
+            //return DmiSurfaceVariable.shortwave_radiation
+        //}
         
         // Note: Pressure level wind requires U/V projection direction correction
         /*if typeOfLevel == "isobaricInhPa" {
@@ -326,6 +322,8 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.snow_depth_water_equivalent // ok
         case ("grad", "heightAboveGround", "0"):
             return DmiSurfaceVariable.shortwave_radiation // ok
+        case ("dswrf", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.direct_radiation
         case ("h", "isothermZero", "0"):
             return DmiSurfaceVariable.freezing_level_height
         case ("cape", "entireAtmosphere", "0"):

@@ -165,6 +165,7 @@ struct KnmiDownload: AsyncCommand {
                 if stepType == "accum" && timestamp == run {
                     return nil // skip precipitation at timestep 0
                 }
+                logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)]")
                 
                 let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
@@ -177,7 +178,7 @@ struct KnmiDownload: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                 case "m**2 s**-2": // gph to metre
                     grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
-                case "(0 - 1)":
+                case "(0 - 1)", "(0-1)":
                     if variable.unit == .percentage {
                         grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
                     }
@@ -194,7 +195,6 @@ struct KnmiDownload: AsyncCommand {
                     return nil
                 }
                 
-                logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
             }.collect().compactMap({$0})
