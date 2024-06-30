@@ -261,6 +261,7 @@ struct DmiDownload: AsyncCommand {
         return handles
     }
     
+    /// https://opendatadocs.dmi.govcloud.dk/Data/Forecast_Data_Weather_Model_HARMONIE_DINI_EDR
     func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
         //if parameterName == "Direct solar exposure" {
             //This contains DNI
@@ -330,6 +331,16 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.cape
         case ("cin", "entireAtmosphere", "0"):
             return DmiSurfaceVariable.convective_inhibition
+        case ("cc", "heightAboveGround", "2"):
+            return DmiSurfaceVariable.cloud_cover_2m
+        case ("cc", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.cloud_cover
+        case ("lcc", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.cloud_cover_low // ok
+        case ("mcc", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.cloud_cover_mid // ok
+        case ("hcc", "heightAboveGround", "0"):
+            return DmiSurfaceVariable.cloud_cover_high // ok
         default:
             break
         }
@@ -339,14 +350,6 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.precipitation
         case ("tsrwe", "0"):
             return DmiSurfaceVariable.snowfall_water_equivalent // ok
-        case ("cc", "2"): // for some reason this is 2 in GRIB files
-            return DmiSurfaceVariable.cloud_cover // ok
-        case ("lcc", "0"):
-            return DmiSurfaceVariable.cloud_cover_low // ok
-        case ("mcc", "0"):
-            return DmiSurfaceVariable.cloud_cover_mid // ok
-        case ("hcc", "0"):
-            return DmiSurfaceVariable.cloud_cover_high // ok
         default: return nil
         }
     }

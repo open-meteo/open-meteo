@@ -9,6 +9,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
+    case cloud_cover_2m
     case pressure_msl
     case relative_humidity_2m
     
@@ -80,13 +81,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .surface_temperature:
             return 20
-        case .cloud_cover:
-            return 1
-        case .cloud_cover_low:
-            return 1
-        case .cloud_cover_mid:
-            return 1
-        case .cloud_cover_high:
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return 1
         case .relative_humidity_2m:
             return 1
@@ -123,14 +118,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
-        case .cloud_cover:
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return .hermite(bounds: 0...100)
-        case .cloud_cover_low:
-            return .hermite(bounds: 0...100)
-        case .cloud_cover_mid:
-            return .hermite(bounds: 0...100)
-        case .cloud_cover_high:
-            return .hermite(bounds: 0...10)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
@@ -164,13 +153,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .surface_temperature:
             return .celsius
-        case .cloud_cover:
-            return .percentage
-        case .cloud_cover_low:
-            return .percentage
-        case .cloud_cover_mid:
-            return .percentage
-        case .cloud_cover_high:
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return .percentage
         case .relative_humidity_2m:
             return .percentage
