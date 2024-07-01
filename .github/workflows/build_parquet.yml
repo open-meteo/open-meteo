@@ -4,7 +4,7 @@ on:
 name: Build ubuntu package Parquet
 
 env:
-    swift_package_resolve: swift package resolve
+    swift_package_resolve: ENABLE_PARQUET=TRUE swift package resolve
     swift_build: ENABLE_PARQUET=TRUE MARCH_SKYLAKE=TRUE swift build -c release -Xswiftc -g -Xswiftc -static-stdlib
     swift_test: swift test
     cache_version: 2
