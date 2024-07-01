@@ -30,11 +30,11 @@ final class BufferedParquetFileWriter {
             self.data = [[Float]](repeating: [Float](), count: data.count)
             
             let columns = [
-                ("location_id", .int64),
-                ("latitude", .float),
-                ("longitude", .float),
-                ("elevation", .float),
-                ("time", .timestamp(unit: .seconds))
+                ("location_id", ArrowDataType.int64),
+                ("latitude", ArrowDataType.float),
+                ("longitude", ArrowDataType.float),
+                ("elevation", ArrowDataType.float),
+                ("time", ArrowDataType.timestamp(unit: .second))
             ] + zip(variables, data).map{("\($0.0)_\($0.1.unit)", ArrowDataType.float)}
             
             let schema = try ArrowSchema(columns)
@@ -74,7 +74,7 @@ final class BufferedParquetFileWriter {
             try ArrowArray(float: latitudes),
             try ArrowArray(float: longitudes),
             try ArrowArray(float: elevations),
-            try ArrowArray(timestamp: times, unit: .seconds)
+            try ArrowArray(timestamp: times, unit: .second)
         ] + data.map( {try ArrowArray(float: $0)}))
         try writer.write(table: table, chunkSize: locations.count)
         
@@ -221,7 +221,7 @@ struct ExportCommand: AsyncCommand {
             )
             try FileManager.default.moveFileOverwrite(from: "\(filePath)~", to: filePath)
         case .parquet:
-            try generateParquet(
+            try await generateParquet(
                 logger: logger,
                 file: filePath,
                 domain: domain,
@@ -239,7 +239,7 @@ struct ExportCommand: AsyncCommand {
         }
     }
     
-    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, ignoreSea: Bool) throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, ignoreSea: Bool) async throws {
         #if ENABLE_PARQUET
         
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
@@ -281,16 +281,16 @@ struct ExportCommand: AsyncCommand {
                     let rows = try variables.map { variable in
                         let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
                         let variable = variable == "precipitation_sum_imerg" ? "precipitation_sum" : variable
-                        guard let data = try reader.get(mixed: variable, time: time) else {
+                        guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                             fatalError("Invalid variable \(variable)")
                         }
                         return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                     }
                     try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
-                    progress.add(time.count * 4 * variables.count)
+                    await progress.add(time.count * 4 * variables.count)
                 }
                 try writer.flush(closeFile: true)
-                progress.finish()
+                await progress.finish()
                 return
             }
             // Loop over locations, read and write
@@ -309,16 +309,16 @@ struct ExportCommand: AsyncCommand {
                     continue
                 }
                 let rows = try variables.map { variable in
-                    guard let data = try reader.get(mixed: variable, time: time) else {
+                    guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                         fatalError("Invalid variable \(variable)")
                     }
                     return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                 }
                 try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
-                progress.add(time.count * 4 * variables.count)
+                await progress.add(time.count * 4 * variables.count)
             }
             try writer.flush(closeFile: true)
-            progress.finish()
+            await progress.finish()
             return
         }
 
@@ -346,16 +346,16 @@ struct ExportCommand: AsyncCommand {
                 let rows = try variables.map { variable in
                     let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
                     let variable = variable == "precipitation_sum_imerg" ? "precipitation_sum" : variable
-                    guard let data = try reader.get(mixed: variable, time: time) else {
+                    guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                         fatalError("Invalid variable \(variable)")
                     }
                     return data
                 }
                 try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: l, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
-                progress.add(time.count * 4 * variables.count)
+                await progress.add(time.count * 4 * variables.count)
             }
             try writer.flush(closeFile: true)
-            progress.finish()
+            await progress.finish()
             return
         }
         
@@ -375,16 +375,16 @@ struct ExportCommand: AsyncCommand {
                 continue
             }
             let rows = try variables.map { variable in
-                guard let data = try reader.get(mixed: variable, time: time) else {
+                guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
                     fatalError("Invalid variable \(variable)")
                 }
                 return data
             }
             try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
-            progress.add(time.count * 4 * variables.count)
+            await progress.add(time.count * 4 * variables.count)
         }
         try writer.flush(closeFile: true)
-        progress.finish()
+        await progress.finish()
         
         #else
         fatalError("Apache Parquet support not enabled")
