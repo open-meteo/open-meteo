@@ -279,7 +279,7 @@ struct ExportCommand: AsyncCommand {
                     if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
                         continue
                     }
-                    if let longitudeBounds, !longitudeBounds.contains(coords.latitude) {
+                    if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
@@ -313,6 +313,9 @@ struct ExportCommand: AsyncCommand {
                 let reader = try domain.getReader(position: gridpoint)
                 let coords = grid.getCoordinates(gridpoint: gridpoint)
                 if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                    continue
+                }
+                if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
@@ -349,6 +352,9 @@ struct ExportCommand: AsyncCommand {
                 if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
                     continue
                 }
+                if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
+                    continue
+                }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
                 if ignoreSea, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
                     continue
@@ -379,6 +385,9 @@ struct ExportCommand: AsyncCommand {
             let reader = try domain.getReader(position: gridpoint)
             let coords = grid.getCoordinates(gridpoint: gridpoint)
             if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                continue
+            }
+            if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
                 continue
             }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
