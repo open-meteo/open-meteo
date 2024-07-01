@@ -143,6 +143,9 @@ struct ExportCommand: AsyncCommand {
         @Option(name: "latitude-bounds")
         var latitudeBounds: String?
         
+        @Option(name: "longitude-bounds")
+        var longitudeBounds: String?
+        
         @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
         var outputFilename: String?
         
@@ -179,6 +182,10 @@ struct ExportCommand: AsyncCommand {
         let filePath = signature.outputFilename ?? (format == .netcdf ? "./output.nc" : "./output.parquet")
         
         let latitudeBounds = signature.latitudeBounds.map {
+            let parts = $0.split(separator: ",")
+            return Float(parts[0])! ... Float(parts[1])!
+        }
+        let longitudeBounds = signature.longitudeBounds.map {
             let parts = $0.split(separator: ",")
             return Float(parts[0])! ... Float(parts[1])!
         }
@@ -234,12 +241,13 @@ struct ExportCommand: AsyncCommand {
                 normals: signature.normalsYears.map { ($0.split(separator: ",").map({Int($0)! }), signature.normalsWith ?? 10) },
                 rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution),
                 latitudeBounds: latitudeBounds,
+                longitudeBounds: longitudeBounds,
                 ignoreSea: signature.ignoreSea
             )
         }
     }
     
-    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, ignoreSea: Bool) async throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, ignoreSea: Bool) async throws {
         #if ENABLE_PARQUET
         
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
@@ -269,6 +277,9 @@ struct ExportCommand: AsyncCommand {
                     //}
                     let coords = grid.getCoordinates(gridpoint: l)
                     if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                        continue
+                    }
+                    if let longitudeBounds, !longitudeBounds.contains(coords.latitude) {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
@@ -708,6 +719,7 @@ enum ExportDomain: String, CaseIterable {
     case glofas_v3_seasonal
     case era5_land
     case era5
+    case ecmwf_ifs
     
     var genericDomain: GenericDomain {
         switch self {
@@ -737,6 +749,8 @@ enum ExportDomain: String, CaseIterable {
             return CdsDomain.era5_land
         case .era5:
             return CdsDomain.era5
+        case .ecmwf_ifs:
+            return CdsDomain.ecmwf_ifs
         }
     }
     
@@ -767,6 +781,8 @@ enum ExportDomain: String, CaseIterable {
         case .era5_land:
             return nil
         case .era5:
+            return nil
+        case .ecmwf_ifs:
             return nil
         }
     }
@@ -805,6 +821,8 @@ enum ExportDomain: String, CaseIterable {
             return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)), options: options)
         case .era5:
             return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)), options: options)
+        case .ecmwf_ifs:
+            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, position: position)), options: options)
         }
     }
     
