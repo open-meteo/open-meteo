@@ -251,6 +251,7 @@ struct MeteoFranceDownload: AsyncCommand {
                               let parameterUnits = message.get(attribute: "parameterUnits"),
                               let validityTime = message.get(attribute: "validityTime"),
                               let validityDate = message.get(attribute: "validityDate"),
+                              let unit = message.get(attribute: "units"),
                               let paramId = message.get(attribute: "paramId")
                         else {
                             fatalError("could not get attributes")
@@ -278,6 +279,12 @@ struct MeteoFranceDownload: AsyncCommand {
                                 grib2d.array.shift180LongitudeAndFlipLatitude()
                             } else {
                                 grib2d.array.flipLatitude()
+                            }
+                            switch unit {
+                            case "kg m-2 s-1": // mm/s to mm/h
+                                grib2d.array.data.multiplyAdd(multiply: 3600, add: 0)
+                            default:
+                                break
                             }
                             // Deaccumulate precipitation
                             guard await previousScoped.deaccumulateIfRequired(variable: temporary, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
@@ -514,10 +521,13 @@ extension VariablePerMemberStorage {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .compactMap({ (t, handles) -> GenericVariableHandle? in
-                guard let tgrp = handles.first(where: {$0.key.variable == tgrp}), let tsnowp = handles.first(where: {$0.key.variable == tsnowp}), let tirf = handles.first(where: {$0.key.variable == tirf}) else {
+                guard 
+                    let tgrp = handles.first(where: {$0.key.variable == tgrp}),
+                    let tsnowp = handles.first(where: {$0.key.variable == tsnowp}),
+                    let tirf = handles.first(where: {$0.key.variable == tirf}) else {
                     return nil
                 }
-                let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tsnowp.value.data)).map({$0 + $1.0 + $1.1})
+                let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({$0 + $1.0 + $1.1})
                 return GenericVariableHandle(
                     variable: outVariable,
                     time: t.timestamp,
