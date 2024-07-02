@@ -127,6 +127,23 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
     }
     
+    /// Temporarily keep those varibles to derive others
+    enum MfVariableTemporary: String {
+        case ugst
+        case vgst
+
+        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
+            switch (shortName, typeOfLevel, levelStr) {
+            case ("10efg", "heightAboveGround", "10"):
+                return .ugst
+            case ("10nfg", "heightAboveGround", "10"):
+                return .vgst
+            default:
+                return nil
+            }
+        }
+    }
+    
     /**
      Download GRIB packaegs SP1, SP2,....
      Issues:
@@ -173,8 +190,11 @@ struct MeteoFranceDownload: AsyncCommand {
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let h = try await curl.withGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+                    
+                    let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
+                    
                     // process sequentialy, as precipitation need to be in order for deaveraging
-                    return try await stream.compactMap { message -> GenericVariableHandle? in
+                    let handles = try await stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
                               let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType"),
@@ -189,6 +209,20 @@ struct MeteoFranceDownload: AsyncCommand {
                             fatalError("could not get attributes")
                         }
                         let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                        
+                        if let temporary = MfVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                            logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                            var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                            try grib2d.load(message: message)
+                            if domain.isGlobal {
+                                grib2d.array.shift180LongitudeAndFlipLatitude()
+                            } else {
+                                grib2d.array.flipLatitude()
+                            }
+                            await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                            return nil
+                        }
+                        
                         guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
                             logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
                             return nil
@@ -218,6 +252,11 @@ struct MeteoFranceDownload: AsyncCommand {
                         let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
                     }.collect()
+                    
+                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
+                    
+                    return handles + windGust
                 }
                 previous = previousScoped
                 handles.append(contentsOf: h)
