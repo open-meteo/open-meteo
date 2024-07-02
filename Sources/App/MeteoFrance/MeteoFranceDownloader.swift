@@ -170,19 +170,9 @@ struct MeteoFranceDownload: AsyncCommand {
                 let gridRes = domain.mfApiGridName.replacingOccurrences(of: ".", with: "")
                 let urlGov = "https://object.data.gouv.fr/meteofrance-pnt/pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
                 
-                // gov server misses those 2 timesteps for packages SP1,SP2,SP2,HP1... they really must be doing such non-sense on purpose https://object.data.gouv.fr/meteofrance-pnt/?list-type=2&delimiter=%2F&prefix=pnt%2F2024-06-23T00:00:00Z/arome/0025/SP1/
-                // Reported here: https://www.data.gouv.fr/fr/datasets/paquets-arome-resolution-0-01deg/#/discussions/662c255f53d52ec22bf5dcf6
-                let forceMfApi = (domain == .arome_france && ["37H42H","43H48H"].contains(packageTime) && package != "IP1") || (domain == .arpege_europe && package == "SP2")
-                
-                // Arpege 0.1° SP2 packages are "sometimes" missing
-                if domain == .arpege_europe && package == "SP2" && !["000H012H", "049H060H", "061H072H", "073H084H", "085H096H", "097H102H"].contains(packageTime) {
-                    continue
-                }
-                    
-                    
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
-                let h = try await curl.withGribStream(url: (useGovServer && !forceMfApi) ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+                let h = try await curl.withGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                     // process sequentialy, as precipitation need to be in order for deaveraging
                     return try await stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
