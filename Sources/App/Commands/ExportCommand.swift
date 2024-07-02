@@ -171,7 +171,7 @@ struct ExportCommand: AsyncCommand {
             }
             let start = try IsoDate(fromIsoString: startDate).toTimestamp()
             let end = try IsoDate(fromIsoString: endDate).toTimestamp()
-            return TimerangeDt(start: start, to: end.add(dtSeconds), dtSeconds: dtSeconds)
+            return TimerangeDt(start: start, to: end.add(days: 1), dtSeconds: dtSeconds)
         }
     }
     
