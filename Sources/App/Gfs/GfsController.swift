@@ -489,7 +489,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let showers = try get(raw: .surface(.showers), time: time).data
                 let rain = zip(frozen_precipitation_percent, zip(precipitation, showers)).map({ (frozen_precipitation_percent, arg1) in
                     let (precipitation, showers) = arg1
-                    let snowfallWaterEqivalent = (frozen_precipitation_percent/100) * precipitation
+                    let snowfallWaterEqivalent = max(min(frozen_precipitation_percent/100,1),0) * precipitation
                     return max(precipitation - snowfallWaterEqivalent - showers, 0)
                 })
                 return DataAndUnit(rain, .millimetre)
