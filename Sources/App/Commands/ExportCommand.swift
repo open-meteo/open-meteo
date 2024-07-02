@@ -286,7 +286,7 @@ struct ExportCommand: AsyncCommand {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                    if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
+                    if let onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                         continue
                     }
                     
@@ -322,7 +322,7 @@ struct ExportCommand: AsyncCommand {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
+                if let onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                     continue
                 }
                 let rows = try variables.map { variable in
@@ -359,7 +359,7 @@ struct ExportCommand: AsyncCommand {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
+                if let onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                     continue
                 }
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
@@ -394,7 +394,7 @@ struct ExportCommand: AsyncCommand {
                 continue
             }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-            if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
+            if let onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                 continue
             }
             let rows = try variables.map { variable in
