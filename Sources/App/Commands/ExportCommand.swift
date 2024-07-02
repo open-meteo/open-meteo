@@ -161,6 +161,9 @@ struct ExportCommand: AsyncCommand {
         @Flag(name: "ignore_sea", help: "Ignore sea points")
         var ignoreSea: Bool
         
+        @Option(name: "ignore_sea_search_radius", help: "Radius to search for land")
+        var ignoreSeaSearchRadius: Int?
+        
         /// Get time range from parameters
         func getTime(dtSeconds: Int) throws -> TimerangeDt? {
             guard let startDate, let endDate else {
@@ -242,12 +245,12 @@ struct ExportCommand: AsyncCommand {
                 rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution),
                 latitudeBounds: latitudeBounds,
                 longitudeBounds: longitudeBounds,
-                ignoreSea: signature.ignoreSea
+                onlySeaAroundSearchRadius: signature.ignoreSea ? (signature.ignoreSeaSearchRadius ?? 0) : nil
             )
         }
     }
     
-    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, ignoreSea: Bool) async throws {
+    func generateParquet(logger: Logger, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?) async throws {
         #if ENABLE_PARQUET
         
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
@@ -283,7 +286,7 @@ struct ExportCommand: AsyncCommand {
                         continue
                     }
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                    if ignoreSea, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                    if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                         continue
                     }
                     
@@ -319,7 +322,7 @@ struct ExportCommand: AsyncCommand {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                if ignoreSea, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
+                if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                     continue
                 }
                 let rows = try variables.map { variable in
@@ -356,7 +359,7 @@ struct ExportCommand: AsyncCommand {
                     continue
                 }
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-                if ignoreSea, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile) {
+                if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: l, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                     continue
                 }
                 let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
@@ -391,7 +394,7 @@ struct ExportCommand: AsyncCommand {
                 continue
             }
             let elevation = try grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-            if ignoreSea, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile) {
+            if onlySeaAroundSearchRadius, try grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
                 continue
             }
             let rows = try variables.map { variable in
@@ -540,10 +543,13 @@ struct ExportCommand: AsyncCommand {
 
 extension Gridable {
     /// Return true if there is no land around a 5x5 box
-    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFileCached>) throws -> Bool {
-        for y in -2...2 {
-            for x in -2...2 {
-                let point = max(0, min(gridpoint + y * nx + x, count))
+    /// `searchRadius = 2` for 5x5 search
+    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFileCached>, searchRadius: Int) throws -> Bool {
+        let yy = gridpoint / nx
+        let xx = gridpoint % nx
+        for y in min(max(yy-searchRadius,0),ny) ..< min(max(yy+searchRadius+1,0),ny) {
+            for x in min(max(xx-searchRadius,0),nx) ..< min(max(xx+searchRadius+1,0),nx){
+                let point = max(0, min(y * nx + x, count))
                 if try !readElevation(gridpoint: point, elevationFile: elevationFile).isSea {
                     return false
                 }
