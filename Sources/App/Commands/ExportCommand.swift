@@ -340,7 +340,7 @@ struct ExportCommand: AsyncCommand {
         }
 
         logger.info("Writing data. Total raw size \((grid.count * time.count * 4 * variables.count).bytesHumanReadable)")
-        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
+        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
         let timestamps64 = time.map({Int64($0.timeIntervalSince1970)})
         
         /// Interpolate data from one grid to another and perform bias correction
