@@ -790,6 +790,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case windspeed_40m
     case windspeed_50m
     case windspeed_80m
+    case wind_direction_250m
+    case wind_direction_300m
+    case wind_direction_350m
+    case wind_direction_450m
     case wind_direction_100m
     case wind_direction_10m
     case wind_direction_120m
@@ -805,6 +809,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wind_direction_80m
     case wind_direction_70m
     case wind_gusts_10m
+    case wind_speed_250m
+    case wind_speed_300m
+    case wind_speed_350m
+    case wind_speed_450m
     case wind_speed_100m
     case wind_speed_10m
     case wind_speed_120m
