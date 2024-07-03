@@ -594,6 +594,12 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .knmiHarmonieAromeNetherlands
         case .dmi_harmonie_arome_europe:
             return .dmiHarmonieAromeEurope
+        case .knmi_seamless:
+            return .knmiSeamless
+        case .dmi_seamless:
+            return .dmiSeamless
+        case .metno_seamless:
+            return .metnoSeamless
         }
     }
 }

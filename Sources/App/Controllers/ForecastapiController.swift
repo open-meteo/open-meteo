@@ -336,6 +336,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case knmi_harmonie_arome_europe
     case knmi_harmonie_arome_netherlands
     case dmi_harmonie_arome_europe
+    case knmi_seamless
+    case dmi_seamless
+    case metno_seamless
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -490,6 +493,22 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .dmi_harmonie_arome_europe:
             return try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .knmi_seamless:
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let knmiNetherlands: (any GenericReaderProtocol)? = try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let knmiEurope = try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, ecmwf, knmiEurope, knmiNetherlands].compactMap({$0})
+        case .dmi_seamless:
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let dmiEurope: (any GenericReaderProtocol)? = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, ecmwf, dmiEurope].compactMap({$0})
+        case .metno_seamless:
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let metno: (any GenericReaderProtocol)? = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, ecmwf, metno].compactMap({$0})
         }
     }
     
