@@ -669,6 +669,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_2m
+    case cloud_base
+    case cloud_top
     case dewpoint_2m
     case dew_point_2m
     case diffuse_radiation
