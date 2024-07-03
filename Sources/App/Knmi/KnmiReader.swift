@@ -198,7 +198,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .weather_code, .weathercode:
                 try prefetchData(variable: .cloud_cover, time: time)
                 try prefetchData(variable: .rain, time: time)
-                try prefetchData(derived: .surface(.snowfall), time: time)
+                try prefetchData(variable: .snowfall_water_equivalent, time: time)
                 //try prefetchData(variable: .cape, time: time)
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .is_day:
