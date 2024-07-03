@@ -21,6 +21,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .cape, previousDay: previousDay)
         case .cloudcover, .cloud_cover:
             return .init(variable: .cloudCover, previousDay: previousDay)
+        case .cloud_cover_2m:
+            return .init(variable: .cloudCover, altitude: 2, previousDay: previousDay)
         case .cloudcover_high, .cloud_cover_high:
             return .init(variable: .cloudCoverHigh, previousDay: previousDay)
         case .cloudcover_low, .cloud_cover_low:
@@ -587,14 +589,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .gfs013:
             return .gfs013
         case .knmi_harmonie_arome_europe:
-            // TODO register domain
-            return .bestMatch
+            return .knmiHarmonieAromeEurope
         case .knmi_harmonie_arome_netherlands:
-            // TODO register domain
-            return .bestMatch
+            return .knmiHarmonieAromeNetherlands
         case .dmi_harmonie_arome_europe:
-            // TODO register domain
-            return .bestMatch
+            return .dmiHarmonieAromeEurope
         }
     }
 }
