@@ -342,9 +342,9 @@ struct KnmiDownload: AsyncCommand {
         
         switch (shortName, typeOfLevel, levelStr) {
         case ("vis", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.visibility
+            return KnmiSurfaceVariable.visibility
         case ("t", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.surface_temperature
+            return KnmiSurfaceVariable.surface_temperature
         case ("t", "heightAboveGround", "2"):
             return KnmiSurfaceVariable.temperature_2m
         case ("r", "heightAboveGround", "2"):

@@ -201,6 +201,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
                 //try prefetchData(variable: .cape, time: time)
                 try prefetchData(variable: .wind_gusts_10m, time: time)
+                try prefetchData(variable: .visibility, time: time)
             case .is_day:
                 break
             case .temperature_80m:
@@ -356,6 +357,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
                 //let cape = try get(raw: .cape, time: time).data
                 let gusts = try get(raw: .wind_gusts_10m, time: time).data
+                let visibility = try get(raw: .visibility, time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
@@ -364,7 +366,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                     gusts: gusts,
                     cape: nil,
                     liftedIndex: nil,
-                    visibilityMeters: nil,
+                    visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
                     modelDtSeconds: time.dtSeconds), .wmoCode
                 )

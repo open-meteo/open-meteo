@@ -65,6 +65,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m: return true
         case .cape: return true
+        case .visibility: return true
         default: return false
         }
     }
