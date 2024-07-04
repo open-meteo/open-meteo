@@ -106,7 +106,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m, .surface_temperature
+        case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
         case .cloud_cover:
             return .hermite(bounds: 0...100)
