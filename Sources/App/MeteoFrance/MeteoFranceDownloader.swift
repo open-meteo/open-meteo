@@ -127,13 +127,76 @@ struct MeteoFranceDownload: AsyncCommand {
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
     }
     
+    /// Temporarily keep those varibles to derive others
+    enum MfVariableTemporary: String {
+        case ugst
+        case vgst
+
+        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
+            switch (shortName, typeOfLevel, levelStr) {
+            case ("10efg", "heightAboveGround", "10"):
+                return .ugst
+            case ("10nfg", "heightAboveGround", "10"):
+                return .vgst
+            default:
+                return nil
+            }
+        }
+    }
+    
+    /// Temporarily keep those varibles to derive others
+    enum MfVariablePrecipTemporary: String, GenericVariable {
+        case tgrp // graupel
+        case tirf // rain
+        case tsnowp // snow
+        
+        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
+            switch (shortName, typeOfLevel, levelStr) {
+            case ("tgrp", "surface", "0"):
+                return .tgrp
+            case ("tirf", "surface", "0"):
+                return .tirf
+            case ("tsnowp", "surface", "0"):
+                return .tsnowp
+            default:
+                return nil
+            }
+        }
+        
+        var omFileName: (file: String, level: Int) {
+            return (rawValue, 0)
+        }
+        
+        var scalefactor: Float {
+             return 10
+        }
+        
+        var interpolation: ReaderInterpolation {
+            return .backwards_sum
+        }
+        
+        var unit: SiUnit {
+            return .millimetre
+        }
+        
+        var isElevationCorrectable: Bool {
+            return false
+        }
+        
+        var storePreviousForecast: Bool {
+            return false
+        }
+        
+        var requiresOffsetCorrectionForMixing: Bool {
+            return false
+        }
+    }
+    
     /**
      Download GRIB packaegs SP1, SP2,....
      Issues:
      - MF does not publish 15minutely data via GRIB packages
      - There is no GRIB inventory, so we have to download the entire GRIB file
-     - Arome HD has snowfall & rain, but no precipitation field. Need post processing to sum up rain+snow and emit precip field
-     - Arome HD has no wind gust field, but UV gust components -> need post process
      */
     func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
@@ -173,8 +236,12 @@ struct MeteoFranceDownload: AsyncCommand {
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let h = try await curl.withGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+                    
+                    let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
+                    let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
+                    
                     // process sequentialy, as precipitation need to be in order for deaveraging
-                    return try await stream.compactMap { message -> GenericVariableHandle? in
+                    let handles = try await stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
                               let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType"),
@@ -184,11 +251,49 @@ struct MeteoFranceDownload: AsyncCommand {
                               let parameterUnits = message.get(attribute: "parameterUnits"),
                               let validityTime = message.get(attribute: "validityTime"),
                               let validityDate = message.get(attribute: "validityDate"),
+                              let unit = message.get(attribute: "units"),
                               let paramId = message.get(attribute: "paramId")
                         else {
                             fatalError("could not get attributes")
                         }
                         let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                        
+                        if let temporary = MfVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                            logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                            var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                            try grib2d.load(message: message)
+                            if domain.isGlobal {
+                                grib2d.array.shift180LongitudeAndFlipLatitude()
+                            } else {
+                                grib2d.array.flipLatitude()
+                            }
+                            await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                            return nil
+                        }
+                        
+                        if domain == .arome_france_hd, let temporary = MfVariablePrecipTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                            logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                            var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                            try grib2d.load(message: message)
+                            if domain.isGlobal {
+                                grib2d.array.shift180LongitudeAndFlipLatitude()
+                            } else {
+                                grib2d.array.flipLatitude()
+                            }
+                            switch unit {
+                            case "kg m-2 s-1": // mm/s to mm/h
+                                grib2d.array.data.multiplyAdd(multiply: 3600, add: 0)
+                            default:
+                                break
+                            }
+                            // Deaccumulate precipitation
+                            guard await previousScoped.deaccumulateIfRequired(variable: temporary, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                                return nil
+                            }
+                            await inMemoryPrecip.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                            return nil
+                        }
+                        
                         guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
                             logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
                             return nil
@@ -218,6 +323,12 @@ struct MeteoFranceDownload: AsyncCommand {
                         let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
                     }.collect()
+                    
+                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
+                    let precip = try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
+                    
+                    return handles + windGust + precip
                 }
                 previous = previousScoped
                 handles.append(contentsOf: h)
@@ -400,5 +511,31 @@ struct MeteoFranceDownload: AsyncCommand {
         }
         //await curl.printStatistics()
         return handles
+    }
+}
+
+
+extension VariablePerMemberStorage {
+    /// Sum up rain, snow and graupel for total precipitation
+    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+        return try self.data
+            .groupedPreservedOrder(by: {$0.key.timestampAndMember})
+            .compactMap({ (t, handles) -> GenericVariableHandle? in
+                guard 
+                    let tgrp = handles.first(where: {$0.key.variable == tgrp}),
+                    let tsnowp = handles.first(where: {$0.key.variable == tsnowp}),
+                    let tirf = handles.first(where: {$0.key.variable == tirf}) else {
+                    return nil
+                }
+                let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({$0 + $1.0 + $1.1})
+                return GenericVariableHandle(
+                    variable: outVariable,
+                    time: t.timestamp,
+                    member: t.member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: precip),
+                    skipHour0: false
+                )
+            }
+        )
     }
 }

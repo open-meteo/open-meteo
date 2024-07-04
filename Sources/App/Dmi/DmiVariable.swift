@@ -15,7 +15,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case cloud_base
     case cloud_top
-    
+
     case wind_speed_10m
     case wind_speed_50m
     case wind_speed_100m

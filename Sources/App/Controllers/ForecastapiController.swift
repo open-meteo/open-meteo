@@ -339,6 +339,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case knmi_seamless
     case dmi_seamless
     case metno_seamless
+
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
