@@ -268,6 +268,15 @@ struct DmiDownload: AsyncCommand {
             //return DmiSurfaceVariable.shortwave_radiation
         //}
         
+        switch parameterName {
+        case "Cloud base":
+            return DmiSurfaceVariable.cloud_base
+        case "Cloud top":
+            return DmiSurfaceVariable.cloud_top
+        default:
+            break
+        }
+        
         // Note: Pressure level wind requires U/V projection direction correction
         /*if typeOfLevel == "isobaricInhPa" {
             guard let level = Int(levelStr) else {

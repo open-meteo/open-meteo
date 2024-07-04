@@ -69,6 +69,10 @@ struct GribAsyncStreamHelper {
     }
 }
 
+enum GribAsyncStreamError: Error {
+    case didNotFindGibHeader
+}
+
 
 /**
  Decode incoming binary stream to grib messages
@@ -104,8 +108,8 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
-                    guard buffer.readableBytes < 4096 else {
-                        fatalError("Did not find GRIB header")
+                    guard buffer.readableBytes < 2*4096 else {
+                        throw GribAsyncStreamError.didNotFindGibHeader
                     }
                     buffer.writeImmutableBuffer(input)
                     continue

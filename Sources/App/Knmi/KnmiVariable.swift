@@ -33,6 +33,8 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     case snowfall_water_equivalent
     case rain
     
+    case surface_temperature
+    case visibility
     case snow_depth_water_equivalent
     
     case wind_gusts_10m
@@ -52,6 +54,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m: return true
+        case .visibility: return true
         default: return false
         }
     }
@@ -66,7 +69,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     
     var scalefactor: Float {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return 20
         case .cloud_cover:
             return 1
@@ -96,12 +99,14 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return 10
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
             return 1
+        case .visibility:
+            return 0.05 // 50 meter
         }
     }
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature
             return .hermite(bounds: nil)
         case .cloud_cover:
             return .hermite(bounds: 0...100)
@@ -129,12 +134,14 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .hermite(bounds: nil)
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
             return .linearDegrees
+        case .visibility:
+            return .linear
         }
     }
     
     var unit: SiUnit {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m,.surface_temperature:
             return .celsius
         case .cloud_cover:
             return .percentage
@@ -162,6 +169,8 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .celsius
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
             return .percentage
+        case .visibility:
+            return .metre
         }
     }
     

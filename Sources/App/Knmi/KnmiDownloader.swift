@@ -52,6 +52,8 @@ struct KnmiDownload: AsyncCommand {
     enum KnmiVariableTemporary: String {
         case ugst
         case vgst
+        case landmask
+        case elevation
         
         static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
             switch (shortName, typeOfLevel, levelStr) {
@@ -59,6 +61,10 @@ struct KnmiDownload: AsyncCommand {
                 return .ugst
             case ("vgst", "heightAboveGround", "10"):
                 return .vgst
+            case ("z", "heightAboveGround", "0"):
+                return .elevation
+            case ("lsm", "heightAboveGround", "0"):
+                return .landmask
             default:
                 return nil
             }
@@ -119,7 +125,7 @@ struct KnmiDownload: AsyncCommand {
     
     /**
      TODO:
-     - model elevation and land/sea mask
+     - model elevation and land/sea mask for European model configuration
      - support ensemble models
      
      Important: Wind U/V components are defined on a Rotated LatLon  projection. They need to be corrected for true north.
@@ -158,6 +164,7 @@ struct KnmiDownload: AsyncCommand {
         }
         let metaUrl = "https://api.dataplatform.knmi.nl/open-data/v1/datasets/\(dataset)_\(run.format_YYYYMMddHH).tar/url"
         let trueNorth = (grid as? ProjectionGrid<RotatedLatLonProjection>)?.getTrueNorthDirection()
+        let generateElevationFile = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath())
         
         guard let metaData = try await curl.downloadInMemoryAsync(url: metaUrl, minSize: nil, headers: [("Authorization", "Bearer \(apikey.randomElement() ?? "")")]).readJSONDecodable(MetaUrlResponse.self) else {
             fatalError("Could not decode meta response")
@@ -206,9 +213,18 @@ struct KnmiDownload: AsyncCommand {
                 }
                 
                 if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                    if !generateElevationFile && [KnmiVariableTemporary.elevation, .landmask].contains(temporary) {
+                        return nil
+                    }
                     logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                     var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                     try grib2d.load(message: message)
+                    switch unit {
+                    case "m**2 s**-2": // gph to metre
+                        grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
+                    default:
+                        break
+                    }
                     await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
                     return nil
                 }
@@ -254,6 +270,10 @@ struct KnmiDownload: AsyncCommand {
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
             }.collect().compactMap({$0})
+            
+            if generateElevationFile {
+                try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
+            }
             
             let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
             let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
@@ -342,9 +362,9 @@ struct KnmiDownload: AsyncCommand {
         
         switch (shortName, typeOfLevel, levelStr) {
         case ("vis", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.visibility
+            return KnmiSurfaceVariable.visibility
         case ("t", "heightAboveGround", "0"):
-            return GfsSurfaceVariable.surface_temperature
+            return KnmiSurfaceVariable.surface_temperature
         case ("t", "heightAboveGround", "2"):
             return KnmiSurfaceVariable.temperature_2m
         case ("r", "heightAboveGround", "2"):

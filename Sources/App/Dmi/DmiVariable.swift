@@ -13,6 +13,9 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case pressure_msl
     case relative_humidity_2m
     
+    case cloud_base
+    case cloud_top
+
     case wind_speed_10m
     case wind_speed_50m
     case wind_speed_100m
@@ -65,6 +68,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m: return true
         case .cape: return true
+        case .visibility: return true
         default: return false
         }
     }
@@ -108,9 +112,11 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .cape:
             return 0.1
         case .visibility:
-            return 0.05 // 50 meter
+            return 0.05 // 20 metre
         case .freezing_level_height:
-            return 0.1 // zero height 10 meter resolution
+            return 0.1 // zero height 10 metre resolution
+        case .cloud_top, .cloud_base:
+            return 0.05 // 20 metre
         }
     }
     
@@ -145,6 +151,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
             return .linearDegrees
         case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
+            return .hermite(bounds: 0...10e9)
+        case .cloud_top, .cloud_base:
             return .hermite(bounds: 0...10e9)
         }
     }
@@ -181,6 +189,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .degreeDirection
         case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
             return .metrePerSecond
+        case .cloud_top, .cloud_base:
+            return .metre
         }
     }
     

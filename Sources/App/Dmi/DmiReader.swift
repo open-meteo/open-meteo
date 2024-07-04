@@ -196,8 +196,9 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .weather_code, .weathercode:
                 try prefetchData(variable: .cloud_cover, time: time)
                 try prefetchData(variable: .precipitation, time: time)
-                try prefetchData(derived: .surface(.snowfall), time: time)
-                //try prefetchData(variable: .cape, time: time)
+                try prefetchData(variable: .snowfall_water_equivalent, time: time)
+                try prefetchData(variable: .cape, time: time)
+                try prefetchData(variable: .visibility, time: time)
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .is_day:
                 break
@@ -343,17 +344,18 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let cloudcover = try get(raw: .cloud_cover, time: time).data
                 let precipitation = try get(derived: .surface(.rain), time: time).data
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
-                //let cape = try get(raw: .cape, time: time).data
+                let cape = try get(raw: .cape, time: time).data
                 let gusts = try get(raw: .wind_gusts_10m, time: time).data
+                let visibility = try get(raw: .visibility, time: time).data
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
                     convectivePrecipitation: nil,
                     snowfallCentimeters: snowfall,
                     gusts: gusts,
-                    cape: nil,
+                    cape: cape,
                     liftedIndex: nil,
-                    visibilityMeters: nil,
+                    visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
                     modelDtSeconds: time.dtSeconds), .wmoCode
                 )
