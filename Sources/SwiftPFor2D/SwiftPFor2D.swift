@@ -4,6 +4,7 @@ import Foundation
 
 public enum SwiftPFor2DError: Error {
     case cannotOpenFile(filename: String, errno: Int32, error: String)
+    case cannotCreateFile(filename: String, errno: Int32, error: String)
     case cannotTruncateFile(filename: String, errno: Int32, error: String)
     case cannotOpenFile(errno: Int32, error: String)
     case cannotMoveFile(from: String, to: String, errno: Int32, error: String)

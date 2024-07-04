@@ -21,6 +21,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .cape, previousDay: previousDay)
         case .cloudcover, .cloud_cover:
             return .init(variable: .cloudCover, previousDay: previousDay)
+        case .cloud_cover_2m:
+            return .init(variable: .cloudCover, altitude: 2, previousDay: previousDay)
         case .cloudcover_high, .cloud_cover_high:
             return .init(variable: .cloudCoverHigh, previousDay: previousDay)
         case .cloudcover_low, .cloud_cover_low:
@@ -229,6 +231,14 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .windDirection, altitude: 50, previousDay: previousDay)
         case .winddirection_80m, .wind_direction_80m:
             return .init(variable: .windDirection, altitude: 80, previousDay: previousDay)
+        case .wind_direction_250m:
+            return .init(variable: .windDirection, altitude: 250, previousDay: previousDay)
+        case .wind_direction_300m:
+            return .init(variable: .windDirection, altitude: 300, previousDay: previousDay)
+        case .wind_direction_350m:
+            return .init(variable: .windDirection, altitude: 350, previousDay: previousDay)
+        case .wind_direction_450m:
+            return .init(variable: .windDirection, altitude: 450, previousDay: previousDay)
         case .windgusts_10m, .wind_gusts_10m:
             return .init(variable: .windGusts, altitude: 10, previousDay: previousDay)
         case .windspeed_100m, .wind_speed_100m:
@@ -251,6 +261,14 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .windSpeed, altitude: 50, previousDay: previousDay)
         case .windspeed_80m, .wind_speed_80m:
             return .init(variable: .windSpeed, altitude: 80, previousDay: previousDay)
+        case .wind_speed_250m:
+            return .init(variable: .windSpeed, altitude: 250, previousDay: previousDay)
+        case .wind_speed_300m:
+            return .init(variable: .windSpeed, altitude: 300, previousDay: previousDay)
+        case .wind_speed_350m:
+            return .init(variable: .windSpeed, altitude: 350, previousDay: previousDay)
+        case .wind_speed_450m:
+            return .init(variable: .windSpeed, altitude: 450, previousDay: previousDay)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration, previousDay: previousDay)
         case .convective_inhibition:
@@ -289,6 +307,10 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance, previousDay: previousDay)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant, previousDay: previousDay)
+        case .cloud_base:
+            return .init(variable: .cloudBase, previousDay: previousDay)
+        case .cloud_top:
+            return .init(variable: .cloudTop, previousDay: previousDay)
         }
     }
 }
@@ -586,6 +608,18 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .gfs025
         case .gfs013:
             return .gfs013
+        case .knmi_harmonie_arome_europe:
+            return .knmiHarmonieAromeEurope
+        case .knmi_harmonie_arome_netherlands:
+            return .knmiHarmonieAromeNetherlands
+        case .dmi_harmonie_arome_europe:
+            return .dmiHarmonieAromeEurope
+        case .knmi_seamless:
+            return .knmiSeamless
+        case .dmi_seamless:
+            return .dmiSeamless
+        case .metno_seamless:
+            return .metnoSeamless
         }
     }
 }

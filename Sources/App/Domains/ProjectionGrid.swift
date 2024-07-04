@@ -10,8 +10,11 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     let projection: Projection
     let nx: Int
     let ny: Int
-    let xrange: ClosedRange<Float>
-    let yrange: ClosedRange<Float>
+    let origin: (x: Float, y: Float)
+    /// In metres
+    let dx: Float
+    /// In metres
+    let dy: Float
     
     var searchRadius: Int {
         return 1
@@ -23,8 +26,18 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         self.projection = projection
         let sw = projection.forward(latitude: latitude.lowerBound, longitude: longitude.lowerBound)
         let ne = projection.forward(latitude: latitude.upperBound, longitude: longitude.upperBound)
-        xrange = sw.x ... ne.x
-        yrange = sw.y ... ne.y
+        origin = sw
+        dx = (ne.x - sw.x) / Float(nx-1)
+        dy = (ne.y - sw.y) / Float(ny-1)
+    }
+    
+    public init(nx: Int, ny: Int, latitude: Float, longitude: Float, dx: Float, dy: Float, projection: Projection) {
+        self.nx = nx
+        self.ny = ny
+        self.projection = projection
+        origin = projection.forward(latitude: latitude, longitude: longitude)
+        self.dx = dx
+        self.dy = dy
     }
     
     func findPoint(lat: Float, lon: Float) -> Int? {
@@ -36,8 +49,8 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     
     func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
         let pos = projection.forward(latitude: lat, longitude: lon)
-        let x = Int(round((pos.x - xrange.lowerBound) / xrange.length * Float(nx-1)))
-        let y = Int(round((pos.y - yrange.lowerBound) / yrange.length * Float(ny-1)))
+        let x = Int(round((pos.x - origin.x) / dx))
+        let y = Int(round((pos.y - origin.y) / dy))
         if y < 0 || x < 0 || y >= ny || x >= nx {
             return nil
         }
@@ -58,8 +71,8 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
         let y = gridpoint / nx
         let x = gridpoint-y * nx
-        let xcord = Float(x)/Float(nx-1) * xrange.length + xrange.lowerBound
-        let ycord = Float(y)/Float(ny-1) * yrange.length + yrange.lowerBound
+        let xcord = Float(x) * dx + origin.x
+        let ycord = Float(y) * dy + origin.y
         let (lat,lon) = projection.inverse(x: xcord, y: ycord)
         return (lat, (lon+180).truncatingRemainder(dividingBy: 360) - 180 )
     }
@@ -67,8 +80,8 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     /// Get angle towards true north. 0 = points towards north pole (e.g. no correction necessary), range -180;180
     func getTrueNorthDirection() -> [Float] {
         let pos = projection.forward(latitude: 90, longitude: 0)
-        let northPoleX = (pos.x - xrange.lowerBound) / xrange.length * Float(nx-1)
-        let northPoleY = (pos.y - yrange.lowerBound) / yrange.length * Float(ny-1)
+        let northPoleX = (pos.x - origin.x) / dx
+        let northPoleY = (pos.y - origin.y) / dy
         let trueNorthDirection = (0..<count).map { gridpoint in
             let x = Float(gridpoint % nx)
             let y = Float(gridpoint / nx)

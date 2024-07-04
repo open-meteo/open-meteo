@@ -28,7 +28,16 @@ extension GribMessage {
         for atr in self.iterate(namespace: .geography) {
             print(atr)
         }
-        //print(get(attribute: "projString")!)
+        /*if let proj = get(attribute: "projString") {
+            print("Projection string: \(proj)")
+        }*/
+        
+        if let gridType = get(attribute: "gridType") {
+            // https://rdrr.io/github/nawendt/gribr/src/R/grib_proj4str.R
+            print("\(gridType)")
+            print("latitudeOfSouthernPoleInDegrees \(get(attribute: "latitudeOfSouthernPoleInDegrees") ?? "nil")")
+            print("longitudeOfSouthernPoleInDegrees \(get(attribute: "longitudeOfSouthernPoleInDegrees") ?? "nil")")
+        }
         
         var coords = [Coords]()
         //var lat = 0.0

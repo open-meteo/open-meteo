@@ -65,8 +65,8 @@ final class DataTests: XCTestCase {
     func testLambertConformal() {
         let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
         let pos = proj.forward(latitude: 47, longitude: -8)
-        XCTAssertEqual(pos.x, 5833.868)
-        XCTAssertEqual(pos.y, 8632.734)
+        XCTAssertEqual(pos.x, 5833.8677)
+        XCTAssertEqual(pos.y, 8632.733)
         let coords = proj.inverse(x: pos.x, y: pos.y)
         XCTAssertEqual(coords.latitude, 47, accuracy: 0.0001)
         XCTAssertEqual(coords.longitude, -8, accuracy: 0.0001)
@@ -101,11 +101,11 @@ final class DataTests: XCTestCase {
          grid 180000 lat 24.32811370921869 lon 239.2705262869787
          */
         
-        XCTAssertEqual(nam.findPoint(lat: 21.137999999999987, lon: 237.28), 0)
-        XCTAssertEqual(nam.findPoint(lat: 24.449714395051082, lon: 265.54789437771944), 10000)
-        XCTAssertEqual(nam.findPoint(lat: 22.73382904757237 , lon: 242.93190409785294), 20000)
-        XCTAssertEqual(nam.findPoint(lat: 24.37172305316154, lon: 271.6307003393202), 30000)
-        XCTAssertEqual(nam.findPoint(lat: 24.007414634071907, lon: 248.77817290935954), 40000)
+        XCTAssertEqual(nam.findPoint(lat: 21.137999999999987, lon: 237.28 - 360), 0)
+        XCTAssertEqual(nam.findPoint(lat: 24.449714395051082, lon: 265.54789437771944 - 360), 10000)
+        XCTAssertEqual(nam.findPoint(lat: 22.73382904757237 , lon: 242.93190409785294 - 360), 20000)
+        XCTAssertEqual(nam.findPoint(lat: 24.37172305316154, lon: 271.6307003393202 - 360), 30000)
+        XCTAssertEqual(nam.findPoint(lat: 24.007414634071907, lon: 248.77817290935954 - 360), 40000)
         
         XCTAssertEqual(nam.getCoordinates(gridpoint: 0).latitude, 21.137999999999987, accuracy: 0.001)
         XCTAssertEqual(nam.getCoordinates(gridpoint: 0).longitude, 237.28 - 360, accuracy: 0.001)
@@ -121,6 +121,44 @@ final class DataTests: XCTestCase {
         
         XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).latitude, 24.007414634071907, accuracy: 0.001)
         XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).longitude, 248.77817290935954 - 360, accuracy: 0.001)
+    }
+    
+    func testLambertCC() {
+        let proj = LambertConformalConicProjection(λ0: 352, ϕ0: 55.5, ϕ1: 55.5, ϕ2: 55.5, radius: 6371229)
+        let grid = ProjectionGrid(
+            nx: 1906,
+            ny: 1606,
+            latitude: 39.671,
+            longitude: -25.421997,
+            dx: 2000,
+            dy: 2000,
+            projection: proj
+        )
+        
+        let origin = proj.forward(latitude: 39.671, longitude: -25.421997)
+        XCTAssertEqual(origin.x, -1527524.9, accuracy: 0.001)
+        XCTAssertEqual(origin.y, -1588682.0, accuracy: 0.001)
+        
+        let x1 = proj.forward(latitude: 39.675304, longitude: -25.400146)
+        XCTAssertEqual(origin.x - x1.x, -1998.125, accuracy: 0.001)
+        XCTAssertEqual(origin.y - x1.y, -0.375, accuracy: 0.001)
+        
+        var c = grid.getCoordinates(gridpoint: 1)
+        XCTAssertEqual(c.latitude, 39.675304, accuracy: 0.001)
+        XCTAssertEqual(c.longitude, -25.400146, accuracy: 0.001)
+        XCTAssertEqual(grid.findPoint(lat: 39.675304, lon: -25.400146), 1)
+        
+        // Coords(i: 122440, x: 456, y: 64, latitude: 42.18604, longitude: -15.30127)
+        c = grid.getCoordinates(gridpoint: 122440)
+        XCTAssertEqual(c.latitude, 42.18604, accuracy: 0.001)
+        XCTAssertEqual(c.longitude, -15.30127, accuracy: 0.001)
+        XCTAssertEqual(grid.findPoint(lat: 42.18604, lon: -15.30127), 122440)
+        
+        // Coords(i: 2999780, x: 1642, y: 1573, latitude: 64.943695, longitude: 30.711975)
+        c = grid.getCoordinates(gridpoint: 2999780)
+        XCTAssertEqual(c.latitude, 64.943695, accuracy: 0.001)
+        XCTAssertEqual(c.longitude, 30.711975, accuracy: 0.001)
+        XCTAssertEqual(grid.findPoint(lat: 64.943695, lon: 30.711975), 2999780)
     }
     
     func testStereographic() {

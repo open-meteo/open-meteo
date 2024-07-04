@@ -288,12 +288,12 @@ final class Curl {
     
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> ByteBuffer {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
             
             // Retry failed file transfers after this point
             do {

@@ -7,16 +7,16 @@ struct LambertConformalConicProjection: Projectable {
     let n: Float
     let λ0: Float
     
-    /// Radius of Earth
-    var R: Float { 6370.997 }
+    /// Radius of Earth. Different radiuses may be used for different GRIBS: https://github.com/SciTools/iris-grib/issues/241#issuecomment-1239069695
+    let R: Float
     
     /// λ0 reference longitude in degrees
     /// ϕ0  reference latitude in degrees
     /// ϕ1 and ϕ2 standard parallels in degrees
-    public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float) {
+    public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float, radius: Float = 6370.997) {
         // https://mathworld.wolfram.com/LambertConformalConicProjection.html
         // https://pubs.usgs.gov/pp/1395/report.pdf page 104
-        λ0 = (λ0_dec + 360).truncatingRemainder(dividingBy: 360).degreesToRadians
+        λ0 = ((λ0_dec + 180).truncatingRemainder(dividingBy: 360) - 180).degreesToRadians
         let ϕ0 = ϕ0_dec.degreesToRadians
         let ϕ1 = ϕ1_dec.degreesToRadians
         let ϕ2 = ϕ2_dec.degreesToRadians
@@ -28,13 +28,14 @@ struct LambertConformalConicProjection: Projectable {
         
         F = (cos(ϕ1) * powf(tan(.pi/4 + ϕ1/2), n))/n
         ρ0 = F/powf(tan(.pi/4 + ϕ0/2),n)
+        R = radius
     }
     
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float) {
         let ϕ = latitude.degreesToRadians
-        let λ = (longitude + 360).truncatingRemainder(dividingBy: 360).degreesToRadians
+        let λ = longitude.degreesToRadians
         // If (λ - λ0) exceeds the range:±: 180°, 360° should be added or subtracted.
-        let θ = n * ((λ - λ0 + .pi).truncatingRemainder(dividingBy: 2 * .pi) - .pi)
+        let θ = n * (λ - λ0)
         
         let p = F/powf(tan(.pi/4 + ϕ/2), n)
         let x = R * p * sin(θ)

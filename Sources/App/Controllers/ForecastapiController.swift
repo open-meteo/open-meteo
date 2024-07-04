@@ -333,6 +333,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case arpae_cosmo_2i_ruc
     case arpae_cosmo_5m
     
+    case knmi_harmonie_arome_europe
+    case knmi_harmonie_arome_netherlands
+    case dmi_harmonie_arome_europe
+    case knmi_seamless
+    case dmi_seamless
+    case metno_seamless
+    
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
@@ -347,10 +354,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             guard let gfs: any GenericReaderProtocol = try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
+            // For Netherlands and Belgium use KNMI
+            if let knmiNetherlands = try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+                let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, iconD2, ecmwf, knmiNetherlands].compacted())
+            }
             // Scandinavian region, combine with ICON
             if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return Array([gfsProbabilites, iconProbabilities, gfs, icon, iconEu, metno].compacted())
+                let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+                let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, iconD2, ecmwf, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
@@ -368,6 +386,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 let arome_france_15min = try MeteoFranceReader(domain: .arome_france_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return Array([gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
+            }
+            // For Northern Europe and Iceland use DMI Harmonie
+            if let dmiEurope = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options){
+                let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+                let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, ecmwf, dmiEurope].compacted())
             }
             // For North America, use HRRR
             if let hrrr = try GfsReader(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
@@ -480,6 +505,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try ArpaeReader(domain: .cosmo_2i_ruc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .arpae_cosmo_5m:
             return try ArpaeReader(domain: .cosmo_5m, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .knmi_harmonie_arome_europe:
+            return try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .knmi_harmonie_arome_netherlands:
+            return try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .dmi_harmonie_arome_europe:
+            return try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .knmi_seamless:
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let knmiNetherlands: (any GenericReaderProtocol)? = try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let knmiEurope = try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, ecmwf, knmiEurope, knmiNetherlands].compactMap({$0})
+        case .dmi_seamless:
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let dmiEurope: (any GenericReaderProtocol)? = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, ecmwf, dmiEurope].compactMap({$0})
+        case .metno_seamless:
+            let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let metno: (any GenericReaderProtocol)? = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, ecmwf, metno].compactMap({$0})
         }
     }
     
@@ -639,6 +686,9 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case cloud_cover_high
     case cloud_cover_low
     case cloud_cover_mid
+    case cloud_cover_2m
+    case cloud_base
+    case cloud_top
     case dewpoint_2m
     case dew_point_2m
     case diffuse_radiation
@@ -760,6 +810,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case windspeed_40m
     case windspeed_50m
     case windspeed_80m
+    case wind_direction_250m
+    case wind_direction_300m
+    case wind_direction_350m
+    case wind_direction_450m
     case wind_direction_100m
     case wind_direction_10m
     case wind_direction_120m
@@ -775,6 +829,10 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wind_direction_80m
     case wind_direction_70m
     case wind_gusts_10m
+    case wind_speed_250m
+    case wind_speed_300m
+    case wind_speed_350m
+    case wind_speed_450m
     case wind_speed_100m
     case wind_speed_10m
     case wind_speed_120m

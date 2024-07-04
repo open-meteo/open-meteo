@@ -6,7 +6,7 @@ struct OpenMeteo {
     static var dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
             guard dir.last == "/" else {
-                fatalError("TEMP_DIRECTORY must end with a trailing slash")
+                fatalError("DATA_DIRECTORY must end with a trailing slash")
             }
             return dir
         }
@@ -91,6 +91,8 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(DownloadDemCommand(), as: "download-dem")
     app.asyncCommands.use(DownloadCamsCommand(), as: "download-cams")
     app.asyncCommands.use(MeteoFranceDownload(), as: "download-meteofrance")
+    app.asyncCommands.use(KnmiDownload(), as: "download-knmi")
+    app.asyncCommands.use(DmiDownload(), as: "download-dmi")
     app.asyncCommands.use(DownloadArpaeCommand(), as: "download-arpae")
     app.asyncCommands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")

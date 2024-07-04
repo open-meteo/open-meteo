@@ -92,6 +92,9 @@ extension Curl {
                 }
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return result
+            } catch let error as GribAsyncStreamError {
+                // do not retry missing Grib header error
+                throw error
             } catch {
                 try await timeout.check(error: error)
             }
