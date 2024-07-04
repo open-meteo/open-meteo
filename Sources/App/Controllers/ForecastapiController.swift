@@ -359,12 +359,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, ecmwf, knmiNetherlands].compacted())
+                let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, iconD2, ecmwf, knmiNetherlands].compacted())
             }
             // Scandinavian region, combine with ICON
             if lat >= 54.9, let metno = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return Array([gfsProbabilites, iconProbabilities, gfs, icon, iconEu, metno].compacted())
+                let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
+                let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, iconD2, ecmwf, metno].compacted())
             }
             // If Icon-d2 is available, use icon domains
             if let iconD2 = try IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
