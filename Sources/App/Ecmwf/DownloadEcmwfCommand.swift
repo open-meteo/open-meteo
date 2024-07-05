@@ -88,6 +88,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
             try domain.domainRegistry.syncToS3(
                 bucket: uploadS3Bucket,
                 variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables

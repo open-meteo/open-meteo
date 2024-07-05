@@ -90,6 +90,7 @@ struct MeteoFranceDownload: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
     }
