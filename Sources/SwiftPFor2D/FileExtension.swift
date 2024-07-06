@@ -145,14 +145,14 @@ extension FileManager {
     }
     
     /// Wait until the file was not updated for at least 60 seconds. If the file does not exist, do nothing
-    public func waitIfFileWasRecentlyModified(at: String) {
+    public func waitIfFileWasRecentlyModified(at: String, waitTimeMinutes: Int = 15) {
         // Wait up to 15 minutes
-        for _ in 0..<90 {
+        for _ in 0 ..< (waitTimeMinutes*6) {
             guard let mTime = FileManager.default.fileStats(at: at)?.modificationTime,
                     mTime > Date().addingTimeInterval(-60) else {
                 break
             }
-            print("Another process is writing to \(at). Waiting up to 15 minutes.")
+            print("Another process is writing to \(at). Check in 10s. Waiting up to \(waitTimeMinutes) minutes.")
             sleep(10)
         }
     }
