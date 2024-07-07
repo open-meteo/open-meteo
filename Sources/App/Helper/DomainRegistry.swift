@@ -68,6 +68,8 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_aifs025
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
+    case ecmwf_lwda_analysis
+    case ecmwf_lwda_ifs
     
     case jma_msm
     case jma_gsm
@@ -125,6 +127,10 @@ enum DomainRegistry: String, CaseIterable {
             return Dem90()
         case .ecmwf_ifs:
             return CdsDomain.ecmwf_ifs
+        case .ecmwf_lwda_analysis:
+            return CdsDomain.ecmwf_lwda_analysis
+        case .ecmwf_lwda_ifs:
+            return CdsDomain.ecmwf_lwda_ifs
         case .copernicus_era5:
             return CdsDomain.era5
         case .copernicus_era5_land:

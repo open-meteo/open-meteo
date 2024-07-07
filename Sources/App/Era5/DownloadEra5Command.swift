@@ -13,11 +13,17 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5_land_daily
     case cerra
     case ecmwf_ifs
+    case ecmwf_lwda_analysis
+    case ecmwf_lwda_ifs
     
     var dtSeconds: Int {
         switch self {
         case .era5_daily, .era5_land_daily:
             return 24*3600
+        case .ecmwf_lwda_ifs:
+            return 3*3600
+        case .ecmwf_lwda_analysis:
+            return 6*3600
         default:
             return 3600
         }
@@ -35,7 +41,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return "reanalysis-era5-land"
         case .cerra:
             return "reanalysis-cerra-single-levels"
-        case .ecmwf_ifs:
+        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
             return ""
         case .era5_land_daily, .era5_daily:
             fatalError()
@@ -69,6 +75,10 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return .copernicus_cerra
         case .ecmwf_ifs:
             return .ecmwf_ifs
+        case .ecmwf_lwda_analysis:
+            return .ecmwf_lwda_analysis
+        case .ecmwf_lwda_ifs:
+            return .ecmwf_lwda_ifs
         }
     }
     
@@ -99,7 +109,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
-        case .ecmwf_ifs:
+        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
             return GaussianGrid(type: .o1280)
         }
     }
@@ -315,7 +325,7 @@ struct DownloadEra5Command: AsyncCommand {
                     query: Query(),
                     destinationFile: tempDownloadGribFile
                 )
-            case .ecmwf_ifs:
+            case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
                 guard let email else {
                     fatalError("email required")
                 }
@@ -451,7 +461,7 @@ struct DownloadEra5Command: AsyncCommand {
             return try downloadDailyEra5Files(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
         case .cerra:
             return try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
-        case .ecmwf_ifs:
+        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
             guard let email else {
                 fatalError("email required")
             }
@@ -597,11 +607,11 @@ struct DownloadEra5Command: AsyncCommand {
             let levtype = "sfc"
             let param: [String]
             /// Use forecast hours 1...12. Skip hour 0, as the model is instable at hour 0
-            let step = (1...12).map({$0})
-            let stream = "oper"
+            let step: [Int]?
+            let stream: String
             /// init time "00:00:00"
-            let time = ["00:00:00", "12:00:00"]
-            let type = "fc"
+            let time: [String]
+            let type: String
         }
         
         timeLoop: for timestamp in timeinterval {
@@ -612,10 +622,38 @@ struct DownloadEra5Command: AsyncCommand {
                 continue
             }
             
-            let query = EcmwfQuery(
-                date: timestamp.iso8601_YYYY_MM_dd,
-                param: variables.map {$0.marsGribCode}
-            )
+            let query: EcmwfQuery
+            switch domain {
+            case .ecmwf_ifs:
+                query = EcmwfQuery(
+                    date: timestamp.iso8601_YYYY_MM_dd,
+                    param: variables.map {$0.marsGribCode},
+                    step: (1...12).map({$0}),
+                    stream: "oper",
+                    time: ["00:00:00", "12:00:00"],
+                    type: "fc"
+                )
+            case .ecmwf_lwda_ifs:
+                query = EcmwfQuery(
+                    date: timestamp.iso8601_YYYY_MM_dd,
+                    param: variables.map {$0.marsGribCode},
+                    step: stride(from: 0, through: 12, by: 3).map({$0}),
+                    stream: "lwda",
+                    time: ["06:00:00", "18:00:00"],
+                    type: "fc"
+                )
+            case .ecmwf_lwda_analysis:
+                query = EcmwfQuery(
+                    date: timestamp.iso8601_YYYY_MM_dd,
+                    param: variables.map {$0.marsGribCode},
+                    step: [0],
+                    stream: "lwda",
+                    time: ["00:00:00", "06:00:00", "12:00:00", "18:00:00"],
+                    type: "an"
+                )
+            default:
+                fatalError()
+            }
             do {
                 try Process.ecmwfApi(key: key, email: email, query: query, destinationFile: tempDownloadGribFile)
             } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
@@ -815,7 +853,7 @@ struct DownloadEra5Command: AsyncCommand {
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
     func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws {
         
-        let timeintervalHourly = timeinterval.with(dtSeconds: 3600)
+        let timeintervalHourly = timeinterval.with(dtSeconds: domain.dtSeconds)
         if timeinterval.count == 0 {
             logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
             return
