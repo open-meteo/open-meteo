@@ -588,7 +588,6 @@ struct DownloadEra5Command: AsyncCommand {
         }
         
         let client = application.makeNewHttpClient(redirectConfiguration: .disallow)
-        defer { try! client.syncShutdown() }
         
         /// Directory dir, where to place temporary downloaded files
         let downloadDir = domain.downloadDirectory
@@ -715,9 +714,7 @@ struct DownloadEra5Command: AsyncCommand {
                 downloadedRange = timestamp ..< downloadedRange.upperBound
             }
         }
-        
-        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
-        try FileManager.default.removeItemIfExists(at: "\(tempDownloadGribFile).py")
+        try await client.shutdown()
         return downloadedRange.range(dtSeconds: timeinterval.dtSeconds)
     }
     
