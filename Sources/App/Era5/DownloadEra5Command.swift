@@ -461,9 +461,9 @@ struct DownloadEra5Command: AsyncCommand {
         let logger = application.logger
         switch domain {
         case .era5_land, .era5, .era5_ocean:
-            return try await downloadDailyEra5Files(logger: logger, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
+            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
         case .cerra:
-            return try downloadDailyFilesCerra(logger: logger, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
+            return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
         case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
             guard let email else {
                 fatalError("email required")
@@ -475,12 +475,15 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyEra5Files(logger: Logger, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) async throws -> TimerangeDt {
+    func downloadDailyEra5Files(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) async throws -> TimerangeDt {
+        let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
         guard timeinterval.dtSeconds == 86400 else {
             fatalError("need daily time axis")
         }
+        
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 99999)
         
         /// Directory dir, where to place temporary downloaded files
         let downloadDir = domain.downloadDirectory
@@ -488,7 +491,6 @@ struct DownloadEra5Command: AsyncCommand {
         
         /// loop over each day, download data and convert it
         let pid = ProcessInfo.processInfo.processIdentifier
-        let tempDownloadGribFile = "\(downloadDir)era5download_\(pid).grib"
         
         /// The effective range of downloaded steps
         /// The lower bound will be adapted if timesteps already exist
@@ -496,7 +498,6 @@ struct DownloadEra5Command: AsyncCommand {
         var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         struct CdsQuery: Encodable {
             let product_type = "reanalysis"
@@ -526,45 +527,45 @@ struct DownloadEra5Command: AsyncCommand {
                 time: hours.map({"\($0.zeroPadded(len: 2)):00"}),
                 variable: variables.map {$0.cdsApiName}
             )
-            do {
-                try Process.cdsApi(dataset: domain.cdsDatasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
-            } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
-                if code == 70 {
-                    logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
-                    downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
-                    break timeLoop
-                } else {
-                    throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
-                }
-            }
             
-            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
-                let shortName = message.get(attribute: "shortName")!
-                guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
-                    fatalError("Could not find \(shortName) in grib")
+            
+            do {
+                let handles = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    
+                    for try await message in stream {
+                        let shortName = message.get(attribute: "shortName")!
+                        guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
+                            fatalError("Could not find \(shortName) in grib")
+                        }
+                        
+                        let hour = Int(message.get(attribute: "validityTime")!)!/100
+                        let date = message.get(attribute: "validityDate")!
+                        logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                        
+                        try grib2d.load(message: message)
+                        if let scaling = variable.netCdfScaling {
+                            grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                        }
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                        
+                        //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
+                        /*guard !fastTime[0, 0..<nt].contains(.nan) else {
+                            // For realtime updates, the latest day could only contain partial data. Skip it.
+                            logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) contains missing data. Skipping.")
+                            break timeLoop
+                        }*/
+                        
+                        try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
+                        let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                        try FileManager.default.removeItemIfExists(at: omFile)
+                        try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    }
                 }
-                
-                let hour = Int(message.get(attribute: "validityTime")!)!/100
-                let date = message.get(attribute: "validityDate")!
-                logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
-                
-                try grib2d.load(message: message)
-                if let scaling = variable.netCdfScaling {
-                    grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
-                }
-                grib2d.array.shift180LongitudeAndFlipLatitude()
-                
-                //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
-                /*guard !fastTime[0, 0..<nt].contains(.nan) else {
-                    // For realtime updates, the latest day could only contain partial data. Skip it.
-                    logger.warning("Timestap \(timestamp.iso8601_YYYY_MM_dd) for variable \(variable) contains missing data. Skipping.")
-                    break timeLoop
-                }*/
-                
-                try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
-                let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
-                try FileManager.default.removeItemIfExists(at: omFile)
-                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+            } catch EcmwfApiError.restrictedAccessToValidData {
+                logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
+                downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
+                break timeLoop
             }
             
             // Update downloaded range if download successfull
@@ -573,8 +574,6 @@ struct DownloadEra5Command: AsyncCommand {
             }
         }
         
-        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
-        try FileManager.default.removeItemIfExists(at: "\(tempDownloadGribFile).py")
         return downloadedRange.range(dtSeconds: timeinterval.dtSeconds)
     }
     
@@ -597,7 +596,6 @@ struct DownloadEra5Command: AsyncCommand {
         
         /// loop over each day, download data and convert it
         let pid = ProcessInfo.processInfo.processIdentifier
-        let tempDownloadGribFile = "\(downloadDir)ownload_\(pid).grib"
         
         /// The effective range of downloaded steps
         /// The lower bound will be adapted if timesteps already exist
@@ -670,7 +668,7 @@ struct DownloadEra5Command: AsyncCommand {
                     for try await message in stream {
                         //let h = stream.compactMap { message -> GenericVariableHandle? in
                         guard let shortName = message.get(attribute: "shortName"),
-                              var stepRange = message.get(attribute: "stepRange"),
+                              let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType") else {
                             fatalError("could not get step range or type")
                         }
@@ -719,7 +717,8 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Dowload CERRA data, use analysis if available, otherwise use forecast
-    func downloadDailyFilesCerra(logger: Logger, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) throws -> TimerangeDt {
+    func downloadDailyFilesCerra(application: Application, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) async throws -> TimerangeDt {
+        let logger = application.logger
         let domain = CdsDomain.cerra
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -731,7 +730,7 @@ struct DownloadEra5Command: AsyncCommand {
         let pid = ProcessInfo.processInfo.processIdentifier
         let tempDownloadGribFile = "\(downloadDir)cerradownload_\(pid).grib"
         
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 99999)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
         
@@ -750,7 +749,7 @@ struct DownloadEra5Command: AsyncCommand {
             let variable: [String]
         }
         
-        func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, level_type: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) throws {
+        func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, level_type: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) async throws {
             let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
             let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
             
@@ -770,72 +769,76 @@ struct DownloadEra5Command: AsyncCommand {
                 leadtime_hour: leadtime_hours.map(String.init),
                 variable: variables.map {$0.cdsApiName}
             )
-            try Process.cdsApi(dataset: datasetName, key: cdskey, query: query, destinationFile: tempDownloadGribFile)
             
-            // Deaccumulate data on the fly. Keep previous timestep in memory
-            var accumulated = [CerraVariable: [Float]]()
-            
-            try SwiftEccodes.iterateMessages(fileName: tempDownloadGribFile, multiSupport: true) { message in
-                let shortName = message.get(attribute: "shortName")!
-                guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
-                    fatalError("Could not find \(shortName) in grib")
-                }
-                
-                /// (key: "validityTime", value: "1700")
-                let hour = Int(message.get(attribute: "validityTime")!)!/100
-                let date = message.get(attribute: "validityDate")!
-                logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
-                //try message.debugGrid(grid: domain.grid)
-                
-                try grib2d.load(message: message)
-                if let scaling = variable.netCdfScaling {
-                    grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
-                }
-                
-                // Deaccumulate data for forecast hours 1,2,3
-                if variable.isAccumulatedSinceModelStart {
-                    let previous = accumulated[variable]
-                    accumulated[variable] = hour % 3 == 0 ? nil : grib2d.array.data
-                    if let previous {
-                        for i in grib2d.array.data.indices {
-                            grib2d.array.data[i] -= previous[i]
+            do {
+                let handles = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    // Deaccumulate data on the fly. Keep previous timestep in memory
+                    var accumulated = [CerraVariable: [Float]]()
+                    
+                    for try await message in stream {
+                        let shortName = message.get(attribute: "shortName")!
+                        guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
+                            fatalError("Could not find \(shortName) in grib")
                         }
+                        
+                        /// (key: "validityTime", value: "1700")
+                        let hour = Int(message.get(attribute: "validityTime")!)!/100
+                        let date = message.get(attribute: "validityDate")!
+                        logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                        //try message.debugGrid(grid: domain.grid)
+                        
+                        try grib2d.load(message: message)
+                        if let scaling = variable.netCdfScaling {
+                            grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                        }
+                        
+                        // Deaccumulate data for forecast hours 1,2,3
+                        if variable.isAccumulatedSinceModelStart {
+                            let previous = accumulated[variable]
+                            accumulated[variable] = hour % 3 == 0 ? nil : grib2d.array.data
+                            if let previous {
+                                for i in grib2d.array.data.indices {
+                                    grib2d.array.data[i] -= previous[i]
+                                }
+                            }
+                        }
+                        
+                        try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
+                        let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                        try FileManager.default.removeItemIfExists(at: omFile)
+                        try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     }
                 }
-                
-                try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
-                let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
-                try FileManager.default.removeItemIfExists(at: omFile)
-                try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
         
-        func downloadAndConvertAll(year: Int, month: Int, day: Int?) throws {
+        func downloadAndConvertAll(year: Int, month: Int, day: Int?) async throws {
             // download forecast hour 1,2,3 for variables without analysis. Analysis is zick zacking around like crazy
             let variablesForecastHour3 = variables.filter { !$0.isHeightLevel }
-            try downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2,3])
+            try await downloadAndConvert(datasetName: domain.cdsDatasetName, productType: ["forecast"], variables: variablesForecastHour3, height_level: nil, level_type: "surface_or_atmosphere", year: year, month: month, day: day, leadtime_hours: [1,2,3])
             
             // download 3 forecast steps from level 100m
             let variablesHeightLevel = variables.filter { $0.isHeightLevel }
-            try downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2,3])
+            try await downloadAndConvert(datasetName: "reanalysis-cerra-height-levels", productType: ["forecast"], variables: variablesHeightLevel, height_level: "100_m", level_type: nil, year: year, month: month, day: day, leadtime_hours: [1,2,3])
         }
         
         /// Make sure data of the day ahead is available
         let dayBefore = timeinterval.range.lowerBound.add(-24*3600).toComponents()
-        try downloadAndConvertAll(year: dayBefore.year, month: dayBefore.month, day: dayBefore.day)
+        try await downloadAndConvertAll(year: dayBefore.year, month: dayBefore.month, day: dayBefore.day)
         
         let months = timeinterval.toYearMonth()
         if months.count >= 3 {
             /// Download one month at once
             for date in months {
                 logger.info("Downloading year \(date.year) month \(date.month)")
-                try downloadAndConvertAll(year: date.year, month: date.month, day: nil)
+                try await downloadAndConvertAll(year: date.year, month: date.month, day: nil)
             }
         } else {
             for timestamp in timeinterval {
                 logger.info("Downloading day \(timestamp.format_YYYYMMdd)")
                 let date = timestamp.toComponents()
-                try downloadAndConvertAll(year: date.year, month: date.month, day: date.day)
+                try await downloadAndConvertAll(year: date.year, month: date.month, day: date.day)
             }
         }
             
