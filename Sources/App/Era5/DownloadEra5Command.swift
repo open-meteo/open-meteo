@@ -665,14 +665,16 @@ struct DownloadEra5Command: AsyncCommand {
             }
             do {
                 let handles = try await curl.withEcmwfApi(query: query, email: email, apikey: key) { stream in
-                    //let previous = GribDeaverager()
-                    // Deaccumulate data on the fly. Keep previous timestep in memory
-                    var accumulated = [Era5Variable: [Float]]()
+                    let deaverager = GribDeaverager()
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     
                     for try await message in stream {
                         //let h = stream.compactMap { message -> GenericVariableHandle? in
-                        let shortName = message.get(attribute: "shortName")!
+                        guard let shortName = message.get(attribute: "shortName"),
+                              var stepRange = message.get(attribute: "stepRange"),
+                              let stepType = message.get(attribute: "stepType") else {
+                            fatalError("could not get step range or type")
+                        }
                         guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
                             fatalError("Could not find \(shortName) in grib")
                         }
@@ -691,22 +693,9 @@ struct DownloadEra5Command: AsyncCommand {
                             grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
                         }
 
-                        // Deaccumulate data for forecast hours 1-12
-                        if variable.isAccumulatedSinceModelStart {
-                            // forecast hour 0
-                            guard endStep > 0 else {
-                                accumulated[variable] = nil
-                                // do not write hour=0 to disk for accumulated variables
-                                continue
-                            }
-                            
-                            let previous = accumulated[variable]
-                            accumulated[variable] = grib2d.array.data
-                            if endStep >= 2, let previous {
-                                for i in grib2d.array.data.indices {
-                                    grib2d.array.data[i] -= previous[i]
-                                }
-                            }
+                        // Deaccumulate precipitation
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            continue
                         }
                         
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
