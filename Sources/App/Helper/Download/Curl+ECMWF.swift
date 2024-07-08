@@ -65,11 +65,11 @@ extension Curl {
     
     /// Delete result after download
     fileprivate func cleanupEcmwfApiJob(job: EcmwfApiResponse, email: String, apikey: String) async throws {
-        var requestCleanUp = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)")
-        requestCleanUp.method = .DELETE
-        requestCleanUp.headers.add(name: "From", value: email)
-        requestCleanUp.headers.add(name: "X-ECMWF-KEY", value: apikey)
-        let _ = try await client.execute(requestCleanUp, timeout: .seconds(10))
+        var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)")
+        request.method = .DELETE
+        request.headers.add(name: "From", value: email)
+        request.headers.add(name: "X-ECMWF-KEY", value: apikey)
+        let _ = try await client.execute(request, timeout: .seconds(10))
     }
     
     /// Wait for josb to finish and return download URL

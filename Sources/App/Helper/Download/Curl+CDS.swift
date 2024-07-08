@@ -5,6 +5,7 @@ import NIOCore
 
 enum CdsApiError: Error {
     case jobAborted
+    case startError(code: Int, message: String)
     case error(message: String, reason: String)
 }
 
@@ -42,13 +43,13 @@ extension Curl {
         let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
         let gribUrl = try await waitForCdsJob(job: job, apikey: apikey, server: server)
         let result = try await withGribStream(url: gribUrl, bzip2Decode: false, body: body)
-        //try await cleanupCdsApiJob(job: job, apikey: apikey)
+        try await cleanupCdsApiJob(job: job, apikey: apikey, server: server)
         return result
     }
     
     /// Start a new job using POST
     fileprivate func startCdsApiJob(dataset: String, query: any Encodable, apikey: String, server: String) async throws -> CdsApiResponse {
-        var request = HTTPClientRequest(url: "\(server)/\(dataset)")
+        var request = HTTPClientRequest(url: "\(server)/resources/\(dataset)")
         request.method = .POST
         request.headers.add(name: "Authorization", value: "Basic \(apikey.base64String())")
         request.headers.add(name: "content-type", value: "application/json")
@@ -58,7 +59,7 @@ extension Curl {
             let response = try await client.execute(request, timeout: .seconds(10))
             if (400..<500).contains(response.status.code) {
                 let error = try await response.readStringImmutable() ?? ""
-                throw EcmwfApiError.jobStartFailed(error: error)
+                throw CdsApiError.startError(code: Int(response.status.code), message: error)
             }
             guard (200..<300).contains(response.status.code) else {
                 let error = try await response.readStringImmutable() ?? ""
@@ -108,5 +109,12 @@ extension Curl {
             }
             job = jobNext
         }
+    }
+    
+    fileprivate func cleanupCdsApiJob(job: CdsApiResponse, apikey: String, server: String) async throws {
+        var request = HTTPClientRequest(url: "\(server)/tasks/\(job.request_id)")
+        request.method = .DELETE
+        request.headers.add(name: "Authorization", value: "Basic \(apikey.base64String())")
+        let _ = try await client.execute(request, timeout: .seconds(10))
     }
 }
