@@ -142,6 +142,15 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
             }
         }
         
+        if domain == .ecmwf_lwda_analysis {
+            switch self {
+            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation:
+                return false
+            default:
+                return true
+            }
+        }
+        
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
         if domain == .era5_land {
             switch self {
