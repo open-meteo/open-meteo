@@ -41,6 +41,9 @@ struct DownloadEra5Command: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
         
+        @Flag(name: "create-netcdf")
+        var createNetcdf: Bool
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval(domain: CdsDomain) throws -> TimerangeDt {
             let dt = 3600*24
@@ -106,7 +109,7 @@ struct DownloadEra5Command: AsyncCommand {
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let timeintervalReturned = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables)
-        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables)
+        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables, createNetcdf: signature.createNetcdf)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
@@ -722,7 +725,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) throws {
+    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], createNetcdf: Bool) throws {
         
         let timeintervalHourly = timeinterval.with(dtSeconds: domain.dtSeconds)
         if timeinterval.count == 0 {
@@ -736,41 +739,22 @@ struct DownloadEra5Command: AsyncCommand {
                 
         let nt = timeintervalHourly.count
         
-        /// loop over each day convert it
-        for variable in variables {
-            let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(variable.rawValue)")
-            
-            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
+        let handles = try variables.flatMap { variable in
+            return try timeintervalHourly.compactMap { timeinterval -> GenericVariableHandle? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
                 if !FileManager.default.fileExists(atPath: omFile) {
                     return nil
                 }
-                return try OmFileReader(file: omFile)
+                return GenericVariableHandle(
+                    variable: variable,
+                    time: timeinterval,
+                    member: 0,
+                    fn: try FileHandle.openFileReading(file: omFile),
+                    skipHour0: false)
             }
-            
-            // chunk 6 locations and 21 days of data
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: timeintervalHourly, skipFirst: 0, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { dim0 in
-                /// Process around 20 MB memory at once
-                let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
-                
-                var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
-                
-                for (i, omfile) in omFiles.enumerated() {
-                    guard let omfile else {
-                        continue
-                    }
-                    try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
-                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
-                    for l in 0..<locationRange.count {
-                        fasttime[l, i] = read[l]
-                    }
-                }
-                progress.add(locationRange.count)
-                return ArraySlice(fasttime.data)
-            }
-            progress.finish()
         }
+        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: timeinterval.range.lowerBound, handles: handles)
     }
     
     /// Data is stored in one file per hour

@@ -230,6 +230,10 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
     }
     
     func availableForDomain(domain: CdsDomain) -> Bool {
+        if self.rawValue.contains("_spread") {
+            return false
+        }
+        
         /// Snow depth is only directly available in era5-land
         /// Others have to download snow depth water equivalent and density separately (not implemented)
         if self == .snow_depth {
@@ -281,7 +285,7 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
             default: return false
             }
         }
-        return !self.rawValue.contains("_spread")
+        return true
     }
     
     var marsGribCode: String {
