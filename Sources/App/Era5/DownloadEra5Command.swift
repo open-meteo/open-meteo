@@ -530,7 +530,7 @@ struct DownloadEra5Command: AsyncCommand {
             
             
             do {
-                let handles = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
+                let _ = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     
                     for try await message in stream {
@@ -661,7 +661,7 @@ struct DownloadEra5Command: AsyncCommand {
                 fatalError()
             }
             do {
-                let handles = try await curl.withEcmwfApi(query: query, email: email, apikey: key) { stream in
+                let _ = try await curl.withEcmwfApi(query: query, email: email, apikey: key) { stream in
                     let deaverager = GribDeaverager()
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     
@@ -771,7 +771,7 @@ struct DownloadEra5Command: AsyncCommand {
             )
             
             do {
-                let handles = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
+                let _ = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     // Deaccumulate data on the fly. Keep previous timestep in memory
                     var accumulated = [CerraVariable: [Float]]()

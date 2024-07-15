@@ -40,27 +40,13 @@ extension Curl {
         request.headers.add(name: "content-type", value: "application/json")
         request.body = .bytes(ByteBuffer(data: try JSONEncoder().encode(query)))
         
-        for i in 0..<10 {
-            let response = try await client.execute(request, timeout: .seconds(10))
-            if (400..<500).contains(response.status.code) {
-                let error = try await response.readStringImmutable() ?? ""
-                throw EcmwfApiError.jobStartFailed(error: error)
-            }
-            guard (200..<300).contains(response.status.code) else {
-                let error = try await response.readStringImmutable() ?? ""
-                logger.error("Job start failed, retry. \(error)")
-                try await Task.sleep(nanoseconds: UInt64(1e+9) * UInt64(i)) // 1s
-                continue
-            }
-            guard let job = try await response.readJSONDecodable(EcmwfApiResponse.self) else {
-                let error = try await response.readStringImmutable() ?? ""
-                fatalError("Could not decode \(error)")
-            }
-            logger.info("Submitted job \(job)")
-            return job
+        let response = try await client.executeRetry(request, logger: logger, deadline: .hours(6))
+        guard let job = try await response.readJSONDecodable(EcmwfApiResponse.self) else {
+            let error = try await response.readStringImmutable() ?? ""
+            fatalError("Could not decode \(error)")
         }
-        logger.error("Could not start job. Exiting")
-        fatalError()
+        logger.info("Submitted job \(job)")
+        return job
     }
     
     /// Delete result after download
@@ -79,19 +65,14 @@ extension Curl {
             var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)?offset=\(offset)&limit=500")
             request.headers.add(name: "From", value: email)
             request.headers.add(name: "X-ECMWF-KEY", value: apikey)
-            let response = try await client.execute(request, timeout: .seconds(10))
+            let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
+            
             if (300..<400).contains(response.status.code) {
                 guard let location = response.headers.first(name: "Location") else {
                     fatalError("No location header set")
                 }
                 logger.info("Grib file at: \(location)")
                 return location
-            }
-            guard (200..<500).contains(response.status.code) else {
-                let error = try await response.readStringImmutable() ?? ""
-                logger.error("Could not read \(error)")
-                try await Task.sleep(nanoseconds: UInt64(1e+9)) // 1s
-                continue
             }
             guard let status = try await response.readJSONDecodable(EcmwfApiResponse.self) else {
                 let error = try await response.readStringImmutable() ?? ""

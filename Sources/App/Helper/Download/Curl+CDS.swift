@@ -55,27 +55,13 @@ extension Curl {
         request.headers.add(name: "content-type", value: "application/json")
         request.body = .bytes(ByteBuffer(data: try JSONEncoder().encode(query)))
         
-        for i in 0..<10 {
-            let response = try await client.execute(request, timeout: .seconds(10))
-            if (400..<500).contains(response.status.code) {
-                let error = try await response.readStringImmutable() ?? ""
-                throw CdsApiError.startError(code: Int(response.status.code), message: error)
-            }
-            guard (200..<300).contains(response.status.code) else {
-                let error = try await response.readStringImmutable() ?? ""
-                logger.error("Job start failed, retry. \(error)")
-                try await Task.sleep(nanoseconds: UInt64(1e+9) * UInt64(i)) // 1s
-                continue
-            }
-            guard let job = try await response.readJSONDecodable(CdsApiResponse.self) else {
-                let error = try await response.readStringImmutable() ?? ""
-                fatalError("Could not decode \(error)")
-            }
-            logger.info("Submitted job \(job)")
-            return job
+        let response = try await client.executeRetry(request, logger: logger, deadline: .hours(6))
+        guard let job = try await response.readJSONDecodable(CdsApiResponse.self) else {
+            let error = try await response.readStringImmutable() ?? ""
+            fatalError("Could not decode \(error)")
         }
-        logger.error("Could not start job. Exiting")
-        fatalError()
+        logger.info("Submitted job \(job)")
+        return job
     }
     
     /// Wait for josb to finish and return download URL
@@ -96,13 +82,7 @@ extension Curl {
             
             var request = HTTPClientRequest(url: "\(server)/tasks/\(job.request_id)")
             request.headers.add(name: "Authorization", value: "Basic \(apikey.base64String())")
-            let response = try await client.execute(request, timeout: .seconds(10))
-            guard (200..<300).contains(response.status.code) else {
-                let error = try await response.readStringImmutable() ?? ""
-                logger.error("Could not read \(error)")
-                try await Task.sleep(nanoseconds: UInt64(1e+9)) // 1s
-                continue
-            }
+            let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
             guard let jobNext = try await response.readJSONDecodable(CdsApiResponse.self) else {
                 let error = try await response.readStringImmutable() ?? ""
                 fatalError("Could not decode \(error)")
