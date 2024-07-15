@@ -7,6 +7,7 @@ enum EcmwfApiError: Error {
     case jobAborted
     case jobStartFailed(error: String)
     case restrictedAccessToValidData
+    case waiting(status: String)
 }
 
 extension Curl {
@@ -60,6 +61,7 @@ extension Curl {
     
     /// Wait for josb to finish and return download URL
     fileprivate func waitForEcmwfJob(job: EcmwfApiResponse, email: String, apikey: String) async throws -> String {
+        let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(12))
         while true {
             var offset = 0
             var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)?offset=\(offset)&limit=500")
@@ -79,7 +81,6 @@ extension Curl {
                 fatalError("Could not decode \(error)")
             }
             
-            logger.info("Status: \(status.status)")
             var isRestrictedAccessError = false
             for message in status.messages {
                 if message.contains("restricted access to valid data") {
@@ -96,7 +97,7 @@ extension Curl {
                 throw EcmwfApiError.jobAborted
             }
             
-            try await Task.sleep(nanoseconds: UInt64(1e+9)) // 1s
+            try await timeout.check(error: EcmwfApiError.waiting(status: status.status), delay: 1)
         }
     }
 }

@@ -3,10 +3,11 @@ import AsyncHTTPClient
 import SwiftEccodes
 import NIOCore
 
-enum CdsApiError: Error {
+fileprivate enum CdsApiError: Error {
     case jobAborted
     case startError(code: Int, message: String)
     case error(message: String, reason: String)
+    case waiting(status: CdsState)
 }
 
 fileprivate enum CdsState: String, Decodable {
@@ -66,9 +67,9 @@ extension Curl {
     
     /// Wait for josb to finish and return download URL
     fileprivate func waitForCdsJob(job: CdsApiResponse, apikey: String, server: String) async throws -> String {
+        let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(12))
         var job = job
         while true {
-            logger.info("Status: \(job) ")
             switch job.state {
             case .queued, .running:
                 break
@@ -77,8 +78,7 @@ extension Curl {
             case .completed:
                 return job.location!
             }
-            
-            try await Task.sleep(nanoseconds: UInt64(1e+9)) // 1s
+            try await timeout.check(error: CdsApiError.waiting(status: job.state), delay: 1)
             
             var request = HTTPClientRequest(url: "\(server)/tasks/\(job.request_id)")
             request.headers.add(name: "Authorization", value: "Basic \(apikey.base64String())")
