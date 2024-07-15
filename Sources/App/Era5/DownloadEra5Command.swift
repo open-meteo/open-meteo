@@ -44,6 +44,9 @@ struct DownloadEra5Command: AsyncCommand {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent conversion jobs")
+        var concurrent: Int?
+        
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval(domain: CdsDomain) throws -> TimerangeDt {
             let dt = 3600*24
@@ -108,8 +111,9 @@ struct DownloadEra5Command: AsyncCommand {
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
-        let timeintervalReturned = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables)
-        try convertDailyFiles(logger: logger, timeinterval: signature.force ? timeinterval : timeintervalReturned, domain: domain, variables: variables, createNetcdf: signature.createNetcdf)
+        let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: timeinterval.range.lowerBound, handles: handles, concurrent: signature.concurrent ?? 4)
+        
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
@@ -347,7 +351,7 @@ struct DownloadEra5Command: AsyncCommand {
         try convertYear(logger: application.logger, year: year, domain: domain, variables: variables, forceUpdate: forceUpdate)
     }
     
-    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) async throws -> TimerangeDt {
+    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) async throws -> [GenericVariableHandle] {
         switch domain {
         case .era5_land, .era5, .era5_ocean, .era5_ensemble:
             return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
@@ -374,7 +378,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyEra5Files<Variable: Era5Downloadable>(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Variable]) async throws -> TimerangeDt {
+    func downloadDailyEra5Files<Variable: Era5Downloadable>(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Variable]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -388,12 +392,9 @@ struct DownloadEra5Command: AsyncCommand {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
-        /// The effective range of downloaded steps
-        /// The lower bound will be adapted if timesteps already exist
-        /// The upper bound will be reduced if the files are not yet on the remote server
-        var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
-        
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        
+        var handles = [GenericVariableHandle]()
         
         timeLoop: for timestamp in timeinterval {
             logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
@@ -445,26 +446,21 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
-                        try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false))
                     }
                 }
             } catch CdsApiError.restrictedAccessToValidData {
                 logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
-                downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
                 break timeLoop
-            }
-            
-            // Update downloaded range if download successfull
-            if downloadedRange.lowerBound > timestamp {
-                downloadedRange = timestamp ..< downloadedRange.upperBound
             }
         }
         
-        return downloadedRange.range(dtSeconds: timeinterval.dtSeconds)
+        return handles
     }
     
     /// Download ECMWF IFS operational archives
-    func downloadDailyEcmwfIfsFiles(application: Application, key: String, email: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) async throws -> TimerangeDt {
+    func downloadDailyEcmwfIfsFiles(application: Application, key: String, email: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -479,11 +475,7 @@ struct DownloadEra5Command: AsyncCommand {
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: client, deadLineHours: 99999)
-        
-        /// The effective range of downloaded steps
-        /// The lower bound will be adapted if timesteps already exist
-        /// The upper bound will be reduced if the files are not yet on the remote server
-        var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
+        var handles = [GenericVariableHandle]()
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
         
@@ -575,26 +567,21 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
-                        try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false))
                     }
                 }
             } catch EcmwfApiError.restrictedAccessToValidData {
                 logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
-                downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
                 break timeLoop
-            }
-            
-            // Update downloaded range if download successfull
-            if downloadedRange.lowerBound > timestamp {
-                downloadedRange = timestamp ..< downloadedRange.upperBound
             }
         }
         try await client.shutdown()
-        return downloadedRange.range(dtSeconds: timeinterval.dtSeconds)
+        return handles
     }
     
     /// Dowload CERRA data, use analysis if available, otherwise use forecast
-    func downloadDailyFilesCerra(application: Application, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) async throws -> TimerangeDt {
+    func downloadDailyFilesCerra(application: Application, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let domain = CdsDomain.cerra
         logger.info("Downloading timerange \(timeinterval.prettyString())")
@@ -610,6 +597,7 @@ struct DownloadEra5Command: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 99999)
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        var handles = [GenericVariableHandle]()
         
         
         struct CdsQuery: Encodable {
@@ -663,6 +651,7 @@ struct DownloadEra5Command: AsyncCommand {
                         let hour = Int(message.get(attribute: "validityTime")!)!/100
                         let date = message.get(attribute: "validityDate")!
                         logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                        let timestamp = try Timestamp.from(yyyymmdd: "\(date)\(hour.zeroPadded(len: 2))")
                         //try message.debugGrid(grid: domain.grid)
                         
                         try grib2d.load(message: message)
@@ -684,7 +673,8 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
-                        try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false))
                     }
                 }
             }
@@ -721,40 +711,7 @@ struct DownloadEra5Command: AsyncCommand {
             
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         try FileManager.default.removeItemIfExists(at: "\(tempDownloadGribFile).py")
-        return timeinterval
-    }
-    
-    /// Convert daily compressed files to longer compressed files specified by `Era5.omFileLength`. E.g. 14 days in one file.
-    func convertDailyFiles(logger: Logger, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], createNetcdf: Bool) throws {
-        
-        let timeintervalHourly = timeinterval.with(dtSeconds: domain.dtSeconds)
-        if timeinterval.count == 0 {
-            logger.info("No new timesteps could be downloaded. Nothing to do. Existing")
-            return
-        }
-        
-        logger.info("Converting timerange \(timeinterval.prettyString())")
-       
-        let om = OmFileSplitter(domain)
-                
-        let nt = timeintervalHourly.count
-        
-        let handles = try variables.flatMap { variable in
-            return try timeintervalHourly.compactMap { timeinterval -> GenericVariableHandle? in
-                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
-                if !FileManager.default.fileExists(atPath: omFile) {
-                    return nil
-                }
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: timeinterval,
-                    member: 0,
-                    fn: try FileHandle.openFileReading(file: omFile),
-                    skipHour0: false)
-            }
-        }
-        try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: timeinterval.range.lowerBound, handles: handles)
+        return handles
     }
     
     /// Data is stored in one file per hour
