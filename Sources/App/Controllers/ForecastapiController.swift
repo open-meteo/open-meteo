@@ -867,6 +867,31 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     
+    
+    case wind_speed_10m_spread
+    case wind_speed_100m_spread
+    case snowfall_spread
+    case temperature_2m_spread
+    case wind_gusts_10m_spread
+    case dew_point_2m_spread
+    case cloud_cover_low_spread
+    case cloud_cover_mid_spread
+    case cloud_cover_high_spread
+    case pressure_msl_spread
+    case snowfall_water_equivalent_spread
+    case snow_depth_spread
+    case soil_temperature_0_to_7cm_spread
+    case soil_temperature_7_to_28cm_spread
+    case soil_temperature_28_to_100cm_spread
+    case soil_temperature_100_to_255cm_spread
+    case soil_moisture_0_to_7cm_spread
+    case soil_moisture_7_to_28cm_spread
+    case soil_moisture_28_to_100cm_spread
+    case soil_moisture_100_to_255cm_spread
+    case shortwave_radiation_spread
+    case precipitation_spread
+    case direct_radiation_spread
+    
     /// Some variables are kept for backwards compatibility
     var remapped: Self {
         switch self {

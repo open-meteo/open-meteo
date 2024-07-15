@@ -56,6 +56,10 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     
+    case wind_speed_10m_spread
+    case wind_speed_100m_spread
+    case snowfall_spread
+    
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -259,6 +263,14 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .dew_point_2m, time: time)
         case .sunshine_duration:
             try prefetchData(raw: .direct_radiation, time: time)
+        case .wind_speed_10m_spread:
+            try prefetchData(raw: .wind_u_component_10m_spread, time: time)
+            try prefetchData(raw: .wind_v_component_10m_spread, time: time)
+        case .wind_speed_100m_spread:
+            try prefetchData(raw: .wind_u_component_100m_spread, time: time)
+            try prefetchData(raw: .wind_v_component_100m_spread, time: time)
+        case .snowfall_spread:
+            try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
     }
     
@@ -511,6 +523,20 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
             let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
+        case .wind_speed_10m_spread:
+            let u = try get(raw: .wind_u_component_10m_spread, time: time)
+            let v = try get(raw: .wind_v_component_10m_spread, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .wind_speed_100m_spread:
+            let u = try get(raw: .wind_u_component_100m_spread, time: time)
+            let v = try get(raw: .wind_v_component_100m_spread, time: time)
+            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .snowfall_spread:
+            let snowwater = try get(raw: .snowfall_water_equivalent_spread, time: time).data
+            let snowfall = snowwater.map { $0 * 0.7 }
+            return DataAndUnit(snowfall, .centimetre)
         }
     }
 }

@@ -361,7 +361,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     struct CdsQuery: Encodable {
-        let product_type: String
+        let product_type: [String]
         let format = "grib"
         let year: String
         let month: String
@@ -404,7 +404,7 @@ struct DownloadEra5Command: AsyncCommand {
             let hours = timeinterval.dtSeconds == 3600 ? [timestamp.hour] : Array(0..<24)
             
             let query = CdsQuery(
-                product_type: domain == .era5_ensemble ? "ensemble_mean" : "reanalysis",
+                product_type: domain == .era5_ensemble ? ["ensemble_mean", "ensemble_spread"] : ["reanalysis"],
                 year: "\(date.year)",
                 month: date.month.zeroPadded(len: 2),
                 day: date.day.zeroPadded(len: 2),

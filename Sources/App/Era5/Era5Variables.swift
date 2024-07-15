@@ -352,17 +352,17 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
         case .wind_u_component_10m, .wind_u_component_10m_spread: fallthrough
         case .wind_v_component_10m, .wind_v_component_10m_spread: fallthrough
         case .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
-        case .dew_point_2m, .dew_point_2m_spread: return .celsius
-        case .temperature_2m, .temperature_2m_spread: return .celsius
+        case .dew_point_2m: return .celsius
+        case .temperature_2m: return .celsius
         case .cloud_cover_low, .cloud_cover_low_spread: return .percentage
         case .cloud_cover_mid, .cloud_cover_mid_spread: return .percentage
         case .cloud_cover_high, .cloud_cover_high_spread: return .percentage
         case .pressure_msl, .pressure_msl_spread: return .pascal
         case .snowfall_water_equivalent, .snowfall_water_equivalent_spread: return .millimetre
-        case .soil_temperature_0_to_7cm, .soil_temperature_0_to_7cm_spread: return .celsius
-        case .soil_temperature_7_to_28cm, .soil_temperature_7_to_28cm_spread: return .celsius
-        case .soil_temperature_28_to_100cm, .soil_temperature_28_to_100cm_spread: return .celsius
-        case .soil_temperature_100_to_255cm, .soil_temperature_100_to_255cm_spread: return .celsius
+        case .soil_temperature_0_to_7cm: return .celsius
+        case .soil_temperature_7_to_28cm: return .celsius
+        case .soil_temperature_28_to_100cm: return .celsius
+        case .soil_temperature_100_to_255cm: return .celsius
         case .shortwave_radiation, .shortwave_radiation_spread: return .wattPerSquareMetre
         case .precipitation, .precipitation_spread: return .millimetre
         case .direct_radiation, .direct_radiation_spread: return .wattPerSquareMetre
@@ -377,6 +377,7 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
             return .degreeDirection
         case .wave_period:
             return .seconds
+        case .dew_point_2m_spread, .temperature_2m_spread, .soil_temperature_0_to_7cm_spread, .soil_temperature_7_to_28cm_spread, .soil_temperature_28_to_100cm_spread, .soil_temperature_100_to_255cm_spread: return .kelvin
         }
     }
     
