@@ -326,6 +326,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case era5
     case cerra
     case era5_land
+    case era5_ensemble
     case ecmwf_ifs
     case ecmwf_lwda_analysis
     case ecmwf_lwda_ifs
@@ -534,6 +535,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try Era5Factory.makeReader(domain: .ecmwf_lwda_analysis, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ecmwf_lwda_ifs:
             return [try Era5Factory.makeReader(domain: .ecmwf_lwda_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .era5_ensemble:
+            return [try Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         }
     }
     

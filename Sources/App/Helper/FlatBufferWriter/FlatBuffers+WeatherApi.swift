@@ -626,6 +626,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .ecmwf_lwda_ifs:
             // TODO register
             return .ecmwfIfs
+        case .era5_ensemble:
+            // TODO register
+            return .era5
         }
     }
 }

@@ -4,121 +4,7 @@ import Vapor
 import SwiftPFor2D
 
 
-///  ERA5: https://rmets.onlinelibrary.wiley.com/doi/10.1002/qj.3803
-enum CdsDomain: String, GenericDomain, CaseIterable {
-    case era5
-    case era5_daily
-    case era5_ocean
-    case era5_land
-    case era5_land_daily
-    case era5_ensemble
-    case cerra
-    case ecmwf_ifs
-    case ecmwf_lwda_analysis
-    case ecmwf_lwda_ifs
-    
-    var dtSeconds: Int {
-        switch self {
-        case .era5_daily, .era5_land_daily:
-            return 24*3600
-        case .ecmwf_lwda_ifs:
-            return 3*3600
-        case .ecmwf_lwda_analysis:
-            return 6*3600
-        default:
-            return 3600
-        }
-    }
-    
-    var isGlobal: Bool {
-        self != .cerra
-    }
-    
-    var cdsDatasetName: String {
-        switch self {
-        case .era5, .era5_ocean, .era5_ensemble:
-            return "reanalysis-era5-single-levels"
-        case .era5_land:
-            return "reanalysis-era5-land"
-        case .cerra:
-            return "reanalysis-cerra-single-levels"
-        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
-            return ""
-        case .era5_land_daily, .era5_daily:
-            fatalError()
-        }
-    }
-    
-    var domainRegistryStatic: DomainRegistry? {
-        switch self {
-        case .era5_daily:
-            return .copernicus_era5
-        case .era5_land_daily:
-            return .copernicus_era5_land
-        case .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
-            return .ecmwf_ifs
-        default:
-            return domainRegistry
-        }
-    }
-    
-    var domainRegistry: DomainRegistry {
-        switch self {
-        case .era5:
-            return .copernicus_era5
-        case .era5_daily:
-            return .copernicus_era5_daily
-        case .era5_ocean:
-            return .copernicus_era5_ocean
-        case .era5_land:
-            return .copernicus_era5_land
-        case .era5_land_daily:
-            return .copernicus_era5_land_daily
-        case .era5_ensemble:
-            return .copernicus_era5_ensemble
-        case .cerra:
-            return .copernicus_cerra
-        case .ecmwf_ifs:
-            return .ecmwf_ifs
-        case .ecmwf_lwda_analysis:
-            return .ecmwf_lwda_analysis
-        case .ecmwf_lwda_ifs:
-            return .ecmwf_lwda_ifs
-        }
-    }
-    
-    var hasYearlyFiles: Bool {
-        return true
-    }
-    
-    var masterTimeRange: Range<Timestamp>? {
-        return nil
-    }
-    
-    /// Use store 14 days per om file
-    var omFileLength: Int {
-        // 24 hours over 21 days = 504 timesteps per file
-        // Afterwards the om compressor will combine 6 locations to one chunks
-        // 6 * 504 = 3024 values per compressed chunk
-        // In case for a 1 year API call, around 51 kb will have to be decompressed with 34 IO operations
-        return 24 * 21
-    }
-    
-    var grid: Gridable {
-        switch self {
-        case .era5, .era5_daily:
-            return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .era5_ocean, .era5_ensemble:
-            return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
-        case .era5_land, .era5_land_daily:
-            return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
-        case .cerra:
-            return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
-        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
-            return GaussianGrid(type: .o1280)
-        }
-    }
-}
+
 
 struct DownloadEra5Command: AsyncCommand {
     /// 6k locations require around 200 MB memory for a yearly time-series
@@ -184,8 +70,6 @@ struct DownloadEra5Command: AsyncCommand {
         switch domain {
         case .cerra:
             variables = try CerraVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? CerraVariable.allCases
-        case .era5_ensemble:
-            variables = try Era5VariableEnsemble.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5VariableEnsemble.allCases
         default:
             variables = try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         }
@@ -462,9 +346,7 @@ struct DownloadEra5Command: AsyncCommand {
     
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) async throws -> TimerangeDt {
         switch domain {
-        case .era5_ensemble:
-            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5VariableEnsemble])
-        case .era5_land, .era5, .era5_ocean:
+        case .era5_land, .era5, .era5_ocean, .era5_ensemble:
             return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
         case .cerra:
             return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
@@ -664,20 +546,14 @@ struct DownloadEra5Command: AsyncCommand {
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     
                     for try await message in stream {
-                        //let h = stream.compactMap { message -> GenericVariableHandle? in
-                        guard let shortName = message.get(attribute: "shortName"),
-                              let stepRange = message.get(attribute: "stepRange"),
-                              let stepType = message.get(attribute: "stepType") else {
-                            fatalError("could not get step range or type")
-                        }
-                        guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
-                            fatalError("Could not find \(shortName) in grib")
+                        let attributes = try GribAttributes(message: message)
+                        let timestamp = attributes.timestamp
+                        guard let variable = Era5Variable.fromGrib(attributes: attributes) else {
+                            fatalError("Could not find \(attributes) in grib")
                         }
                         
-                        let hour = Int(message.get(attribute: "validityTime")!)!/100
-                        let date = message.get(attribute: "validityDate")!
                         let endStep = Int(message.get(attribute: "endStep")!)!
-                        logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                        logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(attributes.parameterName)")
                         
                         if variable == .wind_gusts_10m && endStep == 0 {
                             continue
@@ -689,12 +565,12 @@ struct DownloadEra5Command: AsyncCommand {
                         }
 
                         // Deaccumulate precipitation
-                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &grib2d) else {
                             continue
                         }
                         
-                        try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
-                        let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                        try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
+                        let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     }
