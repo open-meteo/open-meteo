@@ -3,14 +3,15 @@ import AsyncHTTPClient
 import SwiftEccodes
 import NIOCore
 
-fileprivate enum CdsApiError: Error {
+enum CdsApiError: Error {
     case jobAborted
     case startError(code: Int, message: String)
     case error(message: String, reason: String)
     case waiting(status: CdsState)
+    case restrictedAccessToValidData
 }
 
-fileprivate enum CdsState: String, Decodable {
+enum CdsState: String, Decodable {
     case queued
     case failed
     case completed
@@ -48,6 +49,17 @@ extension Curl {
         return result
     }
     
+    /**
+     Get GRIB data from the CDS API and store to file
+     */
+    func downloadCdsApi(dataset: String, query: any Encodable, apikey: String, server: String = "https://cds.climate.copernicus.eu/api/v2", destinationFile: String) async throws {
+        
+        let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
+        let gribUrl = try await waitForCdsJob(job: job, apikey: apikey, server: server)
+        try await download(url: gribUrl, toFile: destinationFile, bzip2Decode: false)
+        try await cleanupCdsApiJob(job: job, apikey: apikey, server: server)
+    }
+    
     /// Start a new job using POST
     fileprivate func startCdsApiJob(dataset: String, query: any Encodable, apikey: String, server: String) async throws -> CdsApiResponse {
         var request = HTTPClientRequest(url: "\(server)/resources/\(dataset)")
@@ -74,6 +86,9 @@ extension Curl {
             case .queued, .running:
                 break
             case .failed:
+                if job.error!.reason.contains("None of the data you have requested is available yet") {
+                    throw CdsApiError.restrictedAccessToValidData
+                }
                 throw CdsApiError.error(message: job.error!.message, reason: job.error!.reason)
             case .completed:
                 return job.location!

@@ -19,6 +19,7 @@ enum DomainRegistry: String, CaseIterable {
     case copernicus_dem90
     case copernicus_cerra
     case copernicus_era5
+    case copernicus_era5_ensemble
     case copernicus_era5_daily
     case copernicus_era5_land
     case copernicus_era5_land_daily
@@ -137,6 +138,8 @@ enum DomainRegistry: String, CaseIterable {
             return CdsDomain.era5_land
         case .copernicus_era5_ocean:
             return CdsDomain.era5_ocean
+        case .copernicus_era5_ensemble:
+            return CdsDomain.era5_ensemble
         case .dwd_ewam:
             return IconWaveDomain.ewam
         case .cmc_gem_gdps:

@@ -24,6 +24,17 @@ extension Curl {
         return result
     }
     
+    /**
+     Get GRIB data from the ECMWF API and download to file
+     Important: http client must be configured to disallow redirects!
+     */
+    func downloadEcmwfApi(query: any Encodable, email: String, apikey: String, destinationFile: String) async throws {
+        let job = try await startEcmwfApiJob(query: query, email: email, apikey: apikey)
+        let gribUrl = try await waitForEcmwfJob(job: job, email: email, apikey: apikey)
+        try await download(url: gribUrl, toFile: destinationFile, bzip2Decode: false)
+        try await cleanupEcmwfApiJob(job: job, email: email, apikey: apikey)
+    }
+    
     fileprivate struct EcmwfApiResponse: Decodable {
         let status: String
         let code: Int

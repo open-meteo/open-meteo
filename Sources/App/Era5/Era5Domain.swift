@@ -1,8 +1,305 @@
 import SwiftPFor2D
 
 
+protocol Era5Downloadable: GenericVariable, GribMessageAssociated {
+    var cdsApiName: String? { get }
+    var netCdfScaling: (offest: Double, scalefactor: Double)? { get }
+}
+
+enum Era5VariableEnsemble: String, CaseIterable, Era5Downloadable {
+    case temperature_2m
+    case wind_u_component_100m
+    case wind_v_component_100m
+    case wind_u_component_10m
+    case wind_v_component_10m
+    case wind_gusts_10m
+    case dew_point_2m
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+    case pressure_msl
+    case snowfall_water_equivalent
+    /// Only ERA5-Land and CERRA have snow depth in ACTUAL height. ERA5 and ECMWF IFS use water equivalent and density
+    //case snow_depth
+    case soil_temperature_0_to_7cm
+    case soil_temperature_7_to_28cm
+    case soil_temperature_28_to_100cm
+    case soil_temperature_100_to_255cm
+    case soil_moisture_0_to_7cm
+    case soil_moisture_7_to_28cm
+    case soil_moisture_28_to_100cm
+    case soil_moisture_100_to_255cm
+    case shortwave_radiation
+    case precipitation
+    case direct_radiation
+    
+    case temperature_2m_spread
+    case wind_u_component_100m_spread
+    case wind_v_component_100m_spread
+    case wind_u_component_10m_spread
+    case wind_v_component_10m_spread
+    case wind_gusts_10m_spread
+    case dew_point_2m_spread
+    case cloud_cover_low_spread
+    case cloud_cover_mid_spread
+    case cloud_cover_high_spread
+    case pressure_msl_spread
+    case snowfall_water_equivalent_spread
+    //case snow_depth_spread
+    case soil_temperature_0_to_7cm_spread
+    case soil_temperature_7_to_28cm_spread
+    case soil_temperature_28_to_100cm_spread
+    case soil_temperature_100_to_255cm_spread
+    case soil_moisture_0_to_7cm_spread
+    case soil_moisture_7_to_28cm_spread
+    case soil_moisture_28_to_100cm_spread
+    case soil_moisture_100_to_255cm_spread
+    case shortwave_radiation_spread
+    case precipitation_spread
+    case direct_radiation_spread
+    
+    /// Name used to query the ECMWF CDS API via python
+    var cdsApiName: String? {
+        switch self {
+        case .wind_u_component_100m: return "100m_u_component_of_wind"
+        case .wind_v_component_100m: return "100m_v_component_of_wind"
+        case .wind_u_component_10m: return "10m_u_component_of_wind"
+        case .wind_v_component_10m: return "10m_v_component_of_wind"
+        case .wind_gusts_10m: return "instantaneous_10m_wind_gust"
+        case .dew_point_2m: return "2m_dewpoint_temperature"
+        case .temperature_2m: return "2m_temperature"
+        case .cloud_cover_low: return "low_cloud_cover"
+        case .cloud_cover_mid: return "medium_cloud_cover"
+        case .cloud_cover_high: return "high_cloud_cover"
+        case .pressure_msl: return "mean_sea_level_pressure"
+        case .snowfall_water_equivalent: return "snowfall"
+        case .soil_temperature_0_to_7cm: return "soil_temperature_level_1"
+        case .soil_temperature_7_to_28cm: return "soil_temperature_level_2"
+        case .soil_temperature_28_to_100cm: return "soil_temperature_level_3"
+        case .soil_temperature_100_to_255cm: return "soil_temperature_level_4"
+        case .shortwave_radiation: return "surface_solar_radiation_downwards"
+        case .precipitation: return "total_precipitation"
+        case .direct_radiation: return "total_sky_direct_solar_radiation_at_surface"
+        case .soil_moisture_0_to_7cm: return "volumetric_soil_water_layer_1"
+        case .soil_moisture_7_to_28cm: return "volumetric_soil_water_layer_2"
+        case .soil_moisture_28_to_100cm: return "volumetric_soil_water_layer_3"
+        case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"
+            // NOTE: snow depth uses different definitions in ERA5 and ECMWF IFS. Only ERA5-land returns the actual height directly
+        //case .snow_depth: return "snow_depth"
+        default: return nil
+        }
+    }
+    
+    var netCdfScaling: (offest: Double, scalefactor: Double)? {
+        switch self {
+        case .temperature_2m: return (-273.15, 1) // kelvin to celsius
+        case .dew_point_2m: return (-273.15, 1)
+        case .cloud_cover_low, .cloud_cover_low_spread: return (0, 100) // fraction to percent
+        case .cloud_cover_mid, .cloud_cover_mid_spread: return (0, 100)
+        case .cloud_cover_high, .cloud_cover_high_spread: return (0, 100)
+        case .pressure_msl: return (0, 1) // keep in Pa (not hPa)
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_spread: return (0, 1000) // meter to millimeter
+        case .soil_temperature_0_to_7cm: return (-273.15, 1) // kelvin to celsius
+        case .soil_temperature_7_to_28cm: return (-273.15, 1)
+        case .soil_temperature_28_to_100cm: return (-273.15, 1)
+        case .soil_temperature_100_to_255cm: return (-273.15, 1)
+        case .shortwave_radiation, .shortwave_radiation_spread: return (0, 1/3600) // joules to watt
+        case .precipitation, .precipitation_spread: return (0, 1000) // meter to millimeter
+        case .direct_radiation, .direct_radiation_spread: return (0, 1/3600)
+        default:
+            return nil
+        }
+    }
+    
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+    
+    /// Scalefactor to compress data
+    var scalefactor: Float {
+        switch self {
+        case .wind_u_component_100m, .wind_u_component_100m_spread: return 10
+        case .wind_v_component_100m, .wind_v_component_100m_spread: return 10
+        case .wind_u_component_10m, .wind_u_component_10m_spread: return 10
+        case .wind_v_component_10m, .wind_v_component_10m_spread: return 10
+        case .cloud_cover_low, .cloud_cover_low_spread: return 1
+        case .cloud_cover_mid, .cloud_cover_mid_spread: return 1
+        case .cloud_cover_high, .cloud_cover_high_spread: return 1
+        case .wind_gusts_10m, .wind_gusts_10m_spread: return 10
+        case .dew_point_2m, .dew_point_2m_spread: return 20
+        case .temperature_2m, .temperature_2m_spread: return 20
+        case .pressure_msl, .pressure_msl_spread: return 0.1
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_spread: return 10
+        case .soil_temperature_0_to_7cm, .soil_temperature_0_to_7cm_spread: return 20
+        case .soil_temperature_7_to_28cm, .soil_temperature_7_to_28cm_spread: return 20
+        case .soil_temperature_28_to_100cm, .soil_temperature_28_to_100cm_spread: return 20
+        case .soil_temperature_100_to_255cm, .soil_temperature_100_to_255cm_spread: return 20
+        case .shortwave_radiation, .shortwave_radiation_spread: return 1
+        case .precipitation, .precipitation_spread: return 10
+        case .direct_radiation, .direct_radiation_spread: return 1
+        case .soil_moisture_0_to_7cm, .soil_moisture_0_to_7cm_spread: return 1000
+        case .soil_moisture_7_to_28cm, .soil_moisture_7_to_28cm_spread: return 1000
+        case .soil_moisture_28_to_100cm, .soil_moisture_28_to_100cm_spread: return 1000
+        case .soil_moisture_100_to_255cm, .soil_moisture_100_to_255cm_spread: return 1000
+        //case .snow_depth, .snow_depth_spread: return 100 // 1 cm resolution
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m, .temperature_2m_spread:
+            return .hermite(bounds: nil)
+        case .wind_u_component_100m, .wind_u_component_100m_spread:
+            return .hermite(bounds: nil)
+        case .wind_v_component_100m, .wind_v_component_100m_spread:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m, .wind_u_component_10m_spread:
+            return .hermite(bounds: nil)
+        case .wind_v_component_10m, .wind_v_component_10m_spread:
+            return .hermite(bounds: nil)
+        case .wind_gusts_10m, .wind_gusts_10m_spread:
+            return .hermite(bounds: nil)
+        case .dew_point_2m, .dew_point_2m_spread:
+            return .hermite(bounds: nil)
+        case .cloud_cover_low, .cloud_cover_low_spread:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_mid, .cloud_cover_mid_spread:
+            return .hermite(bounds: 0...100)
+        case .cloud_cover_high, .cloud_cover_high_spread:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl, .pressure_msl_spread:
+            return .hermite(bounds: nil)
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_spread:
+            return .backwards_sum
+        //case .snow_depth, .snow_depth_spread:
+        //    return .linear
+        case .soil_temperature_0_to_7cm, .soil_temperature_0_to_7cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_temperature_7_to_28cm, .soil_temperature_7_to_28cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_temperature_28_to_100cm, .soil_temperature_28_to_100cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_temperature_100_to_255cm, .soil_temperature_100_to_255cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_moisture_0_to_7cm, .soil_moisture_0_to_7cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_moisture_7_to_28cm, .soil_moisture_7_to_28cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_moisture_28_to_100cm, .soil_moisture_28_to_100cm_spread:
+            return .hermite(bounds: nil)
+        case .soil_moisture_100_to_255cm, .soil_moisture_100_to_255cm_spread:
+            return .hermite(bounds: nil)
+        case .shortwave_radiation, .shortwave_radiation_spread:
+            return .solar_backwards_averaged
+        case .precipitation, .precipitation_spread:
+            return .backwards_sum
+        case .direct_radiation, .direct_radiation_spread:
+            return .solar_backwards_averaged
+        }
+    }
+    
+    var unit: SiUnit {
+        switch self {
+        case .wind_u_component_100m, .wind_u_component_100m_spread: fallthrough
+        case .wind_v_component_100m, .wind_v_component_100m_spread: fallthrough
+        case .wind_u_component_10m, .wind_u_component_10m_spread: fallthrough
+        case .wind_v_component_10m, .wind_v_component_10m_spread: fallthrough
+        case .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
+        case .dew_point_2m, .dew_point_2m_spread: return .celsius
+        case .temperature_2m, .temperature_2m_spread: return .celsius
+        case .cloud_cover_low, .cloud_cover_low_spread: return .percentage
+        case .cloud_cover_mid, .cloud_cover_mid_spread: return .percentage
+        case .cloud_cover_high, .cloud_cover_high_spread: return .percentage
+        case .pressure_msl, .pressure_msl_spread: return .pascal
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_spread: return .millimetre
+        case .soil_temperature_0_to_7cm, .soil_temperature_0_to_7cm_spread: return .celsius
+        case .soil_temperature_7_to_28cm, .soil_temperature_7_to_28cm_spread: return .celsius
+        case .soil_temperature_28_to_100cm, .soil_temperature_28_to_100cm_spread: return .celsius
+        case .soil_temperature_100_to_255cm, .soil_temperature_100_to_255cm_spread: return .celsius
+        case .shortwave_radiation, .shortwave_radiation_spread: return .wattPerSquareMetre
+        case .precipitation, .precipitation_spread: return .millimetre
+        case .direct_radiation, .direct_radiation_spread: return .wattPerSquareMetre
+        case .soil_moisture_0_to_7cm, .soil_moisture_0_to_7cm_spread: return .cubicMetrePerCubicMetre
+        case .soil_moisture_7_to_28cm, .soil_moisture_7_to_28cm_spread: return .cubicMetrePerCubicMetre
+        case .soil_moisture_28_to_100cm, .soil_moisture_28_to_100cm_spread: return .cubicMetrePerCubicMetre
+        case .soil_moisture_100_to_255cm, .soil_moisture_100_to_255cm_spread: return .cubicMetrePerCubicMetre
+        //case .snow_depth, .snow_depth_spread: return .metre
+        }
+    }
+    
+    var isElevationCorrectable: Bool {
+        return self == .temperature_2m || self == .dew_point_2m ||
+            self == .soil_temperature_0_to_7cm || self == .soil_temperature_7_to_28cm ||
+            self == .soil_temperature_28_to_100cm || self == .soil_temperature_100_to_255cm
+    }
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    static func fromGrib(attributes: GribAttributes) -> Self? {
+        switch (attributes.shortName, attributes.dataType) {
+        case ("2t", "em"): return .temperature_2m
+        case ("2t", "es"): return .temperature_2m_spread
+        case ("lcc", "em"): return .cloud_cover_low
+        case ("lcc", "es"): return .cloud_cover_low_spread
+        case ("mcc", "em"): return .cloud_cover_mid
+        case ("mcc", "es"): return .cloud_cover_mid_spread
+        case ("hcc", "em"): return .cloud_cover_high
+        case ("hcc", "es"): return .cloud_cover_high_spread
+        case ("msl", "em"): return .pressure_msl
+        case ("msl", "es"): return .pressure_msl_spread
+        case ("sf", "em"): return .snowfall_water_equivalent
+        case ("sf", "es"): return .snowfall_water_equivalent_spread
+        case ("ssrd", "em"): return .shortwave_radiation
+        case ("ssrd", "es"): return .shortwave_radiation_spread
+        case ("tp", "em"): return .precipitation
+        case ("tp", "es"): return .precipitation_spread
+        case ("tidirswrf", "em"), ("fdir", "em"): return .direct_radiation
+        case ("tidirswrf", "es"), ("fdir", "es"): return .direct_radiation_spread
+        case ("100u", "em"): return .wind_u_component_100m
+        case ("100u", "es"): return .wind_u_component_100m_spread
+        case ("100v", "em"): return .wind_v_component_100m
+        case ("100v", "es"): return .wind_v_component_100m_spread
+        case ("10u", "em"): return .wind_u_component_10m
+        case ("10u", "es"): return .wind_u_component_10m_spread
+        case ("10v", "em"): return .wind_v_component_10m
+        case ("10v", "es"): return .wind_v_component_10m_spread
+        case ("10fg", "em"), ("gust", "em"), ("i10fg", "em"): return .wind_gusts_10m
+        case ("10fg", "es"), ("gust", "es"), ("i10fg", "es"): return .wind_gusts_10m_spread
+        case ("2d", "em"): return .dew_point_2m
+        case ("2d", "es"): return .dew_point_2m_spread
+        case ("stl1", "em"): return .soil_temperature_0_to_7cm
+        case ("stl1", "es"): return .soil_temperature_0_to_7cm_spread
+        case ("stl2", "em"): return .soil_moisture_7_to_28cm
+        case ("stl2", "es"): return .soil_moisture_7_to_28cm_spread
+        case ("stl3", "em"): return .soil_moisture_28_to_100cm
+        case ("stl3", "es"): return .soil_moisture_28_to_100cm_spread
+        case ("stl4", "em"): return .soil_temperature_100_to_255cm
+        case ("stl4", "es"): return .soil_temperature_100_to_255cm_spread
+        case ("swvl1", "em"): return .soil_moisture_0_to_7cm
+        case ("swvl1", "es"): return .soil_moisture_0_to_7cm_spread
+        case ("swvl2", "em"): return .soil_moisture_7_to_28cm
+        case ("swvl2", "es"): return .soil_moisture_7_to_28cm_spread
+        case ("swvl3", "em"): return .soil_moisture_28_to_100cm
+        case ("swvl3", "es"): return .soil_moisture_28_to_100cm_spread
+        case ("swvl4", "em"): return .soil_moisture_100_to_255cm
+        case ("swvl4", "es"): return .soil_moisture_100_to_255cm_spread
+        //case ("sde", "em"): return .snow_depth
+        //case ("sde", "es"): return .snow_depth_spread
+        default:
+            return nil
+        }
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+}
+
 /// Might be used to decode API queries later
-enum Era5Variable: String, CaseIterable, GenericVariable {
+enum Era5Variable: String, CaseIterable, Era5Downloadable {
     case temperature_2m
     case wind_u_component_100m
     case wind_v_component_100m
@@ -49,6 +346,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     
     var requiresOffsetCorrectionForMixing: Bool {
          return false
+    }
+    
+    static func fromGrib(attributes: GribAttributes) -> Era5Variable? {
+        return allCases.first(where: {$0.gribShortName.contains(attributes.shortName)})
     }
     
     var isAccumulatedSinceModelStart: Bool {
@@ -181,7 +482,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable {
     }
     
     /// Name used to query the ECMWF CDS API via python
-    var cdsApiName: String {
+    var cdsApiName: String? {
         switch self {
         case .wind_u_component_100m: return "100m_u_component_of_wind"
         case .wind_v_component_100m: return "100m_v_component_of_wind"

@@ -11,6 +11,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5_ocean
     case era5_land
     case era5_land_daily
+    case era5_ensemble
     case cerra
     case ecmwf_ifs
     case ecmwf_lwda_analysis
@@ -35,7 +36,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     
     var cdsDatasetName: String {
         switch self {
-        case .era5, .era5_ocean:
+        case .era5, .era5_ocean, .era5_ensemble:
             return "reanalysis-era5-single-levels"
         case .era5_land:
             return "reanalysis-era5-land"
@@ -73,6 +74,8 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return .copernicus_era5_land
         case .era5_land_daily:
             return .copernicus_era5_land_daily
+        case .era5_ensemble:
+            return .copernicus_era5_ensemble
         case .cerra:
             return .copernicus_cerra
         case .ecmwf_ifs:
@@ -105,7 +108,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .era5, .era5_daily:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .era5_ocean:
+        case .era5_ocean, .era5_ensemble:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .era5_land, .era5_land_daily:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
@@ -177,9 +180,15 @@ struct DownloadEra5Command: AsyncCommand {
         
         let domain = try CdsDomain.load(rawValue: signature.domain)
         
-        let variables: [GenericVariable] = domain == .cerra ?
-            (try CerraVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? CerraVariable.allCases) :
-        (try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases).filter({ $0.availableForDomain(domain: domain) })
+        let variables: [GenericVariable]
+        switch domain {
+        case .cerra:
+            variables = try CerraVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? CerraVariable.allCases
+        case .era5_ensemble:
+            variables = try Era5VariableEnsemble.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5VariableEnsemble.allCases
+        default:
+            variables = try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
+        }
         
         if signature.calculateBiasField {
             try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
@@ -305,8 +314,14 @@ struct DownloadEra5Command: AsyncCommand {
         let tempDownloadGribFile2 = domain == .era5_land ? "\(downloadDir)lsm.grib" : nil
         let tempDownloadGribFile3 = domain == .era5_land ? "\(downloadDir)soil_type.grib" : nil
         
+
+        
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
+            let client = application.makeNewHttpClient(redirectConfiguration: .disallow)
+            let curl = Curl(logger: logger, client: client, deadLineHours: 99999)
+            
+            
             switch domain {
             case .era5_daily, .era5_land_daily:
                 fatalError()
@@ -321,12 +336,7 @@ struct DownloadEra5Command: AsyncCommand {
                     let month = "01"
                     let year = "2022"
                 }
-                try Process.cdsApi(
-                    dataset: domain.cdsDatasetName,
-                    key: cdskey,
-                    query: Query(),
-                    destinationFile: tempDownloadGribFile
-                )
+                try await curl.downloadCdsApi(dataset: domain.cdsDatasetName, query:  Query(), apikey: cdskey, destinationFile: tempDownloadGribFile)
             case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
                 guard let email else {
                     fatalError("email required")
@@ -342,10 +352,10 @@ struct DownloadEra5Command: AsyncCommand {
                     let time = "00:00:00"
                     let type = "an"
                 }
-                try Process.ecmwfApi(key: cdskey, email: email, query: Query(), destinationFile: tempDownloadGribFile)
-            case .era5:
+                try await curl.downloadEcmwfApi(query: Query(), email: email, apikey: cdskey, destinationFile: tempDownloadGribFile)
+            case .era5, .era5_ensemble:
                 struct Query: Encodable {
-                    let product_type = "reanalysis"
+                    let product_type: String
                     let format = "grib"
                     let variable = ["geopotential", "land_sea_mask", "soil_type"]
                     let time = "00:00"
@@ -353,12 +363,7 @@ struct DownloadEra5Command: AsyncCommand {
                     let month = "01"
                     let year = "2022"
                 }
-                try Process.cdsApi(
-                    dataset: domain.cdsDatasetName,
-                    key: cdskey,
-                    query: Query(),
-                    destinationFile: tempDownloadGribFile
-                )
+                try await curl.downloadCdsApi(dataset: domain.cdsDatasetName, query: Query(product_type: domain == .era5_ensemble ? "ensemble_mean" : "reanalysis"), apikey: cdskey, destinationFile: tempDownloadGribFile)
             case .era5_land:
                 let z = "https://confluence.ecmwf.int/download/attachments/140385202/geo_1279l4_0.1x0.1.grb?version=1&modificationDate=1570448352562&api=v2&download=true"
                 let lsm = "https://confluence.ecmwf.int/download/attachments/140385202/lsm_1279l4_0.1x0.1.grb?version=1&modificationDate=1567525024201&api=v2&download=true"
@@ -379,12 +384,10 @@ struct DownloadEra5Command: AsyncCommand {
                     let month = "12"
                     let year = "2019"
                 }
-                try Process.cdsApi(
-                    dataset: domain.cdsDatasetName,
-                    key: cdskey,
-                    query: Query(),
-                    destinationFile: tempDownloadGribFile)
+                try await curl.downloadCdsApi(dataset: domain.cdsDatasetName, query:  Query(), apikey: cdskey, destinationFile: tempDownloadGribFile)
             }
+            
+            try await client.shutdown()
         }
         
         var landmask: [Float]? = nil
@@ -458,8 +461,9 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) async throws -> TimerangeDt {
-        let logger = application.logger
         switch domain {
+        case .era5_ensemble:
+            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5VariableEnsemble])
         case .era5_land, .era5, .era5_ocean:
             return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
         case .cerra:
@@ -474,8 +478,18 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
     
+    struct CdsQuery: Encodable {
+        let product_type: String
+        let format = "grib"
+        let year: String
+        let month: String
+        let day: String
+        let time: [String]
+        let variable: [String]
+    }
+    
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyEra5Files(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) async throws -> TimerangeDt {
+    func downloadDailyEra5Files<Variable: Era5Downloadable>(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Variable]) async throws -> TimerangeDt {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -489,25 +503,12 @@ struct DownloadEra5Command: AsyncCommand {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
-        /// loop over each day, download data and convert it
-        let pid = ProcessInfo.processInfo.processIdentifier
-        
         /// The effective range of downloaded steps
         /// The lower bound will be adapted if timesteps already exist
         /// The upper bound will be reduced if the files are not yet on the remote server
         var downloadedRange = timeinterval.range.upperBound ..< timeinterval.range.upperBound
         
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
-        
-        struct CdsQuery: Encodable {
-            let product_type = "reanalysis"
-            let format = "grib"
-            let year: String
-            let month: String
-            let day: String
-            let time: [String]
-            let variable: [String]
-        }
         
         timeLoop: for timestamp in timeinterval {
             logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
@@ -521,11 +522,12 @@ struct DownloadEra5Command: AsyncCommand {
             let hours = timeinterval.dtSeconds == 3600 ? [timestamp.hour] : Array(0..<24)
             
             let query = CdsQuery(
+                product_type: domain == .era5_ensemble ? "ensemble_mean" : "reanalysis",
                 year: "\(date.year)",
                 month: date.month.zeroPadded(len: 2),
                 day: date.day.zeroPadded(len: 2),
                 time: hours.map({"\($0.zeroPadded(len: 2)):00"}),
-                variable: variables.map {$0.cdsApiName}
+                variable: variables.compactMap {$0.cdsApiName}
             )
             
             
@@ -534,14 +536,13 @@ struct DownloadEra5Command: AsyncCommand {
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     
                     for try await message in stream {
-                        let shortName = message.get(attribute: "shortName")!
-                        guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
-                            fatalError("Could not find \(shortName) in grib")
+                        let attributes = try GribAttributes(message: message)
+                        let timestamp = attributes.timestamp
+                        guard let variable = Variable.fromGrib(attributes: attributes) else {
+                            fatalError("Could not find \(attributes) in grib")
                         }
                         
-                        let hour = Int(message.get(attribute: "validityTime")!)!/100
-                        let date = message.get(attribute: "validityDate")!
-                        logger.info("Converting variable \(variable) \(date) \(hour) \(message.get(attribute: "name")!)")
+                        logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
                         
                         try grib2d.load(message: message)
                         if let scaling = variable.netCdfScaling {
@@ -556,13 +557,13 @@ struct DownloadEra5Command: AsyncCommand {
                             break timeLoop
                         }*/
                         
-                        try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
-                        let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
+                        try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
+                        let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     }
                 }
-            } catch EcmwfApiError.restrictedAccessToValidData {
+            } catch CdsApiError.restrictedAccessToValidData {
                 logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
                 downloadedRange = min(downloadedRange.lowerBound, timestamp) ..< timestamp
                 break timeLoop
@@ -593,9 +594,6 @@ struct DownloadEra5Command: AsyncCommand {
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: client, deadLineHours: 99999)
-        
-        /// loop over each day, download data and convert it
-        let pid = ProcessInfo.processInfo.processIdentifier
         
         /// The effective range of downloaded steps
         /// The lower bound will be adapted if timesteps already exist
@@ -981,7 +979,7 @@ extension Process {
     }
     
     /// Spawn python ECMWF API and download to a specified file
-    static func ecmwfApi(key: String, email: String, query: Encodable, destinationFile: String, url: String = "https://api.ecmwf.int/v1") throws {
+    /*static func ecmwfApi(key: String, email: String, query: Encodable, destinationFile: String, url: String = "https://api.ecmwf.int/v1") throws {
         let queryEncoded = String(data: try JSONEncoder().encode(query), encoding: .utf8)!
         let pyCode = """
             from ecmwfapi import ECMWFService
@@ -999,5 +997,5 @@ extension Process {
         
         try pyCode.write(toFile: "\(destinationFile).py", atomically: true, encoding: .utf8)
         try Process.spawn(cmd: "python3", args: ["\(destinationFile).py"])
-    }
+    }*/
 }
