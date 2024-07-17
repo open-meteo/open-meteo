@@ -429,10 +429,10 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
         case ("2d", "es"): return .dew_point_2m_spread
         case ("stl1", "em"): return .soil_temperature_0_to_7cm
         case ("stl1", "es"): return .soil_temperature_0_to_7cm_spread
-        case ("stl2", "em"): return .soil_moisture_7_to_28cm
-        case ("stl2", "es"): return .soil_moisture_7_to_28cm_spread
-        case ("stl3", "em"): return .soil_moisture_28_to_100cm
-        case ("stl3", "es"): return .soil_moisture_28_to_100cm_spread
+        case ("stl2", "em"): return .soil_temperature_7_to_28cm
+        case ("stl2", "es"): return .soil_temperature_7_to_28cm_spread
+        case ("stl3", "em"): return .soil_temperature_28_to_100cm
+        case ("stl3", "es"): return .soil_temperature_28_to_100cm_spread
         case ("stl4", "em"): return .soil_temperature_100_to_255cm
         case ("stl4", "es"): return .soil_temperature_100_to_255cm_spread
         case ("swvl1", "em"): return .soil_moisture_0_to_7cm
