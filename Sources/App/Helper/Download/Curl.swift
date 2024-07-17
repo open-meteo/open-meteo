@@ -433,3 +433,24 @@ final actor TotalBytesTransfered {
         logger.info("Finished downloading \(bytes.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
 }
+
+
+/*extension HTTPClientRequest {
+    /// Return a uniqe cache key for this request including url, headers and body
+    func getCacheKey() async throws -> String {
+        var data = Data()
+        if let url = url.data(using: .utf8) {
+            data.append(url)
+        }
+        let headerString = headers.sorted(by: <).map({"\($0)=\($1)"}).joined(separator: ";")
+        if let headers = headerString.data(using: .utf8) {
+            data.append(headers)
+        }
+        if let body {
+            for try await body in body {
+                data.append(contentsOf: body.readableBytesView)
+            }
+        }
+        return SHA256.hash(data: data).hex
+    }
+}*/
