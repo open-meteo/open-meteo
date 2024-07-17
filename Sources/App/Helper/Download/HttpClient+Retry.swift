@@ -5,14 +5,14 @@ import Logging
 
 
 extension HTTPClientResponse {
-    /// Throw
+    /// Throw if a transient error occurred. A retry could be successful
     func throwOnTransientError() throws {
         if isTransientError {
             throw CurlError.downloadFailed(code: status)
         }
     }
     
-    /// True is status code contains an error that is retriable. E.g. Gateway timeout or too many requests
+    /// True is status code contains an error that is retirable. E.g. Gateway timeout or too many requests
     var isTransientError: Bool {
         return [
             .requestTimeout,

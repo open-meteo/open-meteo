@@ -3,6 +3,7 @@ import Vapor
 import AsyncHTTPClient
 import CHelper
 import NIOCore
+import NIOFileSystem
 
 enum CurlError: Error {
     //case noGribMessagesMatch
@@ -248,12 +249,13 @@ final class Curl {
         if !FileManager.default.fileExists(atPath: cacheFile) {
             try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
         }
-        guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
-            fatalError("Could not read cached file")
-        }
+        
+        let fn = try await FileSystem.shared.openFile(forReadingAt: FilePath(cacheFile))
+        let fstat = try await fn.fileHandle.info()
+        
         var headers = HTTPHeaders()
-        headers.add(name: "content-length", value: "\(data.count)")
-        return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
+        headers.add(name: "content-length", value: "\(fstat.size)")
+        return HTTPClientResponse(status: .ok, headers: headers, body: .stream(fn.readChunks()))
     }
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
