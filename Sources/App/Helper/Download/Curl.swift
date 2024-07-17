@@ -3,7 +3,7 @@ import Vapor
 import AsyncHTTPClient
 import CHelper
 import NIOCore
-import NIOFileSystem
+import _NIOFileSystem
 
 enum CurlError: Error {
     //case noGribMessagesMatch
