@@ -733,6 +733,8 @@ struct DownloadEra5Command: AsyncCommand {
             if !forceUpdate && FileManager.default.fileExists(atPath: writeFile.getFilePath()) {
                 continue
             }
+            try writeFile.createDirectory()
+            
             let existingFile = forceUpdate ? try writeFile.openRead() : nil
             let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
