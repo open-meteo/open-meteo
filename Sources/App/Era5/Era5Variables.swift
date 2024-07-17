@@ -396,58 +396,65 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
     }
     
     static func fromGrib(attributes: GribAttributes) -> Self? {
-        switch (attributes.shortName, attributes.dataType ?? "em") {
-        case ("2t", "em"): return .temperature_2m
-        case ("2t", "es"): return .temperature_2m_spread
-        case ("lcc", "em"): return .cloud_cover_low
-        case ("lcc", "es"): return .cloud_cover_low_spread
-        case ("mcc", "em"): return .cloud_cover_mid
-        case ("mcc", "es"): return .cloud_cover_mid_spread
-        case ("hcc", "em"): return .cloud_cover_high
-        case ("hcc", "es"): return .cloud_cover_high_spread
-        case ("msl", "em"): return .pressure_msl
-        case ("msl", "es"): return .pressure_msl_spread
-        case ("sf", "em"): return .snowfall_water_equivalent
-        case ("sf", "es"): return .snowfall_water_equivalent_spread
-        case ("ssrd", "em"): return .shortwave_radiation
-        case ("ssrd", "es"): return .shortwave_radiation_spread
-        case ("tp", "em"): return .precipitation
-        case ("tp", "es"): return .precipitation_spread
-        case ("tidirswrf", "em"), ("fdir", "em"): return .direct_radiation
-        case ("tidirswrf", "es"), ("fdir", "es"): return .direct_radiation_spread
-        case ("100u", "em"): return .wind_u_component_100m
-        case ("100u", "es"): return .wind_u_component_100m_spread
-        case ("100v", "em"): return .wind_v_component_100m
-        case ("100v", "es"): return .wind_v_component_100m_spread
-        case ("10u", "em"): return .wind_u_component_10m
-        case ("10u", "es"): return .wind_u_component_10m_spread
-        case ("10v", "em"): return .wind_v_component_10m
-        case ("10v", "es"): return .wind_v_component_10m_spread
-        case ("10fg", "em"), ("gust", "em"), ("i10fg", "em"): return .wind_gusts_10m
-        case ("10fg", "es"), ("gust", "es"), ("i10fg", "es"): return .wind_gusts_10m_spread
-        case ("2d", "em"): return .dew_point_2m
-        case ("2d", "es"): return .dew_point_2m_spread
-        case ("stl1", "em"): return .soil_temperature_0_to_7cm
-        case ("stl1", "es"): return .soil_temperature_0_to_7cm_spread
-        case ("stl2", "em"): return .soil_temperature_7_to_28cm
-        case ("stl2", "es"): return .soil_temperature_7_to_28cm_spread
-        case ("stl3", "em"): return .soil_temperature_28_to_100cm
-        case ("stl3", "es"): return .soil_temperature_28_to_100cm_spread
-        case ("stl4", "em"): return .soil_temperature_100_to_255cm
-        case ("stl4", "es"): return .soil_temperature_100_to_255cm_spread
-        case ("swvl1", "em"): return .soil_moisture_0_to_7cm
-        case ("swvl1", "es"): return .soil_moisture_0_to_7cm_spread
-        case ("swvl2", "em"): return .soil_moisture_7_to_28cm
-        case ("swvl2", "es"): return .soil_moisture_7_to_28cm_spread
-        case ("swvl3", "em"): return .soil_moisture_28_to_100cm
-        case ("swvl3", "es"): return .soil_moisture_28_to_100cm_spread
-        case ("swvl4", "em"): return .soil_moisture_100_to_255cm
-        case ("swvl4", "es"): return .soil_moisture_100_to_255cm_spread
-        case ("sde", "em"): return .snow_depth
-        case ("sde", "es"): return .snow_depth_spread
-        case ("swh", "em"): return .wave_height
-        case ("mwd", "em"): return .wave_direction
-        case ("mwp", "em"): return .wave_period
+        if attributes.dataType == "es" {
+            switch attributes.shortName {
+            case "2t": return .temperature_2m_spread
+            case "lcc": return .cloud_cover_low_spread
+            case "mcc": return .cloud_cover_mid_spread
+            case "hcc": return .cloud_cover_high_spread
+            case "msl": return .pressure_msl_spread
+            case "sf": return .snowfall_water_equivalent_spread
+            case "ssrd": return .shortwave_radiation_spread
+            case "tp": return .precipitation_spread
+            case "tidirswrf", "fdir": return .direct_radiation_spread
+            case "100u": return .wind_u_component_100m_spread
+            case "100v": return .wind_v_component_100m_spread
+            case "10u": return .wind_u_component_10m_spread
+            case "10v": return .wind_v_component_10m_spread
+            case "10fg", "gust", "i10fg": return .wind_gusts_10m_spread
+            case "2d": return .dew_point_2m_spread
+            case "stl1": return .soil_temperature_0_to_7cm_spread
+            case "stl2": return .soil_temperature_7_to_28cm_spread
+            case "stl3": return .soil_temperature_28_to_100cm_spread
+            case "stl4": return .soil_temperature_100_to_255cm_spread
+            case "swvl1": return .soil_moisture_0_to_7cm_spread
+            case "swvl2": return .soil_moisture_7_to_28cm_spread
+            case "swvl3": return .soil_moisture_28_to_100cm_spread
+            case "swvl4": return .soil_moisture_100_to_255cm_spread
+            case "sde": return .snow_depth_spread
+            default:
+                return nil
+            }
+        }
+        
+        switch attributes.shortName {
+        case "2t": return .temperature_2m
+        case "lcc": return .cloud_cover_low
+        case "mcc": return .cloud_cover_mid
+        case "hcc": return .cloud_cover_high
+        case "msl": return .pressure_msl
+        case "sf": return .snowfall_water_equivalent
+        case "ssrd": return .shortwave_radiation
+        case "tp": return .precipitation
+        case "tidirswrf", "fdir": return .direct_radiation
+        case "100u": return .wind_u_component_100m
+        case "100v": return .wind_v_component_100m
+        case "10u": return .wind_u_component_10m
+        case "10v": return .wind_v_component_10m
+        case "10fg", "gust", "i10fg": return .wind_gusts_10m
+        case "2d": return .dew_point_2m
+        case "stl1": return .soil_temperature_0_to_7cm
+        case "stl2": return .soil_temperature_7_to_28cm
+        case "stl3": return .soil_temperature_28_to_100cm
+        case "stl4": return .soil_temperature_100_to_255cm
+        case "swvl1": return .soil_moisture_0_to_7cm
+        case "swvl2": return .soil_moisture_7_to_28cm
+        case "swvl3": return .soil_moisture_28_to_100cm
+        case "swvl4": return .soil_moisture_100_to_255cm
+        case "sde": return .snow_depth
+        case "swh": return .wave_height
+        case "mwd": return .wave_direction
+        case "mwp": return .wave_period
         default:
             return nil
         }
