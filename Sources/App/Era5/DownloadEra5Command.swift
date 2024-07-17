@@ -90,6 +90,8 @@ struct DownloadEra5Command: AsyncCommand {
         /// Make sure elevation information is present. Otherwise download it
         try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain)
         
+        let concurrent = signature.concurrent ?? System.coreCount
+        
         /// Only download one specified year
         if let yearStr = signature.year {
             if yearStr.contains("-") {
@@ -98,21 +100,21 @@ struct DownloadEra5Command: AsyncCommand {
                     fatalError("year invalid")
                 }
                 for year in Int(split[0])! ... Int(split[1])! {
-                    try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: false, timeintervalDaily: nil)
+                    try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: false, timeintervalDaily: nil, concurrent: concurrent)
                 }
             } else {
                 guard let year = Int(yearStr) else {
                     fatalError("Could not convert year to integer")
                 }
-                try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: signature.force ? signature.getTimeinterval(domain: domain) : nil)
+                try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: signature.force ? signature.getTimeinterval(domain: domain) : nil, concurrent: concurrent)
             }
             return
         }
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
-        let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: timeinterval.range.lowerBound, handles: handles, concurrent: signature.concurrent ?? 4)
+        let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: timeinterval.range.lowerBound, handles: handles, concurrent: concurrent)
         
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -345,23 +347,23 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
     
-    func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?) async throws {
+    func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
         let timeintervalDaily = timeintervalDaily ?? TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        let _ = try await downloadDailyFiles(application: application, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables)
+        let _ = try await downloadDailyFiles(application: application, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables, concurrent: concurrent)
         try convertYear(logger: application.logger, year: year, domain: domain, variables: variables, forceUpdate: forceUpdate)
     }
     
-    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable]) async throws -> [GenericVariableHandle] {
+    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int) async throws -> [GenericVariableHandle] {
         switch domain {
         case .era5_land, .era5, .era5_ocean, .era5_ensemble:
-            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
+            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent)
         case .cerra:
-            return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable])
+            return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable], concurrent: concurrent)
         case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
             guard let email else {
                 fatalError("email required")
             }
-            return try await downloadDailyEcmwfIfsFiles(application: application, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable])
+            return try await downloadDailyEcmwfIfsFiles(application: application, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent)
         case .era5_daily, .era5_land_daily:
             fatalError()
         }
@@ -378,7 +380,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyEra5Files<Variable: Era5Downloadable>(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Variable]) async throws -> [GenericVariableHandle] {
+    func downloadDailyEra5Files<Variable: Era5Downloadable>(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Variable], concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -418,10 +420,8 @@ struct DownloadEra5Command: AsyncCommand {
             
             
             do {
-                let _ = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
-                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    
-                    for try await message in stream {
+                let h = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { messages in
+                    return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                         let attributes = try GribAttributes(message: message)
                         let timestamp = attributes.timestamp
                         guard let variable = Variable.fromGrib(attributes: attributes) else {
@@ -430,6 +430,7 @@ struct DownloadEra5Command: AsyncCommand {
                         
                         logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
                         
+                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                         try grib2d.load(message: message)
                         if let scaling = variable.netCdfScaling {
                             grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
@@ -447,9 +448,10 @@ struct DownloadEra5Command: AsyncCommand {
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false))
-                    }
+                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false)
+                    }.collect().compactMap({$0})
                 }
+                handles.append(contentsOf: h)
             } catch CdsApiError.restrictedAccessToValidData {
                 logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
                 break timeLoop
@@ -460,7 +462,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Download ECMWF IFS operational archives
-    func downloadDailyEcmwfIfsFiles(application: Application, key: String, email: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable]) async throws -> [GenericVariableHandle] {
+    func downloadDailyEcmwfIfsFiles(application: Application, key: String, email: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable], concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -536,11 +538,9 @@ struct DownloadEra5Command: AsyncCommand {
                 fatalError()
             }
             do {
-                let _ = try await curl.withEcmwfApi(query: query, email: email, apikey: key) { stream in
+                let h = try await curl.withEcmwfApi(query: query, email: email, apikey: key) { messages in
                     let deaverager = GribDeaverager()
-                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    
-                    for try await message in stream {
+                    return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                         let attributes = try GribAttributes(message: message)
                         let timestamp = attributes.timestamp
                         guard let variable = Era5Variable.fromGrib(attributes: attributes) else {
@@ -551,9 +551,10 @@ struct DownloadEra5Command: AsyncCommand {
                         logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(attributes.parameterName)")
                         
                         if variable == .wind_gusts_10m && endStep == 0 {
-                            continue
+                            return nil
                         }
                         
+                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                         try grib2d.load(message: message)
                         if let scaling = variable.netCdfScaling {
                             grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
@@ -561,16 +562,17 @@ struct DownloadEra5Command: AsyncCommand {
 
                         // Deaccumulate precipitation
                         guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &grib2d) else {
-                            continue
+                            return nil
                         }
                         
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false))
-                    }
+                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false)
+                    }.collect().compactMap({$0})
                 }
+                handles.append(contentsOf: h)
             } catch EcmwfApiError.restrictedAccessToValidData {
                 logger.info("Timestep \(timestamp.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
                 break timeLoop
@@ -581,7 +583,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Dowload CERRA data, use analysis if available, otherwise use forecast
-    func downloadDailyFilesCerra(application: Application, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable]) async throws -> [GenericVariableHandle] {
+    func downloadDailyFilesCerra(application: Application, cdskey: String, timeinterval: TimerangeDt, variables: [CerraVariable], concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let domain = CdsDomain.cerra
         logger.info("Downloading timerange \(timeinterval.prettyString())")
@@ -636,13 +638,18 @@ struct DownloadEra5Command: AsyncCommand {
             )
             
             do {
-                let _ = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { stream in
-                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                let h = try await curl.withCdsApi(dataset: domain.cdsDatasetName, query: query, apikey: cdskey) { messages in
                     // Deaccumulate data on the fly. Keep previous timestep in memory
-                    var accumulated = [CerraVariable: [Float]]()
+                    let deaverager = GribDeaverager()
                     
-                    for try await message in stream {
-                        let shortName = message.get(attribute: "shortName")!
+                    return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                        guard let shortName = message.get(attribute: "shortName"),
+                              let stepRange = message.get(attribute: "stepRange"),
+                              let stepType = message.get(attribute: "stepType")
+                        else {
+                            fatalError("could not get attributes")
+                        }
+                        
                         guard let variable = variables.first(where: {$0.gribShortName.contains(shortName)}) else {
                             fatalError("Could not find \(shortName) in grib")
                         }
@@ -654,29 +661,25 @@ struct DownloadEra5Command: AsyncCommand {
                         let timestamp = try Timestamp.from(yyyymmdd: "\(date)\(hour.zeroPadded(len: 2))")
                         //try message.debugGrid(grid: domain.grid)
                         
+                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                         try grib2d.load(message: message)
                         if let scaling = variable.netCdfScaling {
                             grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
                         }
                         
-                        // Deaccumulate data for forecast hours 1,2,3
-                        if variable.isAccumulatedSinceModelStart {
-                            let previous = accumulated[variable]
-                            accumulated[variable] = hour % 3 == 0 ? nil : grib2d.array.data
-                            if let previous {
-                                for i in grib2d.array.data.indices {
-                                    grib2d.array.data[i] -= previous[i]
-                                }
-                            }
+                        // Deaccumulate precipitation
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            return nil
                         }
                         
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        handles.append(GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false))
-                    }
+                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false)
+                    }.collect().compactMap({$0})
                 }
+                handles.append(contentsOf: h)
             }
         }
         
