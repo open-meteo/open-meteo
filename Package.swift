@@ -35,6 +35,7 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.1.2"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.0.1"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.0")
     ] : []),
@@ -48,6 +49,8 @@ let package = Package(
                 .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
                 .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
                 .product(name: "SwiftEccodes", package: "SwiftEccodes"),
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "_NIOFileSystem", package: "swift-nio"),
                 "CHelper",
                 "SwiftPFor2D",
                 "CZlib",
