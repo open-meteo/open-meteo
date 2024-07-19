@@ -291,7 +291,7 @@ actor GribDeaverager {
             // Store data for next timestep
             let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
             // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-            if let previous, previous.step != startStep {
+            if let previous, previous.step != startStep, currentStep > previous.step {
                 for l in previous.data.indices {
                     grib2d.array.data[l] -= previous.data[l]
                 }
@@ -306,7 +306,7 @@ actor GribDeaverager {
             // Store data for next timestep
             let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
             // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-            if let previous, previous.step != startStep {
+            if let previous, previous.step != startStep, currentStep > previous.step {
                 let deltaHours = Float(currentStep - startStep)
                 let deltaHoursPrevious = Float(previous.step - startStep)
                 for l in previous.data.indices {

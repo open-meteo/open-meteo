@@ -559,9 +559,21 @@ struct DownloadEra5Command: AsyncCommand {
                         if let scaling = variable.netCdfScaling {
                             grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
                         }
+                        
+                        var stepType = attributes.stepType
+                        var stepRange = attributes.stepRange
+                        
+                        // Deaccumulate data. Data is marked as `instant` in GRIB although data is accumulated
+                        if [Era5Variable.shortwave_radiation, .direct_radiation, .precipitation, .snowfall_water_equivalent].contains(variable) {
+                            if attributes.stepRange == "0" {
+                                return nil
+                            }
+                            stepType = .accum
+                            stepRange = "0-\(attributes.stepRange)"
+                        }
 
                         // Deaccumulate precipitation
-                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &grib2d) else {
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType.rawValue, stepRange: stepRange, grib2d: &grib2d) else {
                             return nil
                         }
                         
