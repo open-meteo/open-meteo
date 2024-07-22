@@ -67,12 +67,12 @@ extension Curl {
         request.method = .DELETE
         request.headers.add(name: "From", value: email)
         request.headers.add(name: "X-ECMWF-KEY", value: apikey)
-        let _ = try await client.execute(request, timeout: .seconds(10))
+        let _ = try await client.executeRetry(request, logger: logger)
     }
     
     /// Wait for josb to finish and return download URL
     fileprivate func waitForEcmwfJob(job: EcmwfApiResponse, email: String, apikey: String) async throws -> String {
-        let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(12))
+        let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(24))
         while true {
             var offset = 0
             var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)?offset=\(offset)&limit=500")

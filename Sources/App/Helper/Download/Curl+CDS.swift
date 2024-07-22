@@ -79,7 +79,7 @@ extension Curl {
     
     /// Wait for josb to finish and return download URL
     fileprivate func waitForCdsJob(job: CdsApiResponse, apikey: String, server: String) async throws -> String {
-        let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(12))
+        let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(24))
         var job = job
         while true {
             switch job.state {
@@ -110,6 +110,6 @@ extension Curl {
         var request = HTTPClientRequest(url: "\(server)/tasks/\(job.request_id)")
         request.method = .DELETE
         request.headers.add(name: "Authorization", value: "Basic \(apikey.base64String())")
-        let _ = try await client.execute(request, timeout: .seconds(10))
+        let _ = try await client.executeRetry(request, logger: logger)
     }
 }
