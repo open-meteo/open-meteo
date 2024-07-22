@@ -350,7 +350,21 @@ struct DownloadEra5Command: AsyncCommand {
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
         let timeintervalDaily = timeintervalDaily ?? TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
         let _ = try await downloadDailyFiles(application: application, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables, concurrent: concurrent)
-        try convertYear(logger: application.logger, year: year, domain: domain, variables: variables, forceUpdate: forceUpdate)
+        
+        let variablesConvert: [GenericVariable]
+        if domain == .era5_ensemble {
+            // ERA5 ensemble domain also contains a spread variable for each mean variable
+            variablesConvert = variables.flatMap {
+                guard let spread: GenericVariable = Era5Variable(rawValue: "\($0)_spread") else {
+                    fatalError("Did not find spread variable for \($0)")
+                }
+                return [$0, spread]
+            }
+        } else {
+            variablesConvert = variables
+        }
+        
+        try convertYear(logger: application.logger, year: year, domain: domain, variables: variablesConvert, forceUpdate: forceUpdate)
     }
     
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int) async throws -> [GenericVariableHandle] {
