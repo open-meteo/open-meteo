@@ -113,7 +113,7 @@ struct DownloadEra5Command: AsyncCommand {
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
-        let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent)
+        let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: timeinterval.range.lowerBound, handles: handles, concurrent: concurrent)
         
         
@@ -349,7 +349,8 @@ struct DownloadEra5Command: AsyncCommand {
     
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
         let timeintervalDaily = timeintervalDaily ?? TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        let _ = try await downloadDailyFiles(application: application, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables, concurrent: concurrent)
+        /// TODO with `forceUpdate` all handles can be returned... pass this along to `convertYear` function
+        let _ = try await downloadDailyFiles(application: application, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: forceUpdate)
         
         let variablesConvert: [GenericVariable]
         if domain == .era5_ensemble {
@@ -367,17 +368,17 @@ struct DownloadEra5Command: AsyncCommand {
         try convertYear(logger: application.logger, year: year, domain: domain, variables: variablesConvert, forceUpdate: forceUpdate)
     }
     
-    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int) async throws -> [GenericVariableHandle] {
+    func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
         switch domain {
         case .era5_land, .era5, .era5_ocean, .era5_ensemble:
-            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent)
+            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent, forceUpdate: forceUpdate)
         case .cerra:
             return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable], concurrent: concurrent)
         case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
             guard let email else {
                 fatalError("email required")
             }
-            return try await downloadDailyEcmwfIfsFiles(application: application, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent)
+            return try await downloadDailyEcmwfIfsFiles(application: application, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent, forceUpdate: forceUpdate)
         case .era5_daily, .era5_land_daily:
             fatalError()
         }
@@ -394,7 +395,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Download ERA5 files from CDS and convert them to daily compressed files
-    func downloadDailyEra5Files<Variable: Era5Downloadable>(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Variable], concurrent: Int) async throws -> [GenericVariableHandle] {
+    func downloadDailyEra5Files(application: Application, cdskey: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -418,6 +419,37 @@ struct DownloadEra5Command: AsyncCommand {
             let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
             
             if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)00.om") {
+                // Return file handles, for existing files to trigger update
+                if forceUpdate {
+                    let variablesConvert: [Era5Variable]
+                    if domain == .era5_ensemble {
+                        // ERA5 ensemble domain also contains a spread variable for each mean variable
+                        variablesConvert = variables.flatMap {
+                            guard let spread = Era5Variable(rawValue: "\($0)_spread") else {
+                                fatalError("Did not find spread variable for \($0)")
+                            }
+                            return [$0, spread]
+                        }
+                    } else {
+                        variablesConvert = variables
+                    }
+                    for t in TimerangeDt(start: timestamp, to: timestamp.add(days: 1), dtSeconds: domain.dtSeconds) {
+                        for variable in variablesConvert {
+                            let file = "\(timestampDir)/\(variable.rawValue)_\(t.format_YYYYMMddHH).om"
+                            logger.info("Open \(file)")
+                            guard let fn = try? FileHandle.openFileReading(file: file) else {
+                                continue
+                            }
+                            handles.append(GenericVariableHandle(
+                                variable: variable,
+                                time: t,
+                                member: 0,
+                                fn: fn,
+                                skipHour0: false
+                            ))
+                        }
+                    }
+                }
                 continue
             }
             // Download 1 hour or 24 hours
@@ -438,7 +470,7 @@ struct DownloadEra5Command: AsyncCommand {
                     return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                         let attributes = try GribAttributes(message: message)
                         let timestamp = attributes.timestamp
-                        guard let variable = Variable.fromGrib(attributes: attributes) else {
+                        guard let variable = Era5Variable.fromGrib(attributes: attributes) else {
                             fatalError("Could not find \(attributes) in grib")
                         }
                         
@@ -476,7 +508,7 @@ struct DownloadEra5Command: AsyncCommand {
     }
     
     /// Download ECMWF IFS operational archives
-    func downloadDailyEcmwfIfsFiles(application: Application, key: String, email: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable], concurrent: Int) async throws -> [GenericVariableHandle] {
+    func downloadDailyEcmwfIfsFiles(application: Application, key: String, email: String, timeinterval: TimerangeDt, domain: CdsDomain, variables: [Era5Variable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading timerange \(timeinterval.prettyString())")
         
@@ -516,6 +548,25 @@ struct DownloadEra5Command: AsyncCommand {
             let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
             
             if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)01.om") {
+                // Return file handles, for existing files to trigger update
+                if forceUpdate {
+                    for t in TimerangeDt(start: timestamp, to: timestamp.add(days: 1), dtSeconds: domain.dtSeconds) {
+                        for variable in variables {
+                            let file = "\(timestampDir)/\(variable.rawValue)_\(t.format_YYYYMMddHH).om"
+                            logger.info("Open \(file)")
+                            guard let fn = try? FileHandle.openFileReading(file: file) else {
+                                continue
+                            }
+                            handles.append(GenericVariableHandle(
+                                variable: variable,
+                                time: t,
+                                member: 0,
+                                fn: fn,
+                                skipHour0: false
+                            ))
+                        }
+                    }
+                }
                 continue
             }
             
