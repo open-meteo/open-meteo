@@ -506,6 +506,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
             
             let query: EcmwfQuery
+            let deaccumulatePrecipitation: Bool
             switch domain {
             case .ecmwf_ifs:
                 query = EcmwfQuery(
@@ -516,6 +517,7 @@ struct DownloadEra5Command: AsyncCommand {
                     time: ["00:00:00", "12:00:00"],
                     type: "fc"
                 )
+                deaccumulatePrecipitation = true
             case .ecmwf_lwda_ifs:
                 query = EcmwfQuery(
                     date: timestamp.iso8601_YYYY_MM_dd,
@@ -525,6 +527,7 @@ struct DownloadEra5Command: AsyncCommand {
                     time: ["06:00:00", "18:00:00"],
                     type: "fc"
                 )
+                deaccumulatePrecipitation = true
             case .ecmwf_lwda_analysis:
                 query = EcmwfQuery(
                     date: timestamp.iso8601_YYYY_MM_dd,
@@ -534,6 +537,7 @@ struct DownloadEra5Command: AsyncCommand {
                     time: ["00:00:00", "06:00:00", "12:00:00", "18:00:00"],
                     type: "an"
                 )
+                deaccumulatePrecipitation = false
             default:
                 fatalError()
             }
@@ -564,7 +568,7 @@ struct DownloadEra5Command: AsyncCommand {
                         var stepRange = attributes.stepRange
                         
                         // Deaccumulate data. Data is marked as `instant` in GRIB although data is accumulated
-                        if [Era5Variable.shortwave_radiation, .direct_radiation, .precipitation, .snowfall_water_equivalent].contains(variable) {
+                        if deaccumulatePrecipitation && [Era5Variable.shortwave_radiation, .direct_radiation, .precipitation, .snowfall_water_equivalent].contains(variable) {
                             if attributes.stepRange == "0" {
                                 return nil
                             }
