@@ -60,7 +60,7 @@ struct DownloadCamsCommand: AsyncCommand {
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            try downloadCamsEurope(logger: logger, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+            try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
             try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
         }
         
@@ -185,7 +185,9 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func downloadCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) throws {
+    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) async throws {
+        
+        let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let downloadFile = "\(domain.downloadDirectory)download.nc"
@@ -202,13 +204,15 @@ struct DownloadCamsCommand: AsyncCommand {
             leadtime_hour: (0..<domain.forecastHours).map(String.init)
         )
         
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+        
         do {
-            try Process.cdsApi(
+            try await curl.downloadCdsApi(
                 dataset: "cams-europe-air-quality-forecasts",
-                key: cdskey,
                 query: query,
-                destinationFile: downloadFile,
-                url: "https://ads.atmosphere.copernicus.eu/api/v2"
+                apikey: cdskey,
+                server: "https://ads.atmosphere.copernicus.eu/api/v2",
+                destinationFile: downloadFile
             )
         } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
             if code == 70 {
