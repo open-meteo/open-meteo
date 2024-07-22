@@ -736,7 +736,7 @@ struct DownloadEra5Command: AsyncCommand {
     /// Data is stored in one file per hour
     /// If `forceUpdate` is set, an existing file is updated
     func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool) throws {
-        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 3600)
+        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds)
         
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
