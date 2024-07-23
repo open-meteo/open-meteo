@@ -32,6 +32,14 @@ extension Array where Element == Float {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+        
+        if self.onlyNaN() {
+            return
+        }
+        guard self[0 ..< Swift.min(6, count)].hasValidData() else {
+            fatalError("First 6 timesteps only contains NaN, followed by valid data. This leads to issues in interpolation.")
+        }
+        
         switch type {
         case .linear:
             interpolateInplaceLinear(nTime: time.count)
