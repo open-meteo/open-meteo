@@ -105,7 +105,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
             
             while true {
                 // repeat until GRIB header is found
-                guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
+                guard var seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
@@ -138,6 +138,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                         }
                         buffer.writeImmutableBuffer(input)
                     }
+                    seek.length = totalSize
                 }
                 
                 messages = try buffer.readWithUnsafeReadableBytes({

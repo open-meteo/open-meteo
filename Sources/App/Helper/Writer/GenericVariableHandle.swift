@@ -40,26 +40,24 @@ struct GenericVariableHandle {
     
     /// Process each variable and update time-series optimised files
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self]) throws {
-        guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
-            logger.warning("No data to convert")
-            return
-        }
-        /// `timeMinMax.min.time` has issues with `skip`
-        let run = run ?? timeMinMax.min.time
-        /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
-        let startTime = min(run, timeMinMax.min.time)
-        let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
-        logger.info("Convert timerange \(time.prettyString())")
-        
         let grid = domain.grid
         let nLocations = grid.count
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
+            guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
+                logger.warning("No data to convert")
+                return
+            }
+            /// `timeMinMax.min.time` has issues with `skip`
+            /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
+            let startTime = min(run ?? timeMinMax.min.time, timeMinMax.min.time)
+            let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+            
             let variable = handles[0].variable
             let skip = handles[0].skipHour0 ? 1 : 0
             let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr)")
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
             
             let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
             let nLocationsPerChunk = om.nLocationsPerChunk
