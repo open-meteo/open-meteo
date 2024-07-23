@@ -17,6 +17,7 @@ enum ArpaeVariableDerived: String, CaseIterable, GenericVariableMixable {
     case is_day
     case rain
     case snowfall
+    case showers
     case wet_bulb_temperature_2m
     case cloudcover
     
@@ -99,6 +100,8 @@ struct ArpaeReader: GenericReaderDerived, GenericReaderProtocol {
         case .rain:
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
+        case .showers:
+            try prefetchData(raw: .precipitation, time: time)
         case .snowfall:
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
@@ -169,6 +172,9 @@ struct ArpaeReader: GenericReaderDerived, GenericReaderProtocol {
         case .snowfall:
             let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
             return DataAndUnit(snoweq.data.map{$0*0.7}, .centimetre)
+        case .showers:
+            let precipitation = try get(raw: .precipitation, time: time)
+            return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
         }
     }
 }

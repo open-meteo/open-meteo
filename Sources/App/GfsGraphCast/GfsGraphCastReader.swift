@@ -11,6 +11,7 @@ enum GfsGraphCastVariableDerivedSurface: String, CaseIterable, GenericVariableMi
     case is_day
     case rain
     case snowfall
+    case showers
     case cloudcover
     case cloudcover_low
     case cloudcover_mid
@@ -122,6 +123,8 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain, .snowfall:
                 try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .temperature_2m, time: time)
+            case .showers:
+                try prefetchData(variable: .precipitation, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -193,6 +196,9 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let precipitation = try get(raw: .precipitation, time: time)
                 return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 1 : 0) }), .millimetre)
+            case .showers:
+                let precipitation = try get(raw: .precipitation, time: time)
+                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
             }
         case .pressure(let v):
             switch v.variable {

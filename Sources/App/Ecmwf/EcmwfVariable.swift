@@ -1112,6 +1112,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case skin_temperature
     case soil_temperature_0cm
     case rain
+    case showers
     case wet_bulb_temperature_2m
     
     case cloudcover
