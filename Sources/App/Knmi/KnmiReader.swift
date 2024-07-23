@@ -251,7 +251,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
             case .windspeed_10m:
-                return try get(raw: .wind_speed_100m, time: time)
+                return try get(raw: .wind_speed_10m, time: time)
             case .windspeed_80m, .wind_speed_80m:
                 let data = try get(raw: .wind_speed_100m, time: time)
                 let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 80)
