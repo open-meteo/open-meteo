@@ -25,7 +25,7 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int) async throws {
         let startTime = Date()
         if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
@@ -39,12 +39,13 @@ struct GenericVariableHandle {
     }
     
     /// Process each variable and update time-series optimised files
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self]) throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self]) throws {
         guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
             logger.warning("No data to convert")
             return
         }
-        // `timeMinMax.min.time` has issues with `skip`
+        /// `timeMinMax.min.time` has issues with `skip`
+        let run = run ?? timeMinMax.min.time
         /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
         let startTime = min(run, timeMinMax.min.time)
         let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
