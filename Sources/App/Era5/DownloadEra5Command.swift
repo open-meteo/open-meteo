@@ -547,7 +547,8 @@ struct DownloadEra5Command: AsyncCommand {
             logger.info("Downloading timestamp \(timestamp.format_YYYYMMdd)")
             let timestampDir = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)"
             
-            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)01.om") {
+            // check for timestep 6, as this should be available also for 6 hourly assimilation data
+            if FileManager.default.fileExists(atPath: "\(timestampDir)/\(variables[0].rawValue)_\(timestamp.format_YYYYMMdd)06.om") {
                 // Return file handles, for existing files to trigger update
                 if forceUpdate {
                     for t in TimerangeDt(start: timestamp, to: timestamp.add(days: 1), dtSeconds: domain.dtSeconds) {
