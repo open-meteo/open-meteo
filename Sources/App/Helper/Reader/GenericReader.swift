@@ -124,7 +124,18 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
-        try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position+1, level: time.ensembleMemberLevel, time: time)
+        if time.dtSeconds == domain.dtSeconds {
+            try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position+1, level: time.ensembleMemberLevel, time: time)
+        }
+        if time.dtSeconds > domain.dtSeconds {
+            /// do not allow aggregations
+            fatalError()
+        }
+        
+        // Data is interpolated in dt
+        let interpolationType = variable.interpolation
+        let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
+        try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position+1, level: time.ensembleMemberLevel, time: .init(time: timeLow, ensembleMember: time.ensembleMember, ensembleMemberLevel: time.ensembleMemberLevel, previousDay: time.previousDay))
     }
     
     /// Read and scale if required
