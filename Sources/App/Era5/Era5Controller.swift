@@ -205,6 +205,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .rain:
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
+        case .showers:
+               try prefetchData(raw: .precipitation, time: time)
         case .weather_code:
             fallthrough
         case .weathercode:
@@ -375,6 +377,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                 return max($0.0-$0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
+        case .showers:
+            let precipitation = try get(raw: .precipitation, time: time)
+            return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
         case .weather_code:
             fallthrough
         case .weathercode:
