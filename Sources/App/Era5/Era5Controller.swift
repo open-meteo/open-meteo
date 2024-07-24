@@ -23,6 +23,7 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case diffuse_radiation
     case surface_pressure
     case snowfall
+    case showers
     case rain
     case et0_fao_evapotranspiration
     case cloudcover

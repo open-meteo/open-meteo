@@ -118,4 +118,3 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
 }
-
