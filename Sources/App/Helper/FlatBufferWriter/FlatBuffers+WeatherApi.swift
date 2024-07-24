@@ -666,10 +666,13 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .dmiSeamless
         case .metno_seamless:
             return .metnoSeamless
-        case .ecmwf_lwda_analysis:
+        case .ecmwf_ifs_analysis_long_window:
             // TODO register
             return .ecmwfIfs
-        case .ecmwf_lwda_ifs:
+        case .ecmwf_ifs_analysis:
+            // TODO register
+            return .ecmwfIfs
+        case .ecmwf_ifs_long_window:
             // TODO register
             return .ecmwfIfs
         case .era5_ensemble:

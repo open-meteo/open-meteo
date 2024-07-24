@@ -230,7 +230,7 @@ struct DownloadEra5Command: AsyncCommand {
                     let year = "2022"
                 }
                 try await curl.downloadCdsApi(dataset: domain.cdsDatasetName, query:  Query(), apikey: cdskey, destinationFile: tempDownloadGribFile)
-            case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
+            case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
                 guard let email else {
                     fatalError("email required")
                 }
@@ -374,7 +374,7 @@ struct DownloadEra5Command: AsyncCommand {
             return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent, forceUpdate: forceUpdate)
         case .cerra:
             return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable], concurrent: concurrent)
-        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
+        case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
             guard let email else {
                 fatalError("email required")
             }
@@ -584,7 +584,7 @@ struct DownloadEra5Command: AsyncCommand {
                     type: "fc"
                 )
                 deaccumulatePrecipitation = true
-            case .ecmwf_lwda_ifs:
+            case .ecmwf_ifs_long_window:
                 query = EcmwfQuery(
                     date: timestamp.iso8601_YYYY_MM_dd,
                     param: variables.map {$0.marsGribCode},
@@ -594,12 +594,22 @@ struct DownloadEra5Command: AsyncCommand {
                     type: "fc"
                 )
                 deaccumulatePrecipitation = true
-            case .ecmwf_lwda_analysis:
+            case .ecmwf_ifs_analysis_long_window:
                 query = EcmwfQuery(
                     date: timestamp.iso8601_YYYY_MM_dd,
                     param: variables.map {$0.marsGribCode},
                     step: nil,
                     stream: "lwda",
+                    time: ["00:00:00", "06:00:00", "12:00:00", "18:00:00"],
+                    type: "an"
+                )
+                deaccumulatePrecipitation = false
+            case .ecmwf_ifs_analysis:
+                query = EcmwfQuery(
+                    date: timestamp.iso8601_YYYY_MM_dd,
+                    param: variables.map {$0.marsGribCode},
+                    step: nil,
+                    stream: "oper",
                     time: ["00:00:00", "06:00:00", "12:00:00", "18:00:00"],
                     type: "an"
                 )

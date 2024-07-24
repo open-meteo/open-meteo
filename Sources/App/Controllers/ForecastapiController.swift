@@ -328,8 +328,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case era5_land
     case era5_ensemble
     case ecmwf_ifs
-    case ecmwf_lwda_analysis
-    case ecmwf_lwda_ifs
+    case ecmwf_ifs_analysis
+    case ecmwf_ifs_analysis_long_window
+    case ecmwf_ifs_long_window
     
     case arpae_cosmo_seamless
     case arpae_cosmo_2i
@@ -531,10 +532,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let metno: (any GenericReaderProtocol)? = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities, ecmwf, metno].compactMap({$0})
-        case .ecmwf_lwda_analysis:
-            return [try Era5Factory.makeReader(domain: .ecmwf_lwda_analysis, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
-        case .ecmwf_lwda_ifs:
-            return [try Era5Factory.makeReader(domain: .ecmwf_lwda_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ecmwf_ifs_analysis_long_window:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs_analysis_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ecmwf_ifs_analysis:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs_analysis, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ecmwf_ifs_long_window:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5_ensemble:
             return [try Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         }

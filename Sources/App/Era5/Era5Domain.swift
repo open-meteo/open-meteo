@@ -10,16 +10,17 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
     case era5_ensemble
     case cerra
     case ecmwf_ifs
-    case ecmwf_lwda_analysis
-    case ecmwf_lwda_ifs
+    case ecmwf_ifs_analysis
+    case ecmwf_ifs_analysis_long_window
+    case ecmwf_ifs_long_window
     
     var dtSeconds: Int {
         switch self {
         case .era5_daily, .era5_land_daily:
             return 24*3600
-        case .ecmwf_lwda_ifs, .era5_ensemble:
+        case .ecmwf_ifs_long_window, .era5_ensemble:
             return 3*3600
-        case .ecmwf_lwda_analysis:
+        case .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_analysis:
             return 6*3600
         default:
             return 3600
@@ -38,7 +39,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return "reanalysis-era5-land"
         case .cerra:
             return "reanalysis-cerra-single-levels"
-        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
+        case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
             return ""
         case .era5_land_daily, .era5_daily:
             fatalError()
@@ -51,7 +52,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return .copernicus_era5
         case .era5_land_daily:
             return .copernicus_era5_land
-        case .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
+        case .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window:
             return .ecmwf_ifs
         default:
             return domainRegistry
@@ -76,10 +77,12 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return .copernicus_cerra
         case .ecmwf_ifs:
             return .ecmwf_ifs
-        case .ecmwf_lwda_analysis:
-            return .ecmwf_lwda_analysis
-        case .ecmwf_lwda_ifs:
-            return .ecmwf_lwda_ifs
+        case .ecmwf_ifs_analysis_long_window:
+            return .ecmwf_ifs_analysis_long_window
+        case .ecmwf_ifs_long_window:
+            return .ecmwf_ifs_long_window
+        case .ecmwf_ifs_analysis:
+            return .ecmwf_ifs_analysis
         }
     }
     
@@ -110,7 +113,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
             return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
-        case .ecmwf_ifs, .ecmwf_lwda_analysis, .ecmwf_lwda_ifs:
+        case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
             return GaussianGrid(type: .o1280)
         }
     }

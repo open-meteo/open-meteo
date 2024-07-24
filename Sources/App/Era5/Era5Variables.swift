@@ -250,7 +250,7 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
             }
         }
         
-        if domain == .ecmwf_lwda_analysis {
+        if domain == .ecmwf_ifs_analysis_long_window || domain == .ecmwf_ifs_analysis {
             switch self {
             case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation:
                 return false
