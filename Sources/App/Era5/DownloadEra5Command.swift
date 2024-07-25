@@ -856,7 +856,10 @@ struct DownloadEra5Command: AsyncCommand {
                         continue
                     }
                     try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
-                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
+                    var read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
+                    if let variable = variable as? Era5Variable, [Era5Variable.shortwave_radiation, .shortwave_radiation_spread, .direct_radiation, .direct_radiation_spread].contains(variable) {
+                        read = read.map {$0/3}
+                    }
                     for l in 0..<locationRange.count {
                         fasttime[l, i] = read[l]
                     }
