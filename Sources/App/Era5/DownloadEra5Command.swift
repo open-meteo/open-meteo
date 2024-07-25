@@ -478,8 +478,8 @@ struct DownloadEra5Command: AsyncCommand {
                         
                         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                         try grib2d.load(message: message)
-                        if let scaling = variable.netCdfScaling {
-                            grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                        if let scaling = variable.netCdfScaling(domain: domain) {
+                            grib2d.array.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                         }
                         grib2d.array.shift180LongitudeAndFlipLatitude()
                         
@@ -636,8 +636,8 @@ struct DownloadEra5Command: AsyncCommand {
                         
                         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                         try grib2d.load(message: message)
-                        if let scaling = variable.netCdfScaling {
-                            grib2d.array.data.multiplyAdd(multiply: Float(scaling.scalefactor), add: Float(scaling.offest))
+                        if let scaling = variable.netCdfScaling(domain: domain) {
+                            grib2d.array.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                         }
                         
                         var stepType = attributes.stepType
@@ -856,10 +856,7 @@ struct DownloadEra5Command: AsyncCommand {
                         continue
                     }
                     try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
-                    var read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
-                    if let variable = variable as? Era5Variable, [Era5Variable.shortwave_radiation, .shortwave_radiation_spread, .direct_radiation, .direct_radiation_spread].contains(variable) {
-                        read = read.map {$0/3}
-                    }
+                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
                     for l in 0..<locationRange.count {
                         fasttime[l, i] = read[l]
                     }

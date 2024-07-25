@@ -1,12 +1,7 @@
 import Foundation
 
 
-protocol Era5Downloadable: GenericVariable, GribMessageAssociated {
-    var cdsApiName: String? { get }
-    var netCdfScaling: (offest: Double, scalefactor: Double)? { get }
-}
-
-enum Era5Variable: String, CaseIterable, Era5Downloadable {
+enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated {
     case temperature_2m
     case wind_u_component_100m
     case wind_v_component_100m
@@ -109,7 +104,7 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
         }
     }
     
-    var netCdfScaling: (offest: Double, scalefactor: Double)? {
+    func netCdfScaling(domain: CdsDomain) -> (offset: Float, scalefactor: Float)? {
         switch self {
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
         case .dew_point_2m: return (-273.15, 1)
@@ -122,9 +117,9 @@ enum Era5Variable: String, CaseIterable, Era5Downloadable {
         case .soil_temperature_7_to_28cm: return (-273.15, 1)
         case .soil_temperature_28_to_100cm: return (-273.15, 1)
         case .soil_temperature_100_to_255cm: return (-273.15, 1)
-        case .shortwave_radiation, .shortwave_radiation_spread: return (0, 1/3600) // joules to watt
+        case .shortwave_radiation, .shortwave_radiation_spread: return (0, 1/Float(domain.dtSeconds)) // joules to watt
         case .precipitation, .precipitation_spread: return (0, 1000) // meter to millimeter
-        case .direct_radiation, .direct_radiation_spread: return (0, 1/3600)
+        case .direct_radiation, .direct_radiation_spread: return (0, 1/Float(domain.dtSeconds))
         default:
             return nil
         }
