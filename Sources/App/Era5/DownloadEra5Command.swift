@@ -100,7 +100,7 @@ struct DownloadEra5Command: AsyncCommand {
                     fatalError("year invalid")
                 }
                 for year in Int(split[0])! ... Int(split[1])! {
-                    try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: false, timeintervalDaily: nil, concurrent: concurrent)
+                    try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: nil, concurrent: concurrent)
                 }
             } else {
                 guard let year = Int(yearStr) else {
