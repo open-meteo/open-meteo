@@ -10,3 +10,4 @@ db.sqlite
 data/
 data
 .cache
+.venv

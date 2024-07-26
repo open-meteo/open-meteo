@@ -57,6 +57,9 @@ struct SyncCommand: AsyncCommand {
         
         @Flag(name: "execute", help: "Actually perfom file delete on cleanup")
         var execute: Bool
+        
+        @Option(name: "year", help: "Download one year or a range of years (e.g. 2000-2005)")
+        var year: String?
     }
     
     /// All weather variables that may be available for `previous days API`
@@ -95,6 +98,21 @@ struct SyncCommand: AsyncCommand {
         let pastDays = signature.pastDays ?? 7
         let concurrent = signature.concurrent ?? 4
         
+        /// Select all files that contain data within a range of years
+        let yearRange = signature.year.map { yearStr in
+            if yearStr.contains("-") {
+                let split = yearStr.split(separator: "-")
+                guard split.count == 2, split[0].count == 4, split[0].count == 4, let start = Int(split[0]), let end = Int(split[0]), start >= 1800, start <= 2200, end >= 1800, end <= 2200 else {
+                    fatalError("year invalid")
+                }
+                return Timestamp(start, 1, 1) ..< Timestamp(end+1, 1, 1)
+            }
+            guard yearStr.count == 4, let year = Int(yearStr), year >= 1800, year <= 2200 else {
+                fatalError("year invalid")
+            }
+            return Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1)
+        }
+        
         /// Download from each server concurrently
         await zip(serverSet, zip(modelsSet, variablesSet)).foreachConcurrent(nConcurrent: serverSet.count) { (server, arg1) in
             let (models, variablesSig) = arg1
@@ -113,8 +131,15 @@ struct SyncCommand: AsyncCommand {
                 /// Used for `really_download_all_but_pressure_once_per_day` to download pressure data only once per day
                 let downloadPressureNow = lastPressureDownloadDate != Timestamp.now().with(hour: 0)
                 do {
-                    logger.info("Checking for files to with more than \(pastDays) past days data")
-                    let newerThan = Timestamp.now().add(-24 * 3600 * pastDays)
+                    if let yearRange {
+                        let start = yearRange.lowerBound.toComponents().year
+                        let end = yearRange.upperBound.toComponents().year-1
+                        logger.info("Checking for files within year \(start)-\(end)")
+                    } else {
+                        logger.info("Checking for files to with more than \(pastDays) past days data")
+                    }
+                    
+                    let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
                     
                     /// Get a list of all variables from all models
                     let remotes: [(DomainRegistry, String)] = try await models.mapConcurrent(nConcurrent: concurrent) { model -> [(DomainRegistry, String)] in
@@ -142,7 +167,7 @@ struct SyncCommand: AsyncCommand {
                             return []
                         }
                         let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
-                        let filtered = remote.files.includeFiles(newerThan: newerThan, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+                        let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
                         return filtered.map({$0})
                     }.flatMap({$0})
                     
@@ -284,7 +309,7 @@ fileprivate extension URL {
 
 fileprivate extension Array where Element == S3DataController.S3ListV2File {
     /// Only include files with data newer than a given timestamp. This is based on evaluating the time-chunk in the filename and is not based on the modification time
-    func includeFiles(newerThan: Timestamp, domain: DomainRegistry) -> [Element] {
+    func includeFiles(timeRange: Range<Timestamp>, domain: DomainRegistry) -> [Element] {
         let omFileLength = domain.getDomain().omFileLength
         let dtSeconds = domain.getDomain().dtSeconds
         return self.filter({ file in
@@ -297,12 +322,12 @@ fileprivate extension Array where Element == S3DataController.S3ListV2File {
                 return true
             }
             if name.starts(with: "year_"), let year = Int(name[name.index(name.startIndex, offsetBy: 5)..<(name.lastIndex(of: ".") ?? name.endIndex)]) {
-                let end = Timestamp(year+1, 1, 1)
-                return end > newerThan
+                let fileTime = Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1)
+                return timeRange.overlaps(fileTime)
             }
             if name.starts(with: "chunk_"), let chunk = Int(name[name.index(name.startIndex, offsetBy: 6)..<(name.lastIndex(of: ".") ?? name.endIndex)]) {
-                let end = Timestamp((chunk + 1) * omFileLength * dtSeconds)
-                return end > newerThan
+                let fileTime = Timestamp(chunk * omFileLength * dtSeconds) ..< Timestamp((chunk + 1) * omFileLength * dtSeconds)
+                return timeRange.overlaps(fileTime)
             }
             return false
         })

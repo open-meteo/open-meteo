@@ -15,7 +15,7 @@ extension AsyncSequence where Element == ByteBuffer {
 struct GribAsyncStreamHelper {
     /// Detect a range of bytes in a byte stream if there is a grib header and returns it
     /// Note: The required length to decode a GRIB message is not checked of the input buffer
-    static func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int)? {
+    static func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int, gribVersion: Int)? {
         let search = "GRIB"
         guard let base = memory.baseAddress else {
             return nil
@@ -50,6 +50,7 @@ struct GribAsyncStreamHelper {
             // 5-7 totalLength = 4284072
             // 8 editionNumber = 1
             // Read 24 bytes as bigEndian and turn into UInt32
+            // If length is greater than 8388607, this is some ECMWF extension https://confluence.ecmwf.int/display/FCST/Detailed+information+of+implementation+of+IFS+cycle+41r2#DetailedinformationofimplementationofIFScycle41r2-GRIBedition1messagesize
             let base = base.advanced(by: offset + 4).assumingMemoryBound(to: UInt32.self).pointee
             let masked = (base & 0x00ffffff)
             let shifted = (masked << 8)
@@ -57,7 +58,7 @@ struct GribAsyncStreamHelper {
             guard length <= (1 << 24) else {
                 return nil
             }
-            return (offset, Int(length))
+            return (offset, Int(length), 1)
         }
         
         let length = header.length.bigEndian
@@ -65,7 +66,7 @@ struct GribAsyncStreamHelper {
         guard (1...2).contains(header.version), length <= (1 << 40) else {
             return nil
         }
-        return (offset, Int(length))
+        return (offset, Int(length), 2)
     }
 }
 
@@ -104,7 +105,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
             
             while true {
                 // repeat until GRIB header is found
-                guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
+                guard var seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
@@ -123,10 +124,28 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     buffer.writeImmutableBuffer(input)
                 }
                 
+                // If length is greater than 8388607, this is some ECMWF extension https://confluence.ecmwf.int/display/FCST/Detailed+information+of+implementation+of+IFS+cycle+41r2#DetailedinformationofimplementationofIFScycle41r2-GRIBedition1messagesize
+                if seek.gribVersion == 1 && seek.length >= 8388607 {
+                    let totalSize = try buffer.withUnsafeReadableBytes({
+                        let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
+                        let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
+                        return messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
+                    })
+                    // Repeat until enough data is available
+                    while buffer.readableBytes < seek.offset + totalSize {
+                        guard let input = try await self.iterator.next() else {
+                            return nil
+                        }
+                        buffer.writeImmutableBuffer(input)
+                    }
+                    seek.length = totalSize
+                }
+                
                 messages = try buffer.readWithUnsafeReadableBytes({
                     let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
                     let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
-                    return (seek.offset+seek.length, messages)
+                    let totalSize = messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
+                    return (seek.offset+totalSize, messages)
                 })
                 buffer.discardReadBytes()
                 if let next = messages?.popLast() {

@@ -25,7 +25,7 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int) async throws {
         let startTime = Date()
         if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
@@ -39,26 +39,25 @@ struct GenericVariableHandle {
     }
     
     /// Process each variable and update time-series optimised files
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self]) throws {
-        guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
-            logger.warning("No data to convert")
-            return
-        }
-        // `timeMinMax.min.time` has issues with `skip`
-        /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
-        let startTime = min(run, timeMinMax.min.time)
-        let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
-        logger.info("Convert timerange \(time.prettyString())")
-        
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self]) throws {
         let grid = domain.grid
         let nLocations = grid.count
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
+            guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
+                logger.warning("No data to convert")
+                return
+            }
+            /// `timeMinMax.min.time` has issues with `skip`
+            /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
+            let startTime = min(run ?? timeMinMax.min.time, timeMinMax.min.time)
+            let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+            
             let variable = handles[0].variable
             let skip = handles[0].skipHour0 ? 1 : 0
             let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr)")
+            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
             
             let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
             let nLocationsPerChunk = om.nLocationsPerChunk
@@ -291,7 +290,7 @@ actor GribDeaverager {
             // Store data for next timestep
             let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
             // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-            if let previous, previous.step != startStep {
+            if let previous, previous.step != startStep, currentStep > previous.step {
                 for l in previous.data.indices {
                     grib2d.array.data[l] -= previous.data[l]
                 }
@@ -306,7 +305,7 @@ actor GribDeaverager {
             // Store data for next timestep
             let previous = set(variable: variable, member: member, step: currentStep, data: grib2d.array.data)
             // For the overall first timestep or the first step of each repeating section, deaveraging is not required
-            if let previous, previous.step != startStep {
+            if let previous, previous.step != startStep, currentStep > previous.step {
                 let deltaHours = Float(currentStep - startStep)
                 let deltaHoursPrevious = Float(previous.step - startStep)
                 for l in previous.data.indices {

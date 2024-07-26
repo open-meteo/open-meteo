@@ -326,7 +326,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case era5
     case cerra
     case era5_land
+    case era5_ensemble
     case ecmwf_ifs
+    case ecmwf_ifs_analysis
+    case ecmwf_ifs_analysis_long_window
+    case ecmwf_ifs_long_window
     
     case arpae_cosmo_seamless
     case arpae_cosmo_2i
@@ -528,6 +532,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let metno: (any GenericReaderProtocol)? = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities, ecmwf, metno].compactMap({$0})
+        case .ecmwf_ifs_analysis_long_window:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs_analysis_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ecmwf_ifs_analysis:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs_analysis, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ecmwf_ifs_long_window:
+            return [try Era5Factory.makeReader(domain: .ecmwf_ifs_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .era5_ensemble:
+            return [try Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         }
     }
     
@@ -857,6 +869,31 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case shortwave_radiation_clear_sky
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
+    
+    
+    case wind_speed_10m_spread
+    case wind_speed_100m_spread
+    case snowfall_spread
+    case temperature_2m_spread
+    case wind_gusts_10m_spread
+    case dew_point_2m_spread
+    case cloud_cover_low_spread
+    case cloud_cover_mid_spread
+    case cloud_cover_high_spread
+    case pressure_msl_spread
+    case snowfall_water_equivalent_spread
+    case snow_depth_spread
+    case soil_temperature_0_to_7cm_spread
+    case soil_temperature_7_to_28cm_spread
+    case soil_temperature_28_to_100cm_spread
+    case soil_temperature_100_to_255cm_spread
+    case soil_moisture_0_to_7cm_spread
+    case soil_moisture_7_to_28cm_spread
+    case soil_moisture_28_to_100cm_spread
+    case soil_moisture_100_to_255cm_spread
+    case shortwave_radiation_spread
+    case precipitation_spread
+    case direct_radiation_spread
     
     /// Some variables are kept for backwards compatibility
     var remapped: Self {

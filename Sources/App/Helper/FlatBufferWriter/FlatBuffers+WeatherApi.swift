@@ -311,6 +311,52 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .cloudBase, previousDay: previousDay)
         case .cloud_top:
             return .init(variable: .cloudTop, previousDay: previousDay)
+        case .wind_speed_10m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_speed_100m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .snowfall_spread:
+            return .init(variable: .snowfall, aggregation: .spread, previousDay: previousDay)
+        case .temperature_2m_spread:
+            return .init(variable: .temperature, aggregation: .spread, altitude: 2, previousDay: previousDay)
+        case .wind_gusts_10m_spread:
+            return .init(variable: .windGusts, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .dew_point_2m_spread:
+            return .init(variable: .dewPoint, aggregation: .spread, altitude: 2, previousDay: previousDay)
+        case .cloud_cover_low_spread:
+            return .init(variable: .cloudCoverLow, aggregation: .spread, previousDay: previousDay)
+        case .cloud_cover_mid_spread:
+            return .init(variable: .cloudCoverMid, aggregation: .spread, previousDay: previousDay)
+        case .cloud_cover_high_spread:
+            return .init(variable: .cloudCoverHigh, aggregation: .spread, previousDay: previousDay)
+        case .pressure_msl_spread:
+            return .init(variable: .pressureMsl, aggregation: .spread, previousDay: previousDay)
+        case .snowfall_water_equivalent_spread:
+            return .init(variable: .snowfallWaterEquivalent, aggregation: .spread, previousDay: previousDay)
+        case .snow_depth_spread:
+            return .init(variable: .snowDepth, aggregation: .spread, previousDay: previousDay)
+        case .soil_temperature_0_to_7cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 0, depthTo: 7, previousDay: previousDay)
+        case .soil_temperature_7_to_28cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 7, depthTo: 28, previousDay: previousDay)
+        case .soil_temperature_28_to_100cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 28, depthTo: 100, previousDay: previousDay)
+        case .soil_temperature_100_to_255cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 100, depthTo: 255, previousDay: previousDay)
+        case .soil_moisture_0_to_7cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 0, depthTo: 7, previousDay: previousDay)
+        case .soil_moisture_7_to_28cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 7, depthTo: 28, previousDay: previousDay)
+        case .soil_moisture_28_to_100cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 28, depthTo: 100, previousDay: previousDay)
+        case .soil_moisture_100_to_255cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 100, depthTo: 255, previousDay: previousDay)
+        case .shortwave_radiation_spread:
+            return .init(variable: .shortwaveRadiation, aggregation: .spread, previousDay: previousDay)
+        case .precipitation_spread:
+            return .init(variable: .precipitation, aggregation: .spread, previousDay: previousDay)
+        case .direct_radiation_spread:
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
         }
     }
 }
@@ -620,6 +666,14 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .dmiSeamless
         case .metno_seamless:
             return .metnoSeamless
+        case .ecmwf_ifs_analysis_long_window:
+            return .ecmwfIfsAnalysisLongWindow
+        case .ecmwf_ifs_analysis:
+            return .ecmwfIfsAnalysis
+        case .ecmwf_ifs_long_window:
+            return .ecmwfIfsLongWindow
+        case .era5_ensemble:
+            return .era5Ensemble
         }
     }
 }

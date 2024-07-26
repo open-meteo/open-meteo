@@ -74,19 +74,19 @@ struct GloFasDownloader: AsyncCommand {
                         fatalError("year invalid")
                     }
                     for year in Int(split[0])! ... Int(split[1])! {
-                        try downloadYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                        try await downloadYear(application: context.application, year: year, cdskey: cdskey, domain: domain)
                     }
                 } else {
                     guard let year = Int(yearStr) else {
                         fatalError("Could not convert year to integer")
                     }
-                    try downloadYear(logger: logger, year: year, cdskey: cdskey, domain: domain)
+                    try await downloadYear(application: context.application, year: year, cdskey: cdskey, domain: domain)
                 }
                 return
             }
             
             let timeInterval = try signature.getTimeinterval()
-            try downloadTimeIntervalConsolidated(logger: logger, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
+            try await downloadTimeIntervalConsolidated(application: context.application, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
         case .seasonalv3:
             fallthrough
         case .forecast:
@@ -250,7 +250,8 @@ struct GloFasDownloader: AsyncCommand {
     }
     
     /// Download timeinterval and convert to omfile database
-    func downloadTimeIntervalConsolidated(logger: Logger, timeinterval: TimerangeDt, cdskey: String, domain: GloFasDomain) throws {
+    func downloadTimeIntervalConsolidated(application: Application, timeinterval: TimerangeDt, cdskey: String, domain: GloFasDomain) async throws {
+        let logger = application.logger
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         let gribFile = "\(downloadDir)glofasv4_temp.grib"
@@ -274,10 +275,11 @@ struct GloFasDownloader: AsyncCommand {
                 hday: (0...31).map{$0.zeroPadded(len: 2)},
                 product_type: domain.productType
             )
-            try Process.cdsApi(
-                dataset: "cems-glofas-historical",
-                key: cdskey,
+            let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+            try await curl.downloadCdsApi(
+                dataset:  "cems-glofas-historical",
                 query: query,
+                apikey: cdskey,
                 destinationFile: gribFile
             )
             try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
@@ -300,10 +302,11 @@ struct GloFasDownloader: AsyncCommand {
                     hday: ["\(day.day.zeroPadded(len: 2))"],
                     product_type: domain.productType
                 )
-                try Process.cdsApi(
-                    dataset: "cems-glofas-historical",
-                    key: cdskey,
+                let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+                try await curl.downloadCdsApi(
+                    dataset:  "cems-glofas-historical",
                     query: query,
+                    apikey: cdskey,
                     destinationFile: gribFile
                 )
                 try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
@@ -352,7 +355,8 @@ struct GloFasDownloader: AsyncCommand {
     }
     
     /// Download and convert entire year to yearly files
-    func downloadYear(logger: Logger, year: Int, cdskey: String, domain: GloFasDomain) throws {
+    func downloadYear(application: Application, year: Int, cdskey: String, domain: GloFasDomain) async throws {
+        let logger = application.logger
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         let gribFile = "\(downloadDir)glofasv4_\(year).grib"
@@ -367,10 +371,11 @@ struct GloFasDownloader: AsyncCommand {
                 hday: (0...31).map{$0.zeroPadded(len: 2)},
                 product_type: domain.productType
             )
-            try Process.cdsApi(
+            let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+            try await curl.downloadCdsApi(
                 dataset: "cems-glofas-historical",
-                key: cdskey,
                 query: query,
+                apikey: cdskey,
                 destinationFile: gribFile
             )
         }

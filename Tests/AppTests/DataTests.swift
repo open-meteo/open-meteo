@@ -1,6 +1,7 @@
 import Foundation
 @testable import App
 import XCTest
+//import NIOFileSystem
 
 
 final class DataTests: XCTestCase {
@@ -10,6 +11,17 @@ final class DataTests: XCTestCase {
         FileManager.default.changeCurrentDirectoryPath(projectHome)
         #endif
     }
+    
+    /*func testGribStream() async throws {
+        let url = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-009-d4755d5b313f7cded016e66ba0cd989b-hyELHH.grib"
+        let fileSystem = FileSystem.shared
+        
+        try await fileSystem.withFileHandle(forReadingAt: FilePath(url)) { fn in
+            for try await message in fn.readChunks().decodeGrib() {
+                print(message.get(attribute: "shortName")!)
+            }
+        }
+    }*/
     
     func testDem90() throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")

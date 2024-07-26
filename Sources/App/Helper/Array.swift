@@ -10,6 +10,14 @@ extension Sequence where Element == Float {
         }
         return count == 0 ? .nan : sum / Float(count)
     }
+    
+    func onlyNaN() -> Bool {
+        return first(where: {!$0.isNaN}) == nil
+    }
+    
+    func hasValidData() -> Bool {
+        return !onlyNaN()
+    }
 }
 
 extension Array where Element == Float {
@@ -69,10 +77,6 @@ extension Array where Element == Float {
         for i in self.indices {
             self[i] = .nan
         }
-    }
-    
-    func onlyNaN() -> Bool {
-        return first(where: {!$0.isNaN}) == nil
     }
 }
 
