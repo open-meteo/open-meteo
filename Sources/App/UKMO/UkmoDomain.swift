@@ -78,4 +78,22 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return t.add(hours: -8).floor(toNearestHour: 1)
         }
     }
+    
+    /**
+     Return forecast hours for each run as a unix Timestamp. Works better for 15 minutely steps.
+     */
+    func forecastSteps(run: Timestamp) -> [Timestamp] {
+        switch self {
+        case .global_deterministic_10km:
+            if run.hour % 12 == 6 {
+                // shortend run
+                return (Array(0..<54) + stride(from: 54, through: 60, by: 3)).map({run.add(hours: $0)})
+            }
+            return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: 168, by: 6)).map({run.add(hours: $0)})
+        case .uk_deterministic_10km:
+            return TimerangeDt(start: run, nTime: 55, dtSeconds: 3600).map({$0})
+        case .uk_deterministic_10km_15min:
+            return TimerangeDt(start: run, nTime: 55*4, dtSeconds: 900).map({$0})
+        }
+    }
 }
