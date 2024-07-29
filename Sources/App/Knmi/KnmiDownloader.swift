@@ -127,6 +127,7 @@ struct KnmiDownload: AsyncCommand {
      TODO:
      - model elevation and land/sea mask for European model configuration
      - support ensemble models
+     - Europe domain does not have total precipitation. Only rain, snow and graupel. Showers are entirely missing!!! NL nest has total precipitation
      
      Important: Wind U/V components are defined on a Rotated LatLon  projection. They need to be corrected for true north.
      */
@@ -194,7 +195,7 @@ struct KnmiDownload: AsyncCommand {
                     logger.warning("could not get attributes")
                     return nil
                 }
-                /// NOTE: KNMI does not ssem to set this field. Only way to decode member number would be file name which is not accessible while streaming
+                /// NOTE: KNMI does not seem to set this field. Only way to decode member number would be file name which is not accessible while streaming
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
                 
@@ -388,6 +389,8 @@ struct KnmiDownload: AsyncCommand {
         switch (shortName, levelStr) {
         case ("rain", "0"):
             return KnmiSurfaceVariable.rain
+        case ("tp", "0"):
+            return KnmiSurfaceVariable.precipitation
         case ("snow", "0"):
             return KnmiSurfaceVariable.snowfall_water_equivalent
         case ("2t", "2"):

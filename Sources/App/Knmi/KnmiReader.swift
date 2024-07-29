@@ -60,7 +60,6 @@ enum KnmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case weather_code
     case is_day
     case showers
-    case precipitation
     case wet_bulb_temperature_2m
     case cloudcover
     case cloudcover_low
@@ -225,11 +224,10 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .sunshine_duration:
                 try prefetchData(derived: .surface(.direct_radiation), time: time)
-            case .precipitation:
-                try prefetchData(variable: .rain, time: time)
-                try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .showers:
                 try prefetchData(variable: .rain, time: time)
+                try prefetchData(variable: .precipitation, time: time)
+                try prefetchData(variable: .snowfall_water_equivalent, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -353,7 +351,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
             case .weathercode, .weather_code:
                 let cloudcover = try get(raw: .cloud_cover, time: time).data
-                let precipitation = try get(derived: .surface(.precipitation), time: time).data
+                let precipitation = try get(raw: .precipitation, time: time).data
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
                 //let cape = try get(raw: .cape, time: time).data
                 let gusts = try get(raw: .wind_gusts_10m, time: time).data
@@ -379,8 +377,10 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .temperature_180m:
                 return try get(raw: .temperature_200m, time: time)
             case .showers:
-                let precipitation = try get(raw: .rain, time: time)
-                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+                let precipitation = try get(raw: .precipitation, time: time)
+                let snow = try get(raw: .snowfall_water_equivalent, time: time)
+                let rain = try get(raw: .rain, time: time)
+                return DataAndUnit(zip(zip(precipitation.data, rain.data), snow.data).map({min($0.0 - $0.1 - $1, 0)}), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
@@ -399,10 +399,6 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(duration, .seconds)
-            case .precipitation:
-                let rain = try get(raw: .rain, time: time)
-                let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
-                return DataAndUnit(zip(rain.data, snoweq.data).map(+), rain.unit)
             case .global_tilted_irradiance:
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
                 let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data

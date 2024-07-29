@@ -206,9 +206,22 @@ struct DmiDownload: AsyncCommand {
                     //try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     //fatalError()
                     
-                    if let variable = variable as? DmiSurfaceVariable, [DmiSurfaceVariable.shortwave_radiation, .direct_radiation].contains(variable) {
-                        // GRIB unit says W/m2, but it's J/s
-                        grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0)
+                    if let variable = variable as? DmiSurfaceVariable {
+                        switch variable {
+                        case .shortwave_radiation, .direct_radiation:
+                            // GRIB unit says W/m2, but it's J/s
+                            grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0)
+                        case .cloud_top, .cloud_base:
+                            // Cloud base and top mark "no clouds" as NaN
+                            // Set it to infinity to work with conversion
+                            for i in grib2d.array.data.indices {
+                                if grib2d.array.data[i].isNaN {
+                                    grib2d.array.data[i] = .infinity
+                                }
+                            }
+                        default:
+                            break
+                        }
                     }
                     
                     switch unit {
