@@ -36,7 +36,7 @@ extension Array where Element == Float {
         if self.onlyNaN() {
             return
         }
-        guard self[0 ..< Swift.min(6, time.count)].hasValidData() else {
+        if self[0..<Swift.min(6, time.count)].onlyNaN() && self[Swift.min(6, time.count)..<time.count].hasValidData() {
             fatalError("First 6 timesteps only contains NaN, followed by valid data. This leads to issues in interpolation.")
         }
         
