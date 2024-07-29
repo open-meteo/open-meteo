@@ -32,6 +32,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     
     case snowfall_water_equivalent
     case rain
+    case precipitation
     
     case surface_temperature
     case visibility
@@ -44,7 +45,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .rain, .snowfall_water_equivalent: return true
+        case .precipitation, .rain, .snowfall_water_equivalent: return true
         case .wind_speed_10m, .wind_direction_10m: return true
         case .wind_speed_50m, .wind_direction_50m: return true
         case .wind_speed_100m, .wind_direction_100m: return true
@@ -81,7 +82,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return 1
         case .relative_humidity_2m:
             return 1
-        case .rain:
+        case .rain, .precipitation:
             return 10
         case .wind_gusts_10m:
             return 10
@@ -122,10 +123,12 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .hermite(bounds: 0...100)
         case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_200m, .wind_speed_300m:
             return .hermite(bounds: 0...1000)
-        case .rain:
+        case .rain, .precipitation:
             return .backwards_sum
-        case .snowfall_water_equivalent, .snow_depth_water_equivalent:
+        case .snowfall_water_equivalent:
             return .backwards_sum
+        case .snow_depth_water_equivalent:
+            return .linear
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
         case .shortwave_radiation:
@@ -153,7 +156,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .rain, .snow_depth_water_equivalent:
+        case .rain, .precipitation, .snow_depth_water_equivalent:
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond
