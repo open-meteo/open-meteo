@@ -250,12 +250,18 @@ final class Curl {
             try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
         }
         
-        let fn = try await FileSystem.shared.openFile(forReadingAt: FilePath(cacheFile))
-        let fstat = try await fn.fileHandle.info()
+        guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
+            fatalError("Could not read cached file")
+        }
+        
+        //let fn = try await FileSystem.shared.openFile(forReadingAt: FilePath(cacheFile))
+        //let fstat = try await fn.fileHandle.info()
         
         var headers = HTTPHeaders()
-        headers.add(name: "content-length", value: "\(fstat.size)")
-        return HTTPClientResponse(status: .ok, headers: headers, body: .stream(fn.readChunks()))
+        //headers.add(name: "content-length", value: "\(fstat.size)")
+        //return HTTPClientResponse(status: .ok, headers: headers, body: .stream(fn.readChunks()))
+        headers.add(name: "content-length", value: "\(data.count)")
+        return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
     }
     
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before

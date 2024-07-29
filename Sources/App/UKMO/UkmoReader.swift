@@ -10,35 +10,7 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     
     case windspeed_10m
     case winddirection_10m
-    case windspeed_100m
-    case winddirection_100m
-    case windspeed_200m
-    case winddirection_200m
-    case windspeed_300m
-    case winddirection_300m
-    /// Is using 100m wind
-    case windspeed_80m
-    case winddirection_80m
-    /// Is using 100m wind
-    case windspeed_120m
-    case winddirection_120m
-    /// Is using 200m wind
-    case windspeed_180m
-    case winddirection_180m
     
-    /// Is using 100m wind
-    case wind_speed_80m
-    case wind_direction_80m
-    /// Is using 100m wind
-    case wind_speed_120m
-    case wind_direction_120m
-    /// Is using 200m wind
-    case wind_speed_180m
-    case wind_direction_180m
-    
-    case temperature_80m
-    case temperature_120m
-    case temperature_180m
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -159,20 +131,6 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .relative_humidity_2m, time: time)
             case .windspeed_10m:
                 try prefetchData(variable: .wind_speed_10m, time: time)
-            case .windspeed_80m, .wind_speed_80m, .windspeed_100m, .windspeed_120m, .wind_speed_120m:
-                try prefetchData(variable: .wind_speed_100m, time: time)
-            case .windspeed_200m, .windspeed_180m, .wind_speed_180m:
-                try prefetchData(variable: .wind_speed_200m, time: time)
-            case .winddirection_10m:
-                try prefetchData(variable: .wind_direction_10m, time: time)
-            case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
-                try prefetchData(variable: .wind_direction_100m, time: time)
-            case .winddirection_200m, .winddirection_180m, .wind_direction_180m:
-                try prefetchData(variable: .wind_direction_200m, time: time)
-            case .windspeed_300m:
-                try prefetchData(variable: .wind_speed_300m, time: time)
-            case .winddirection_300m:
-                try prefetchData(variable: .wind_direction_300m, time: time)
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -204,12 +162,6 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .visibility, time: time)
             case .is_day:
                 break
-            case .temperature_80m:
-                try prefetchData(variable: .temperature_100m, time: time)
-            case .temperature_120m:
-                try prefetchData(variable: .temperature_100m, time: time)
-            case .temperature_180m:
-                try prefetchData(variable: .temperature_200m, time: time)
             case .wet_bulb_temperature_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -230,6 +182,8 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .showers:
                 try prefetchData(variable: .rain, time: time)
+            case .winddirection_10m:
+                try prefetchData(variable: .wind_direction_10m, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -252,32 +206,8 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             switch variableDerivedSurface {
             case .windspeed_10m:
                 return try get(raw: .wind_speed_10m, time: time)
-            case .windspeed_80m, .wind_speed_80m:
-                let data = try get(raw: .wind_speed_100m, time: time)
-                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 80)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
-            case .windspeed_100m:
-                return try get(raw: .wind_speed_100m, time: time)
-            case .windspeed_120m, .wind_speed_120m:
-                let data = try get(raw: .wind_speed_100m, time: time)
-                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
-            case .windspeed_180m, .wind_speed_180m:
-                let data = try get(raw: .wind_speed_200m, time: time)
-                let scalefactor = Meteorology.scaleWindFactor(from: 200, to: 180)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
-            case .windspeed_200m:
-                return try get(raw: .wind_speed_200m, time: time)
-            case .windspeed_300m:
-                return try get(raw: .wind_speed_300m, time: time)
             case .winddirection_10m:
                 return try get(raw: .wind_direction_10m, time: time)
-            case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
-                return try get(raw: .wind_direction_100m, time: time)
-            case .winddirection_200m, .winddirection_180m, .wind_direction_180m:
-                return try get(raw: .wind_direction_200m, time: time)
-            case .winddirection_300m:
-                return try get(raw: .wind_direction_300m, time: time)
             case .apparent_temperature:
                 let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
@@ -372,12 +302,6 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
-            case .temperature_80m:
-                return try get(raw: .temperature_100m, time: time)
-            case .temperature_120m:
-                return try get(raw: .temperature_100m, time: time)
-            case .temperature_180m:
-                return try get(raw: .temperature_200m, time: time)
             case .showers:
                 let precipitation = try get(raw: .rain, time: time)
                 return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)

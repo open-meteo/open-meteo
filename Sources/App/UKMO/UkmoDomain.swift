@@ -58,8 +58,14 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
     }
     
     var omFileLength: Int {
-        // 60 timesteps
-        return 90
+        switch self {
+        case .global_deterministic_10km:
+            return 168 + 1 + 24
+        case .uk_deterministic_10km:
+            return 55 + 24
+        case .uk_deterministic_10km_15min:
+            return 55*4 + 24
+        }
     }
     
     var ensembleMembers: Int {
