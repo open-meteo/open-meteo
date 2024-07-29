@@ -41,7 +41,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case snowfall_water_equivalent
     case precipitation
     
-    case snow_depth_water_equivalent
+    //case snow_depth_water_equivalent
     
     case wind_gusts_10m
 
@@ -105,8 +105,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 10
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return 20
-        case .snow_depth_water_equivalent:
-            return 10
+        //case .snow_depth_water_equivalent:
+        //    return 10
         case .convective_inhibition:
             return 1
         case .cape:
@@ -132,7 +132,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
-        case .snowfall_water_equivalent, .snow_depth_water_equivalent:
+        case .snowfall_water_equivalent: //, .snow_depth_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
@@ -165,7 +165,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .precipitation, .snow_depth_water_equivalent:
+        case .precipitation: //, .snow_depth_water_equivalent:
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond

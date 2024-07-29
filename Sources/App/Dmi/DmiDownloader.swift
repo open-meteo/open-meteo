@@ -341,8 +341,8 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.temperature_150m
         case ("t", "heightAboveGround", "250"):
             return DmiSurfaceVariable.temperature_250m
-        case ("sd", "heightAboveGround", "0"):
-            return DmiSurfaceVariable.snow_depth_water_equivalent // ok
+        //case ("sd", "heightAboveGround", "0"):
+            //return DmiSurfaceVariable.snow_depth_water_equivalent // ok
         case ("grad", "heightAboveGround", "0"):
             return DmiSurfaceVariable.shortwave_radiation // ok
         case ("dswrf", "heightAboveGround", "0"):
