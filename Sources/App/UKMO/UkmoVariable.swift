@@ -331,9 +331,9 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             // UVB to etyhemally UV factor 18.9 https://link.springer.com/article/10.1039/b312985c
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
-            return (18.9 * 0.025, 0)
+            return (0, 18.9 * 0.025)
         case .pressure_msl:
-            return (1/100, 0)
+            return (0, 1/00)
         default:
             return nil
         }
