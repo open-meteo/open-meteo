@@ -82,6 +82,15 @@ final class Curl {
         
         let deadline = deadline ?? self.deadline
         
+        if _url.starts(with: "file://") {
+            guard let data = try FileHandle(forReadingAtPath: String(_url.dropFirst(7)))?.readToEnd() else {
+                fatalError("Could not read file \(_url.dropFirst(7))")
+            }
+            var headers = HTTPHeaders()
+            headers.add(name: "content-length", value: "\(data.count)")
+            return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
+        }
+        
         // Check in cache
         if let cacheDirectory, method == .GET {
             return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent, headers: headers)

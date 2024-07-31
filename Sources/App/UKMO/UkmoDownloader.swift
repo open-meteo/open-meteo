@@ -42,17 +42,17 @@ struct UkmoDownload: AsyncCommand {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        let onlyVariables: [UkmoVariable]? = try signature.onlyVariables.map {
+        let onlyVariables: [UkmoVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
                 if let variable = UkmoPressureVariable(rawValue: String($0)) {
-                    return UkmoVariable.pressure(variable)
+                    return variable
                 }
-                return UkmoVariable.surface(try UkmoSurfaceVariable.load(rawValue: String($0)))
+                return try UkmoSurfaceVariable.load(rawValue: String($0))
             }
         }
         
                 
-        let handles = try await download(application: context.application, domain: domain, variables: onlyVariables ?? UkmoSurfaceVariable.allCases.map{UkmoVariable.surface($0)}, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+        let handles = try await download(application: context.application, domain: domain, variables: onlyVariables ?? UkmoSurfaceVariable.allCases, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
@@ -66,7 +66,7 @@ struct UkmoDownload: AsyncCommand {
     
     /**
      */
-    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariable], run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(2)
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
@@ -76,14 +76,14 @@ struct UkmoDownload: AsyncCommand {
         let nMembers = domain.ensembleMembers
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        
-        let variables = UkmoSurfaceVariable.allCases // [UkmoSurfaceVariable.temperature_2m]
-        
+                
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
-        let baseUrl = "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/global-deterministic-10km/\(run.iso8601_YYYYMMddTHHmm)Z/"
+        //let baseUrl = "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
+        let baseUrl = "file:///Volumes/2TB_1GBs/ukmo/\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
         
         let handles = try await domain.forecastSteps(run: run).asyncMap { timestamp -> [GenericVariableHandle] in
+            logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
@@ -92,7 +92,7 @@ struct UkmoDownload: AsyncCommand {
                 if variable.skipHour0, timestamp == run {
                     return nil
                 }
-                guard let fileName = variable.getNcFileName(domain: domain) else {
+                guard let fileName = variable.getNcFileName(domain: domain, forecastHour: forecastHour) else {
                     return nil
                 }
                 

@@ -3,7 +3,7 @@ import Foundation
 /**
  List of all surface Ukmo variables
  */
-enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, GenericVariableMixable {
     case temperature_2m
     case cloud_cover
     case cloud_cover_low
@@ -11,7 +11,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     case cloud_cover_high
     case cloud_cover_2m
     case cloud_base
-    case cloud_top
+    //case cloud_top
     
     case pressure_msl
     case relative_humidity_2m
@@ -39,6 +39,10 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     case uv_index
     
     var storePreviousForecast: Bool {
+        return false
+        
+        
+        
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .rain, .snowfall_water_equivalent, .precipitation: return true
@@ -94,7 +98,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return 0.05 // 50 meter
         case .cloud_cover_2m:
             return 1
-        case .cloud_base, .cloud_top:
+        case .cloud_base://, .cloud_top:
             return 0.05 // 20 metre
         case .precipitation:
             return 10
@@ -141,7 +145,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .linearDegrees
         case .visibility:
             return .linear
-        case .cloud_top, .cloud_base:
+        case .cloud_base://, .cloud_top:
             return .hermite(bounds: 0...10e9)
         case .freezing_level_height:
             return .linear
@@ -184,7 +188,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .percentage
         case .visibility:
             return .metre
-        case .cloud_top, .cloud_base:
+        case .cloud_base://, .cloud_top:
             return .metre
         case .freezing_level_height:
             return .metre
@@ -196,7 +200,35 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         }
     }
     
-    func getNcFileName(domain: UkmoDomain) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+        
+        switch domain {
+        case .global_deterministic_10km:
+            switch self {
+            case .showers, .snowfall_water_equivalent, .hail, .rain:
+                // Global has only rates for precip, snow, showers and rain
+                // Need to adjust based on total precip amount
+                return nil
+            case .shortwave_radiation:
+                // global has only direct radiation, but not diffuse/total
+                return nil
+            case .cloud_base:
+                return nil
+            case .uv_index:
+                return nil
+            case .freezing_level_height:
+                return nil
+            default:
+                break
+            }
+        case .uk_deterministic_2km:
+            break
+        case .uk_deterministic_2km_15min:
+            // 15min data has only precip rates for precip, rain, hail and snow.
+            // This needs to be adjusted for the 1 hourly total amount of precip
+            return nil
+        }
+        
         switch self {
         case .cape:
             return "CAPE_surface"
@@ -215,9 +247,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .cloud_cover_2m:
             return "fog_fraction_at_screen_level"
         case .cloud_base:
-            return nil
-        case .cloud_top:
-            return nil
+            return "height_AGL_at_cloud_base_where_cloud_cover_2p5_oktas"
         case .pressure_msl:
             return "pressure_at_mean_sea_level"
         case .relative_humidity_2m:
@@ -229,17 +259,33 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .wind_gusts_10m:
             return "wind_direction_at_10m"
         case .precipitation:
-            return "precipitation_rate" //"precipitation_accumulation-PT01H"
+            //return "precipitation_rate"
+            // hourly until 49, while rain is hourly until hour 57
+            if forecastHour >= 150 {
+                return "precipitation_accumulation-PT06H"
+            }
+            if forecastHour >= 49 {
+                return forecastHour % 3 == 0 ? "precipitation_accumulation-PT03H" : nil
+            }
+            return "precipitation_accumulation-PT01H" // "precipitation_rate"
         case .snowfall_water_equivalent:
-            return "snowfall_rate"
+            return "snowfall_accumulation-PT01H"
         case .rain:
-            return "rainfall_rate" // "rainfall_accumulation-PT01H"
+            // NOTE "rainfall_rate" is instantanous -> therefore the sum would be wrong
+            // hourly until 57
+            if forecastHour >= 150 {
+                return "rainfall_accumulation-PT06H"
+            }
+            if forecastHour >= 57 {
+                return "rainfall_accumulation-PT03H"
+            }
+            return "rainfall_accumulation-PT01H" // "rainfall_rate"
         case .hail:
-            return nil
+            return "hail_fall_accumulation-PT01H"
         case .showers:
-            return "rainfall_rate_from_convection"
+            return nil // "rainfall_rate_from_convection"
         case .freezing_level_height:
-            return nil
+            return "height_AGL_at_freezing_level"
         case .surface_temperature:
             return "temperature_at_surface"
         case .visibility:
@@ -247,18 +293,18 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .snow_depth_water_equivalent:
             return "snow_depth_water_equivalent"
         case .shortwave_radiation:
-            return "radiation_flux_in_shortwave_direct_downward_at_surface"
+            return "radiation_flux_in_shortwave_total_downward_at_surface"
         case .direct_radiation:
-            return nil
+            return "radiation_flux_in_shortwave_direct_downward_at_surface"
         case .uv_index:
-            return nil
+            return "radiation_flux_in_uv_downward_at_surface"
         }
     }
     
     var skipHour0: Bool {
         switch self {
         case .precipitation, .rain:
-            return false
+            return true
         default:
             return false
         }
@@ -273,7 +319,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .relative_humidity_2m:
             return (0, 100) // fraction to %
         case .precipitation, .rain, .snowfall_water_equivalent, .showers, .hail:
-            return (0, 100 * 3600) // ms-1 to mm/h
+            return (0, 100) // m to mm
         case .uv_index:
             // UVB to etyhemally UV factor 18.9 https://link.springer.com/article/10.1039/b312985c
             // 0.025 m2/W to get the uv index
@@ -305,13 +351,14 @@ enum UkmoPressureVariableType: String, CaseIterable {
     case wind_direction
     case geopotential_height
     case relative_humidity
+    case vertical_velocity
 }
 
 
 /**
  A pressure level variable on a given level in hPa / mb
  */
-struct UkmoPressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
+struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: UkmoPressureVariableType
     let level: Int
     
@@ -342,6 +389,8 @@ struct UkmoPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         case .relative_humidity:
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
+        case .vertical_velocity:
+            return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
     
@@ -357,6 +406,8 @@ struct UkmoPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
             return .hermite(bounds: nil)
         case .relative_humidity:
             return .hermite(bounds: 0...100)
+        case .vertical_velocity:
+            return .hermite(bounds: nil)
         }
     }
     
@@ -372,14 +423,55 @@ struct UkmoPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
             return .metre
         case .relative_humidity:
             return .percentage
+        case .vertical_velocity:
+            return .metrePerSecondNotUnitConverted
         }
     }
     
     var isElevationCorrectable: Bool {
         return false
     }
+    
+    var skipHour0: Bool {
+        return false
+    }
+    
+    var multiplyAdd: (offset: Float, scalefactor: Float)? {
+        switch variable {
+        case .temperature:
+            return (-273.15, 1) // kelvin to celsius
+        case .relative_humidity:
+            return (0, 100) // fraction to %
+        default:
+            return nil
+        }
+    }
+    
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+        switch variable {
+        case .temperature:
+            return "temperature_on_pressure_levels"
+        case .wind_speed:
+            return "wind_speed_on_pressure_levels"
+        case .wind_direction:
+            return "wind_direction_on_pressure_levels"
+        case .geopotential_height:
+            return "height_ASL_on_pressure_levels"
+        case .relative_humidity:
+            return "relative_humidity_on_pressure_levels"
+        case .vertical_velocity:
+            return "wind_vertical_velocity_on_pressure_levels"
+        }
+    }
 }
 /**
  Combined surface and pressure level variables with all definitions for downloading and API
  */
 typealias UkmoVariable = SurfaceAndPressureVariable<UkmoSurfaceVariable, UkmoPressureVariable>
+
+
+protocol UkmoVariableDownloadable: GenericVariable {
+    var skipHour0: Bool { get }
+    var multiplyAdd: (offset: Float, scalefactor: Float)? { get }
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String?
+}

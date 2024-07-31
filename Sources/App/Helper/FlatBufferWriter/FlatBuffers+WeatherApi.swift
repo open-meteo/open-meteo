@@ -674,6 +674,13 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ecmwfIfsLongWindow
         case .era5_ensemble:
             return .era5Ensemble
+        case .ukmo_seamless:
+            // TODO register UKMO
+            return .ecmwfIfs
+        case .ukmo_global_deterministic_10km:
+            return .ecmwfIfs
+        case .ukmo_uk_deterministic_2km:
+            return .ecmwfIfs
         }
     }
 }
