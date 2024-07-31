@@ -333,7 +333,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
             return (0, 18.9 * 0.025)
         case .pressure_msl:
-            return (0, 1/00)
+            return (0, 1/100)
         default:
             return nil
         }
