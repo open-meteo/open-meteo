@@ -135,6 +135,27 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).longitude, 248.77817290935954 - 360, accuracy: 0.001)
     }
     
+    func testLambertAzimuthalEqualAreaProjection() {
+        let proj = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
+        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigion: -1036000, longitudeProjectionOrigion: -1158000, dx: 2000, dy: 2000, projection: proj)
+        // peak north denmark 57.745566, 10.620785
+        let coords = proj.forward(latitude: 57.745566, longitude: 10.620785)
+        XCTAssertEqual(coords.x, 773650.5, accuracy: 0.0001) // around 774000.0
+        XCTAssertEqual(coords.y, 389820.06, accuracy: 0.0001) // around 378000
+        
+        let r = proj.inverse(x: 773650.5, y: 389820.06)
+        XCTAssertEqual(r.longitude, 10.620785, accuracy: 0.0001)
+        XCTAssertEqual(r.latitude, 57.745566, accuracy: 0.0001)
+        
+        let coords2 = grid.findPointXy(lat: 57.745566, lon: 10.620785)!
+        XCTAssertEqual(coords2.x, 966)
+        XCTAssertEqual(coords2.y, 713)
+        
+        let r2 = grid.getCoordinates(gridpoint: 966 + 713 * grid.nx)
+        XCTAssertEqual(r2.longitude, 10.6271515, accuracy: 0.0001)
+        XCTAssertEqual(r2.latitude, 57.746563, accuracy: 0.0001)
+    }
+    
     func testLambertCC() {
         let proj = LambertConformalConicProjection(λ0: 352, ϕ0: 55.5, ϕ1: 55.5, ϕ2: 55.5, radius: 6371229)
         let grid = ProjectionGrid(

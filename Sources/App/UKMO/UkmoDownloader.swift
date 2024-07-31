@@ -118,6 +118,13 @@ struct UkmoDownload: AsyncCommand {
                     if let scaling = variable.multiplyAdd {
                         data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                     }
+                    if let variable = variable as? UkmoSurfaceVariable, variable == .cloud_base {
+                        for i in data.indices {
+                            if data[i].isNaN {
+                                data[i] = 0
+                            }
+                        }
+                    }
                     return data
                 }
                 

@@ -13,14 +13,24 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
     var grid: Gridable {
         switch self {
         case .global_deterministic_10km:
-            return RegularGrid(nx: 2560, ny: 1920, latMin: -90, lonMin: -180, dx: 360/2560, dy: 180/1920)
+            return RegularGrid(
+                nx: 2560,
+                ny: 1920,
+                latMin: -90,
+                lonMin: -180,
+                dx: 360/2560,
+                dy: 180/1920
+            )
         case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+            let projection = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
             return ProjectionGrid(
-                nx: 676,
-                ny: 564,
-                latitude: 39.740627...62.619324,
-                longitude: -25.162262...38.75702,
-                projection: RotatedLatLonProjection(latitude: -35, longitude: -8)
+                nx: 1042,
+                ny: 970, 
+                latitudeProjectionOrigion: -1036000,
+                longitudeProjectionOrigion: -1158000,
+                dx: 2000,
+                dy: 2000,
+                projection: projection
             )
         }
     }

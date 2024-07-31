@@ -222,7 +222,12 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 break
             }
         case .uk_deterministic_2km:
-            break
+            switch self {
+            case .convective_inhibition:
+                return nil
+            default:
+                break
+            }
         case .uk_deterministic_2km_15min:
             // 15min data has only precip rates for precip, rain, hail and snow.
             // This needs to be adjusted for the 1 hourly total amount of precip
@@ -261,11 +266,13 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .precipitation:
             //return "precipitation_rate"
             // hourly until 49, while rain is hourly until hour 57
-            if forecastHour >= 150 {
-                return "precipitation_accumulation-PT06H"
-            }
-            if forecastHour >= 49 {
-                return forecastHour % 3 == 0 ? "precipitation_accumulation-PT03H" : nil
+            if domain == .global_deterministic_10km {
+                if forecastHour >= 150 {
+                    return "precipitation_accumulation-PT06H"
+                }
+                if forecastHour >= 49 {
+                    return forecastHour % 3 == 0 ? "precipitation_accumulation-PT03H" : nil
+                }
             }
             return "precipitation_accumulation-PT01H" // "precipitation_rate"
         case .snowfall_water_equivalent:
@@ -303,7 +310,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     
     var skipHour0: Bool {
         switch self {
-        case .precipitation, .rain:
+        case .precipitation, .rain, .hail, .snowfall_water_equivalent:
             return true
         default:
             return false
