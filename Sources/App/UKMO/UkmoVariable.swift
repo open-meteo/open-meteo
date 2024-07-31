@@ -328,10 +328,9 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .precipitation, .rain, .snowfall_water_equivalent, .showers, .hail:
             return (0, 100) // m to mm
         case .uv_index:
-            // UVB to etyhemally UV factor 18.9 https://link.springer.com/article/10.1039/b312985c
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
-            return (0, 18.9 * 0.025)
+            return (0, 1/0.25)
         case .pressure_msl:
             return (0, 1/100)
         default:
