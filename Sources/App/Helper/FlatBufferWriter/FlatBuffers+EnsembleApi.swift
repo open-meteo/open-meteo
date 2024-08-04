@@ -80,7 +80,7 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
         case .cape:
             return .init(variable: .cape)
         case .surface_temperature:
-            return .init(variable: .surfacePressure)
+            return .init(variable: .surfaceTemperature)
         case .soil_temperature_0_to_10cm:
             return .init(variable: .soilTemperature, depth: 0, depthTo: 10)
         case .soil_temperature_10_to_40cm:
