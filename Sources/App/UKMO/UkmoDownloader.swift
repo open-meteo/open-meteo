@@ -142,8 +142,7 @@ struct UkmoDownload: AsyncCommand {
                     guard let ncVar = vars.first else {
                         fatalError("Could not open variable for \(fileName)")
                     }
-                    guard let unitC: [CChar] = try ncVar.getAttribute("units")?.read(),
-                            let unit = String(cString: unitC + [0], encoding: .utf8) else {
+                    guard let unit = try ncVar.getAttribute("units")?.readString() else {
                         fatalError("Could not get unit from \(ncVar.name)")
                     }
                     logger.info("Processing \(ncVar.name) [\(unit)]")
@@ -204,5 +203,15 @@ struct UkmoDownload: AsyncCommand {
         
         await curl.printStatistics()
         return handles
+    }
+}
+
+extension Attribute {
+    /// Try to read attributes value as string. Otherwise return nil
+    func readString() throws -> String? {
+        guard let char: [CChar] = try read() else {
+            return nil
+        }
+        return String(cString: char + [0], encoding: .utf8)
     }
 }
