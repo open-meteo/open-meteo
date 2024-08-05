@@ -13,7 +13,6 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
-    case direct_radiation
     case direct_radiation_instant
     case diffuse_radiation_instant
     case diffuse_radiation
@@ -32,7 +31,6 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case weather_code
     case is_day
     case showers
-    case precipitation
     case wet_bulb_temperature_2m
     case cloudcover
     case cloudcover_low
@@ -151,7 +149,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .relative_humidity_2m, time: time)
             case .global_tilted_irradiance, .global_tilted_irradiance_instant:
                 fallthrough
-            case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .shortwave_radiation_instant:
+            case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant, .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .weather_code, .weathercode:
                 try prefetchData(variable: .cloud_cover, time: time)
@@ -176,10 +174,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             case .windgusts_10m:
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .sunshine_duration:
-                try prefetchData(derived: .surface(.direct_radiation), time: time)
-            case .precipitation:
-                try prefetchData(variable: .rain, time: time)
-                try prefetchData(variable: .snowfall_water_equivalent, time: time)
+                try prefetchData(variable: .direct_radiation, time: time)
             case .showers:
                 try prefetchData(variable: .rain, time: time)
             case .winddirection_10m:
@@ -258,7 +253,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
             case .direct_normal_irradiance:
-                let dhi = try get(derived: .surface(.direct_radiation), time: time).data
+                let dhi = try get(raw: .direct_radiation, time: time).data
                 let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(dni, .wattPerSquareMetre)
             case .direct_normal_irradiance_instant:
@@ -269,12 +264,8 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 let swrad = try get(raw: .shortwave_radiation, time: time)
                 let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(diffuse, swrad.unit)
-            case .direct_radiation:
-                let swrad = try get(raw: .shortwave_radiation, time: time)
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(zip(swrad.data, diffuse).map(-), swrad.unit)
             case .direct_radiation_instant:
-                let direct = try get(derived: .surface(.direct_radiation), time: time)
+                let direct = try get(raw: .direct_radiation, time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
             case .diffuse_radiation_instant:
@@ -283,9 +274,9 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
             case .weathercode, .weather_code:
                 let cloudcover = try get(raw: .cloud_cover, time: time).data
-                let precipitation = try get(derived: .surface(.precipitation), time: time).data
+                let precipitation = try get(raw: .precipitation, time: time).data
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
-                //let cape = try get(raw: .cape, time: time).data
+                let cape = try get(raw: .cape, time: time).data
                 let gusts = try get(raw: .wind_gusts_10m, time: time).data
                 let visibility = try get(raw: .visibility, time: time).data
                 return DataAndUnit(WeatherCode.calculate(
@@ -294,7 +285,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                     convectivePrecipitation: nil,
                     snowfallCentimeters: snowfall,
                     gusts: gusts,
-                    cape: nil,
+                    cape: cape,
                     liftedIndex: nil,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: nil,
@@ -320,20 +311,16 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             case .windgusts_10m:
                 return try get(raw: .wind_gusts_10m, time: time)
             case .sunshine_duration:
-                let directRadiation = try get(derived: .surface(.direct_radiation), time: time)
+                let directRadiation = try get(raw: .direct_radiation, time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(duration, .seconds)
-            case .precipitation:
-                let rain = try get(raw: .rain, time: time)
-                let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
-                return DataAndUnit(zip(rain.data, snoweq.data).map(+), rain.unit)
             case .global_tilted_irradiance:
-                let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
+                let directRadiation = try get(raw: .direct_radiation, time: time).data
                 let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             case .global_tilted_irradiance_instant:
-                let directRadiation = try get(derived: .surface(.direct_radiation), time: time).data
+                let directRadiation = try get(raw: .direct_radiation, time: time).data
                 let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)

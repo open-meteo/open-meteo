@@ -13,6 +13,15 @@ struct UkmoDownload: AsyncCommand {
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
+        
+        @Flag(name: "surface", help: "Download surface variables")
+        var surface: Bool
+        
+        @Flag(name: "pressure", help: "Download pressure level variables")
+        var pressure: Bool
+        
+        @Flag(name: "height", help: "Download height level variables")
+        var height: Bool
 
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
@@ -25,19 +34,20 @@ struct UkmoDownload: AsyncCommand {
         
         @Option(name: "only-variables")
         var onlyVariables: String?
+        
+        @Option(name: "server", help: "Default 'https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/'")
+        var server: String?
     }
 
     var help: String {
-        "Download KNMI models"
+        "Download UKMO models"
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try UkmoDomain.load(rawValue: signature.domain)
-        
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        
         let nConcurrent = signature.concurrent ?? System.coreCount
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
@@ -57,11 +67,14 @@ struct UkmoDownload: AsyncCommand {
             }
         }
         
-                
-        let handles = try await download(application: context.application, domain: domain, variables: onlyVariables ?? UkmoSurfaceVariable.allCases, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+        let allSurface = UkmoSurfaceVariable.allCases
+        let allPressure = UkmoPressureVariableType.allCases.map { UkmoPressureVariable.init(variable: $0, level: -1) }
+        let allHeight = UkmoHeightVariableType.allCases.map { UkmoHeightVariable.init(variable: $0, level: -1) }
+        let variables = onlyVariables ?? (signature.surface ? allSurface : []) + (signature.pressure ? allPressure : []) + (signature.height ? allHeight : [])
+        
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
-        //try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -71,22 +84,28 @@ struct UkmoDownload: AsyncCommand {
     }
     
     /**
+     Download a specified UKMO run and return file handles for conversion
      */
-    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours = Double(2)
-        Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
+        let deadLineHours: Double
+        switch domain {
+        case .global_deterministic_10km:
+            deadLineHours = 5
+        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+            deadLineHours = 1
+        }
+        Process.alarm(seconds: Int(deadLineHours+0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let grid = domain.grid
         let nMembers = domain.ensembleMembers
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
-        //let baseUrl = "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
-        let baseUrl = "file:///Volumes/2TB_1GBs/ukmo/\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
+        let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
+        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
         
         let handles = try await domain.forecastSteps(run: run).asyncFlatMap { timestamp -> [GenericVariableHandle] in
             logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
@@ -94,7 +113,7 @@ struct UkmoDownload: AsyncCommand {
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
-            return try await variables.asyncFlatMap { variable -> [GenericVariableHandle] in
+            return try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
                 if variable.skipHour0, timestamp == run {
                     return []
                 }
@@ -169,7 +188,7 @@ struct UkmoDownload: AsyncCommand {
                         skipHour0: variable.skipHour0
                     )
                 }
-            }
+            }.flatMap({$0})
         }
         
         await curl.printStatistics()

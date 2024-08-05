@@ -39,17 +39,14 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     case uv_index
     
     var storePreviousForecast: Bool {
-        return false
-        
-        
-        
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .rain, .snowfall_water_equivalent, .precipitation: return true
+        case .rain, .snowfall_water_equivalent, .precipitation, .showers: return true
         case .wind_speed_10m, .wind_direction_10m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
-        case .shortwave_radiation: return true
+        case .cape: return true
+        case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m: return true
         case .visibility: return true
         default: return false
@@ -201,7 +198,6 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     }
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
-        
         switch domain {
         case .global_deterministic_10km:
             switch self {
@@ -497,7 +493,12 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
     let level: Int
     
     var storePreviousForecast: Bool {
-        return false
+        switch variable {
+        case .wind_speed, .wind_direction:
+            return level <= 300
+        default:
+            return false
+        }
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
@@ -568,6 +569,12 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
     }
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+        switch domain {
+        case .global_deterministic_10km:
+            return nil
+        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+            break
+        }
         switch variable {
         case .temperature:
             return "temperature_on_height_levels"
