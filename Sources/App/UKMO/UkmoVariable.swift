@@ -346,6 +346,10 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return false
         }
     }
+    
+    func withLevel(level: Float) -> UkmoSurfaceVariable {
+        return self
+    }
 }
 
 /**
@@ -469,6 +473,10 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             return "wind_vertical_velocity_on_pressure_levels"
         }
     }
+    
+    func withLevel(level: Float) -> UkmoPressureVariable {
+        return UkmoPressureVariable(variable: variable, level: Int(level))
+    }
 }
 /**
  Combined surface and pressure level variables with all definitions for downloading and API
@@ -480,4 +488,5 @@ protocol UkmoVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }
     var multiplyAdd: (offset: Float, scalefactor: Float)? { get }
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String?
+    func withLevel(level: Float) -> Self
 }

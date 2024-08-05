@@ -82,23 +82,23 @@ struct UkmoDownload: AsyncCommand {
         //let baseUrl = "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
         let baseUrl = "file:///Volumes/2TB_1GBs/ukmo/\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
         
-        let handles = try await domain.forecastSteps(run: run).asyncMap { timestamp -> [GenericVariableHandle] in
+        let handles = try await domain.forecastSteps(run: run).asyncFlatMap { timestamp -> [GenericVariableHandle] in
             logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
-            return try await variables.asyncMap { variable -> GenericVariableHandle? in
+            return try await variables.asyncFlatMap { variable -> [GenericVariableHandle] in
                 if variable.skipHour0, timestamp == run {
-                    return nil
+                    return []
                 }
                 guard let fileName = variable.getNcFileName(domain: domain, forecastHour: forecastHour) else {
-                    return nil
+                    return []
                 }
                 
                 let url = "\(baseUrl)\(timestamp.iso8601_YYYYMMddTHHmm)Z-PT\(forecastHour.zeroPadded(len: 4))H\(timestamp.minute.zeroPadded(len: 2))M-\(fileName).nc"
                 let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
-                let data = try memory.withUnsafeReadableBytes { memory in
+                let data = try memory.withUnsafeReadableBytes { memory -> [(level: Float, data: [Float])] in
                     guard let nc = try NetCDF.open(memory: memory) else {
                         fatalError("Could not open netcdf from memory")
                     }
@@ -114,6 +114,30 @@ struct UkmoDownload: AsyncCommand {
                     guard let ncFloat = ncVar.asType(Float.self) else {
                         fatalError("Could not open float variable \(ncVar.name)")
                     }
+                    /// File contains multiple levels on pressure or height
+                    if ncVar.dimensions.count == 3 {
+                        /// `height` or `pressure`
+                        let levelStr = ncVar.dimensions[0].name
+                        guard var levels = try nc.getVariable(name: levelStr)?.asType(Float.self)?.read() else {
+                            fatalError("Could not read levels from variable \(levelStr)")
+                        }
+                        if levelStr == "pressure" {
+                            // Pa to hPa
+                            levels.multiplyAdd(multiply: 1/100, add: 0)
+                        }
+                        return try levels.enumerated().compactMap { (i, level) in
+                            if level < 10 {
+                                // skip pressure levels higher than 10 hPa
+                                return nil
+                            }
+                            var data = try ncFloat.read(offset: [i, 0, 0], count: [1, ncVar.dimensionsFlat[1], ncVar.dimensionsFlat[2]])
+                            if let scaling = variable.multiplyAdd {
+                                data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+                            }
+                            return (level, data)
+                        }
+                    }
+                    
                     var data = try ncFloat.read()
                     if let scaling = variable.multiplyAdd {
                         data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
@@ -125,23 +149,22 @@ struct UkmoDownload: AsyncCommand {
                             }
                         }
                     }
-                    return data
+                    return [(0, data)]
                 }
                 
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: 0,
-                    fn: fn,
-                    skipHour0: variable.skipHour0
-                )
-            }.compactMap({$0})
-        }.flatMap({$0})
-        
-        // loop timestemps
-        // loop variables
-        // download netcdf in memory and convert
+                return try data.map { (level, data) -> GenericVariableHandle in
+                    let variable = variable.withLevel(level: level)
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                    return GenericVariableHandle(
+                        variable: variable,
+                        time: timestamp,
+                        member: 0,
+                        fn: fn,
+                        skipHour0: variable.skipHour0
+                    )
+                }
+            }
+        }
         
         await curl.printStatistics()
         return handles
