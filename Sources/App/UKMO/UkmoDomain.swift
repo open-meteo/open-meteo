@@ -121,4 +121,14 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return TimerangeDt(start: run, nTime: 55*4, dtSeconds: 900).map({$0})
         }
     }
+    
+    var runsPerDay: Int {
+        switch self {
+        case .global_deterministic_10km:
+            return 4
+        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+            return 24
+
+        }
+    }
 }
