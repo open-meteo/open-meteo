@@ -454,6 +454,18 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
     }
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+        switch domain {
+        case .global_deterministic_10km:
+            break
+        case .uk_deterministic_2km:
+            if variable == .vertical_velocity {
+                return nil
+            }
+            break
+        case .uk_deterministic_2km_15min:
+            return nil
+        }
+        
         switch variable {
         case .temperature:
             return "temperature_on_pressure_levels"
