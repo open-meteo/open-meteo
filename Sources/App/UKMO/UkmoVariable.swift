@@ -428,7 +428,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         case .wind_speed:
             return .metrePerSecond
         case .wind_direction:
-            return .percentage
+            return .degreeDirection
         case .geopotential_height:
             return .metre
         case .relative_humidity:
@@ -478,10 +478,117 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         return UkmoPressureVariable(variable: variable, level: Int(level))
     }
 }
+
+/**
+ Types of height level variables
+ */
+enum UkmoHeightVariableType: String, CaseIterable {
+    case temperature
+    case wind_speed
+    case wind_direction
+    case cloud_cover
+}
+
+/**
+ A height level variable on a given level in hPa / mb
+ */
+struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadable, Hashable, GenericVariableMixable {
+    let variable: UkmoHeightVariableType
+    let level: Int
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+    
+    var scalefactor: Float {
+        // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
+        switch variable {
+        case .temperature:
+            return 10
+        case .wind_speed:
+            return 10
+        case .wind_direction:
+            return 0.5
+        case .cloud_cover:
+            return 1
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch variable {
+        case .temperature:
+            return .hermite(bounds: nil)
+        case .wind_speed:
+            return .hermite(bounds: 0...1000)
+        case .wind_direction:
+            return .linearDegrees
+        case .cloud_cover:
+            return .hermite(bounds: 0...100)
+        }
+    }
+    
+    var unit: SiUnit {
+        switch variable {
+        case .temperature:
+            return .celsius
+        case .wind_speed:
+            return .metrePerSecond
+        case .wind_direction:
+            return .degreeDirection
+        case .cloud_cover:
+            return .percentage
+        }
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var skipHour0: Bool {
+        return false
+    }
+    
+    var multiplyAdd: (offset: Float, scalefactor: Float)? {
+        switch variable {
+        case .temperature:
+            return (-273.15, 1) // kelvin to celsius
+        case .cloud_cover:
+            return (0, 100) // fraction to %
+        default:
+            return nil
+        }
+    }
+    
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+        switch variable {
+        case .temperature:
+            return "temperature_on_height_levels"
+        case .wind_speed:
+            return "wind_speed_on_height_levels"
+        case .wind_direction:
+            return "wind_direction_on_height_levels"
+        case .cloud_cover:
+            return "cloud_amount_on_height_levels"
+        }
+    }
+    
+    func withLevel(level: Float) -> UkmoHeightVariable {
+        return UkmoHeightVariable(variable: variable, level: Int(level))
+    }
+}
+
 /**
  Combined surface and pressure level variables with all definitions for downloading and API
  */
-typealias UkmoVariable = SurfaceAndPressureVariable<UkmoSurfaceVariable, UkmoPressureVariable>
+typealias UkmoVariable = SurfacePressureAndHeightVariable<UkmoSurfaceVariable, UkmoPressureVariable, UkmoHeightVariable>
 
 
 protocol UkmoVariableDownloadable: GenericVariable {

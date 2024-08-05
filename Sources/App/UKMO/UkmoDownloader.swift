@@ -44,7 +44,13 @@ struct UkmoDownload: AsyncCommand {
         
         let onlyVariables: [UkmoVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
+                if let surface = UkmoSurfaceVariable(rawValue: String($0)) {
+                    return surface
+                }
                 if let variable = UkmoPressureVariable(rawValue: String($0)) {
+                    return variable
+                }
+                if let variable = UkmoHeightVariable(rawValue: String($0)) {
                     return variable
                 }
                 return try UkmoSurfaceVariable.load(rawValue: String($0))
