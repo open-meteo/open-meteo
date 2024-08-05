@@ -80,7 +80,7 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
         case .cape:
             return .init(variable: .cape)
         case .surface_temperature:
-            return .init(variable: .surfacePressure)
+            return .init(variable: .surfaceTemperature)
         case .soil_temperature_0_to_10cm:
             return .init(variable: .soilTemperature, depth: 0, depthTo: 10)
         case .soil_temperature_10_to_40cm:
@@ -96,7 +96,7 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
         case .soil_moisture_40_to_100cm:
             return .init(variable: .soilMoisture, depth: 40, depthTo: 100)
         case .soil_moisture_100_to_200cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
+            return .init(variable: .soilMoisture, depth: 100, depthTo: 200)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
         case .global_tilted_irradiance:
@@ -133,11 +133,11 @@ extension EnsemblePressureVariableType: FlatBuffersVariable {
 
 extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
     typealias HourlyVariable = EnsembleSurfaceVariable
-    
+
     typealias HourlyPressureType = EnsemblePressureVariableType
-    
+
     typealias DailyVariable = ForecastVariableDaily
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .icon_seamless:

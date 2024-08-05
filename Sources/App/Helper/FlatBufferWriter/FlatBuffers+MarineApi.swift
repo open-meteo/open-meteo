@@ -40,7 +40,7 @@ extension IconWaveVariableDaily: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
         case .wave_height_max:
-            return .init(variable: .windWaveHeight, aggregation: .maximum)
+            return .init(variable: .waveHeight, aggregation: .maximum)
         case .wind_wave_height_max:
             return .init(variable: .windWaveHeight, aggregation: .maximum)
         case .swell_wave_height_max:
@@ -67,11 +67,11 @@ extension IconWaveVariableDaily: FlatBuffersVariable {
 
 extension IconWaveDomainApi: ModelFlatbufferSerialisable {
     typealias HourlyVariable = MarineVariable
-    
+
     typealias HourlyPressureType = ForecastPressureVariableType
-    
+
     typealias DailyVariable = IconWaveVariableDaily
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case.best_match:

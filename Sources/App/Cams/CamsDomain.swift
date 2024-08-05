@@ -96,7 +96,12 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("No interpolation required")
+        switch self {
+        case .uv_index, .uv_index_clear_sky:
+            return .solar_backwards_averaged
+        default:
+            return .hermite(bounds: 0...Float.infinity)
+        }
     }
     
     var isElevationCorrectable: Bool {

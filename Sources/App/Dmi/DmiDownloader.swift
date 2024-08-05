@@ -213,10 +213,10 @@ struct DmiDownload: AsyncCommand {
                             grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0)
                         case .cloud_top, .cloud_base:
                             // Cloud base and top mark "no clouds" as NaN
-                            // Set it to infinity to work with conversion
+                            // Set it to 0 to work with conversion
                             for i in grib2d.array.data.indices {
                                 if grib2d.array.data[i].isNaN {
-                                    grib2d.array.data[i] = .infinity
+                                    grib2d.array.data[i] = 0
                                 }
                             }
                         default:
@@ -341,8 +341,8 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.temperature_150m
         case ("t", "heightAboveGround", "250"):
             return DmiSurfaceVariable.temperature_250m
-        case ("sd", "heightAboveGround", "0"):
-            return DmiSurfaceVariable.snow_depth_water_equivalent // ok
+        //case ("sd", "heightAboveGround", "0"):
+            //return DmiSurfaceVariable.snow_depth_water_equivalent // ok
         case ("grad", "heightAboveGround", "0"):
             return DmiSurfaceVariable.shortwave_radiation // ok
         case ("dswrf", "heightAboveGround", "0"):
