@@ -8,6 +8,7 @@ import SwiftNetCDF
  
  TODO:
  - land and sea mask
+ - direct radiation to global conversion?
  - additional processing server?
  - deploy on prod server
  */
