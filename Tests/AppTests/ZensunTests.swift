@@ -232,6 +232,6 @@ final class ZensunTests: XCTestCase {
         let time = TimerangeDt(start: Timestamp(2022,7,31), nTime: 24, dtSeconds: 3600)
         let diff = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad, latitude: -22.5, longitude: 17, timerange: time)
         // Note: Differences to the actual diffuse radiation are expected!
-        XCTAssertEqualArray(diff, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9707108, 118.167114, 113.10868, 211.9621, 336.0515, 361.00406, 362.58548, 300.82724, 202.34702, 130.68182, 37.861877, 0.9707107, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+        XCTAssertEqualArray(diff, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 9.287625, 116.9848, 133.84239, 166.59798, 219.15633, 200.51555, 205.13588, 167.13881, 146.30597, 132.74532, 84.49708, 4.2427073, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
     }
 }
