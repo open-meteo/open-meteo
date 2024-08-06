@@ -69,6 +69,8 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
     typealias HourlyVariable = MarineVariable
 
     typealias HourlyPressureType = ForecastPressureVariableType
+    
+    typealias HourlyHeightType = ForecastHeightVariableType
 
     typealias DailyVariable = IconWaveVariableDaily
 

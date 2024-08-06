@@ -384,6 +384,28 @@ extension ForecastPressureVariableType: FlatBuffersVariable {
     }
 }
 
+extension ForecastHeightVariableType: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .temperature:
+            return .init(variable: .temperature)
+        case .relativehumidity, .relative_humidity:
+            return .init(variable: .relativeHumidity)
+        case .windspeed, .wind_speed:
+            return .init(variable: .windSpeed)
+        case .winddirection, .wind_direction:
+            return .init(variable: .windDirection)
+        case .dewpoint, .dew_point:
+            return .init(variable: .dewPoint)
+        case .cloudcover, .cloud_cover:
+            return .init(variable: .cloudCover)
+        case .vertical_velocity:
+            return .init(variable: .verticalVelocity)
+        }
+    }
+}
+
+
 extension ForecastVariableDaily: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -545,6 +567,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
     typealias HourlyVariable = VariableAndPreviousDay
     
     typealias HourlyPressureType = ForecastPressureVariableType
+    
+    typealias HourlyHeightType = ForecastHeightVariableType
     
     typealias DailyVariable = ForecastVariableDaily
     

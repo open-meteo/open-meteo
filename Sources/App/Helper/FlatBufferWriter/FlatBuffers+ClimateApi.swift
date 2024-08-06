@@ -115,6 +115,8 @@ extension Cmip6Domain: ModelFlatbufferSerialisable {
     
     typealias HourlyPressureType = ForecastPressureVariableType
     
+    typealias HourlyHeightType = ForecastHeightVariableType
+    
     typealias DailyVariable = Cmip6VariableOrDerivedPostBias
     
     var flatBufferModel: openmeteo_sdk_Model {

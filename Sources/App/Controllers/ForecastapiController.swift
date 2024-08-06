@@ -247,12 +247,14 @@ struct WeatherApiController {
 }
 
 extension ForecastVariable {
-    var resultVariable: ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable {
+    var resultVariable: ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable {
         switch self {
         case .pressure(let p):
             return .pressure(.init(p.variable, p.level))
         case .surface(let s):
             return .surface(s)
+        case .height(let h):
+            return .height(.init(h.variable, h.level))
         }
     }
 }
@@ -980,7 +982,36 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
     }
 }
 
-typealias ForecastVariable = SurfaceAndPressureVariable<VariableAndPreviousDay, ForecastPressureVariable>
+/// Available pressure level variables
+enum ForecastHeightVariableType: String, GenericVariableMixable {
+    case temperature
+    case relativehumidity
+    case relative_humidity
+    case windspeed
+    case wind_speed
+    case winddirection
+    case wind_direction
+    case dewpoint
+    case dew_point
+    case cloudcover
+    case cloud_cover
+    case vertical_velocity
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixable {
+    let variable: ForecastHeightVariableType
+    let level: Int
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, ForecastPressureVariable, ForecastHeightVariable>
 
 extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
@@ -989,6 +1020,8 @@ extension ForecastVariable {
             return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
         case .pressure(let pressure):
             return (ForecastVariable.pressure(pressure), 0)
+        case .height(let height):
+            return (ForecastVariable.height(height), 0)
         }
     }
 }
