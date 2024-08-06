@@ -13,7 +13,7 @@ final class OutputformatTests: XCTestCase {
     }
     
     override func tearDown() async throws {
-        try await app?.asyncShutdown()
+        app?.shutdown()
         app = nil
     }
     
