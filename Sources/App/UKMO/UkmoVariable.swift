@@ -201,9 +201,8 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         switch domain {
         case .global_deterministic_10km:
             switch self {
-            case .showers, .snowfall_water_equivalent, .hail, .rain:
-                // Global has only rates for precip, snow, showers and rain
-                // Need to adjust based on total precip amount
+            case .showers, .snowfall_water_equivalent, .hail:
+                // Global has only instantanous rates for snow and showers
                 return nil
             case .shortwave_radiation:
                 // global has only direct radiation, but not diffuse/total

@@ -3,6 +3,14 @@ import Vapor
 import SwiftPFor2D
 import SwiftNetCDF
 
+/**
+ TODO:
+ - estimate precipitation components for global
+ - pecip for 15min data or comment out domain
+ - land and sea mask
+ - additional processing server?
+ - deploy on prod server
+ */
 struct UkmoDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
