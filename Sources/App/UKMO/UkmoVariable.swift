@@ -223,10 +223,6 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             default:
                 break
             }
-        case .uk_deterministic_2km_15min:
-            // 15min data has only precip rates for precip, rain, hail and snow.
-            // This needs to be adjusted for the 1 hourly total amount of precip
-            return nil
         }
         
         switch self {
@@ -461,8 +457,6 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
                 return nil
             }
             break
-        case .uk_deterministic_2km_15min:
-            return nil
         }
         
         switch variable {
@@ -583,7 +577,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
         switch domain {
         case .global_deterministic_10km:
             return nil
-        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+        case .uk_deterministic_2km:
             break
         }
         switch variable {

@@ -547,16 +547,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ukmo_seamless:
             let ukmoGlobal: (any GenericReaderProtocol)? = try UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ukmoUk15min = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoGlobal, ukmoUk, ukmoUk15min].compactMap({$0})
+            return [ukmoGlobal, ukmoUk].compactMap({$0})
         case .ukmo_global_deterministic_10km:
             let ukmoGlobal: (any GenericReaderProtocol)? = try UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [ukmoGlobal].compactMap({$0})
         case .ukmo_uk_deterministic_2km:
-            let ukmoUk15min = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km_15min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoUk, ukmoUk15min].compactMap({$0})
+            return [ukmoUk].compactMap({$0})
         }
     }
     

@@ -4,9 +4,9 @@ import SwiftPFor2D
 import SwiftNetCDF
 
 /**
+ Download UK MetOffice models from AWS rolling archive
+ 
  TODO:
- - estimate precipitation components for global
- - pecip for 15min data or comment out domain
  - land and sea mask
  - additional processing server?
  - deploy on prod server
@@ -111,7 +111,7 @@ struct UkmoDownload: AsyncCommand {
         switch domain {
         case .global_deterministic_10km:
             deadLineHours = 5
-        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+        case .uk_deterministic_2km:
             deadLineHours = 1
         }
         Process.alarm(seconds: Int(deadLineHours+0.1) * 3600)

@@ -1,14 +1,13 @@
 import Foundation
 
 /**
-https://registry.opendata.aws/met-office-global-deterministic/
-
- 
+ UK MetOffice domains from AWS rolling archive:
+ https://registry.opendata.aws/met-office-global-deterministic/
+ https://registry.opendata.aws/met-office-uk-deterministic/
  */
 enum UkmoDomain: String, GenericDomain, CaseIterable {
     case global_deterministic_10km
     case uk_deterministic_2km
-    case uk_deterministic_2km_15min
     
     var grid: Gridable {
         switch self {
@@ -21,7 +20,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
                 dx: 360/2560,
                 dy: 180/1920
             )
-        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+        case .uk_deterministic_2km:
             let projection = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
             return ProjectionGrid(
                 nx: 1042,
@@ -41,8 +40,6 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return .ukmo_global_deterministic_10km
         case .uk_deterministic_2km:
             return .ukmo_uk_deterministic_2km
-        case .uk_deterministic_2km_15min:
-            return .ukmo_uk_deterministic_2km_15min
         }
     }
     
@@ -54,8 +51,6 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .global_deterministic_10km, .uk_deterministic_2km:
             return 3600
-        case .uk_deterministic_2km_15min:
-            return 900
         }
     }
     
@@ -73,8 +68,6 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return 168 + 1 + 24
         case .uk_deterministic_2km:
             return 55 + 24
-        case .uk_deterministic_2km_15min:
-            return 55*4 + 24
         }
     }
     
@@ -89,7 +82,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         case .global_deterministic_10km:
             // Delay of 10:00 hours after initialisation, updates every 6 hours
             return t.add(hours: -10).floor(toNearestHour: 6)
-        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+        case .uk_deterministic_2km:
             // Delay of 8:00 hours after initialisation, updates every hour
             return t.add(hours: -8).floor(toNearestHour: 1)
         }
@@ -99,7 +92,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .global_deterministic_10km:
             return "global-deterministic-10km"
-        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+        case .uk_deterministic_2km:
             return "uk-deterministic-2km"
         }
     }
@@ -117,8 +110,6 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: 168, by: 6)).map({run.add(hours: $0)})
         case .uk_deterministic_2km:
             return TimerangeDt(start: run, nTime: 55, dtSeconds: 3600).map({$0})
-        case .uk_deterministic_2km_15min:
-            return TimerangeDt(start: run, nTime: 55*4, dtSeconds: 900).map({$0})
         }
     }
     
@@ -126,7 +117,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .global_deterministic_10km:
             return 4
-        case .uk_deterministic_2km, .uk_deterministic_2km_15min:
+        case .uk_deterministic_2km:
             return 24
 
         }
