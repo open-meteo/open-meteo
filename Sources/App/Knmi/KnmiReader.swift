@@ -380,7 +380,7 @@ struct KnmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let precipitation = try get(raw: .precipitation, time: time)
                 let snow = try get(raw: .snowfall_water_equivalent, time: time)
                 let rain = try get(raw: .rain, time: time)
-                return DataAndUnit(zip(zip(precipitation.data, rain.data), snow.data).map({min($0.0 - $0.1 - $1, 0)}), precipitation.unit)
+                return DataAndUnit(zip(zip(precipitation.data, rain.data), snow.data).map({max($0.0 - $0.1 - $1, 0)}), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
