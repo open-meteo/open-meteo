@@ -699,12 +699,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .era5_ensemble:
             return .era5Ensemble
         case .ukmo_seamless:
-            // TODO register UKMO
-            return .ecmwfIfs
+            return .ukmoSeamless
         case .ukmo_global_deterministic_10km:
-            return .ecmwfIfs
+            return .ukmoGlobalDeterministic10km
         case .ukmo_uk_deterministic_2km:
-            return .ecmwfIfs
+            return .ukmoUkDeterministic2km
         }
     }
 }
