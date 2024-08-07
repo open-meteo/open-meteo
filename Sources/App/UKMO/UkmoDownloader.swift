@@ -95,6 +95,7 @@ struct UkmoDownload: AsyncCommand {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
@@ -104,6 +105,62 @@ struct UkmoDownload: AsyncCommand {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
         }
+    }
+    
+    func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
+        let logger = application.logger
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
+        if domain != .uk_deterministic_2km {
+            // only UKV 2km domain has the required information to calculate height and land mask
+            return
+        }
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
+            return
+        }
+        try domain.surfaceElevationFileOm.createDirectory()
+        
+        logger.info("Downloading height and elevation data")
+        
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
+        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/\(run.iso8601_YYYYMMddTHHmm)Z"
+        
+        let surfacePressureFile = "\(baseUrl)-PT0000H00M-pressure_at_surface.nc"
+        let mslPressureFile = "\(baseUrl)-PT0000H00M-pressure_at_mean_sea_level.nc"
+        let lsmFile = "\(baseUrl)-PT0000H00M-landsea_mask.nc"
+        let temperatureFile = "\(baseUrl)-PT0000H00M-temperature_at_screen_level.nc"
+        
+        guard let surfacePressure = try await curl.downloadInMemoryAsync(url: surfacePressureFile, minSize: nil).readUkmoNetCDF().data.first?.data else {
+            fatalError("Could not download surface pressure")
+        }
+        guard let mslPressure = try await curl.downloadInMemoryAsync(url: mslPressureFile, minSize: nil).readUkmoNetCDF().data.first?.data else {
+            fatalError("Could not download mean sea level pressure")
+        }
+        guard var temperature = try await curl.downloadInMemoryAsync(url: temperatureFile, minSize: nil).readUkmoNetCDF().data.first?.data else {
+            fatalError("Could not download temperature")
+        }
+        temperature.data.multiplyAdd(multiply: 1, add: -273.15)
+        
+        var elevation = Meteorology.elevation(
+            sealevelPressure: mslPressure.data,
+            surfacePressure: surfacePressure.data,
+            temperature_2m: temperature.data
+        )
+        
+        guard let lsm = try await curl.downloadInMemoryAsync(url: lsmFile, minSize: nil).readUkmoNetCDF().data.first?.data else {
+            fatalError("Could not download land sea mask")
+        }
+        for i in elevation.indices {
+            if lsm.data[i] <= 0 {
+                elevation[i] = -999 // mask sea grid points
+            }
+        }
+        if createNetcdf {
+            try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
+        }
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
     }
     
     /**
@@ -212,6 +269,15 @@ fileprivate extension ByteBuffer {
             guard let unit = try ncVar.getAttribute("units")?.readString() else {
                 fatalError("Could not get unit from \(ncVar.name)")
             }
+            
+            if let ncInt32 = ncVar.asType(Int32.self) {
+                // landmask uses `Int`
+                let data = try ncInt32.read()
+                let ny = ncVar.dimensionsFlat[0]
+                let nx = ncVar.dimensionsFlat[1]
+                return (ncVar.name, unit, [(0, Array2D(data: data.map({Float($0)}), nx: nx, ny: ny))])
+            }
+            
             guard let ncFloat = ncVar.asType(Float.self) else {
                 fatalError("Could not open float variable \(ncVar.name)")
             }
