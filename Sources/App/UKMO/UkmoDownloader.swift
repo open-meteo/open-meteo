@@ -155,46 +155,10 @@ struct UkmoDownload: AsyncCommand {
                     }
                     throw error
                 }
-                let data = try memory.withUnsafeReadableBytes { memory -> [(level: Float, data: [Float])] in
-                    guard let nc = try NetCDF.open(memory: memory) else {
-                        fatalError("Could not open netcdf from memory")
-                    }
-                    let vars = nc.getVariables()
-                    guard let ncVar = vars.first else {
-                        fatalError("Could not open variable for \(fileName)")
-                    }
-                    guard let unit = try ncVar.getAttribute("units")?.readString() else {
-                        fatalError("Could not get unit from \(ncVar.name)")
-                    }
-                    logger.info("Processing \(ncVar.name) [\(unit)]")
-                    guard let ncFloat = ncVar.asType(Float.self) else {
-                        fatalError("Could not open float variable \(ncVar.name)")
-                    }
-                    /// File contains multiple levels on pressure or height
-                    if ncVar.dimensions.count == 3 {
-                        /// `height` or `pressure`
-                        let levelStr = ncVar.dimensions[0].name
-                        guard var levels = try nc.getVariable(name: levelStr)?.asType(Float.self)?.read() else {
-                            fatalError("Could not read levels from variable \(levelStr)")
-                        }
-                        if levelStr == "pressure" {
-                            // Pa to hPa
-                            levels.multiplyAdd(multiply: 1/100, add: 0)
-                        }
-                        return try levels.enumerated().compactMap { (i, level) in
-                            if level < 10 {
-                                // skip pressure levels higher than 10 hPa
-                                return nil
-                            }
-                            var data = try ncFloat.read(offset: [i, 0, 0], count: [1, ncVar.dimensionsFlat[1], ncVar.dimensionsFlat[2]])
-                            if let scaling = variable.multiplyAdd {
-                                data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
-                            }
-                            return (level, data)
-                        }
-                    }
-                    
-                    var data = try ncFloat.read()
+                let data = try memory.readUkmoNetCDF()
+                logger.info("Processing \(data.name) [\(data.unit)]")
+                return try data.data.compactMap { (level, data) -> GenericVariableHandle? in
+                    var data = data.data
                     if let scaling = variable.multiplyAdd {
                         data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                     }
@@ -205,10 +169,6 @@ struct UkmoDownload: AsyncCommand {
                             }
                         }
                     }
-                    return [(0, data)]
-                }
-                
-                return try data.map { (level, data) -> GenericVariableHandle in
                     let variable = variable.withLevel(level: level)
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
                     return GenericVariableHandle(
@@ -221,7 +181,6 @@ struct UkmoDownload: AsyncCommand {
                 }
             }.flatMap({$0})
         }
-        
         await curl.printStatistics()
         return handles
     }
@@ -234,5 +193,52 @@ extension Attribute {
             return nil
         }
         return String(cString: char + [0], encoding: .utf8)
+    }
+}
+
+fileprivate extension ByteBuffer {
+    /**
+     Read NetCDF files from UKMO. For muliple levels (pressuse and height files) multiple levels are returned
+     */
+    func readUkmoNetCDF() throws -> (name: String, unit: String, data: [(level: Float, data: Array2D)]) {
+        return try withUnsafeReadableBytes { memory in
+            guard let nc = try NetCDF.open(memory: memory) else {
+                fatalError("Could not open netcdf from memory")
+            }
+            let vars = nc.getVariables()
+            guard let ncVar = vars.first else {
+                fatalError("Could not open variable")
+            }
+            guard let unit = try ncVar.getAttribute("units")?.readString() else {
+                fatalError("Could not get unit from \(ncVar.name)")
+            }
+            guard let ncFloat = ncVar.asType(Float.self) else {
+                fatalError("Could not open float variable \(ncVar.name)")
+            }
+            /// File contains multiple levels on pressure or height
+            if ncVar.dimensions.count == 3 {
+                /// `height` or `pressure`
+                let levelStr = ncVar.dimensions[0].name
+                guard let levels = try nc.getVariable(name: levelStr)?.asType(Float.self)?.read() else {
+                    fatalError("Could not read levels from variable \(levelStr)")
+                }
+                return (ncVar.name, unit, try levels.enumerated().compactMap({ (i, level) in
+                    // Pa to hPa
+                    let level = levelStr == "pressure" ? level / 10 : level
+                    if level < 10 {
+                        // skip pressure levels higher than 10 hPa
+                        return nil
+                    }
+                    let ny = ncVar.dimensionsFlat[1]
+                    let nx = ncVar.dimensionsFlat[2]
+                    let data = try ncFloat.read(offset: [i, 0, 0], count: [1, nx, ny])
+                    return (level, Array2D(data: data, nx: nx, ny: ny))
+                }))
+            }
+            let data = try ncFloat.read()
+            let ny = ncVar.dimensionsFlat[0]
+            let nx = ncVar.dimensionsFlat[1]
+            return (ncVar.name, unit, [(0, Array2D(data: data, nx: nx, ny: ny))])
+        }
     }
 }
