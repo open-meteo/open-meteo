@@ -231,7 +231,7 @@ fileprivate extension ByteBuffer {
                     }
                     let ny = ncVar.dimensionsFlat[1]
                     let nx = ncVar.dimensionsFlat[2]
-                    let data = try ncFloat.read(offset: [i, 0, 0], count: [1, nx, ny])
+                    let data = try ncFloat.read(offset: [i, 0, 0], count: [1, ny, nx])
                     return (level, Array2D(data: data, nx: nx, ny: ny))
                 }))
             }
