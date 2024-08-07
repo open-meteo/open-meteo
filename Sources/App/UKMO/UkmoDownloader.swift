@@ -49,6 +49,9 @@ struct UkmoDownload: AsyncCommand {
         
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
+        
+        @Flag(name: "skip-missing", help: "Ignore missing files while downloading")
+        var skipMissing: Bool
     }
 
     var help: String {
@@ -84,7 +87,7 @@ struct UkmoDownload: AsyncCommand {
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
-                let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server)
+                let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
             }
             return
@@ -92,7 +95,7 @@ struct UkmoDownload: AsyncCommand {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -106,7 +109,7 @@ struct UkmoDownload: AsyncCommand {
     /**
      Download a specified UKMO run and return file handles for conversion
      */
-    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?, skipMissing: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double
         switch domain {
@@ -122,7 +125,7 @@ struct UkmoDownload: AsyncCommand {
         let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing, waitAfterLastModified: TimeInterval(2*60))
         
         let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
@@ -142,7 +145,16 @@ struct UkmoDownload: AsyncCommand {
                 }
                 
                 let url = "\(baseUrl)\(timestamp.iso8601_YYYYMMddTHHmm)Z-PT\(forecastHour.zeroPadded(len: 4))H\(timestamp.minute.zeroPadded(len: 2))M-\(fileName).nc"
-                let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
+                let memory: ByteBuffer
+                do {
+                    memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
+                } catch {
+                    if skipMissing {
+                        // Ignore download error and continue with next file
+                        return []
+                    }
+                    throw error
+                }
                 let data = try memory.withUnsafeReadableBytes { memory -> [(level: Float, data: [Float])] in
                     guard let nc = try NetCDF.open(memory: memory) else {
                         fatalError("Could not open netcdf from memory")
