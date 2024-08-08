@@ -122,7 +122,6 @@ struct UkmoDownload: AsyncCommand {
         logger.info("Downloading height and elevation data")
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
         let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/\(run.iso8601_YYYYMMddTHHmm)Z"
@@ -187,60 +186,76 @@ struct UkmoDownload: AsyncCommand {
         let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
         
-        let handles = try await domain.forecastSteps(run: run).asyncFlatMap { timestamp -> [GenericVariableHandle] in
+        var handles = [GenericVariableHandle]()
+        for timestamp in domain.forecastSteps(run: run) {
             logger.info("Process timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             if let maxForecastHour, forecastHour > maxForecastHour {
-                return []
+                break
             }
-            return try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
-                if variable.skipHour0, timestamp == run {
-                    return []
-                }
-                guard let fileName = variable.getNcFileName(domain: domain, forecastHour: forecastHour) else {
-                    return []
-                }
-                
-                let url = "\(baseUrl)\(timestamp.iso8601_YYYYMMddTHHmm)Z-PT\(forecastHour.zeroPadded(len: 4))H\(timestamp.minute.zeroPadded(len: 2))M-\(fileName).nc"
-                let memory: ByteBuffer
-                do {
-                    memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
-                } catch {
-                    if skipMissing {
-                        // Ignore download error and continue with next file
+            do {
+                let handle = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
+                    if variable.skipHour0, timestamp == run {
                         return []
                     }
-                    throw error
-                }
-                let data = try memory.readUkmoNetCDF()
-                logger.info("Processing \(data.name) [\(data.unit)]")
-                return try data.data.compactMap { (level, data) -> GenericVariableHandle? in
-                    var data = data.data
-                    if let scaling = variable.multiplyAdd {
-                        data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+                    guard let fileName = variable.getNcFileName(domain: domain, forecastHour: forecastHour) else {
+                        return []
                     }
-                    if let variable = variable as? UkmoSurfaceVariable, variable == .cloud_base {
-                        for i in data.indices {
-                            if data[i].isNaN {
-                                data[i] = 0
+                    
+                    let url = "\(baseUrl)\(timestamp.iso8601_YYYYMMddTHHmm)Z-PT\(forecastHour.zeroPadded(len: 4))H\(timestamp.minute.zeroPadded(len: 2))M-\(fileName).nc"
+                    /// UKV 2km sometimes only has 12 forecast hours. Terminte download and convert the already downloaded data
+                    let ignoreMissingTimestepsPastHour12 = forecastHour > 12 && domain == .uk_deterministic_2km
+                    let memory: ByteBuffer
+                    do {
+                        let deadline = ignoreMissingTimestepsPastHour12 ? 0.1 : nil
+                        memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024, deadLineHours: deadline)
+                    } catch {
+                        if skipMissing {
+                            // Ignore download error and continue with next file
+                            return []
+                        }
+                        if ignoreMissingTimestepsPastHour12 {
+                            throw UkmoDownloadError.is12HoursShortRun
+                        }
+                        throw error
+                    }
+                    let data = try memory.readUkmoNetCDF()
+                    logger.info("Processing \(data.name) [\(data.unit)]")
+                    return try data.data.compactMap { (level, data) -> GenericVariableHandle? in
+                        var data = data.data
+                        if let scaling = variable.multiplyAdd {
+                            data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+                        }
+                        if let variable = variable as? UkmoSurfaceVariable, variable == .cloud_base {
+                            for i in data.indices {
+                                if data[i].isNaN {
+                                    data[i] = 0
+                                }
                             }
                         }
+                        let variable = variable.withLevel(level: level)
+                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                        return GenericVariableHandle(
+                            variable: variable,
+                            time: timestamp,
+                            member: 0,
+                            fn: fn,
+                            skipHour0: variable.skipHour0
+                        )
                     }
-                    let variable = variable.withLevel(level: level)
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
-                    return GenericVariableHandle(
-                        variable: variable,
-                        time: timestamp,
-                        member: 0,
-                        fn: fn,
-                        skipHour0: variable.skipHour0
-                    )
-                }
-            }.flatMap({$0})
+                }.flatMap({$0})
+                handles.append(contentsOf: handle)
+            } catch UkmoDownloadError.is12HoursShortRun {
+                break
+            }
         }
         await curl.printStatistics()
         return handles
     }
+}
+
+enum UkmoDownloadError: Error {
+    case is12HoursShortRun
 }
 
 extension Attribute {
