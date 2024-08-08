@@ -101,6 +101,9 @@ enum DomainRegistry: String, CaseIterable {
     case knmi_harmonie_arome_netherlands
     case dmi_harmonie_arome_europe
     
+    case ukmo_global_deterministic_10km
+    case ukmo_uk_deterministic_2km
+    
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
@@ -269,6 +272,10 @@ enum DomainRegistry: String, CaseIterable {
             return KnmiDomain.harmonie_arome_netherlands
         case .dmi_harmonie_arome_europe:
             return DmiDomain.harmonie_arome_europe
+        case .ukmo_global_deterministic_10km:
+            return UkmoDomain.global_deterministic_10km
+        case .ukmo_uk_deterministic_2km:
+            return UkmoDomain.uk_deterministic_2km
         }
     }
 }

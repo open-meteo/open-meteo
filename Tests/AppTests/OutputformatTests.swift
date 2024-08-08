@@ -127,12 +127,12 @@ final class OutputformatTests: XCTestCase {
             ApiColumn(variable: .windspeed_10m_mean, unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 2))]),
         ])
         
-        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
+        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
             ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
             ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))]),
         ])
         
-        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "current_weather", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
+        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "current_weather", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
             ApiColumnSingle(variable: .surface(.init(.temperature_20m, 0)), unit: .celsius, value: 20),
             ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10),
         ])
@@ -326,12 +326,12 @@ final class OutputformatTests: XCTestCase {
             ApiColumn(variable: .windspeed_10m_mean, unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 2))]),
         ])
         
-        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
+        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022,7,12,0), nTime: 48, dtSeconds: 3600), columns: [
             ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
             ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))]),
         ])
         
-        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable>(name: "current_weather", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
+        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "current_weather", time: Timestamp(2022,7,12,1,15), dtSeconds: 3600/4, columns: [
             ApiColumnSingle(variable: .surface(.init(.temperature_20m, 0)), unit: .celsius, value: 20),
             ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10),
         ])

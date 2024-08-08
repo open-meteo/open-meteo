@@ -38,6 +38,8 @@ extension GlofasDomainApi: ModelFlatbufferSerialisable {
     
     typealias HourlyPressureType = EnsemblePressureVariableType
     
+    typealias HourlyHeightType = ForecastHeightVariableType
+    
     typealias DailyVariable = GloFasVariableOrDerived
     
     var flatBufferModel: openmeteo_sdk_Model {

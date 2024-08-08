@@ -44,6 +44,11 @@ This document lists all required cronjobs to download data. However, downloading
 45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain aifs025 > ~/log/ecmwfa025.log 2>&1 || cat ~/log/ecmwfa025.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain aifs025 > ~/log/ecmwfa025.log 2>&1 || cat ~/log/ecmwfa025.log
 
+# UK Met Office
+0 3,9,15,19 * * * /usr/local/bin/openmeteo-api download-ukmo global_deterministic_10km --surface --pressure --height > ~/log/ukmo_global.log 2>&1 || cat ~/log/ukmo_global.log
+0 1-23/2 * * * /usr/local/bin/openmeteo-api download-ukmo uk_deterministic_2km --surface --pressure --height > ~/log/ukmo_uk.log 2>&1 || cat ~/log/ukmo_uk.log
+0 */2 * * * /usr/local/bin/openmeteo-api download-ukmo uk_deterministic_2km --surface --pressure --height > ~/log/ukmo_uk2.log 2>&1 || cat ~/log/ukmo_uk2.log
+
 # metno
 27 * * * * /usr/local/bin/openmeteo-api download-metno nordic_pp > ~/log/nordic_pp.log 2>&1 || cat ~/log/nordic_pp.log
 

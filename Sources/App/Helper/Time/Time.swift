@@ -166,6 +166,19 @@ public struct Timestamp: Hashable {
         return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))"
     }
     
+    /// With format `yyyyMMdd'T'HHmm'`
+    var iso8601_YYYYMMddTHHmm: String {
+        var time = timeIntervalSince1970
+        var t = tm()
+        gmtime_r(&time, &t)
+        let year = Int(t.tm_year+1900)
+        let month = Int(t.tm_mon+1)
+        let day = Int(t.tm_mday)
+        let hour = Int(t.tm_hour)
+        let minute = Int(t.tm_min)
+        return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))"
+    }
+    
     /// With format `yyyy-MM-dd`
     var iso8601_YYYY_MM_dd: String {
         var time = timeIntervalSince1970

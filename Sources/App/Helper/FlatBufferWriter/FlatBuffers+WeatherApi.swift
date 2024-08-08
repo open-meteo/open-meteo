@@ -384,6 +384,28 @@ extension ForecastPressureVariableType: FlatBuffersVariable {
     }
 }
 
+extension ForecastHeightVariableType: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .temperature:
+            return .init(variable: .temperature)
+        case .relativehumidity, .relative_humidity:
+            return .init(variable: .relativeHumidity)
+        case .windspeed, .wind_speed:
+            return .init(variable: .windSpeed)
+        case .winddirection, .wind_direction:
+            return .init(variable: .windDirection)
+        case .dewpoint, .dew_point:
+            return .init(variable: .dewPoint)
+        case .cloudcover, .cloud_cover:
+            return .init(variable: .cloudCover)
+        case .vertical_velocity:
+            return .init(variable: .verticalVelocity)
+        }
+    }
+}
+
+
 extension ForecastVariableDaily: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -546,6 +568,8 @@ extension MultiDomains: ModelFlatbufferSerialisable {
     
     typealias HourlyPressureType = ForecastPressureVariableType
     
+    typealias HourlyHeightType = ForecastHeightVariableType
+    
     typealias DailyVariable = ForecastVariableDaily
     
     var flatBufferModel: openmeteo_sdk_Model {
@@ -674,6 +698,12 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ecmwfIfsLongWindow
         case .era5_ensemble:
             return .era5Ensemble
+        case .ukmo_seamless:
+            return .ukmoSeamless
+        case .ukmo_global_deterministic_10km:
+            return .ukmoGlobalDeterministic10km
+        case .ukmo_uk_deterministic_2km:
+            return .ukmoUkDeterministic2km
         }
     }
 }

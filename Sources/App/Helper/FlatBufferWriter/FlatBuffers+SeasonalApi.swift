@@ -86,6 +86,8 @@ extension SeasonalForecastDomainApi: ModelFlatbufferSerialisable {
     
     typealias HourlyPressureType = EnsemblePressureVariableType
     
+    typealias HourlyHeightType = ForecastHeightVariableType
+    
     typealias DailyVariable = DailyCfsVariable
     
     var flatBufferModel: openmeteo_sdk_Model {

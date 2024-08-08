@@ -247,12 +247,14 @@ struct WeatherApiController {
 }
 
 extension ForecastVariable {
-    var resultVariable: ForecastapiResult<MultiDomains>.SurfaceAndPressureVariable {
+    var resultVariable: ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable {
         switch self {
         case .pressure(let p):
             return .pressure(.init(p.variable, p.level))
         case .surface(let s):
             return .surface(s)
+        case .height(let h):
+            return .height(.init(h.variable, h.level))
         }
     }
 }
@@ -343,6 +345,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case knmi_seamless
     case dmi_seamless
     case metno_seamless
+    
+    case ukmo_seamless
+    case ukmo_global_deterministic_10km
+    case ukmo_uk_deterministic_2km
+    
 
     
     /// Return the required readers for this domain configuration
@@ -540,6 +547,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5_ensemble:
             return [try Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ukmo_seamless:
+            let ukmoGlobal: (any GenericReaderProtocol)? = try UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [ukmoGlobal, ukmoUk].compactMap({$0})
+        case .ukmo_global_deterministic_10km:
+            let ukmoGlobal: (any GenericReaderProtocol)? = try UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [ukmoGlobal].compactMap({$0})
+        case .ukmo_uk_deterministic_2km:
+            let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [ukmoUk].compactMap({$0})
         }
     }
     
@@ -965,7 +982,36 @@ struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariable
     }
 }
 
-typealias ForecastVariable = SurfaceAndPressureVariable<VariableAndPreviousDay, ForecastPressureVariable>
+/// Available pressure level variables
+enum ForecastHeightVariableType: String, GenericVariableMixable {
+    case temperature
+    case relativehumidity
+    case relative_humidity
+    case windspeed
+    case wind_speed
+    case winddirection
+    case wind_direction
+    case dewpoint
+    case dew_point
+    case cloudcover
+    case cloud_cover
+    case vertical_velocity
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixable {
+    let variable: ForecastHeightVariableType
+    let level: Int
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
+
+typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, ForecastPressureVariable, ForecastHeightVariable>
 
 extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
@@ -974,6 +1020,8 @@ extension ForecastVariable {
             return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
         case .pressure(let pressure):
             return (ForecastVariable.pressure(pressure), 0)
+        case .height(let height):
+            return (ForecastVariable.height(height), 0)
         }
     }
 }

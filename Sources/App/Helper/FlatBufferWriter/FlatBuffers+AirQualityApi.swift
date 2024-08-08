@@ -98,6 +98,8 @@ extension CamsQuery.Domain: ModelFlatbufferSerialisable {
     
     typealias HourlyPressureType = ForecastPressureVariableType
     
+    typealias HourlyHeightType = ForecastHeightVariableType
+    
     typealias DailyVariable = ForecastVariableDaily
     
     var flatBufferModel: openmeteo_sdk_Model {
