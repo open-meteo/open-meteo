@@ -50,6 +50,13 @@ struct Meteorology {
         return (153.846 * (t * (-1 * r) - 273.15 * r + t + 273.15))/r
     }
     
+    /// Estimate elevation from sea and surface level pressure
+    /// Psurf = Psea / ((1 - (0.0065 * h) / (t + 273.15 + 0.0065 * h))^ -5.25578129287)
+    /// h = (153.846 (t (-(Psurf/Psea)^0.1902666690786014) - 273.15 (Psurf/Psea)^0.1902666690786014 + t + 273.15))/(Psurf/Psea)^0.1902666690786014
+    static func elevation(sealevelPressure: [Float], surfacePressure: [Float], temperature_2m: [Float]) -> [Float] {
+        return zip(sealevelPressure, zip(surfacePressure, temperature_2m)).map({elevation(sealevelPressure: $0, surfacePressure: $1.0, temperature_2m: $1.1)})
+    }
+    
     /// Calculate wind component from speed and direction
     @inlinable static func uWind(speed: Float, directionDegree: Float) -> Float {
         return -1 * speed * sin(directionDegree.degreesToRadians)

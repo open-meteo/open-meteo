@@ -40,6 +40,15 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         self.dy = dy
     }
     
+    public init(nx: Int, ny: Int, latitudeProjectionOrigion: Float, longitudeProjectionOrigion: Float, dx: Float, dy: Float, projection: Projection) {
+        self.nx = nx
+        self.ny = ny
+        self.projection = projection
+        origin = (longitudeProjectionOrigion, latitudeProjectionOrigion)
+        self.dx = dx
+        self.dy = dy
+    }
+    
     func findPoint(lat: Float, lon: Float) -> Int? {
         guard let (x,y) = findPointXy(lat: lat, lon: lon) else {
             return nil

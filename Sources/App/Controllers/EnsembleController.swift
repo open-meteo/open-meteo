@@ -82,12 +82,14 @@ public struct EnsembleApiController {
 }
 
 extension EnsembleVariableWithoutMember {
-    var resultVariable: ForecastapiResult<EnsembleMultiDomains>.SurfaceAndPressureVariable {
+    var resultVariable: ForecastapiResult<EnsembleMultiDomains>.SurfacePressureAndHeightVariable {
         switch self {
         case .pressure(let p):
             return .pressure(.init(p.variable, p.level))
         case .surface(let s):
             return .surface(s)
+        case .height(let s):
+            return .height(.init(s.variable, s.level))
         }
     }
 }
@@ -294,7 +296,7 @@ struct EnsemblePressureVariable: PressureVariableRespresentable, GenericVariable
     }
 }
 
-typealias EnsembleVariableWithoutMember = SurfaceAndPressureVariable<EnsembleSurfaceVariable, EnsemblePressureVariable>
+typealias EnsembleVariableWithoutMember = SurfacePressureAndHeightVariable<EnsembleSurfaceVariable, EnsemblePressureVariable, ForecastHeightVariable>
 
 typealias EnsembleVariable = EnsembleVariableWithoutMember
 

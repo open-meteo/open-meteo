@@ -11,6 +11,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 protocol ModelFlatbufferSerialisable: RawRepresentableString {
     associatedtype HourlyVariable: FlatBuffersVariable
     associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
+    associatedtype HourlyHeightType: FlatBuffersVariable, RawRepresentable, Equatable
     associatedtype DailyVariable: FlatBuffersVariable
     
     /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
@@ -138,11 +139,11 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
         let elevation: Float?
         
         let prefetch: (() throws -> ())
-        let current: (() throws -> ApiSectionSingle<SurfaceAndPressureVariable>)?
-        let hourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
+        let current: (() throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
+        let hourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
         let daily: (() throws -> ApiSection<Model.DailyVariable>)?
-        let sixHourly: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
-        let minutely15: (() throws -> ApiSection<SurfaceAndPressureVariable>)?
+        let sixHourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let minutely15: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
         
         /// e.g. `52.52N13.42E38m`
         var formatedCoordinatesFilename: String {
@@ -161,9 +162,19 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
             self.level = level
         }
     }
+    
+    struct HeightVariableAndLevel {
+        let variable: Model.HourlyHeightType
+        let level: Int
+        
+        init(_ variable: Model.HourlyHeightType, _ level: Int) {
+            self.variable = variable
+            self.level = level
+        }
+    }
 
     /// Enum with surface and pressure variable
-    enum SurfaceAndPressureVariable: RawRepresentableString, FlatBuffersVariable {
+    enum SurfacePressureAndHeightVariable: RawRepresentableString, FlatBuffersVariable {
         init?(rawValue: String) {
             fatalError()
         }
@@ -174,11 +185,14 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
                 return v.rawValue
             case .pressure(let v):
                 return "\(v.variable.rawValue)_\(v.level)hPa"
+            case .height(let v):
+                return "\(v.variable.rawValue)_\(v.level)m"
             }
         }
         
         case surface(Model.HourlyVariable)
         case pressure(PressureVariableAndLevel)
+        case height(HeightVariableAndLevel)
         
         func getFlatBuffersMeta() -> FlatBufferVariableMeta {
             switch self {
@@ -191,6 +205,15 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
                     aggregation: meta.aggregation,
                     altitude: meta.altitude,
                     pressureLevel: Int16(pressureVariableAndLevel.level),
+                    depth: meta.depth,
+                    depthTo: meta.depthTo
+                )
+            case .height(let heightVariableAndLevel):
+                let meta = heightVariableAndLevel.variable.getFlatBuffersMeta()
+                return FlatBufferVariableMeta(
+                    variable: meta.variable,
+                    aggregation: meta.aggregation,
+                    altitude: Int16(heightVariableAndLevel.level),
                     depth: meta.depth,
                     depthTo: meta.depthTo
                 )

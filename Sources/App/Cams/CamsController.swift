@@ -69,7 +69,7 @@ struct CamsController {
                 }
                 let domain = readerAndDomain.domain
                 
-                let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsHourly.map { variables in
+                let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
                     return {
                         return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
                             let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings()).convertAndRound(params: params)
@@ -79,7 +79,7 @@ struct CamsController {
                     }
                 }
                 
-                let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfaceAndPressureVariable>)? = paramsCurrent.map { variables in
+                let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsCurrent.map { variables in
                     return {
                         return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
                             let d = try reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
