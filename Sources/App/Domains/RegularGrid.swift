@@ -9,9 +9,8 @@ struct RegularGrid: Gridable {
     let dx: Float
     let dy: Float
     let searchRadius: Int
-    let excludeBorderPixel: Int
     
-    public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1, excludeBorderPixel: Int = 0) {
+    public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
         self.nx = nx
         self.ny = ny
         self.latMin = latMin
@@ -19,7 +18,6 @@ struct RegularGrid: Gridable {
         self.dx = dx
         self.dy = dy
         self.searchRadius = searchRadius
-        self.excludeBorderPixel = excludeBorderPixel
     }
     
     var isGlobal: Bool {
@@ -33,18 +31,14 @@ struct RegularGrid: Gridable {
         return y * nx + x
     }
     
-    func findPointXy(lat: Float, lon: Float, excludeBorderPixel: Int? = nil) -> (x: Int, y: Int)? {
-        let excludeBorderPixel = excludeBorderPixel ?? self.excludeBorderPixel
+    func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
         let x = Int(roundf((lon-lonMin) / dx))
         let y = Int(roundf((lat-latMin) / dy))
         
         // Allow points on the border. For global grids, this grid point now wrappes to the eastern side
         let xx = Float(nx) * dx >= 359 ? x.moduloPositive(nx) : x
         let yy = Float(ny) * dy >= 179 ? y.moduloPositive(ny) : y
-        if yy < excludeBorderPixel ||
-            xx < excludeBorderPixel ||
-            yy >= ny-excludeBorderPixel ||
-            xx >= nx-excludeBorderPixel {
+        if yy < 0 || xx < 0 || yy >= ny || xx >= nx {
             return nil
         }
         return (xx, yy)
@@ -62,10 +56,7 @@ struct RegularGrid: Gridable {
         let x = (lon-lonMin) / dx
         let y = (lat-latMin) / dy
         
-        if y < Float(excludeBorderPixel) ||
-            x < Float(excludeBorderPixel) ||
-            y >= Float(ny-excludeBorderPixel) ||
-            x >= Float(nx-excludeBorderPixel) {
+        if y < 0 || x < 0 || y >= Float(ny) || x >= Float(nx) {
             return nil
         }
         
@@ -75,8 +66,8 @@ struct RegularGrid: Gridable {
     }
     
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
-        guard let (x1, y1) = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound, excludeBorderPixel: 0),
-              let (x2, y2) = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound, excludeBorderPixel: 0) else {
+        guard let (x1, y1) = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
+              let (x2, y2) = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound) else {
             return []
         }
         
