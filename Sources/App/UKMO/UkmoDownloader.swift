@@ -305,7 +305,7 @@ fileprivate extension ByteBuffer {
                 }
                 return (ncVar.name, unit, try levels.enumerated().compactMap({ (i, level) in
                     // Pa to hPa
-                    let level = levelStr == "pressure" ? level / 10 : level
+                    let level = levelStr == "pressure" ? level / 100 : level
                     if level < 10 {
                         // skip pressure levels higher than 10 hPa
                         return nil
