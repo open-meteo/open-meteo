@@ -16,14 +16,15 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     /// In metres
     let dy: Float
     
-    var searchRadius: Int {
-        return 1
-    }
+    let searchRadius: Int
+    let excludeBorderPixel: Int
     
-    public init(nx: Int, ny: Int, latitude: ClosedRange<Float>, longitude: ClosedRange<Float>, projection: Projection) {
+    public init(nx: Int, ny: Int, latitude: ClosedRange<Float>, longitude: ClosedRange<Float>, projection: Projection, searchRadius: Int = 1, excludeBorderPixel: Int = 0) {
         self.nx = nx
         self.ny = ny
         self.projection = projection
+        self.searchRadius = searchRadius
+        self.excludeBorderPixel = excludeBorderPixel
         let sw = projection.forward(latitude: latitude.lowerBound, longitude: longitude.lowerBound)
         let ne = projection.forward(latitude: latitude.upperBound, longitude: longitude.upperBound)
         origin = sw
@@ -31,22 +32,26 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         dy = (ne.y - sw.y) / Float(ny-1)
     }
     
-    public init(nx: Int, ny: Int, latitude: Float, longitude: Float, dx: Float, dy: Float, projection: Projection) {
+    public init(nx: Int, ny: Int, latitude: Float, longitude: Float, dx: Float, dy: Float, projection: Projection, searchRadius: Int = 1, excludeBorderPixel: Int = 0) {
         self.nx = nx
         self.ny = ny
         self.projection = projection
         origin = projection.forward(latitude: latitude, longitude: longitude)
         self.dx = dx
         self.dy = dy
+        self.searchRadius = searchRadius
+        self.excludeBorderPixel = excludeBorderPixel
     }
     
-    public init(nx: Int, ny: Int, latitudeProjectionOrigion: Float, longitudeProjectionOrigion: Float, dx: Float, dy: Float, projection: Projection) {
+    public init(nx: Int, ny: Int, latitudeProjectionOrigion: Float, longitudeProjectionOrigion: Float, dx: Float, dy: Float, projection: Projection, searchRadius: Int = 1, excludeBorderPixel: Int = 0) {
         self.nx = nx
         self.ny = ny
         self.projection = projection
         origin = (longitudeProjectionOrigion, latitudeProjectionOrigion)
         self.dx = dx
         self.dy = dy
+        self.searchRadius = searchRadius
+        self.excludeBorderPixel = excludeBorderPixel
     }
     
     func findPoint(lat: Float, lon: Float) -> Int? {
@@ -56,11 +61,15 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         return y * nx + x
     }
     
-    func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
+    func findPointXy(lat: Float, lon: Float, excludeBorderPixel: Int? = nil) -> (x: Int, y: Int)? {
+        let excludeBorderPixel = excludeBorderPixel ?? self.excludeBorderPixel
         let pos = projection.forward(latitude: lat, longitude: lon)
         let x = Int(round((pos.x - origin.x) / dx))
         let y = Int(round((pos.y - origin.y) / dy))
-        if y < 0 || x < 0 || y >= ny || x >= nx {
+        if y < excludeBorderPixel || 
+            x < excludeBorderPixel ||
+            y >= ny-excludeBorderPixel ||
+            x >= nx-excludeBorderPixel {
             return nil
         }
         return (x, y)
@@ -68,7 +77,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
         let (x,y) = projection.forward(latitude: lat, longitude: lon)
-        if y < 0 || x < 0 || y >= Float(ny) || x >= Float(nx) {
+        if y < Float(excludeBorderPixel) ||
+            x < Float(excludeBorderPixel) ||
+            y >= Float(ny-excludeBorderPixel) ||
+            x >= Float(nx-excludeBorderPixel) {
             return nil
         }
         let xFraction = x.truncatingRemainder(dividingBy: 1)
@@ -100,10 +112,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     }
     
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
-        guard let sw = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
-              let se = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.upperBound),
-              let nw = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.lowerBound),
-              let ne = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound) else {
+        guard let sw = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound, excludeBorderPixel: 0),
+              let se = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.upperBound, excludeBorderPixel: 0),
+              let nw = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.lowerBound, excludeBorderPixel: 0),
+              let ne = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound, excludeBorderPixel: 0) else {
             return []
         }
         
