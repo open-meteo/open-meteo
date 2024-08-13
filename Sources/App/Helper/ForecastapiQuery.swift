@@ -15,6 +15,26 @@ extension ClosedRange where Element == Timestamp {
     }
 }
 
+enum ApiTimeIntervalEnum: String, Codable {
+    case original
+    case hourly
+    case hourly3
+    case hourly6
+    
+    var dtSeconds: Int? {
+        switch self {
+        case .original:
+            return nil
+        case .hourly:
+            return 3600
+        case .hourly3:
+            return 3*3600
+        case .hourly6:
+            return 6*3600
+        }
+    }
+}
+
 /// All API parameter that are accepted and decoded via GET
 struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let latitude: [String]
@@ -36,6 +56,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
     let timeformat: Timeformat?
+    let timeinterval: ApiTimeIntervalEnum?
     
     let bounding_box: [String]
     
