@@ -16,7 +16,7 @@ extension ClosedRange where Element == Timestamp {
 }
 
 /// Option to overwrite the temporal output resolution instead of always getting 1-hourly data.
-enum ApiTimeIntervalEnum: String, Codable {
+enum ApiTemporalResolution: String, Codable {
     case native
     case hourly
     case hourly_1
@@ -58,7 +58,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
     let timeformat: Timeformat?
-    let time_interval: ApiTimeIntervalEnum?
+    let temporal_resolution: ApiTemporalResolution?
     
     let bounding_box: [String]
     

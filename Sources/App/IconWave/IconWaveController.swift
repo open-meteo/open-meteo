@@ -124,7 +124,7 @@ struct IconWaveController {
                 guard let reader = try GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                     return nil
                 }
-                let hourlyDt = (params.time_interval ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
                 let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
                 let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                 
