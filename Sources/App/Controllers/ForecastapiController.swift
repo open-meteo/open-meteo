@@ -140,7 +140,7 @@ struct WeatherApiController {
                 guard let reader = try readerAndDomain.reader() else {
                     return nil
                 }
-                let hourlyDt = (params.timeinterval ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                let hourlyDt = (params.time_interval ?? .hourly).dtSeconds ?? reader.modelDtSeconds
                 let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
                 let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                 let domain = readerAndDomain.domain
