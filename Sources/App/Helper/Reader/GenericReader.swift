@@ -40,8 +40,8 @@ struct TimerangeDtAndSettings: Hashable {
         return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
     
-    func with(ensembleMember: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time, ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+    func with(time: TimerangeDt? = nil, ensembleMember: Int? = nil) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
     
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
@@ -161,15 +161,19 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         if time.dtSeconds == domain.dtSeconds {
             return try readAndScale(variable: variable, time: time)
         }
-        if time.dtSeconds > domain.dtSeconds {
-            /// do not allow aggregations
-            fatalError()
-        }
-        
         let interpolationType = variable.interpolation
         
+        if time.dtSeconds > domain.dtSeconds {
+            // Aggregate data
+            // TODO backwards aggregation needs to read more timesteps to the left
+            let timeRead = time.time.with(dtSeconds: domain.dtSeconds)
+            let read = try readAndScale(variable: variable, time: time.with(time: timeRead))
+            let aggregated = read.data.aggregate(type: interpolationType, timeOld: time.time, timeNew: timeRead)
+            return DataAndUnit(aggregated, read.unit)
+        }
+        
         let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
-        let read = try readAndScale(variable: variable, time: .init(time: timeLow, ensembleMember: time.ensembleMember, ensembleMemberLevel: time.ensembleMemberLevel, previousDay: time.previousDay))
+        let read = try readAndScale(variable: variable, time: time.with(time: timeLow))
         let dataLow = read.data
         
         let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
