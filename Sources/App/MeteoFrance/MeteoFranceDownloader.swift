@@ -322,7 +322,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         
                         logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                         let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
+                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect()
                     
                     let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -504,8 +504,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     variable: variable,
                     time: timestamp,
                     member: 0,
-                    fn: fn,
-                    skipHour0: variable.skipHour0(domain: domain)
+                    fn: fn
                 ))
                 
             }
@@ -533,8 +532,7 @@ extension VariablePerMemberStorage {
                     variable: outVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: precip),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: precip)
                 )
             }
         )

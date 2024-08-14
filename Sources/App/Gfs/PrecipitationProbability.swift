@@ -137,8 +137,7 @@ extension VariablePerMemberStorage {
             variable: variable,
             time: timestamp,
             member: 0,
-            fn: fn,
-            skipHour0: false
+            fn: fn
         )
     }
 }
@@ -181,8 +180,7 @@ extension Array where Element == GenericVariableHandle {
                     variable: variable,
                     time: timestamp,
                     member: 0,
-                    fn: fn,
-                    skipHour0: false
+                    fn: fn
                 )
             })
     }

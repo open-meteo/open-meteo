@@ -131,7 +131,6 @@ struct DownloadIconWaveCommand: AsyncCommand {
         
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            let skip = 0
 
             let readers: [(hour: Int, reader: OmFileReader<MmapFile>)] = try forecastHours.compactMap({ hour in
                 let reader = try OmFileReader(file: "\(domain.downloadDirectory)\(variable.rawValue)_\(hour).om")
@@ -139,7 +138,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                 return (hour, reader)
             })
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 data2d.data.fillWithNaNs()

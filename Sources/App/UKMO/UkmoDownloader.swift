@@ -239,8 +239,7 @@ struct UkmoDownload: AsyncCommand {
                             variable: variable,
                             time: timestamp,
                             member: 0,
-                            fn: fn,
-                            skipHour0: variable.skipHour0
+                            fn: fn
                         )
                     }
                 }.flatMap({$0})

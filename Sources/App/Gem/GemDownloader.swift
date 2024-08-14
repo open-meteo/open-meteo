@@ -257,8 +257,7 @@ struct GemDownload: AsyncCommand {
                                     variable: windspeedVariable,
                                     time: run.add(hours: hour),
                                     member: member,
-                                    fn: fn,
-                                    skipHour0: variable.skipHour0
+                                    fn: fn
                                 ))
                                 grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
                             }
@@ -269,8 +268,7 @@ struct GemDownload: AsyncCommand {
                             variable: variable,
                             time: run.add(hours: hour),
                             member: member,
-                            fn: fn,
-                            skipHour0: variable.skipHour0
+                            fn: fn
                         ))
                     }
                 } catch {

@@ -273,7 +273,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
             }
         }

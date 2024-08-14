@@ -174,8 +174,8 @@ struct DownloadBomCommand: AsyncCommand {
                 let fnSpeed = try writer.write(domain: domain, variable: map.speed, data: speed)
                 let fnDirection = try writer.write(domain: domain, variable: map.direction, data: direction)
                 return [
-                    GenericVariableHandle(variable: map.speed, time: timestamp, member: 0, fn: fnSpeed, skipHour0: false),
-                    GenericVariableHandle(variable: map.direction, time: timestamp, member: 0, fn: fnDirection, skipHour0: false)
+                    GenericVariableHandle(variable: map.speed, time: timestamp, member: 0, fn: fnSpeed),
+                    GenericVariableHandle(variable: map.direction, time: timestamp, member: 0, fn: fnDirection)
                     ]
             }
         }.flatMap({$0})
@@ -249,7 +249,7 @@ struct DownloadBomCommand: AsyncCommand {
                 logger.info("Compressing and writing data to member_\(member) \(omVariable.omFileName.file).om")
                 return try self.iterateForecast(domain: domain, member: member, variable: variable.name, run: run).map { (timestamp, data) in
                     let fn = try writer.write(domain: domain, variable: omVariable, data: data)
-                    return GenericVariableHandle(variable: omVariable, time: timestamp, member: member, fn: fn, skipHour0: false)
+                    return GenericVariableHandle(variable: omVariable, time: timestamp, member: member, fn: fn)
                 }
             }
             if domain == .access_global_ensemble && variable.om == .precipitation {
@@ -286,8 +286,8 @@ struct DownloadBomCommand: AsyncCommand {
                 let fnSnow = try writer.write(domain: domain, variable: .snowfall_water_equivalent, data: snow)
                 let fnWeatherCode = try writer.write(domain: domain, variable: .weather_code, data: weather_code)
                 return [
-                    GenericVariableHandle(variable: BomVariable.snowfall_water_equivalent, time: timestamp, member: member, fn: fnSnow, skipHour0: false),
-                    GenericVariableHandle(variable: BomVariable.weather_code, time: timestamp, member: member, fn: fnWeatherCode, skipHour0: false)
+                    GenericVariableHandle(variable: BomVariable.snowfall_water_equivalent, time: timestamp, member: member, fn: fnSnow),
+                    GenericVariableHandle(variable: BomVariable.weather_code, time: timestamp, member: member, fn: fnWeatherCode)
                 ]
             }.flatMap({$0})
         }
@@ -303,7 +303,7 @@ struct DownloadBomCommand: AsyncCommand {
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 let rh = zip(sfc_temp.1, dewpt_scrn.1).map({Meteorology.relativeHumidity(temperature: $0.0-273.15, dewpoint: $0.1-273.15)})
                 let fnRh = try writer.write(domain: domain, variable: .relative_humidity_2m, data: rh)
-                return GenericVariableHandle(variable: BomVariable.relative_humidity_2m, time: timestamp, member: member, fn: fnRh, skipHour0: false)
+                return GenericVariableHandle(variable: BomVariable.relative_humidity_2m, time: timestamp, member: member, fn: fnRh)
             }
         }
         
@@ -320,8 +320,8 @@ struct DownloadBomCommand: AsyncCommand {
                 let fnSpeed = try writer.write(domain: domain, variable: .wind_speed_10m, data: speed)
                 let fnDirection = try writer.write(domain: domain, variable: .wind_direction_10m, data: direction)
                 return [
-                    GenericVariableHandle(variable: BomVariable.wind_speed_10m, time: timestamp, member: member, fn: fnSpeed, skipHour0: false),
-                    GenericVariableHandle(variable: BomVariable.wind_direction_10m, time: timestamp, member: member, fn: fnDirection, skipHour0: false)
+                    GenericVariableHandle(variable: BomVariable.wind_speed_10m, time: timestamp, member: member, fn: fnSpeed),
+                    GenericVariableHandle(variable: BomVariable.wind_direction_10m, time: timestamp, member: member, fn: fnDirection)
                 ]
             }.flatMap({$0})
         }
@@ -398,7 +398,7 @@ struct DownloadBomCommand: AsyncCommand {
             logger.info("Compressing and writing data to \(omVariable.omFileName.file).om")
             return try self.combineAnalysisForecast(domain: domain, variable: variable.name, run: run).map { (timestamp, data) in
                 let fn = try writer.write(domain: domain, variable: omVariable, data: data)
-                return GenericVariableHandle(variable: omVariable, time: timestamp, member: 0, fn: fn, skipHour0: false)
+                return GenericVariableHandle(variable: omVariable, time: timestamp, member: 0, fn: fn)
             }
         }
         
@@ -426,8 +426,8 @@ struct DownloadBomCommand: AsyncCommand {
             let fnSnow = try writer.write(domain: domain, variable: .snowfall_water_equivalent, data: snow)
             let fnWeatherCode = try writer.write(domain: domain, variable: .weather_code, data: weather_code)
             return [
-                GenericVariableHandle(variable: BomVariable.snowfall_water_equivalent, time: timestamp, member: 0, fn: fnSnow, skipHour0: false),
-                GenericVariableHandle(variable: BomVariable.weather_code, time: timestamp, member: 0, fn: fnWeatherCode, skipHour0: false)
+                GenericVariableHandle(variable: BomVariable.snowfall_water_equivalent, time: timestamp, member: 0, fn: fnSnow),
+                GenericVariableHandle(variable: BomVariable.weather_code, time: timestamp, member: 0, fn: fnWeatherCode)
             ]
         }
         
@@ -443,8 +443,8 @@ struct DownloadBomCommand: AsyncCommand {
             let fnSpeed = try writer.write(domain: domain, variable: .wind_speed_10m, data: speed)
             let fnDirection = try writer.write(domain: domain, variable: .wind_direction_10m, data: direction)
             return [
-                GenericVariableHandle(variable: BomVariable.wind_speed_10m, time: timestamp, member: 0, fn: fnSpeed, skipHour0: false),
-                GenericVariableHandle(variable: BomVariable.wind_direction_10m, time: timestamp, member: 0, fn: fnDirection, skipHour0: false)
+                GenericVariableHandle(variable: BomVariable.wind_speed_10m, time: timestamp, member: 0, fn: fnSpeed),
+                GenericVariableHandle(variable: BomVariable.wind_direction_10m, time: timestamp, member: 0, fn: fnDirection)
                 ]
         }
         await curl.printStatistics()

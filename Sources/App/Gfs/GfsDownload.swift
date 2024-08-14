@@ -273,8 +273,7 @@ struct GfsDownload: AsyncCommand {
                         variable: variable.variable,
                         time: timestamp,
                         member: 0,
-                        fn: fn,
-                        skipHour0: variable.variable.skipHour0(for: domain)
+                        fn: fn
                     ))
                 }
             }
@@ -424,9 +423,7 @@ struct GfsDownload: AsyncCommand {
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
-                        member: member, fn: fn,
-                        skipHour0: variable.variable.skipHour0(for: domain)
-                    ))
+                        member: member, fn: fn                    ))
                 }
             }
             if domain.ensembleMembers > 1 {
@@ -505,7 +502,7 @@ struct GfsDownload: AsyncCommand {
                 variable: GfsSurfaceVariable.precipitation_probability,
                 time: run.add(hours: forecastHour),
                 member: 0,
-                fn: fn, skipHour0: false
+                fn: fn
             ))
         }
         await curl.printStatistics()

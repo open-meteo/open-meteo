@@ -247,7 +247,7 @@ struct DmiDownload: AsyncCommand {
                     }
                     
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn, skipHour0: stepType == "accum" || stepType == "avg")
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn)
                 }.collect().compactMap({$0})
                 
                 previous = previousScoped
