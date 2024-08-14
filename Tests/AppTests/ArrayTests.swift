@@ -14,23 +14,28 @@ final class ArrayTests: XCTestCase {
     
     func testBackwardInterpolateInplace() {
         var a: [Float] = [0,1,.nan,.nan,.nan,5]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0, isSummation: false)
+        a.interpolateInplaceBackwards(nTime: 6, isSummation: false)
         XCTAssertEqual(a, [0,1,5,5,5,5])
         
         // Make sure nTime is honored correctly
         a = [0,.nan,1,.nan,.nan,.nan, 0,.nan,1,.nan,.nan,.nan]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 0, isSummation: false)
+        a.interpolateInplaceBackwards(nTime: 6, isSummation: false)
         XCTAssertEqualArray(a, [0,1,1,.nan,.nan,.nan, 0,1,1,.nan,.nan,.nan], accuracy: 0.0001)
         
         // Make sure nTime is honored correctly
-        a = [.nan,.nan,1,.nan,.nan,.nan, .nan,.nan,1,.nan,.nan,.nan]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 1, isSummation: false)
-        XCTAssertEqualArray(a, [.nan,1,1,.nan,.nan,.nan, .nan,1,1,.nan,.nan,.nan], accuracy: 0.0001)
+        a = [1,.nan,2,.nan,1,.nan, 3,.nan,4,.nan,1,.nan]
+        a.interpolateInplaceBackwards(nTime: 6, isSummation: false)
+        XCTAssertEqualArray(a, [1,2,2,1,1,.nan, 3,4,4,1,1,.nan], accuracy: 0.0001)
         
         // Check sum
-        a = [.nan,.nan,1,.nan,.nan,.nan, .nan,.nan,1,.nan,.nan,.nan]
-        a.interpolateInplaceBackwards(nTime: 6, skipFirst: 1, isSummation: true)
-        XCTAssertEqualArray(a, [.nan,0.5,0.5,.nan,.nan,.nan, .nan,0.5,0.5,.nan,.nan,.nan], accuracy: 0.0001)
+        a = [.nan,.nan,1.5,.nan,.nan,1.5, .nan,.nan,3,.nan,.nan,3]
+        a.interpolateInplaceBackwards(nTime: 6, isSummation: true)
+        XCTAssertEqualArray(a, [0.5,0.5,0.5,0.5,0.5,0.5, 1,1,1,1,1,1], accuracy: 0.0001)
+        
+        // Check spacing detection
+        a = [.nan,.nan,.nan,1.5,.nan,.nan,1.5, .nan,.nan,.nan,3,.nan,.nan,3]
+        a.interpolateInplaceBackwards(nTime: 7, isSummation: true)
+        XCTAssertEqualArray(a, [.nan,0.5,0.5,0.5,0.5,0.5,0.5, .nan,1,1,1,1,1,1], accuracy: 0.0001)
     }
     
     func testInterpolateDegrees() {
@@ -84,20 +89,20 @@ final class ArrayTests: XCTestCase {
         let coords = IconDomains.icon.grid.getCoordinates(gridpoint: 1256 + 2879 * 1132)
         let grid = RegularGrid(nx: 1, ny: 1, latMin: coords.latitude, lonMin: coords.longitude, dx: 1, dy: 1)
         var time = TimerangeDt(start: Timestamp(2022,08,16), nTime: data.count, dtSeconds: 3600)
-        data.interpolateInplaceSolarBackwards(skipFirst: 1, time: time, grid: grid, locationRange: 0..<1)
+        data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1)
         
         XCTAssertEqualArray(data[79..<181], [2.7751129, 12.565333, 29.92181, 68.30576, 131.8756, 208.47153, 294.43616, 375.1984, 409.64493, 379.91507, 308.65784, 221.19334, 128.86157, 52.262794, 9.649313, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.114281915, 0.58105505, 1.2083836, 2.049771, 3.058337, 3.6581643, 3.113253, 1.8148575, 0.87113553, 0.9296356, 1.2847356, 1.2012333, 0.62843615, 0.14723891, 0.0017813047, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.024401145, 0.0, 3.7263098, 48.388783, 136.54715, 215.34631, 230.58772, 197.1857, 151.3438, 107.45953, 63.816956, 32.818916, 16.335684, 7.1231337, 1.4328097, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 2.870412, 13.837922, 38.44829, 115.605644, 251.0613, 378.11237, 428.5317, 416.82214, 379.8396, 334.78162, 273.56696, 201.93892, 125.62505, 57.04836, 11.268686, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.6770487, 39.30699, 84.17851, 133.38658, 185.12206, 228.63828], accuracy: 0.001)
         // original: [0.5327332, 7.0458064, 30.065294, 68.640236, 125.21594, 208.47006, 287.15527, 362.1674, 409.62054, 381.09317, 313.93628, 221.14587, 134.36256, 58.54249, 9.156854, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.02641212, 0.35874152, 1.2143807, 2.1519227, 3.0996456, 3.658186, 3.2371387, 2.086485, 0.87108666, 0.88595426, 1.1891304, 1.2009717, 0.6598327, 0.18529162, 0.0016845806, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0, 0, 3.7452843, 43.235752, 122.65912, 215.34958, 233.18326, 206.56552, 151.33687, 110.88687, 69.342674, 32.812675, 17.16428, 7.791204, 1.3503972, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.45440406, 7.076116, 38.64731, 112.47823, 234.80026, 378.12024, 429.4058, 423.3296, 379.82858, 336.3908, 276.80637, 201.91202, 130.41829, 62.39851, 10.584465, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.5342923, 24.450073, 84.617775, 142.16772, 190.57127, 228.64375]
         
         /// Mix 3 and 6 hourly missing values
         data = [.nan, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.3125, 11.9375, 57.484375, 75.203125, 81.625, 56.3125, 69.359375, 100.671875, 320.9375, 400.78125, 373.76562, 246.95312, 53.632812, 29.242188, 2.578125, -0.109375, 0.0, 0.0625, 0.0859375, -0.0859375, 0.0234375, -0.0859375, 0.140625, -0.03125, 0.2421875, 4.2109375, 3.515625, 8.65625, 14.0, 4.015625, 18.257812, 0.3359375, 4.0, 1.90625, 0.796875, 1.09375, 3.59375, 0.578125, -0.046875, 0.140625, 0.1015625, -0.1953125, -0.015625, -0.109375, 0.2890625, -0.0078125, -0.234375, 0.03125, 2.96875, 27.578125, 98.99219, 126.14844, 183.63281, 261.22656, 319.10156, 409.4922, 386.6797, 374.72656, 353.08594, 311.9453, 132.4375, 70.46875, 8.3828125, -0.0703125, 0.0703125, -0.2578125, 0.0546875, -0.1171875, 0.3671875, -0.2421875, -0.203125, 0.515625, .nan, .nan, 15.9765625, .nan, .nan, 175.58594, .nan, .nan, 411.35938, .nan, .nan, 272.71875, .nan, .nan, 40.820312, .nan, .nan, -0.0234375, .nan, .nan, -0.0859375, .nan, .nan, 0.0546875, .nan, .nan, 0.640625, .nan, .nan, 3.078125, .nan, .nan, 0.875, .nan, .nan, 1.484375, .nan, .nan, 0.0078125, .nan, .nan, -0.0546875, .nan, .nan, 0.140625, .nan, .nan, -0.0625, .nan, .nan, 1.9609375, .nan, .nan, 181.02344, .nan, .nan, 152.05469, .nan, .nan, 40.648438, .nan, .nan, 6.5390625, .nan, .nan, -0.0546875, .nan, .nan, .nan, .nan, .nan, (0.1875-0.015625)/2, .nan, .nan, .nan, .nan, .nan, (317.53125+20.078125)/2, .nan, .nan, .nan, .nan, .nan, (250.71094+381.72656)/2, .nan, .nan, .nan, .nan, .nan, (-0.3359375+53.742188)/2, .nan, .nan, .nan, .nan, .nan, (-0.0625+0.171875)/2, .nan, .nan, .nan, .nan, .nan, (191.8125+43.609375)/2]
-        data.interpolateInplaceSolarBackwards(skipFirst: 1, time: time, grid: grid, locationRange: 0..<1)
+        data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1)
         XCTAssertEqualArray(data[79..<181], [2.7751129, 12.565333, 29.92181, 68.30576, 131.8756, 208.47153, 294.43616, 375.1984, 409.64493, 379.91507, 308.65784, 221.19334, 128.86157, 52.262794, 9.649313, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.114281915, 0.58105505, 1.2083836, 2.049771, 3.058337, 3.6581643, 3.113253, 1.8148575, 0.87113553, 0.9296356, 1.2847356, 1.2012333, 0.62843615, 0.14723891, 0.0017813047, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.024401145, 0.0, 3.7263098, 48.388783, 136.54715, 215.34631, 230.58772, 197.1857, 151.3438, 107.45953, 63.816956, 32.818916, 16.335684, 7.1231337, 1.4328097, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 12.024332, 67.70339, 140.62544, 208.97667, 268.2166, 314.4697, 346.27148, 361.9829, 358.3321, 333.28455, 287.1204, 223.18909, 147.80145, 71.60986, 14.433392, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.8246827, 46.422653, 97.88847, 146.12347, 187.83421, 220.17207], accuracy: 0.001)
         
         /// Immediately 3 hourly data. Note: the left-most values only rely on the clearness index of the first point
         data = [.nan, .nan, .nan, 320.9375, .nan, .nan, 246.95312, .nan, .nan, 2.578125, .nan, .nan, 0.0, .nan, .nan, 0.0]
         time = TimerangeDt(start: Timestamp(2022,08,16,12), nTime: data.count, dtSeconds: 3600)
-        data.interpolateInplaceSolarBackwards(skipFirst: 1, time: time, grid: grid, locationRange: 0..<1)
+        data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1)
         XCTAssertEqualArray(data, [.nan, 316.6924, 327.28204, 319.8192, 304.3659, 271.0651, 201.56267, 101.99449, 25.591284, 0.6671406, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
     }
     
@@ -185,7 +190,7 @@ func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T
         if a1.isNaN && b1.isNaN {
             continue
         }
-        if abs(a1 - b1) > accuracy {
+        if a1.isNaN || b1.isNaN || abs(a1 - b1) > accuracy {
             failed = true
             break
         }
@@ -195,7 +200,7 @@ func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T
             if a1.isNaN && b1.isNaN {
                 continue
             }
-            if abs(a1 - b1) > accuracy {
+            if a1.isNaN || b1.isNaN || abs(a1 - b1) > accuracy {
                 print("\(a1)\t\(b1)\t\(a1-b1)")
             }
         }

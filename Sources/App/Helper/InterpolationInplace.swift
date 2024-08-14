@@ -7,9 +7,10 @@ extension Array3DFastTime {
     /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
-    mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         precondition(nTime == time.count)
-        data.interpolateInplace(type: type, skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
+        data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
 }
 extension Array2DFastTime {
@@ -18,9 +19,10 @@ extension Array2DFastTime {
     /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
-    mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         precondition(nTime == time.count)
-        data.interpolateInplace(type: type, skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
+        data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
 }
 
@@ -31,15 +33,8 @@ extension Array where Element == Float {
     /// Important: Backwards sums like precipitation must be deaveraged before AND should already have a corrected sum. The interpolation code will simply copy the array value of the next element WITHOUT dividing by `dt`. Meaning a 6 hour preciptation value should be devided by 2 before, to preserve the rum correctly
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
-    mutating func interpolateInplace(type: ReaderInterpolation, skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
-        
-        if self.onlyNaN() {
-            return
-        }
-        if self[0..<Swift.min(6, time.count)].onlyNaN() && self[Swift.min(6, time.count)..<time.count].hasValidData() {
-            fatalError("First 6 timesteps only contains NaN, followed by valid data. This leads to issues in interpolation.")
-        }
-        
+    /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         switch type {
         case .linear:
             interpolateInplaceLinear(nTime: time.count)
@@ -48,25 +43,41 @@ extension Array where Element == Float {
         case .hermite(let bounds):
             interpolateInplaceHermite(nTime: time.count, bounds: bounds)
         case .solar_backwards_averaged:
-            interpolateInplaceSolarBackwards(skipFirst: skipFirst, time: time, grid: grid, locationRange: locationRange)
+            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange)
         case .backwards_sum:
-            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst, isSummation: true)
+            interpolateInplaceBackwards(nTime: time.count, isSummation: true)
         case .backwards:
-            interpolateInplaceBackwards(nTime: time.count, skipFirst: skipFirst, isSummation: false)
+            interpolateInplaceBackwards(nTime: time.count, isSummation: false)
         }
     }
     
     
     /// Interpolate missing values, but taking the next valid value
-    /// `skipFirst` set skip first to prevent filling the frist hour of precipitation
-    mutating func interpolateInplaceBackwards(nTime: Int, skipFirst: Int, isSummation: Bool) {
+    /// Automatically detects data spacing. e.g. `--D--D--D` and correctly backfills
+    mutating func interpolateInplaceBackwards(nTime: Int, isSummation: Bool) {
         precondition(nTime <= self.count)
-        precondition(skipFirst <= nTime)
         precondition(self.count % nTime == 0)
         let nLocations = self.count / nTime
         for l in 0..<nLocations {
-            var previousIndex = 0
-            for t in skipFirst..<nTime {
+            /// Find the first valid value. This might be adjusted due to data spacing
+            var firstValid = nTime
+            for t in 0..<nTime {
+                guard !self[l * nTime + t].isNaN else {
+                    continue
+                }
+                if firstValid == nTime {
+                    firstValid = t
+                    continue
+                }
+                // 1 = no spacing
+                // 2 = -D-D-D
+                // 3 = --D--D--D
+                firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
+                break
+            }
+
+            var previousIndex = firstValid - 1
+            for t in firstValid..<nTime {
                 guard self[l * nTime + t].isNaN else {
                     previousIndex = t
                     continue
@@ -230,20 +241,19 @@ extension Array where Element == Float {
     ///
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
     ///
-    ///`skipFirst` set skip first to prevent filling the frist hours
-    mutating func interpolateInplaceSolarBackwards(skipFirst: Int, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    /// Automatically detects data spacing. e.g. `--D--D--D` and correctly backfills
+    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
         let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
-        precondition(skipFirst <= nTime)
         
         let nLocations = self.count / nTime
         precondition(locationRange.count <= nLocations)
         precondition(nLocations % locationRange.count == 0)
         
         // If no values are missing, return and do not calculate solar coefficients
-        guard let firstMissing = self[skipFirst..<nTime].firstIndex(where: {$0.isNaN}),
-              let lastMissing = self[skipFirst..<nTime].lastIndex(where: {$0.isNaN}) else {
+        guard let firstMissing = self[0..<nTime].firstIndex(where: {$0.isNaN}),
+              let lastMissing = self[0..<nTime].lastIndex(where: {$0.isNaN}) else {
             return
         }
         /// Which range of hours solar radiation data is required
@@ -263,10 +273,27 @@ extension Array where Element == Float {
         for l in 0..<nLocations {
             let sPos = l / (nLocations / locationRange.count)
             
+            /// Find the first valid value. This might be adjusted due to data spacing
+            var firstValid = nTime
+            for t in 0..<nTime {
+                guard !self[l * nTime + t].isNaN else {
+                    continue
+                }
+                if firstValid == nTime {
+                    firstValid = t
+                    continue
+                }
+                // 1 = no spacing
+                // 2 = -D-D-D
+                // 3 = --D--D--D
+                firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
+                break
+            }
+            
             /// At  the boundary, it wont be possible to detect a valid spacing for 4 points
             /// Reuse the previously good known spacing
             var width = 0
-            for t in skipFirst..<nTime {
+            for t in firstValid..<nTime {
                 guard self[l * nTime + t].isNaN else {
                     continue
                 }

@@ -190,8 +190,7 @@ struct MfWaveDownload: AsyncCommand {
                                 variable: variable,
                                 time: timestamp,
                                 member: 0,
-                                fn: fn,
-                                skipHour0: false
+                                fn: fn
                             )
                         }
                     }
@@ -228,8 +227,7 @@ struct MfWaveDownload: AsyncCommand {
                             variable: variable,
                             time: timestamp,
                             member: 0,
-                            fn: fn,
-                            skipHour0: false
+                            fn: fn
                         )
                     }
                 }.flatMap({$0})

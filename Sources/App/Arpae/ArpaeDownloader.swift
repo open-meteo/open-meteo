@@ -97,7 +97,7 @@ struct DownloadArpaeCommand: AsyncCommand {
                 }
                 logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: stepType == "accum")
+                return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
             }.collect().compactMap({$0})
         }
         await curl.printStatistics()

@@ -126,7 +126,6 @@ struct MetNoDownloader: AsyncCommand {
         
         for variable in variables {
             logger.info("Converting \(variable)")
-            let skip = variable.skipHour0 ? 1 : 0
             
             guard let ncVar = ncFile.getVariable(name: variable.netCdfName) else {
                 fatalError("Could not open nc variable \(variable) \(variable.netCdfName)")
@@ -139,12 +138,12 @@ struct MetNoDownloader: AsyncCommand {
             
             /// Create chunked time-series arrays instead of transposing the entire array
             let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
                 for (i,l) in locationRange.enumerated() {
-                    for h in skip..<nTime {
+                    for h in 0..<nTime {
                         data2d[i, h] = spatial[h, l]
                     }
                 }

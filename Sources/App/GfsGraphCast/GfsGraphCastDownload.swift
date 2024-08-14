@@ -175,7 +175,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, skipHour0: false)
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
             }
             
@@ -202,8 +202,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     variable: rhVariable,
                     time: v.timestamp,
                     member: v.member,
-                    fn: fn,
-                    skipHour0: false
+                    fn: fn
                 )
             }.compactMap({$0})
             
@@ -224,8 +223,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     variable: v.variable,
                     time: v.timestamp,
                     member: v.member,
-                    fn: fn,
-                    skipHour0: false
+                    fn: fn
                 )
             }.compactMap({$0})
             
@@ -272,29 +270,25 @@ struct GfsGraphCastDownload: AsyncCommand {
                     variable: GfsGraphCastSurfaceVariable.cloud_cover_low,
                     time: timestamp,
                     member: 0,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover_low),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover_low)
                 ),
                 GenericVariableHandle(
                     variable: GfsGraphCastSurfaceVariable.cloud_cover_mid,
                     time: timestamp,
                     member: 0,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover_mid),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover_mid)
                 ),
                 GenericVariableHandle(
                     variable: GfsGraphCastSurfaceVariable.cloud_cover_high,
                     time: timestamp,
                     member: 0,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover_high),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover_high)
                 ),
                 GenericVariableHandle(
                     variable: GfsGraphCastSurfaceVariable.cloud_cover,
                     time: timestamp,
                     member: 0,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: cloudcover)
                 )
             ]
             return handles + handles2 + handles3 + handlesClouds

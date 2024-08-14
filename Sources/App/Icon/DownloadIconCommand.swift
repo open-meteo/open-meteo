@@ -193,8 +193,7 @@ struct DownloadIconCommand: AsyncCommand {
                             variable: variable,
                             time: timestamp,
                             member: 0,
-                            fn: fn,
-                            skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                            fn: fn
                         ))
                     }
                     messages = [messages[0]]
@@ -231,8 +230,7 @@ struct DownloadIconCommand: AsyncCommand {
                         variable: variable,
                         time: timestamp,
                         member: member,
-                        fn: fn,
-                        skipHour0: variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                        fn: fn
                     ))
                 }
             }
@@ -354,8 +352,7 @@ struct DownloadIconCommand: AsyncCommand {
                     variable: v.variable,
                     time: v.timestamp,
                     member: v.member,
-                    fn: fn,
-                    skipHour0: v.variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                    fn: fn
                 ))
             }
             
@@ -428,8 +425,7 @@ struct DownloadIconCommand: AsyncCommand {
                     variable: v.variable,
                     time: v.timestamp,
                     member: v.member,
-                    fn: fn,
-                    skipHour0: v.variable.skipHour(hour: 0, domain: domain, forDownload: false, run: run)
+                    fn: fn
                 ))
             }
             previousHour = hour

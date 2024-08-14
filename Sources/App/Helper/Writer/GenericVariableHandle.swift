@@ -10,14 +10,12 @@ struct GenericVariableHandle {
     let time: Timestamp
     let member: Int
     private let fn: FileHandle
-    let skipHour0: Bool
     
-    public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, skipHour0: Bool) {
+    public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle) {
         self.variable = variable
         self.time = time
         self.member = member
         self.fn = fn
-        self.skipHour0 = skipHour0
     }
     
     public func makeReader() throws -> OmFileReader<MmapFile> {
@@ -54,7 +52,6 @@ struct GenericVariableHandle {
             let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
             
             let variable = handles[0].variable
-            let skip = handles[0].skipHour0 ? 1 : 0
             let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
@@ -88,7 +85,7 @@ struct GenericVariableHandle {
             
             let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
             
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, skipFirst: skip,  scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
                 let d0offset = offset / nMembers
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
@@ -114,7 +111,6 @@ struct GenericVariableHandle {
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
-                    skipFirst: skip,
                     time: time,
                     grid: domain.grid,
                     locationRange: locationRange
@@ -204,8 +200,7 @@ extension VariablePerMemberStorage {
                     variable: outSpeedVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outSpeedVariable.scalefactor, all: speed),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outSpeedVariable.scalefactor, all: speed)
                 )
                 
                 if let outDirectionVariable {
@@ -217,8 +212,7 @@ extension VariablePerMemberStorage {
                         variable: outDirectionVariable,
                         time: t.timestamp,
                         member: t.member,
-                        fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outDirectionVariable.scalefactor, all: direction),
-                        skipHour0: false
+                        fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outDirectionVariable.scalefactor, all: direction)
                     )
                     return [speedHandle, directionHandle]
                 }

@@ -196,8 +196,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     variable: rh,
                     time: timestamp,
                     member: member,
-                    fn: fn,
-                    skipHour0: false
+                    fn: fn
                 ))
             }
             
@@ -215,15 +214,13 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     variable: u,
                     time: timestamp,
                     member: member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: u.scalefactor, all: uData),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: u.scalefactor, all: uData)
                 ))
                 handles.append(GenericVariableHandle(
                     variable: v,
                     time: timestamp,
                     member: member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: u.scalefactor, all: vData),
-                    skipHour0: false
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: u.scalefactor, all: vData)
                 ))
             }
             
@@ -343,8 +340,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     variable: variable,
                     time: timestamp,
                     member: member,
-                    fn: fn,
-                    skipHour0: skipHour0
+                    fn: fn
                 )
             }.collect().compactMap({$0})
             handles.append(contentsOf: h)
@@ -361,8 +357,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         variable: EcmwfVariable.relative_humidity_2m,
                         time: timestamp,
                         member: member,
-                        fn: fn,
-                        skipHour0: false
+                        fn: fn
                     ))
                 } else if let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data {
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: rh1000)
@@ -370,8 +365,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         variable: EcmwfVariable.relative_humidity_2m,
                         time: timestamp,
                         member: member,
-                        fn: fn,
-                        skipHour0: false
+                        fn: fn
                     ))
                 }
                 
@@ -440,29 +434,25 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     variable: EcmwfVariable.cloud_cover_low,
                     time: timestamp,
                     member: member,
-                    fn: fnCloudCoverLow,
-                    skipHour0: false
+                    fn: fnCloudCoverLow
                 ))
                 handles.append(GenericVariableHandle(
                     variable: EcmwfVariable.cloud_cover_mid,
                     time: timestamp,
                     member: member,
-                    fn: fnCloudCoverMid,
-                    skipHour0: false
+                    fn: fnCloudCoverMid
                 ))
                 handles.append(GenericVariableHandle(
                     variable: EcmwfVariable.cloud_cover_high,
                     time: timestamp,
                     member: member,
-                    fn: fnCloudCoverHigh,
-                    skipHour0: false
+                    fn: fnCloudCoverHigh
                 ))
                 handles.append(GenericVariableHandle(
                     variable: EcmwfVariable.cloud_cover,
                     time: timestamp,
                     member: member,
-                    fn: fnCloudCover,
-                    skipHour0: false
+                    fn: fnCloudCover
                 ))
             }
             
@@ -560,8 +550,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     variable: variable,
                     time: timestamp,
                     member: member,
-                    fn: fn,
-                    skipHour0: false
+                    fn: fn
                 )
             }.collect().compactMap({$0})
             handles.append(contentsOf: h)
