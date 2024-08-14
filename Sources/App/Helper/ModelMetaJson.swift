@@ -1,8 +1,13 @@
 import Foundation
 
+/**
+ TODO:
+ - CAMS, IconWave, GloFas, seasonal forecast, CMIP, satellite
+ - run end lenght might be too short for side-runs
+ */
 struct ModelUpdateMetaJson: Codable {
     /// Model initilsiation time as unix timestamp. E.g. 0z
-    let last_run_initialisaiton_time: Int
+    let last_run_initialisation_time: Int
     
     /// Last modification time. The time the conversion finished on the download and processing server
     let last_run_modification_time: Int
@@ -23,7 +28,7 @@ struct ModelUpdateMetaJson: Codable {
     static func update(domain: GenericDomain, run: Timestamp, end: Timestamp) throws {
         let now = Timestamp.now()
         let meta = ModelUpdateMetaJson(
-            last_run_initialisaiton_time: run.timeIntervalSince1970,
+            last_run_initialisation_time: run.timeIntervalSince1970,
             last_run_modification_time: now.timeIntervalSince1970,
             last_run_availability_time: now.timeIntervalSince1970,
             temporal_resolution_seconds: domain.dtSeconds,
@@ -36,6 +41,13 @@ struct ModelUpdateMetaJson: Codable {
         try fn.write(contentsOf: try encoder.encode(meta))
         try fn.close()
         try FileManager.default.moveFileOverwrite(from: "\(path)~", to: path)
+    }
+    
+    /// Write new model meta data, but only of it contains temperature_2m or precipitation. Ignores e.g. upper level runs
+    static func update(domain: GenericDomain, run: Timestamp, handles: [GenericVariableHandle]) throws {
+        if handles.contains(where: {["temperature_2m", "precipitation"].contains($0.variable.omFileName.file)}) {
+            try update(domain: domain, run: run, end: handles.max(by: {$0.time > $1.time})?.time ?? Timestamp(0))
+        }
     }
 }
 

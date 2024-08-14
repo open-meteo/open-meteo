@@ -84,6 +84,7 @@ struct GfsDownload: AsyncCommand {
             variables = [GfsSurfaceVariable.precipitation_probability]
             let handles = try await downloadPrecipitationProbability(application: context.application, run: run)
             try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -119,11 +120,13 @@ struct GfsDownload: AsyncCommand {
             
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
         case .gfswave025, .gfswave025_ens:
             variables = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing)
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
             break
         }
         

@@ -86,6 +86,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         }
         let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+        try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })

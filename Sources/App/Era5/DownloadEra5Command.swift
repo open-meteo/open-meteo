@@ -115,7 +115,7 @@ struct DownloadEra5Command: AsyncCommand {
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: concurrent)
-        
+        try ModelUpdateMetaJson.update(domain: domain, run: handles.min(by: {$0.time < $1.time})?.time ?? Timestamp(0), handles: handles)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)

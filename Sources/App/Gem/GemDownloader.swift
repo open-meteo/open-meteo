@@ -88,6 +88,7 @@ struct GemDownload: AsyncCommand {
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+        try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
         logger.info("Finished in \(start.timeElapsedPretty())")
         
         if let uploadS3Bucket = signature.uploadS3Bucket {

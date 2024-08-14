@@ -60,6 +60,7 @@ struct MfWaveDownload: AsyncCommand {
         
         let handles = try await download(application: context.application, domain: domain, run: run)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+        try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
