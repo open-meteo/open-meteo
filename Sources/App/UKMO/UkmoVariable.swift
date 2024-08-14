@@ -253,7 +253,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .wind_direction_10m:
             return "wind_direction_at_10m"
         case .wind_gusts_10m:
-            return "wind_direction_at_10m"
+            return "wind_gust_at_10m"
         case .precipitation:
             //return "precipitation_rate"
             // hourly until 49, while rain is hourly until hour 57
