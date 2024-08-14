@@ -67,13 +67,16 @@ struct CamsController {
                 guard let reader = try readerAndDomain.reader() else {
                     return nil
                 }
+                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                 let domain = readerAndDomain.domain
                 
                 let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
                     return {
-                        return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings()).convertAndRound(params: params)
-                            assert(time.hourlyRead.count == d.data.count)
+                        return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                            let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
+                            assert(timeHourlyRead.count == d.data.count)
                             return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                         })
                     }
@@ -98,7 +101,7 @@ struct CamsController {
                             try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                         }
                         if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings())
+                            try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
                         }
                     },
                     current: currentFn,

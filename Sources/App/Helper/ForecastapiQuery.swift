@@ -15,6 +15,28 @@ extension ClosedRange where Element == Timestamp {
     }
 }
 
+/// Option to overwrite the temporal output resolution instead of always getting 1-hourly data.
+enum ApiTemporalResolution: String, Codable {
+    case native
+    case hourly
+    case hourly_1
+    case hourly_3
+    case hourly_6
+    
+    var dtSeconds: Int? {
+        switch self {
+        case .native:
+            return nil
+        case .hourly, .hourly_1:
+            return 3600
+        case .hourly_3:
+            return 3*3600
+        case .hourly_6:
+            return 6*3600
+        }
+    }
+}
+
 /// All API parameter that are accepted and decoded via GET
 struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let latitude: [String]
@@ -36,6 +58,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let precipitation_unit: PrecipitationUnit?
     let length_unit: LengthUnit?
     let timeformat: Timeformat?
+    let temporal_resolution: ApiTemporalResolution?
     
     let bounding_box: [String]
     
@@ -410,6 +433,7 @@ enum ForecastapiError: Error {
     case coordinatesAndStartEndDatesCountMustBeTheSame
     case coordinatesAndElevationCountMustBeTheSame
     case generic(message: String)
+    case cannotReturnModelsWithDiffernetTimeIntervals
 }
 
 extension ForecastapiError: AbortError {
@@ -461,6 +485,8 @@ extension ForecastapiError: AbortError {
             return "Parameter 'elevation' must have the same number of elements as coordinates"
         case .generic(message: let message):
             return message
+        case .cannotReturnModelsWithDiffernetTimeIntervals:
+            return "Cannot return models with different time-intervals"
         }
     }
 }
