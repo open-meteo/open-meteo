@@ -124,6 +124,9 @@ struct IconWaveController {
                 guard let reader = try GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                     return nil
                 }
+                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                 
                 return .init(
                     model: domain,
@@ -133,7 +136,7 @@ struct IconWaveController {
                     prefetch: {
                         if let paramsHourly {
                             for member in 0..<reader.domain.countEnsembleMember {
-                                try reader.prefetchData(variables: paramsHourly, time: time.hourlyRead.toSettings(ensembleMember: member))
+                                try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(ensembleMember: member))
                             }
                         }
                         if let paramsCurrent {
@@ -157,18 +160,18 @@ struct IconWaveController {
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
+                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
                                 var unit: SiUnit? = nil
                                 let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: variable, time: time.hourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                    guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                         return nil
                                     }
                                     unit = d.unit
-                                    assert(time.hourlyRead.count == d.data.count)
+                                    assert(timeHourlyRead.count == d.data.count)
                                     return ApiArray.float(d.data)
                                 }
                                 guard allMembers.count > 0 else {
-                                    return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.hourlyRead.count)), count: reader.domain.countEnsembleMember))
+                                    return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
                                 }
                                 return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
                             })

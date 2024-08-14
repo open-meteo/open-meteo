@@ -40,8 +40,8 @@ struct TimerangeDtAndSettings: Hashable {
         return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
     
-    func with(ensembleMember: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time, ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+    func with(time: TimerangeDt? = nil, ensembleMember: Int? = nil) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
     
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
@@ -126,16 +126,15 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
         if time.dtSeconds == domain.dtSeconds {
             try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position+1, level: time.ensembleMemberLevel, time: time)
-        }
-        if time.dtSeconds > domain.dtSeconds {
-            /// do not allow aggregations
-            fatalError()
+            return
         }
         
-        // Data is interpolated in dt
         let interpolationType = variable.interpolation
-        let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
-        try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position+1, level: time.ensembleMemberLevel, time: .init(time: timeLow, ensembleMember: time.ensembleMember, ensembleMemberLevel: time.ensembleMemberLevel, previousDay: time.previousDay))
+        let timeRead = time.dtSeconds > domain.dtSeconds ?
+            time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
+            time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
+        
+        try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position+1, level: time.ensembleMemberLevel, time: time.with(time: timeRead))
     }
     
     /// Read and scale if required
@@ -161,19 +160,21 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         if time.dtSeconds == domain.dtSeconds {
             return try readAndScale(variable: variable, time: time)
         }
-        if time.dtSeconds > domain.dtSeconds {
-            /// do not allow aggregations
-            fatalError()
-        }
-        
         let interpolationType = variable.interpolation
         
-        let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds).expandLeftRight(by: domain.dtSeconds*(interpolationType.padding-1))
-        let read = try readAndScale(variable: variable, time: .init(time: timeLow, ensembleMember: time.ensembleMember, ensembleMemberLevel: time.ensembleMemberLevel, previousDay: time.previousDay))
-        let dataLow = read.data
+        if time.dtSeconds > domain.dtSeconds {
+            // Aggregate data
+            let timeRead = time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
+            let read = try readAndScale(variable: variable, time: time.with(time: timeRead))
+            let aggregated = read.data.aggregate(type: interpolationType, timeOld: timeRead, timeNew: time.time)
+            return DataAndUnit(aggregated, read.unit)
+        }
         
-        let data = dataLow.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
-        return DataAndUnit(data, read.unit)
+        // Interpolate data
+        let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
+        let read = try readAndScale(variable: variable, time: time.with(time: timeLow))
+        let interpolated = read.data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
+        return DataAndUnit(interpolated, read.unit)
     }
     
     func get(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
@@ -189,13 +190,24 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 }
 
 extension TimerangeDt {
-    func forInterpolationTo(modelDt: Int) -> TimerangeDt {
-        let start = range.lowerBound.floor(toNearest: modelDt)
-        let end = range.upperBound.ceil(toNearest: modelDt)
+    /// Expand the time range for interpolation
+    func forAggregationTo(modelDt: Int, interpolation: ReaderInterpolation) -> TimerangeDt {
+        switch interpolation {
+        case .linear, .linearDegrees, .hermite(_), .backwards:
+            return self.with(dtSeconds: modelDt)
+        case .solar_backwards_averaged, .backwards_sum:
+            // Need to read previous timesteps to sum/average the correct value
+            let steps = dtSeconds / modelDt
+            let backSeconds = -1 * modelDt * (steps - 1)
+            return self.with(dtSeconds: modelDt).with(start: range.lowerBound.add(backSeconds))
+        }
+    }
+    
+    /// Adjust time for interpolation. E.g. Reads a bit more data for hermite interpolation
+    func forInterpolationTo(modelDt: Int, interpolation: ReaderInterpolation) -> TimerangeDt {
+        let expand = modelDt*(interpolation.padding-1)
+        let start = range.lowerBound.floor(toNearest: modelDt).add(-1*expand)
+        let end = range.upperBound.ceil(toNearest: modelDt).add(expand)
         return TimerangeDt(start: start, to: end, dtSeconds: modelDt)
     }
-    func expandLeftRight(by: Int) -> TimerangeDt {
-        return TimerangeDt(start: range.lowerBound.add(-1*by), to: range.upperBound.add(by), dtSeconds: dtSeconds)
-    }
 }
-

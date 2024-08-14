@@ -140,6 +140,9 @@ struct WeatherApiController {
                 guard let reader = try readerAndDomain.reader() else {
                     return nil
                 }
+                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                 let domain = readerAndDomain.domain
                 
                 return .init(
@@ -163,7 +166,7 @@ struct WeatherApiController {
                         if let paramsHourly {
                             for variable in paramsHourly {
                                 let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))
+                                try reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
                             }
                         }
                         if let paramsDaily {
@@ -183,12 +186,12 @@ struct WeatherApiController {
                     },
                     hourly: paramsHourly.map { variables in
                         return {
-                            return .init(name: "hourly", time: time.hourlyDisplay, columns: try variables.map { variable in
+                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
                                 let (v, previousDay) = variable.variableAndPreviousDay
-                                guard let d = try reader.get(variable: v, time: time.hourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.hourlyRead.count))])
+                                guard let d = try reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: timeHourlyRead.count))])
                                 }
-                                assert(time.hourlyRead.count == d.data.count)
+                                assert(timeHourlyRead.count == d.data.count)
                                 return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
                             })
                         }
