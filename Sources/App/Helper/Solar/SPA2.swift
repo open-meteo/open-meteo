@@ -60,7 +60,7 @@ struct SPA2 {
     {
         var sum: Double = 0
         for i in 0..<terms.count {
-            sum += terms[i].reduce(0, { $0 + $1.0 * cos($1.1 + $1.2 * jme) }) * pow(jme, Double(i))
+            sum += terms[i].reduce(0, { fma($1.0, cos(fma($1.2, jme, $1.1)), $0) }) * pow(jme, Double(i))
         }
         return sum / 1.0e8
     }
@@ -97,7 +97,7 @@ struct SPA2 {
     }
     
     func third_order_polynomial(_ a: Double, _ b: Double, _ c: Double, _ d: Double, _ x: Double) -> Double {
-        return ((a*x + b)*x + c)*x + d
+        return fma(fma(fma(a, x, b), x, c), x, d)
     }
     
     func mean_elongation_moon_sun(jce: Double) -> Double
@@ -154,9 +154,16 @@ struct SPA2 {
     func ecliptic_mean_obliquity(jme: Double) -> Double
     {
         let u = jme/10.0
-        
-        return 84381.448 + u*(-4680.93 + u*(-1.55 + u*(1999.25 + u*(-51.38 + u*(-249.67 +
-                                                                                 u*(  -39.05 + u*( 7.12 + u*(  27.87 + u*(  5.79 + u*2.45)))))))))
+        let a9 = fma(u, 2.45, 5.79)
+        let a8 = fma(u, a9, 27.87)
+        let a7 = fma(u, a8, 7.12)
+        let a6 = fma(u, a7, -39.05)
+        let a5 = fma(u, a6, -249.67)
+        let a4 = fma(u, a5, -51.38)
+        let a3 = fma(u, a4, 1999.25)
+        let a2 = fma(u, a3, -1.55)
+        let a1 = fma(u, a2, -4680.93)
+        return fma(u, a1, 84381.448)
     }
     
     func ecliptic_true_obliquity(delta_epsilon: Double, epsilon0: Double) -> Double
@@ -194,8 +201,11 @@ struct SPA2 {
     
     func sun_mean_longitude(jme: Double) -> Double
     {
-        return limit_degrees(degrees: 280.4664567 + jme*(360007.6982779 + jme*(0.03032028 +
-                                                                               jme*(1/49931.0   + jme*(-1/15300.0     + jme*(-1/2000000.0))))))
+        let a4 = fma(jme, -1/2000000.0, -1/15300.0)
+        let a3 = fma(jme, a4, 1/49931.0)
+        let a2 = fma(jme, a3, 0.03032028)
+        let a1 = fma(jme, a2, 360007.6982779)
+        return limit_degrees(degrees: fma(jme, a1, 280.4664567))
     }
     
     func eot(m: Double, alpha: Double, del_psi: Double, epsilon: Double) -> Double
