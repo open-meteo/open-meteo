@@ -46,7 +46,7 @@
 //         listed below.                                              //
 //                                                                    //
 ////////////////////////////////////////////////////////////////////////
-
+/*
 #ifndef __solar_position_algorithm_header
 #define __solar_position_algorithm_header
 
@@ -202,3 +202,4 @@ double topocentric_azimuth_angle(double azimuth_astro);
 int spa_calculate(spa_data *spa);
 
 #endif
+*/
