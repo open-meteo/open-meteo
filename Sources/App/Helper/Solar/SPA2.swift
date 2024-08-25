@@ -38,16 +38,14 @@ struct SPA2 {
         return jce / 10.0
     }
     
-    func limit_degrees(degrees: Double) -> Double
-    {
+    func limit_degrees(degrees: Double) -> Double {
         let degrees = degrees / 360.0
         var limited = 360.0*(degrees-floor(degrees))
         if (limited < 0) { limited += 360.0 }
         return limited
     }
     
-    func limit_minutes(minutes: Double) -> Double
-    {
+    func limit_minutes(minutes: Double) -> Double {
         var limited=minutes
         
         if      (limited < -20.0) { limited += 1440.0 }
@@ -56,13 +54,14 @@ struct SPA2 {
         return limited
     }
     
-    func earth_periodic_term_summation(terms: [[(Double, Double, Double)]], jme: Double) -> Double
-    {
-        var sum: Double = 0
-        for i in 0..<terms.count {
-            sum += terms[i].reduce(0, { fma($1.0, cos(fma($1.2, jme, $1.1)), $0) }) * pow(jme, Double(i))
-        }
-        return sum / 1.0e8
+    func earth_periodic_term_summation(terms: [[(Double, Double, Double)]], jme: Double) -> Double {
+        return terms.enumerated().reduce(0, {
+            fma(
+                $1.element.reduce(0, { fma($1.0, cos(fma($1.2, jme, $1.1)), $0) }),
+                pow(jme, Double($1.offset)),
+                $0
+            )
+        }) / 1.0e8
     }
     
     func earth_heliocentric_longitude(jme: Double) -> Double {
@@ -70,80 +69,67 @@ struct SPA2 {
         return limit_degrees(degrees: sum.rad2deg)
     }
     
-    func earth_heliocentric_latitude(jme: Double) -> Double
-    {
+    func earth_heliocentric_latitude(jme: Double) -> Double {
         let sum = earth_periodic_term_summation(terms: B_TERMS, jme: jme)
         return sum.rad2deg
     }
     
-    func earth_radius_vector(jme: Double) -> Double
-    {
+    func earth_radius_vector(jme: Double) -> Double {
         let sum = earth_periodic_term_summation(terms: R_TERMS, jme: jme)
         return sum
     }
     
-    func geocentric_longitude(l: Double) -> Double
-    {
-        var theta = l + 180.0
-        
-        if (theta >= 360.0) { theta -= 360.0 }
-        
+    func geocentric_longitude(l: Double) -> Double {
+        let theta = l + 180.0
+        if (theta >= 360.0) {
+            return theta - 360.0
+        }
         return theta
     }
     
-    func geocentric_latitude(b: Double) -> Double
-    {
+    func geocentric_latitude(b: Double) -> Double {
         return -b
     }
     
     func third_order_polynomial(_ a: Double, _ b: Double, _ c: Double, _ d: Double, _ x: Double) -> Double {
-        return fma(fma(fma(a, x, b), x, c), x, d)
+        let a2 = fma(x, a, b)
+        let a1 = fma(x, a2, c)
+        return fma(x, a1, d)
     }
     
-    func mean_elongation_moon_sun(jce: Double) -> Double
-    {
+    func mean_elongation_moon_sun(jce: Double) -> Double {
         return third_order_polynomial(1.0/189474.0, -0.0019142, 445267.11148, 297.85036, jce)
     }
     
-    func mean_anomaly_sun(jce: Double) -> Double
-    {
+    func mean_anomaly_sun(jce: Double) -> Double {
         return third_order_polynomial(-1.0/300000.0, -0.0001603, 35999.05034, 357.52772, jce)
     }
     
-    func mean_anomaly_moon(jce: Double) -> Double
-    {
+    func mean_anomaly_moon(jce: Double) -> Double {
         return third_order_polynomial(1.0/56250.0, 0.0086972, 477198.867398, 134.96298, jce)
     }
     
-    func argument_latitude_moon(jce: Double) -> Double
-    {
+    func argument_latitude_moon(jce: Double) -> Double {
         return third_order_polynomial(1.0/327270.0, -0.0036825, 483202.017538, 93.27191, jce)
     }
     
-    func ascending_longitude_moon(jce: Double) -> Double
-    {
+    func ascending_longitude_moon(jce: Double) -> Double {
         return third_order_polynomial(1.0/450000.0, 0.0020708, -1934.136261, 125.04452, jce)
     }
     
-    func xy_term_summation(i: Int, x: [Double]) -> Double
-    {
-        var sum: Double = 0
-        
-        for j in 0..<Y_TERMS[i].count {
-            sum += x[j]*Y_TERMS[i][j]
-        }
-        
-        return sum
-    }
-    
-    func nutation_longitude_and_obliquity(jce: Double, x: [Double]) -> (del_psi: Double, del_epsilon: Double)
-    {
-        var sum_psi: Double=0, sum_epsilon: Double=0
+    func nutation_longitude_and_obliquity(jce: Double, x: (Double, Double, Double, Double, Double)) -> (del_psi: Double, del_epsilon: Double) {
+        var sum_psi: Double = 0
+        var sum_epsilon: Double = 0
         
         for i in 0..<Y_TERMS.count {
-            let xy_term_sum  = xy_term_summation(i: i, x: x).deg2rad
-            sum_psi     += (PE_TERMS[i][0] + jce*PE_TERMS[i][1])*sin(xy_term_sum)
-            sum_epsilon += (PE_TERMS[i][2] + jce*PE_TERMS[i][3])*cos(xy_term_sum)
+            let a0 = x.0 * Y_TERMS[i].0
+            let a1 = fma(x.1, Y_TERMS[i].1, a0)
+            let a2 = fma(x.2, Y_TERMS[i].2, a1)
+            let a3 = fma(x.3, Y_TERMS[i].3, a2)
+            let a4 = fma(x.4, Y_TERMS[i].4, a3)
+            let xy_term_sum = a4.deg2rad
+            sum_psi     = fma(fma(jce, PE_TERMS[i].1, PE_TERMS[i].0), sin(xy_term_sum), sum_psi)
+            sum_epsilon = fma(fma(jce, PE_TERMS[i].3, PE_TERMS[i].2), cos(xy_term_sum), sum_epsilon)
         }
         
         let del_psi     = sum_psi     / 36000000.0
@@ -151,8 +137,7 @@ struct SPA2 {
         return (del_psi, del_epsilon)
     }
     
-    func ecliptic_mean_obliquity(jme: Double) -> Double
-    {
+    func ecliptic_mean_obliquity(jme: Double) -> Double {
         let u = jme/10.0
         let a9 = fma(u, 2.45, 5.79)
         let a8 = fma(u, a9, 27.87)
@@ -166,41 +151,33 @@ struct SPA2 {
         return fma(u, a1, 84381.448)
     }
     
-    func ecliptic_true_obliquity(delta_epsilon: Double, epsilon0: Double) -> Double
-    {
+    func ecliptic_true_obliquity(delta_epsilon: Double, epsilon0: Double) -> Double {
         return delta_epsilon + epsilon0/3600.0
     }
     
-    func aberration_correction(r: Double) -> Double
-    {
+    func aberration_correction(r: Double) -> Double {
         return -20.4898 / (3600.0*r)
     }
     
-    func apparent_sun_longitude(theta: Double, delta_psi: Double, delta_tau: Double) -> Double
-    {
+    func apparent_sun_longitude(theta: Double, delta_psi: Double, delta_tau: Double) -> Double {
         return theta + delta_psi + delta_tau
     }
     
-    func geocentric_right_ascension(lamda: Double, epsilon: Double, beta: Double) -> Double
-    {
+    func geocentric_right_ascension(lamda: Double, epsilon: Double, beta: Double) -> Double {
         let lamda_rad   = lamda.deg2rad
         let epsilon_rad = epsilon.deg2rad
         
-        return limit_degrees(degrees: atan2(sin(lamda_rad)*cos(epsilon_rad) -
-                                            tan(beta.deg2rad)*sin(epsilon_rad), cos(lamda_rad)).rad2deg)
+        return limit_degrees(degrees: atan2(sin(lamda_rad)*cos(epsilon_rad) - tan(beta.deg2rad)*sin(epsilon_rad), cos(lamda_rad)).rad2deg)
     }
     
-    func geocentric_declination(beta: Double, epsilon: Double, lamda: Double) -> Double
-    {
+    func geocentric_declination(beta: Double, epsilon: Double, lamda: Double) -> Double {
         let beta_rad    = (beta.deg2rad)
         let epsilon_rad = (epsilon.deg2rad)
         
-        return (asin(sin(beta_rad)*cos(epsilon_rad) +
-                     cos(beta_rad)*sin(epsilon_rad)*sin(lamda.deg2rad))).rad2deg
+        return (asin(sin(beta_rad)*cos(epsilon_rad) + cos(beta_rad)*sin(epsilon_rad)*sin(lamda.deg2rad))).rad2deg
     }
     
-    func sun_mean_longitude(jme: Double) -> Double
-    {
+    func sun_mean_longitude(jme: Double) -> Double {
         let a4 = fma(jme, -1/2000000.0, -1/15300.0)
         let a3 = fma(jme, a4, 1/49931.0)
         let a2 = fma(jme, a3, 0.03032028)
@@ -208,8 +185,7 @@ struct SPA2 {
         return limit_degrees(degrees: fma(jme, a1, 280.4664567))
     }
     
-    func eot(m: Double, alpha: Double, del_psi: Double, epsilon: Double) -> Double
-    {
+    func eot(m: Double, alpha: Double, del_psi: Double, epsilon: Double) -> Double {
         return limit_minutes(minutes: 4.0*(m - 0.0057183 - alpha + del_psi*cos(epsilon.deg2rad)))
     }
     
@@ -237,7 +213,7 @@ struct SPA2 {
         let x3 = argument_latitude_moon(jce: jce)
         let x4 = ascending_longitude_moon(jce: jce)
         
-        let (del_psi, del_epsilon) = nutation_longitude_and_obliquity(jce: jce, x: [x0,x1,x2,x3,x4])
+        let (del_psi, del_epsilon) = nutation_longitude_and_obliquity(jce: jce, x: (x0,x1,x2,x3,x4))
         
         let epsilon0 = ecliptic_mean_obliquity(jme: jme)
         let epsilon  = ecliptic_true_obliquity(delta_epsilon: del_epsilon, epsilon0: epsilon0)
@@ -257,8 +233,7 @@ struct SPA2 {
     }
     
     
-    let L_TERMS: [[(Double, Double, Double)]] =
-    [
+    let L_TERMS: [[(Double, Double, Double)]] = [
         [
             (175347046.0,0,0),
             (3341656.0,4.6692568,6283.07585),
@@ -402,8 +377,7 @@ struct SPA2 {
         ]
     ]
     
-    let B_TERMS: [[(Double, Double, Double)]] =
-    [
+    let B_TERMS: [[(Double, Double, Double)]] = [
         [
             (280.0,3.199,84334.662),
             (102.0,5.422,5507.553),
@@ -417,8 +391,7 @@ struct SPA2 {
         ]
     ]
     
-    let R_TERMS: [[(Double, Double, Double)]] =
-    [
+    let R_TERMS: [[(Double, Double, Double)]] = [
         [
             (100013989.0,0,0),
             (1670700.0,3.0984635,6283.07585),
@@ -494,137 +467,136 @@ struct SPA2 {
     ///  Periodic Terms for the nutation in longitude and obliquity
     ////////////////////////////////////////////////////////////////
     
-    let Y_TERMS: [[Double]] =
-    [
-        [0,0,0,0,1],
-        [-2,0,0,2,2],
-        [0,0,0,2,2],
-        [0,0,0,0,2],
-        [0,1,0,0,0],
-        [0,0,1,0,0],
-        [-2,1,0,2,2],
-        [0,0,0,2,1],
-        [0,0,1,2,2],
-        [-2,-1,0,2,2],
-        [-2,0,1,0,0],
-        [-2,0,0,2,1],
-        [0,0,-1,2,2],
-        [2,0,0,0,0],
-        [0,0,1,0,1],
-        [2,0,-1,2,2],
-        [0,0,-1,0,1],
-        [0,0,1,2,1],
-        [-2,0,2,0,0],
-        [0,0,-2,2,1],
-        [2,0,0,2,2],
-        [0,0,2,2,2],
-        [0,0,2,0,0],
-        [-2,0,1,2,2],
-        [0,0,0,2,0],
-        [-2,0,0,2,0],
-        [0,0,-1,2,1],
-        [0,2,0,0,0],
-        [2,0,-1,0,1],
-        [-2,2,0,2,2],
-        [0,1,0,0,1],
-        [-2,0,1,0,1],
-        [0,-1,0,0,1],
-        [0,0,2,-2,0],
-        [2,0,-1,2,1],
-        [2,0,1,2,2],
-        [0,1,0,2,2],
-        [-2,1,1,0,0],
-        [0,-1,0,2,2],
-        [2,0,0,2,1],
-        [2,0,1,0,0],
-        [-2,0,2,2,2],
-        [-2,0,1,2,1],
-        [2,0,-2,0,1],
-        [2,0,0,0,1],
-        [0,-1,1,0,0],
-        [-2,-1,0,2,1],
-        [-2,0,0,0,1],
-        [0,0,2,2,1],
-        [-2,0,2,0,1],
-        [-2,1,0,2,1],
-        [0,0,1,-2,0],
-        [-1,0,1,0,0],
-        [-2,1,0,0,0],
-        [1,0,0,0,0],
-        [0,0,1,2,0],
-        [0,0,-2,2,2],
-        [-1,-1,1,0,0],
-        [0,1,1,0,0],
-        [0,-1,1,2,2],
-        [2,-1,-1,2,2],
-        [0,0,3,2,2],
-        [2,-1,0,2,2],
+    let Y_TERMS: [(Double, Double, Double, Double, Double)] = [
+        (0,0,0,0,1),
+        (-2,0,0,2,2),
+        (0,0,0,2,2),
+        (0,0,0,0,2),
+        (0,1,0,0,0),
+        (0,0,1,0,0),
+        (-2,1,0,2,2),
+        (0,0,0,2,1),
+        (0,0,1,2,2),
+        (-2,-1,0,2,2),
+        (-2,0,1,0,0),
+        (-2,0,0,2,1),
+        (0,0,-1,2,2),
+        (2,0,0,0,0),
+        (0,0,1,0,1),
+        (2,0,-1,2,2),
+        (0,0,-1,0,1),
+        (0,0,1,2,1),
+        (-2,0,2,0,0),
+        (0,0,-2,2,1),
+        (2,0,0,2,2),
+        (0,0,2,2,2),
+        (0,0,2,0,0),
+        (-2,0,1,2,2),
+        (0,0,0,2,0),
+        (-2,0,0,2,0),
+        (0,0,-1,2,1),
+        (0,2,0,0,0),
+        (2,0,-1,0,1),
+        (-2,2,0,2,2),
+        (0,1,0,0,1),
+        (-2,0,1,0,1),
+        (0,-1,0,0,1),
+        (0,0,2,-2,0),
+        (2,0,-1,2,1),
+        (2,0,1,2,2),
+        (0,1,0,2,2),
+        (-2,1,1,0,0),
+        (0,-1,0,2,2),
+        (2,0,0,2,1),
+        (2,0,1,0,0),
+        (-2,0,2,2,2),
+        (-2,0,1,2,1),
+        (2,0,-2,0,1),
+        (2,0,0,0,1),
+        (0,-1,1,0,0),
+        (-2,-1,0,2,1),
+        (-2,0,0,0,1),
+        (0,0,2,2,1),
+        (-2,0,2,0,1),
+        (-2,1,0,2,1),
+        (0,0,1,-2,0),
+        (-1,0,1,0,0),
+        (-2,1,0,0,0),
+        (1,0,0,0,0),
+        (0,0,1,2,0),
+        (0,0,-2,2,2),
+        (-1,-1,1,0,0),
+        (0,1,1,0,0),
+        (0,-1,1,2,2),
+        (2,-1,-1,2,2),
+        (0,0,3,2,2),
+        (2,-1,0,2,2),
     ]
     
-    let PE_TERMS: [[Double]] = [
-        [-171996,-174.2,92025,8.9],
-        [-13187,-1.6,5736,-3.1],
-        [-2274,-0.2,977,-0.5],
-        [2062,0.2,-895,0.5],
-        [1426,-3.4,54,-0.1],
-        [712,0.1,-7,0],
-        [-517,1.2,224,-0.6],
-        [-386,-0.4,200,0],
-        [-301,0,129,-0.1],
-        [217,-0.5,-95,0.3],
-        [-158,0,0,0],
-        [129,0.1,-70,0],
-        [123,0,-53,0],
-        [63,0,0,0],
-        [63,0.1,-33,0],
-        [-59,0,26,0],
-        [-58,-0.1,32,0],
-        [-51,0,27,0],
-        [48,0,0,0],
-        [46,0,-24,0],
-        [-38,0,16,0],
-        [-31,0,13,0],
-        [29,0,0,0],
-        [29,0,-12,0],
-        [26,0,0,0],
-        [-22,0,0,0],
-        [21,0,-10,0],
-        [17,-0.1,0,0],
-        [16,0,-8,0],
-        [-16,0.1,7,0],
-        [-15,0,9,0],
-        [-13,0,7,0],
-        [-12,0,6,0],
-        [11,0,0,0],
-        [-10,0,5,0],
-        [-8,0,3,0],
-        [7,0,-3,0],
-        [-7,0,0,0],
-        [-7,0,3,0],
-        [-7,0,3,0],
-        [6,0,0,0],
-        [6,0,-3,0],
-        [6,0,-3,0],
-        [-6,0,3,0],
-        [-6,0,3,0],
-        [5,0,0,0],
-        [-5,0,3,0],
-        [-5,0,3,0],
-        [-5,0,3,0],
-        [4,0,0,0],
-        [4,0,0,0],
-        [4,0,0,0],
-        [-4,0,0,0],
-        [-4,0,0,0],
-        [-4,0,0,0],
-        [3,0,0,0],
-        [-3,0,0,0],
-        [-3,0,0,0],
-        [-3,0,0,0],
-        [-3,0,0,0],
-        [-3,0,0,0],
-        [-3,0,0,0],
-        [-3,0,0,0],
+    let PE_TERMS: [(Double, Double, Double, Double)] = [
+        (-171996,-174.2,92025,8.9),
+        (-13187,-1.6,5736,-3.1),
+        (-2274,-0.2,977,-0.5),
+        (2062,0.2,-895,0.5),
+        (1426,-3.4,54,-0.1),
+        (712,0.1,-7,0),
+        (-517,1.2,224,-0.6),
+        (-386,-0.4,200,0),
+        (-301,0,129,-0.1),
+        (217,-0.5,-95,0.3),
+        (-158,0,0,0),
+        (129,0.1,-70,0),
+        (123,0,-53,0),
+        (63,0,0,0),
+        (63,0.1,-33,0),
+        (-59,0,26,0),
+        (-58,-0.1,32,0),
+        (-51,0,27,0),
+        (48,0,0,0),
+        (46,0,-24,0),
+        (-38,0,16,0),
+        (-31,0,13,0),
+        (29,0,0,0),
+        (29,0,-12,0),
+        (26,0,0,0),
+        (-22,0,0,0),
+        (21,0,-10,0),
+        (17,-0.1,0,0),
+        (16,0,-8,0),
+        (-16,0.1,7,0),
+        (-15,0,9,0),
+        (-13,0,7,0),
+        (-12,0,6,0),
+        (11,0,0,0),
+        (-10,0,5,0),
+        (-8,0,3,0),
+        (7,0,-3,0),
+        (-7,0,0,0),
+        (-7,0,3,0),
+        (-7,0,3,0),
+        (6,0,0,0),
+        (6,0,-3,0),
+        (6,0,-3,0),
+        (-6,0,3,0),
+        (-6,0,3,0),
+        (5,0,0,0),
+        (-5,0,3,0),
+        (-5,0,3,0),
+        (-5,0,3,0),
+        (4,0,0,0),
+        (4,0,0,0),
+        (4,0,0,0),
+        (-4,0,0,0),
+        (-4,0,0,0),
+        (-4,0,0,0),
+        (3,0,0,0),
+        (-3,0,0,0),
+        (-3,0,0,0),
+        (-3,0,0,0),
+        (-3,0,0,0),
+        (-3,0,0,0),
+        (-3,0,0,0),
+        (-3,0,0,0),
     ]
 }
 
