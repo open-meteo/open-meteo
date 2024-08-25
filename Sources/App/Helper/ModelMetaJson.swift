@@ -18,10 +18,10 @@ struct ModelUpdateMetaJson: Codable {
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
     let temporal_resolution_seconds: Int
     
-    /// First date of available data
+    /// First date of available data -> Also different per server / variable etc
     let data_start_time: Int
     
-    /// Last available timestamp
+    /// Last available timestamp -> Probably not reliable at all.... Short runs, upper model runs, etc....
     let data_end_time: Int
     
     /// Write a new meta data JSON
