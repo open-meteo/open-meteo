@@ -33,9 +33,7 @@ final class BenchmarkCommand: Command {
         run.measure("Solar Position Calculation for 50 years, hourly", 625) {
             let _ = SolarPositionAlgorithm.sunPosition(timerange: TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2000,1,1), dtSeconds: 3600))
         }
-        
-        return
-        
+                
         let sizeMb = 128
         let data = run.measure("Generating dummy temperature timeseries (\(sizeMb) MB)", 272) {
             return (0..<1024*1024/4*sizeMb).map({

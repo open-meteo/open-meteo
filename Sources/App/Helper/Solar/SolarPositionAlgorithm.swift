@@ -2,8 +2,12 @@ import Foundation
 import CHelper
 
 /**
- Support routines to use the NREL Solar Posiition Altorithm SPA
+ Solar position calculation based on the NREL Solar Position Algorithm SPA
  https://www.nrel.gov/docs/fy08osti/34302.pdf
+ 
+ Only solar declination and equation of time are calculated.
+ The Swift version is approx 5 times faster than C by skipping unnecessary calculations.
+ Calculation of 50 years hourly solar position requires roughly 700ms.
  */
 struct SolarPositionAlgorithm {
     /// Calculate solar position for a given timerange
@@ -250,7 +254,6 @@ struct SolarPositionAlgorithm {
     func calculate(julianDate jd: Double) -> (delta: Double, eot: Double) {
         //double x[TERM_X_COUNT]
         let delta_t: Double = 60
-        //let jd = julian_day(year: year, month: month, day: day, hour: hour, minute: minute, second: second, delta_ut1: delta_ut1, timezone: timezone)
         //spa->jc = julian_century(spa->jd)
         
         let jde = julian_ephemeris_day(jd: jd, deltaT: delta_t)
@@ -275,15 +278,15 @@ struct SolarPositionAlgorithm {
         let epsilon0 = ecliptic_mean_obliquity(jme: jme)
         let epsilon  = ecliptic_true_obliquity(delta_epsilon: del_epsilon, epsilon0: epsilon0)
         
-        let del_tau   = aberration_correction(r: r)
-        let lamda     = apparent_sun_longitude(theta: theta, delta_psi: del_psi, delta_tau: del_tau)
+        let del_tau  = aberration_correction(r: r)
+        let lamda    = apparent_sun_longitude(theta: theta, delta_psi: del_psi, delta_tau: del_tau)
         //spa->nu0       = greenwich_mean_sidereal_time (spa->jd, spa->jc)
         //spa->nu        = greenwich_sidereal_time (spa->nu0, spa->del_psi, spa->epsilon)
         
         let alpha = geocentric_right_ascension(lamda: lamda, epsilon: epsilon, beta: beta)
         let delta = geocentric_declination(beta: beta, epsilon: epsilon, lamda: lamda)
         
-        let m        = sun_mean_longitude(jme: jme)
+        let m   = sun_mean_longitude(jme: jme)
         let eot = eot(m: m, alpha: alpha, del_psi: del_psi, epsilon: epsilon)
         
         return (delta, eot)
