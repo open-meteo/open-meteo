@@ -60,7 +60,7 @@ struct SPA2 {
     {
         var sum: Double = 0
         for i in 0..<terms.count {
-            sum += terms[i].reduce(0, { $0 + $1.0 * cos($1.1 + $1.2 * jme) })
+            sum += terms[i].reduce(0, { $0 + $1.0 * cos($1.1 + $1.2 * jme) }) * pow(jme, Double(i))
         }
         return sum / 1.0e8
     }
