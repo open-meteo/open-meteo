@@ -26,18 +26,22 @@ struct SPA2 {
         return julianDay
     }
     
+    @inlinable
     func julian_ephemeris_day(jd: Double, deltaT: Double) -> Double {
         return jd + deltaT / 86400.0
     }
     
+    @inlinable
     func julian_ephemeris_century(jde: Double) -> Double {
         return (jde - 2451545.0) / 36525.0
     }
     
+    @inlinable
     func julian_ephemeris_millennium(jce: Double) -> Double {
         return jce / 10.0
     }
     
+    @inlinable
     func limit_degrees(degrees: Double) -> Double {
         let degrees = degrees / 360.0
         var limited = 360.0*(degrees-floor(degrees))
@@ -79,6 +83,7 @@ struct SPA2 {
         return sum
     }
     
+    @inlinable
     func geocentric_longitude(l: Double) -> Double {
         let theta = l + 180.0
         if (theta >= 360.0) {
@@ -87,10 +92,12 @@ struct SPA2 {
         return theta
     }
     
+    @inlinable
     func geocentric_latitude(b: Double) -> Double {
         return -b
     }
     
+    @inlinable
     func third_order_polynomial(_ a: Double, _ b: Double, _ c: Double, _ d: Double, _ x: Double) -> Double {
         let a2 = fma(x, a, b)
         let a1 = fma(x, a2, c)
@@ -151,14 +158,17 @@ struct SPA2 {
         return fma(u, a1, 84381.448)
     }
     
+    @inlinable
     func ecliptic_true_obliquity(delta_epsilon: Double, epsilon0: Double) -> Double {
         return delta_epsilon + epsilon0/3600.0
     }
     
+    @inlinable
     func aberration_correction(r: Double) -> Double {
         return -20.4898 / (3600.0*r)
     }
     
+    @inlinable
     func apparent_sun_longitude(theta: Double, delta_psi: Double, delta_tau: Double) -> Double {
         return theta + delta_psi + delta_tau
     }
@@ -601,10 +611,12 @@ struct SPA2 {
 }
 
 extension Double {
+    @inlinable
     var rad2deg: Double {
         return (180.0 / .pi)*self
     }
     
+    @inlinable
     var deg2rad: Double
     {
         return (.pi / 180.0)*self
