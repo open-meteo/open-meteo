@@ -15,7 +15,7 @@ struct SolarPositionAlgorithm {
         
         for time in timerange {
             let date = time.toComponents()
-            var a = spa_data(
+            /*var a = spa_data(
                 year: Int32(date.year),
                 month: Int32(date.month),
                 day: Int32(date.day),
@@ -36,7 +36,17 @@ struct SolarPositionAlgorithm {
             
             guard spa_calculate(&a) == 0 else {
                 fatalError("SPA failed")
-            }
+            }*/
+            
+            let a = SPA2().calculate(                year: Int(date.year),
+                                                     month: Int(date.month),
+                                                     day: Int(date.day),
+                                                     hour: Int(time.hour),
+                                                     minute: Int(time.minute),
+                                                     second: Double(time.second),
+                                                     delta_ut1: 0,
+                                                     timezone: 0)
+            
             declination.append(Float(a.delta))
             equationOfTime.append(Float(a.eot))
         }
