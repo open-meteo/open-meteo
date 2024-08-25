@@ -40,229 +40,208 @@ struct SPA2 {
     
     func limit_degrees(degrees: Double) -> Double
     {
-        let degrees = degrees / 360.0;
-        var limited = 360.0*(degrees-floor(degrees));
+        let degrees = degrees / 360.0
+        var limited = 360.0*(degrees-floor(degrees))
         if (limited < 0) { limited += 360.0 }
-        return limited;
+        return limited
     }
     
     func limit_minutes(minutes: Double) -> Double
     {
-        var limited=minutes;
+        var limited=minutes
         
-        if      (limited < -20.0) { limited += 1440.0; }
-        else if (limited >  20.0) { limited -= 1440.0; }
+        if      (limited < -20.0) { limited += 1440.0 }
+        else if (limited >  20.0) { limited -= 1440.0 }
         
-        return limited;
+        return limited
     }
     
-    
-    func earth_values(term_sum: [Double], jme: Double) -> Double
+    func earth_periodic_term_summation(terms: [[(Double, Double, Double)]], jme: Double) -> Double
     {
-        let sum = term_sum.enumerated().reduce(0, {$0 + $1.element * pow(jme, Double($1.offset))})
+        var sum: Double = 0
+        for i in 0..<terms.count {
+            sum += terms[i].reduce(0, { $0 + $1.0 * cos($1.1 + $1.2 * jme) })
+        }
         return sum / 1.0e8
     }
     
-    func earth_periodic_term_summation(terms: [(Double, Double, Double)], jme: Double) -> Double
-    {
-        return terms.reduce(0, { $0 + $1.0 * cos($1.1 + $1.2 * jme) })
-    }
-    
     func earth_heliocentric_longitude(jme: Double) -> Double {
-        var sum = [Double](repeating: 0.0, count: L_TERMS.count)
-        
-        for i in 0..<L_TERMS.count {
-            sum[i] = earth_periodic_term_summation(terms: L_TERMS[i], jme: jme);
-        }
-        
-        return limit_degrees(degrees: earth_values(term_sum: sum, jme: jme).rad2deg);
-        
+        let sum = earth_periodic_term_summation(terms: L_TERMS, jme: jme)
+        return limit_degrees(degrees: sum.rad2deg)
     }
     
     func earth_heliocentric_latitude(jme: Double) -> Double
     {
-        var sum = [Double](repeating: 0.0, count: B_TERMS.count)
-        
-        for i in 0..<B_TERMS.count {
-            sum[i] = earth_periodic_term_summation(terms: B_TERMS[i], jme: jme);
-        }
-        
-        return earth_values(term_sum: sum, jme: jme).rad2deg;
-        
+        let sum = earth_periodic_term_summation(terms: B_TERMS, jme: jme)
+        return sum.rad2deg
     }
     
     func earth_radius_vector(jme: Double) -> Double
     {
-        var sum = [Double](repeating: 0.0, count: R_TERMS.count)
-        
-        for i in 0..<R_TERMS.count {
-            sum[i] = earth_periodic_term_summation(terms: R_TERMS[i], jme: jme);
-        }
-        
-        return earth_values(term_sum: sum, jme: jme);
-        
+        let sum = earth_periodic_term_summation(terms: R_TERMS, jme: jme)
+        return sum
     }
     
     func geocentric_longitude(l: Double) -> Double
     {
-        var theta = l + 180.0;
+        var theta = l + 180.0
         
-        if (theta >= 360.0) { theta -= 360.0; }
+        if (theta >= 360.0) { theta -= 360.0 }
         
-        return theta;
+        return theta
     }
     
     func geocentric_latitude(b: Double) -> Double
     {
-        return -b;
+        return -b
     }
     
     func third_order_polynomial(_ a: Double, _ b: Double, _ c: Double, _ d: Double, _ x: Double) -> Double {
-        return ((a*x + b)*x + c)*x + d;
+        return ((a*x + b)*x + c)*x + d
     }
     
     func mean_elongation_moon_sun(jce: Double) -> Double
     {
-        return third_order_polynomial(1.0/189474.0, -0.0019142, 445267.11148, 297.85036, jce);
+        return third_order_polynomial(1.0/189474.0, -0.0019142, 445267.11148, 297.85036, jce)
     }
     
     func mean_anomaly_sun(jce: Double) -> Double
     {
-        return third_order_polynomial(-1.0/300000.0, -0.0001603, 35999.05034, 357.52772, jce);
+        return third_order_polynomial(-1.0/300000.0, -0.0001603, 35999.05034, 357.52772, jce)
     }
     
     func mean_anomaly_moon(jce: Double) -> Double
     {
-        return third_order_polynomial(1.0/56250.0, 0.0086972, 477198.867398, 134.96298, jce);
+        return third_order_polynomial(1.0/56250.0, 0.0086972, 477198.867398, 134.96298, jce)
     }
     
     func argument_latitude_moon(jce: Double) -> Double
     {
-        return third_order_polynomial(1.0/327270.0, -0.0036825, 483202.017538, 93.27191, jce);
+        return third_order_polynomial(1.0/327270.0, -0.0036825, 483202.017538, 93.27191, jce)
     }
     
     func ascending_longitude_moon(jce: Double) -> Double
     {
-        return third_order_polynomial(1.0/450000.0, 0.0020708, -1934.136261, 125.04452, jce);
+        return third_order_polynomial(1.0/450000.0, 0.0020708, -1934.136261, 125.04452, jce)
     }
     
     func xy_term_summation(i: Int, x: [Double]) -> Double
     {
-        var sum: Double = 0;
+        var sum: Double = 0
         
         for j in 0..<Y_TERMS[i].count {
-            sum += x[j]*Y_TERMS[i][j];
+            sum += x[j]*Y_TERMS[i][j]
         }
         
-        return sum;
+        return sum
     }
     
     func nutation_longitude_and_obliquity(jce: Double, x: [Double]) -> (del_psi: Double, del_epsilon: Double)
     {
-        var sum_psi: Double=0, sum_epsilon: Double=0;
+        var sum_psi: Double=0, sum_epsilon: Double=0
         
         for i in 0..<Y_TERMS.count {
-            let xy_term_sum  = xy_term_summation(i: i, x: x).deg2rad;
-            sum_psi     += (PE_TERMS[i][0] + jce*PE_TERMS[i][1])*sin(xy_term_sum);
-            sum_epsilon += (PE_TERMS[i][2] + jce*PE_TERMS[i][3])*cos(xy_term_sum);
+            let xy_term_sum  = xy_term_summation(i: i, x: x).deg2rad
+            sum_psi     += (PE_TERMS[i][0] + jce*PE_TERMS[i][1])*sin(xy_term_sum)
+            sum_epsilon += (PE_TERMS[i][2] + jce*PE_TERMS[i][3])*cos(xy_term_sum)
         }
         
-        let del_psi     = sum_psi     / 36000000.0;
-        let del_epsilon = sum_epsilon / 36000000.0;
+        let del_psi     = sum_psi     / 36000000.0
+        let del_epsilon = sum_epsilon / 36000000.0
         return (del_psi, del_epsilon)
     }
     
     func ecliptic_mean_obliquity(jme: Double) -> Double
     {
-        let u = jme/10.0;
+        let u = jme/10.0
         
         return 84381.448 + u*(-4680.93 + u*(-1.55 + u*(1999.25 + u*(-51.38 + u*(-249.67 +
-                                                                                 u*(  -39.05 + u*( 7.12 + u*(  27.87 + u*(  5.79 + u*2.45)))))))));
+                                                                                 u*(  -39.05 + u*( 7.12 + u*(  27.87 + u*(  5.79 + u*2.45)))))))))
     }
     
     func ecliptic_true_obliquity(delta_epsilon: Double, epsilon0: Double) -> Double
     {
-        return delta_epsilon + epsilon0/3600.0;
+        return delta_epsilon + epsilon0/3600.0
     }
     
     func aberration_correction(r: Double) -> Double
     {
-        return -20.4898 / (3600.0*r);
+        return -20.4898 / (3600.0*r)
     }
     
     func apparent_sun_longitude(theta: Double, delta_psi: Double, delta_tau: Double) -> Double
     {
-        return theta + delta_psi + delta_tau;
+        return theta + delta_psi + delta_tau
     }
     
     func geocentric_right_ascension(lamda: Double, epsilon: Double, beta: Double) -> Double
     {
-        let lamda_rad   = lamda.deg2rad;
-        let epsilon_rad = epsilon.deg2rad;
+        let lamda_rad   = lamda.deg2rad
+        let epsilon_rad = epsilon.deg2rad
         
         return limit_degrees(degrees: atan2(sin(lamda_rad)*cos(epsilon_rad) -
-                                            tan(beta.deg2rad)*sin(epsilon_rad), cos(lamda_rad)).rad2deg);
+                                            tan(beta.deg2rad)*sin(epsilon_rad), cos(lamda_rad)).rad2deg)
     }
     
     func geocentric_declination(beta: Double, epsilon: Double, lamda: Double) -> Double
     {
-        let beta_rad    = (beta.deg2rad);
-        let epsilon_rad = (epsilon.deg2rad);
+        let beta_rad    = (beta.deg2rad)
+        let epsilon_rad = (epsilon.deg2rad)
         
         return (asin(sin(beta_rad)*cos(epsilon_rad) +
-                     cos(beta_rad)*sin(epsilon_rad)*sin(lamda.deg2rad))).rad2deg;
+                     cos(beta_rad)*sin(epsilon_rad)*sin(lamda.deg2rad))).rad2deg
     }
     
     func sun_mean_longitude(jme: Double) -> Double
     {
         return limit_degrees(degrees: 280.4664567 + jme*(360007.6982779 + jme*(0.03032028 +
-                                                                               jme*(1/49931.0   + jme*(-1/15300.0     + jme*(-1/2000000.0))))));
+                                                                               jme*(1/49931.0   + jme*(-1/15300.0     + jme*(-1/2000000.0))))))
     }
     
     func eot(m: Double, alpha: Double, del_psi: Double, epsilon: Double) -> Double
     {
-        return limit_minutes(minutes: 4.0*(m - 0.0057183 - alpha + del_psi*cos(epsilon.deg2rad)));
+        return limit_minutes(minutes: 4.0*(m - 0.0057183 - alpha + del_psi*cos(epsilon.deg2rad)))
     }
     
     
     func calculate(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Double, delta_ut1: Double, timezone: Double) -> (delta: Double, eot: Double) {
-        //double x[TERM_X_COUNT];
+        //double x[TERM_X_COUNT]
         let delta_t: Double = 60
         let jd = julian_day(year: year, month: month, day: day, hour: hour, minute: minute, second: second, delta_ut1: delta_ut1, timezone: timezone)
-        //spa->jc = julian_century(spa->jd);
+        //spa->jc = julian_century(spa->jd)
         
-        let jde = julian_ephemeris_day(jd: jd, deltaT: delta_t);
-        let jce = julian_ephemeris_century(jde: jde);
-        let jme = julian_ephemeris_millennium(jce: jce);
+        let jde = julian_ephemeris_day(jd: jd, deltaT: delta_t)
+        let jce = julian_ephemeris_century(jde: jde)
+        let jme = julian_ephemeris_millennium(jce: jce)
         
-        let l = earth_heliocentric_longitude(jme: jme);
-        let b = earth_heliocentric_latitude(jme: jme);
-        let r = earth_radius_vector(jme: jme);
+        let l = earth_heliocentric_longitude(jme: jme)
+        let b = earth_heliocentric_latitude(jme: jme)
+        let r = earth_radius_vector(jme: jme)
         
-        let theta = geocentric_longitude(l: l);
-        let beta  = geocentric_latitude(b: b);
+        let theta = geocentric_longitude(l: l)
+        let beta  = geocentric_latitude(b: b)
         
-        let x0 = mean_elongation_moon_sun(jce: jce);
-        let x1 = mean_anomaly_sun(jce: jce);
-        let x2 = mean_anomaly_moon(jce: jce);
-        let x3 = argument_latitude_moon(jce: jce);
-        let x4 = ascending_longitude_moon(jce: jce);
+        let x0 = mean_elongation_moon_sun(jce: jce)
+        let x1 = mean_anomaly_sun(jce: jce)
+        let x2 = mean_anomaly_moon(jce: jce)
+        let x3 = argument_latitude_moon(jce: jce)
+        let x4 = ascending_longitude_moon(jce: jce)
         
-        let (del_psi, del_epsilon) = nutation_longitude_and_obliquity(jce: jce, x: [x0,x1,x2,x3,x4]);
+        let (del_psi, del_epsilon) = nutation_longitude_and_obliquity(jce: jce, x: [x0,x1,x2,x3,x4])
         
-        let epsilon0 = ecliptic_mean_obliquity(jme: jme);
-        let epsilon  = ecliptic_true_obliquity(delta_epsilon: del_epsilon, epsilon0: epsilon0);
+        let epsilon0 = ecliptic_mean_obliquity(jme: jme)
+        let epsilon  = ecliptic_true_obliquity(delta_epsilon: del_epsilon, epsilon0: epsilon0)
         
-        let del_tau   = aberration_correction(r: r);
-        let lamda     = apparent_sun_longitude(theta: theta, delta_psi: del_psi, delta_tau: del_tau);
-        //spa->nu0       = greenwich_mean_sidereal_time (spa->jd, spa->jc);
-        //spa->nu        = greenwich_sidereal_time (spa->nu0, spa->del_psi, spa->epsilon);
+        let del_tau   = aberration_correction(r: r)
+        let lamda     = apparent_sun_longitude(theta: theta, delta_psi: del_psi, delta_tau: del_tau)
+        //spa->nu0       = greenwich_mean_sidereal_time (spa->jd, spa->jc)
+        //spa->nu        = greenwich_sidereal_time (spa->nu0, spa->del_psi, spa->epsilon)
         
-        let alpha = geocentric_right_ascension(lamda: lamda, epsilon: epsilon, beta: beta);
-        let delta = geocentric_declination(beta: beta, epsilon: epsilon, lamda: lamda);
+        let alpha = geocentric_right_ascension(lamda: lamda, epsilon: epsilon, beta: beta)
+        let delta = geocentric_declination(beta: beta, epsilon: epsilon, lamda: lamda)
         
-        let m        = sun_mean_longitude(jme: jme);
-        let eot = eot(m: m, alpha: alpha, del_psi: del_psi, epsilon: epsilon);
+        let m        = sun_mean_longitude(jme: jme)
+        let eot = eot(m: m, alpha: alpha, del_psi: del_psi, epsilon: epsilon)
         
         return (delta, eot)
     }
@@ -411,7 +390,7 @@ struct SPA2 {
         [
             (1,3.14,0)
         ]
-    ];
+    ]
     
     let B_TERMS: [[(Double, Double, Double)]] =
     [
@@ -426,7 +405,7 @@ struct SPA2 {
             (9,3.9,5507.55),
             (6,1.73,5223.69)
         ]
-    ];
+    ]
     
     let R_TERMS: [[(Double, Double, Double)]] =
     [
@@ -499,7 +478,7 @@ struct SPA2 {
         [
             (4,2.56,6283.08)
         ]
-    ];
+    ]
     
     ////////////////////////////////////////////////////////////////
     ///  Periodic Terms for the nutation in longitude and obliquity
@@ -570,7 +549,7 @@ struct SPA2 {
         [2,-1,-1,2,2],
         [0,0,3,2,2],
         [2,-1,0,2,2],
-    ];
+    ]
     
     let PE_TERMS: [[Double]] = [
         [-171996,-174.2,92025,8.9],
@@ -636,16 +615,16 @@ struct SPA2 {
         [-3,0,0,0],
         [-3,0,0,0],
         [-3,0,0,0],
-    ];
+    ]
 }
 
 extension Double {
     var rad2deg: Double {
-        return (180.0 / .pi)*self;
+        return (180.0 / .pi)*self
     }
     
     var deg2rad: Double
     {
-        return (.pi / 180.0)*self;
+        return (.pi / 180.0)*self
     }
 }
