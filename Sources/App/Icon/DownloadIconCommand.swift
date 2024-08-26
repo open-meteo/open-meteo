@@ -221,6 +221,9 @@ struct DownloadIconCommand: AsyncCommand {
                     if let variable = variable as? IconSurfaceVariable {
                         if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            if variable == .temperature_2m {
+                                logger.info("Storing \(variable) for member \(member)")
+                            }
                             continue
                         }
                     }
@@ -253,14 +256,14 @@ struct DownloadIconCommand: AsyncCommand {
                     // ICON EPC is actually downloading surface level pressure
                     // calculate sea level presure using temperature and elevation
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Sea level pressure calculation requires temperature 2m")
+                        fatalError("Sea level pressure calculation requires temperature 2m, member \(v.member)")
                     }
                     data.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: data.data, elevation: domainElevation)
                 }
                 if domain == .iconEps && v.variable == .relative_humidity_2m {
                     // ICON EPS is using dewpoint, convert to relative humidity
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Relative humidity calculation requires temperature_2m")
+                        fatalError("Relative humidity calculation requires temperature_2m, member \(v.member)")
                     }
                     data.data.multiplyAdd(multiply: 1, add: -273.15)
                     data.data = zip(t2m.data, data.data).map(Meteorology.relativeHumidity)
@@ -270,10 +273,10 @@ struct DownloadIconCommand: AsyncCommand {
                 // Similar for snow at +2°C or more
                 if v.variable == .weather_code {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Weather code correction requires temperature_2m")
+                        fatalError("Weather code correction requires temperature_2m, member \(v.member)")
                     }
                     guard let precip = await storage.get(v.with(variable: .precipitation)) else {
-                        fatalError("Weather code correction requires precipitation")
+                        fatalError("Weather code correction requires precipitation, member \(v.member)")
                     }
                     let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
                     for i in data.data.indices {
@@ -294,7 +297,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Note: snowfall height is NaN if snowfall height is at ground level
                 if v.variable == .freezing_level_height || v.variable == .snowfall_height {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Freezing level height and snowfall height correction requires temperature_2m")
+                        fatalError("Freezing level height and snowfall height correction requires temperature_2m, member \(v.member)")
                     }
                     for i in data.data.indices {
                         let freezingLevelHeight = data.data[i].isNaN ? max(0, domainElevation[i]) : data.data[i]
@@ -309,7 +312,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Add snow to liquid rain if temperature is > 1.5°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain, let snowfallWaterEquivalent = await storage.get(v.with(variable: .snowfall_water_equivalent)) {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Rain correction requires temperature 2m")
+                        fatalError("Rain correction requires temperature 2m, member \(v.member)")
                     }
                     let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
                     let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
@@ -325,7 +328,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// Set snow to 0 if temperature is > 1.5°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .snowfall_water_equivalent {
                     guard let t2m = await storage.get(v.with(variable: .temperature_2m)) else {
-                        fatalError("Snow correction requires temperature 2m")
+                        fatalError("Snow correction requires temperature 2m, member \(v.member)")
                     }
                     let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
                     let snowfallConvectiveWaterEquivalent = await storage.get(v.with(variable: .snowfall_convective_water_equivalent))
