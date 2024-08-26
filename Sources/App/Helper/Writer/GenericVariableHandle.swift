@@ -89,12 +89,13 @@ struct GenericVariableHandle {
                 let d0offset = offset / nMembers
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+                let nLoc = locationRange.count
                 data3d.data.fillWithNaNs()
                 for reader in readers {
                     precondition(reader.reader.count == nMembers, "nMember count wrong")
                     for r in reader.reader {
-                        try r.fn.read(into: &readTemp, arrayDim1Range: (0..<locationRange.count), arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<locationRange.count, r.member, time.index(of: reader.time)!] = readTemp
+                        try r.fn.read(into: &readTemp, arrayDim1Range: 0..<nLoc, arrayDim1Length: nLoc, dim0Slow: 0..<1, dim1: locationRange)
+                        data3d[0..<nLoc, r.member, time.index(of: reader.time)!] = readTemp[0..<nLoc]
                     }
                 }
                 
@@ -116,8 +117,8 @@ struct GenericVariableHandle {
                     locationRange: locationRange
                 )
                 
-                progress.add(locationRange.count * nMembers)
-                return data3d.data[0..<locationRange.count * nMembers * time.count]
+                progress.add(nLoc * nMembers)
+                return data3d.data[0..<nLoc * nMembers * time.count]
             }
             progress.finish()
         }
