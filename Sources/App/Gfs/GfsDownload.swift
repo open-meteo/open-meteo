@@ -80,10 +80,6 @@ struct GfsDownload: AsyncCommand {
         let variables: [any GfsVariableDownloadable]
         
         switch domain {
-        case .gfs025_ensemble:
-            variables = [GfsSurfaceVariable.precipitation_probability]
-            let handles = try await downloadPrecipitationProbability(application: context.application, run: run)
-            try GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles)
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens:
@@ -212,8 +208,6 @@ struct GfsDownload: AsyncCommand {
             deadLineHours = 2
         case .hrrr_conus:
             deadLineHours = 2
-        case .gfs025_ensemble:
-            deadLineHours = 8
         case .gfs025_ens, .gfswave025_ens:
             deadLineHours = 8
         case .gfs05_ens:
@@ -437,73 +431,6 @@ struct GfsDownload: AsyncCommand {
                 }
             }
             previousHour = forecastHour
-        }
-        await curl.printStatistics()
-        return handles
-    }
-    
-    /// Download precipitation members from GFS ensemble and calculate probability
-    func downloadPrecipitationProbability(application: Application, run: Timestamp) async throws -> [GenericVariableHandle] {
-        let domain = GfsDomain.gfs025_ensemble
-        
-        let grid = domain.grid
-        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
-        let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4, waitAfterLastModified: 90)
-        
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        
-        enum EnsembleVariable: CurlIndexedVariable, CaseIterable {
-            var gribIndexName: String? {
-                return "APCP:surface"
-            }
-            case precipitation
-        }
-        let members = 0...30
-        let forecastHours = domain.forecastHours(run: run.hour, secondFlush: false)
-        var previous = [Int: [Float]]()
-        previous.reserveCapacity(members.count)
-        let threshold = Float(0.3)
-        var handles = [GenericVariableHandle]()
-        
-        for forecastHour in forecastHours {
-            if forecastHour == 0 {
-                continue
-            }
-            /// Probability 0-100
-            var greater01 = [Float](repeating: 0, count: grid.count)
-            // Download all members, and increase precipitation probability
-            for member in members {
-                let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
-                let grib = try await curl.downloadIndexedGrib(url: url, variables: EnsembleVariable.allCases)[0]
-                try grib2d.load(message: grib.message)
-                grib2d.array.shift180LongitudeAndFlipLatitude()
-                let startStep = Int(grib.message.get(attribute: "stepRange")!.split(separator: "-")[0])!
-                
-                // deaccumlate on the fly
-                if startStep != forecastHour - 3, let previousData = previous[member] {
-                    for i in 0..<grib2d.array.data.count {
-                        if grib2d.array.data[i] - previousData[i] >= threshold {
-                            greater01[i] += 100 / Float(members.count)
-                        }
-                    }
-                } else {
-                    for i in 0..<grib2d.array.data.count {
-                        if grib2d.array.data[i] >= threshold {
-                            greater01[i] += 100 / Float(members.count)
-                        }
-                    }
-                }
-                previous[member] = grib2d.array.data
-            }
-            let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: greater01)
-            handles.append(GenericVariableHandle(
-                variable: GfsSurfaceVariable.precipitation_probability,
-                time: run.add(hours: forecastHour),
-                member: 0,
-                fn: fn
-            ))
         }
         await curl.printStatistics()
         return handles

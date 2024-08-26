@@ -75,8 +75,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case visibility
     
-    case precipitation_probability
-    
     
     var storePreviousForecast: Bool {
         switch self {
@@ -152,7 +150,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .diffuse_radiation: return 1
         case .uv_index: return 20
         case .uv_index_clear_sky: return 20
-        case .precipitation_probability: return 1
         case .categorical_freezing_rain: return 1
         case .convective_inhibition: return 1
         }
@@ -240,8 +237,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .visibility:
             return .linear
-        case .precipitation_probability:
-            return .linear
         case .convective_inhibition:
             return .hermite(bounds: nil)
         }
@@ -288,7 +283,6 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .diffuse_radiation: return .wattPerSquareMetre
         case .uv_index: return .dimensionless
         case .uv_index_clear_sky: return .dimensionless
-        case .precipitation_probability: return .percentage
         case .categorical_freezing_rain: return .dimensionless
         case .convective_inhibition: return .joulePerKilogram
         }

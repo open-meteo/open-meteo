@@ -366,7 +366,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             let iconProbabilities = try ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             
-            guard let gfs: any GenericReaderProtocol = try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            guard let gfs: any GenericReaderProtocol = try GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
             // For Netherlands and Belgium use KNMI
@@ -435,7 +435,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [gfsProbabilites] + (try GfsReader(domains: [.gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .gfs_global:
             let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return [gfsProbabilites] + (try GfsReader(domains: [.gfs025_ensemble, .gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return [gfsProbabilites] + (try GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
         case .gfs025:
             return try GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .gfs013:
