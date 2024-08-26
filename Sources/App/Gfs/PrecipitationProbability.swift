@@ -43,7 +43,6 @@ struct ProbabilityReader {
     /// Read probabilities from GFS ensemble models 0.25° and 0.5°
     static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderMixerSameDomain<GenericReader<GfsDomain, ProbabilityVariable>> {
         return GenericReaderMixerSameDomain(reader: [
-            try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode),
             try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode),
             try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode)
         ].compactMap({$0}))

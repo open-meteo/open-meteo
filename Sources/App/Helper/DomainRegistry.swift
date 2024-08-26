@@ -35,7 +35,6 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_gfswave025
     case ncep_gefswave025
     case ncep_gefs025
-    case ncep_gefs025_probability
     case ncep_gefs05
     case ncep_hrrr_conus
     case ncep_hrrr_conus_15min
@@ -162,8 +161,6 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.gfs025
         case .ncep_gefs025:
             return GfsDomain.gfs025_ens
-        case .ncep_gefs025_probability:
-            return GfsDomain.gfs025_ensemble
         case .ncep_gefs05:
             return GfsDomain.gfs05_ens
         case .glofas_consolidated_v4:

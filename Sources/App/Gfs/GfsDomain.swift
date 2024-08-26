@@ -20,9 +20,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     case hrrr_conus_15min
     
-    /// Only used for precipitation probability on the fly
-    case gfs025_ensemble
-    
     /// Actually contains raw member data.
     /// Contains up to 35 days of forecast, BUT the first 16 days are calculated at first, followed by day 16-25 18 hours later and only for 0z run.
     case gfs025_ens
@@ -44,8 +41,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return .ncep_hrrr_conus
         case .hrrr_conus_15min:
             return .ncep_hrrr_conus_15min
-        case .gfs025_ensemble:
-            return .ncep_gefs025_probability
         case .gfs025_ens:
             return .ncep_gefs025
         case .gfs05_ens:
@@ -61,7 +56,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .hrrr_conus_15min:
             return .ncep_hrrr_conus
-        case .gfs025_ensemble, .gfswave025, .gfswave025_ens:
+        case .gfswave025, .gfswave025_ens:
             return .ncep_gefs025
         default:
             return domainRegistry
@@ -86,8 +81,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 24
         case .hrrr_conus_15min:
             return 24
-        case .gfs025_ensemble:
-            return 4
         case .gfs025_ens:
             return 4
         case .gfs05_ens:
@@ -107,8 +100,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .hrrr_conus:
             return 3600
-        case .gfs025_ensemble:
-            return 3*3600
         case .gfs025_ens, .gfswave025_ens:
             return 3*3600
         case .gfs05_ens:
@@ -128,8 +119,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return true
         case .hrrr_conus:
             return false
-        case .gfs025_ensemble:
-            return true
         case .gfs025_ens, .gfswave025_ens:
             return true
         case .gfs05_ens:
@@ -148,8 +137,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs05_ens:
             fallthrough
         case .gfs025_ens, .gfswave025_ens:
-            fallthrough
-        case .gfs025_ensemble:
             fallthrough
         case .gfs013:
             fallthrough
@@ -189,8 +176,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, to: 240, by: 3)) + Array(stride(from: 240, through: 384, by: 6))
         case .gfs025_ens:
             fallthrough
-        case .gfs025_ensemble:
-            return Array(stride(from: 0, through: 240, by: 3))
         case .gfswave025_ens:
             return Array(stride(from: 0, through: 384, by: 3))
         case .gfs013:
@@ -218,8 +203,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             /// Smaler selection, same as ECMWF IFS04
             return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
         case .gfs025_ens:
-            fallthrough
-        case .gfs025_ensemble:
             return []
         case .gfs013:
             return []
@@ -250,8 +233,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return (840 + 4*24)/3 + 1 // 313
         case .gfs025_ens:
             fallthrough
-        case .gfs025_ensemble:
-            return (240 + 4*24)/3 + 1 // 113
         //case .nam_conus:
             //return 60 + 4*24
         case .gfs013:
@@ -277,8 +258,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536-1) / 2, lonMin: -180, dx: 360/3072, dy: 0.11714935)
         case .gfs025_ens:
-            fallthrough
-        case .gfs025_ensemble:
             fallthrough
         case .gfs025, .gfswave025, .gfswave025_ens:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
@@ -333,8 +312,6 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
             return ["\(gefsServer)gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2ap5/\(memberString).t\(hh)z.pgrb2a.0p50.f\(fHHH)",
                     "\(gefsServer)gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2bp5/\(memberString).t\(hh)z.pgrb2b.0p50.f\(fHHH)"]
-        case .gfs025_ensemble:
-            fallthrough
         case .gfs025_ens:
             let memberString = member == 0 ? "gec00" : "gep\(member.zeroPadded(len: 2))"
             return ["\(gefsServer)gefs.\(yyyymmdd)/\(hh)/atmos/pgrb2sp25/\(memberString).t\(hh)z.pgrb2s.0p25.f\(fHHH)"]
