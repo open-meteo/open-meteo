@@ -288,8 +288,8 @@ struct GemDownload: AsyncCommand {
                         handles.append(handle)
                     }
                 }
-                previousHour = hour
             }
+            previousHour = hour
         }
         await curl.printStatistics()
         return handles
