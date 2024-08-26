@@ -171,8 +171,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":CAPE:surface:"
             case .visibility:
                 return ":VIS:surface:"
-            case .precipitation_probability:
-                return nil
             default:
                 return nil
             }
@@ -209,13 +207,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":VDDSF:surface:\(fcst):"
             case .visibility:
                 return ":VIS:surface:\(fcst):"
-            default:
-                return nil
-            }
-        case .gfs025_ensemble:
-            switch self {
-            case .precipitation_probability:
-                return ":APCP:surface:"
             default:
                 return nil
             }
@@ -356,7 +347,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             }
         }
         switch self {
-        case .precipitation_probability: return true
         case .precipitation: return true
         case .categorical_freezing_rain: return true
         case .sensible_heat_flux: return true
@@ -409,8 +399,6 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             case .hrrr_conus:
                 // precipitation rate per second to hourly precipitation
                 return (Float(domain.dtSeconds), 0)
-            case .gfs025_ensemble:
-                fallthrough
             case .gfs025_ens:
                 fallthrough
             case .gfs05_ens:
@@ -469,8 +457,6 @@ extension GfsPressureVariable: GfsVariableDownloadable {
                 // Converted later while downlading
                 return ":VVEL:\(level) mb:"
             case .gfs025_ens:
-                return nil
-            case .gfs025_ensemble:
                 return nil
             }
         }

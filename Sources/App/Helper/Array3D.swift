@@ -123,4 +123,28 @@ public struct Array3DFastTime {
             }
         }
     }
+    
+    /// One spatial field into time-series array
+    @inlinable subscript(location: Range<Int>, level: Int, time: Int) -> ArraySlice<Float> {
+        get {
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            var out = [Float]()
+            out.reserveCapacity(location.count)
+            for loc in location {
+                out.append(self[loc, level, time])
+            }
+            return ArraySlice(out)
+        }
+        set {
+            precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
+            precondition(level < nLevel, "level subscript invalid: \(level) with nLevel=\(nLevel)")
+            precondition(time < nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
+            precondition(newValue.count == location.count, "Array and location count do not match")
+            for (loc, value) in zip(location, newValue) {
+                data[loc * nTime * nLevel + level * nTime + time] = value
+            }
+        }
+    }
 }

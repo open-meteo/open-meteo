@@ -30,6 +30,10 @@ final class BenchmarkCommand: Command {
         print("| \("Test".pad(80)) | \("Mean".pad(8)) | \("Min".pad(8)) | \("Max".pad(8)) | \("Runs".pad(8)) | \("Diff to Apple M1".pad(20)) |")
         print("|\(String.dash(80+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(8+2))|\(String.dash(20+2))|")
         
+        run.measure("Solar Position Calculation for 50 years, hourly", 625) {
+            let _ = SolarPositionAlgorithm.sunPosition(timerange: TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2000,1,1), dtSeconds: 3600))
+        }
+                
         let sizeMb = 128
         let data = run.measure("Generating dummy temperature timeseries (\(sizeMb) MB)", 272) {
             return (0..<1024*1024/4*sizeMb).map({
