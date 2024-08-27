@@ -25,7 +25,7 @@ struct GenericVariableHandle {
     /// Process concurrently
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool) async throws {
         let startTime = Date()
-        /*if concurrent > 1 {
+        if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
                 try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values})
             })
@@ -33,11 +33,11 @@ struct GenericVariableHandle {
             try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles)
         }
         let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
-        logger.info("Conversion completed in \(timeElapsed)")*/
+        logger.info("Conversion completed in \(timeElapsed)")
         
         /// Write new model meta data, but only of it contains temperature_2m or precipitation. Ignores e.g. upper level runs
         if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation"].contains($0.variable.omFileName.file)}) {
-            let end = handles.max(by: {$0.time > $1.time})?.time ?? Timestamp(0)
+            let end = handles.max(by: {$0.time < $1.time})?.time ?? Timestamp(0)
             
             let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
             
@@ -60,13 +60,14 @@ struct GenericVariableHandle {
                     )
                 ]
             }
-            try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes)
-            try ModelUpdateMetaJson.update(domain: domain, run: run, end: end)
+            let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
+            try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
         }
     }
     
     /// Process each variable and update time-series optimised files
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self]) throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], storePreviousForecastOverwrite: Bool? = nil) throws {
         let grid = domain.grid
         let nLocations = grid.count
         
@@ -120,7 +121,7 @@ struct GenericVariableHandle {
                 }
             }
             
-            let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
+            let storePreviousForecast = (storePreviousForecastOverwrite ?? variable.storePreviousForecast) && nMembers <= 1
             
             try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
                 let d0offset = offset / nMembers

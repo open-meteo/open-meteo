@@ -38,6 +38,7 @@ enum ModelTimeVariable: String, GenericVariable {
  TODO:
  - CAMS, IconWave, GloFas, seasonal forecast, CMIP, satellite
  - run end lenght might be too short for side-runs
+ - updates per day? updates every n hours? update_frequency_seconds
  */
 struct ModelUpdateMetaJson: Codable {
     /// Model initilsiation time as unix timestamp. E.g. 0z
@@ -59,8 +60,7 @@ struct ModelUpdateMetaJson: Codable {
     let data_end_time: Int
     
     /// Write a new meta data JSON
-    static func update(domain: GenericDomain, run: Timestamp, end: Timestamp) throws {
-        let now = Timestamp.now()
+    static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws {
         let meta = ModelUpdateMetaJson(
             last_run_initialisation_time: run.timeIntervalSince1970,
             last_run_modification_time: now.timeIntervalSince1970,
