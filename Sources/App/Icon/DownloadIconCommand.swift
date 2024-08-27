@@ -505,13 +505,11 @@ struct DownloadIconCommand: AsyncCommand {
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
         
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
-        try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
             
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent)
-            try ModelUpdateMetaJson.update(domain: IconDomains.iconD2_15min, run: run, handles: handles15minIconD2)
+            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true)
         }
         
         logger.info("Finished in \(start.timeElapsedPretty())")

@@ -1,4 +1,38 @@
 import Foundation
+import SwiftPFor2D
+
+enum ModelTimeVariable: String, GenericVariable {
+    case initialisation_time
+    case modification_time
+    
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+    
+    var scalefactor: Float {
+        return 1
+    }
+    
+    var interpolation: ReaderInterpolation {
+        return .backwards
+    }
+    
+    var unit: SiUnit {
+        return .seconds
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var storePreviousForecast: Bool {
+        return true
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+}
 
 /**
  TODO:
@@ -41,13 +75,6 @@ struct ModelUpdateMetaJson: Codable {
         try fn.write(contentsOf: try encoder.encode(meta))
         try fn.close()
         try FileManager.default.moveFileOverwrite(from: "\(path)~", to: path)
-    }
-    
-    /// Write new model meta data, but only of it contains temperature_2m or precipitation. Ignores e.g. upper level runs
-    static func update(domain: GenericDomain, run: Timestamp, handles: [GenericVariableHandle]) throws {
-        if handles.contains(where: {["temperature_2m", "precipitation"].contains($0.variable.omFileName.file)}) {
-            try update(domain: domain, run: run, end: handles.max(by: {$0.time > $1.time})?.time ?? Timestamp(0))
-        }
     }
 }
 

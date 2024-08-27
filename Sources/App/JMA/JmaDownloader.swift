@@ -56,15 +56,14 @@ struct JmaDownload: AsyncCommand {
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
-                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false)
             }
             return
         }
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent)
-        try ModelUpdateMetaJson.update(domain: domain, run: run, handles: handles)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
         logger.info("Finished in \(start.timeElapsedPretty())")
 
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -486,6 +485,10 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
+    }
+    
+    var ensembleMembers: Int {
+        return 0
     }
     
     var hasYearlyFiles: Bool {

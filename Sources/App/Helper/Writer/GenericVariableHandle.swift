@@ -23,9 +23,9 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool) async throws {
         let startTime = Date()
-        if concurrent > 1 {
+        /*if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
                 try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values})
             })
@@ -33,7 +33,36 @@ struct GenericVariableHandle {
             try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles)
         }
         let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
-        logger.info("Conversion completed in \(timeElapsed)")
+        logger.info("Conversion completed in \(timeElapsed)")*/
+        
+        /// Write new model meta data, but only of it contains temperature_2m or precipitation. Ignores e.g. upper level runs
+        if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation"].contains($0.variable.omFileName.file)}) {
+            let end = handles.max(by: {$0.time > $1.time})?.time ?? Timestamp(0)
+            
+            let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
+            
+            // generate model update timeseries
+            let range = TimerangeDt(start: run, to: end.add(domain.dtSeconds), dtSeconds: domain.dtSeconds)
+            let current = Timestamp.now()
+            let initTimes = try range.flatMap {
+                return [
+                    GenericVariableHandle(
+                        variable: ModelTimeVariable.initialisation_time,
+                        time: $0,
+                        member: 0,
+                        fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: [Float($0.timeIntervalSince1970)])
+                    ),
+                    GenericVariableHandle(
+                        variable: ModelTimeVariable.modification_time,
+                        time: $0,
+                        member: 0,
+                        fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: 1, all: [Float(current.timeIntervalSince1970)])
+                    )
+                ]
+            }
+            try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, end: end)
+        }
     }
     
     /// Process each variable and update time-series optimised files
@@ -56,14 +85,22 @@ struct GenericVariableHandle {
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
             
-            let om = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil)
+            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+                return (time, try h.map{(try $0.makeReader(), $0.member)})
+            }
+            
+            /// If only one value is set, this could be the model initialisation or modifcation time
+            let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
+            
+            let om = OmFileSplitter(domain,
+                                    nLocations: isSingleValueVariable ? 1 : nil,
+                                    nMembers: nMembers,
+                                    chunknLocations: nMembers > 1 ? nMembers : nil
+            )
             let nLocationsPerChunk = om.nLocationsPerChunk
             var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
             var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
             
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
-                return (time, try h.map{(try $0.makeReader(), $0.member)})
-            }
             // Create netcdf file for debugging
             if createNetcdf {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
