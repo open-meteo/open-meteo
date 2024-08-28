@@ -186,8 +186,17 @@ struct SyncCommand: AsyncCommand {
                         let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                         try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                         // Another process might be updating this file right now. E.g. Second sync operation
-                        FileManager.default.waitIfFileWasRecentlyModified(at: "~\(localFile)", waitTimeMinutes: 1)
-                        try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                        FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
+                        if localFile.hasPrefix("/meta.json") {
+                            /// Update the `last_run_availability_time` within meta.json
+                            try await curl
+                                .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
+                                .readJSONDecodable(ModelUpdateMetaJson.self)?
+                                .with(last_run_availability_time: .now())
+                                .writeTo(path: localFile)
+                        } else {
+                            try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                        }
                         if let cacheDirectory = OpenMeteo.cacheDirectory {
                             // Delete cached file, in case cache is active
                             let cacheFile = "\(cacheDirectory)/\(pathNoData)"

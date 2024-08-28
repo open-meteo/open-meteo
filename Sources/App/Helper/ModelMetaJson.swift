@@ -72,10 +72,28 @@ struct ModelUpdateMetaJson: Codable {
             //data_start_time: 0,
             data_end_time: end.timeIntervalSince1970
         )
+        let path = OmFileManagerReadable.meta(domain: domain.domainRegistry)
+        try path.createDirectory()
+        let pathString = path.getFilePath()
+        try meta.writeTo(path: pathString)
+    }
+    
+    /// Update the availability time and return a new object
+    func with(last_run_availability_time: Timestamp) -> ModelUpdateMetaJson {
+        return ModelUpdateMetaJson(
+            last_run_initialisation_time: last_run_initialisation_time,
+            last_run_modification_time: last_run_modification_time,
+            last_run_availability_time: last_run_availability_time.timeIntervalSince1970,
+            temporal_resolution_seconds: temporal_resolution_seconds,
+            data_end_time: data_end_time
+        )
+    }
+    
+    /// Write to as an atomic operation
+    func writeTo(path: String) throws {
         let encoder = JSONEncoder()
-        let path = OmFileManagerReadable.meta(domain: domain.domainRegistry).getFilePath()
         let fn = try FileHandle.createNewFile(file: "\(path)~")
-        try fn.write(contentsOf: try encoder.encode(meta))
+        try fn.write(contentsOf: try encoder.encode(self))
         try fn.close()
         try FileManager.default.moveFileOverwrite(from: "\(path)~", to: path)
     }
