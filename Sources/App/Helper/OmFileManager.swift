@@ -37,7 +37,7 @@ enum OmFileManagerReadable: Hashable {
             }
             return "\(domain.rawValue)/static/\(variable).om"
         case .meta(let domain):
-            return "\(domain.rawValue)/meta.json"
+            return "\(domain.rawValue)/static/meta.json"
         }
     }
     
