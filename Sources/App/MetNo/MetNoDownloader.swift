@@ -167,7 +167,7 @@ struct MetNoDownloader: AsyncCommand {
             }
         }
         
-        try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: nTime-1))
+        try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: nTime * domain.dtSeconds))
     }
 }
 

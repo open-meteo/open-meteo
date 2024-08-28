@@ -54,10 +54,13 @@ struct ModelUpdateMetaJson: Codable {
     let temporal_resolution_seconds: Int
     
     /// First date of available data -> Also different per server / variable etc
-    let data_start_time: Int
+    //let data_start_time: Int
     
-    /// Last available timestamp -> Probably not reliable at all.... Short runs, upper model runs, etc....
+    /// End of updated timerange. The last timestep is not included! -> Probably not reliable at all.... Short runs, upper model runs, etc....
     let data_end_time: Int
+    
+    /// E.g. `3600` for updates every 1 hour
+    //let update_interval_seconds: Int
     
     /// Write a new meta data JSON
     static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws {
@@ -66,7 +69,7 @@ struct ModelUpdateMetaJson: Codable {
             last_run_modification_time: now.timeIntervalSince1970,
             last_run_availability_time: now.timeIntervalSince1970,
             temporal_resolution_seconds: domain.dtSeconds,
-            data_start_time: 0,
+            //data_start_time: 0,
             data_end_time: end.timeIntervalSince1970
         )
         let encoder = JSONEncoder()

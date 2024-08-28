@@ -37,14 +37,15 @@ struct GenericVariableHandle {
         
         /// Write new model meta data, but only of it contains temperature_2m or precipitation. Ignores e.g. upper level runs
         if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation"].contains($0.variable.omFileName.file)}) {
-            let end = handles.max(by: {$0.time < $1.time})?.time ?? Timestamp(0)
+            let end = handles.max(by: {$0.time < $1.time})?.time.add(domain.dtSeconds) ?? Timestamp(0)
             
             let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
             
             // generate model update timeseries
-            let range = TimerangeDt(start: run, to: end.add(domain.dtSeconds), dtSeconds: domain.dtSeconds)
+            //let range = TimerangeDt(start: run, to: end, dtSeconds: domain.dtSeconds)
             let current = Timestamp.now()
-            let initTimes = try range.flatMap {
+            /*let initTimes = try range.flatMap {
+                // TODO timestamps need 64 bit integration
                 return [
                     GenericVariableHandle(
                         variable: ModelTimeVariable.initialisation_time,
@@ -61,7 +62,7 @@ struct GenericVariableHandle {
                 ]
             }
             let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
-            try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)
+            try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
             try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
         }
     }
