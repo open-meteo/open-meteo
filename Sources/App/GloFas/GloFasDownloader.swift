@@ -578,6 +578,27 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
             return 215
         }
     }
+    
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .forecast:
+            return 12*3600
+        case .consolidated:
+            return 0
+        case .seasonal:
+            return 12*3600
+        case .intermediate:
+            return 0
+        case .forecastv3:
+            return 12*3600
+        case .consolidatedv3:
+            return 0
+        case .seasonalv3:
+            return 12*3600
+        case .intermediatev3:
+            return 0
+        }
+    }
 }
 
 enum GloFasVariable: String, GenericVariable {

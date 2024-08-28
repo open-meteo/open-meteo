@@ -72,23 +72,19 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     }
     
     var runsPerDay: Int {
+        return (24*3600) / updateIntervalSeconds
+    }
+    
+    var updateIntervalSeconds: Int {
         switch self {
-        case .gfs013:
-            return 4
-        case .gfs025:
-            return 4
-        case .hrrr_conus:
-            return 24
-        case .hrrr_conus_15min:
-            return 24
-        case .gfs025_ens:
-            return 4
-        case .gfs05_ens:
-            return 4
-        case .gfswave025:
-            return 4
-        case .gfswave025_ens:
-            return 4
+        case .gfs013, .gfs025:
+            return 6*3600
+        case .hrrr_conus, .hrrr_conus_15min:
+            return 3600
+        case .gfs025_ens, .gfs05_ens:
+            return 6*3600
+        case .gfswave025, .gfswave025_ens:
+            return 6*3600
         }
     }
     

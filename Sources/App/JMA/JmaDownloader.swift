@@ -509,6 +509,15 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         return self == .gsm
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .gsm:
+            return 6*3600
+        case .msm:
+            return 3*3600
+        }
+    }
+    
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()

@@ -270,6 +270,10 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
             return nil
         }
     }
+    
+    var updateIntervalSeconds: Int {
+        return 0
+    }
 }
 
 extension GenericDomain {

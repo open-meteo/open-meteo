@@ -69,6 +69,27 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
 
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .ecmwf:
+            fatalError()
+        case .ukMetOffice:
+            fatalError()
+        case .meteoFrance:
+            fatalError()
+        case .dwd:
+            fatalError()
+        case .cmcc:
+            fatalError()
+        case .ncep:
+            return 6*3600
+        case .jma:
+            fatalError()
+        case .eccc:
+            fatalError()
+        }
+    }
+    
     /// 14 days longer than actual one update
     var omFileLength: Int {
         switch self {

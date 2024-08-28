@@ -17,6 +17,9 @@ protocol GenericDomain {
     /// Time resoltuion of the deomain. 3600 for hourly, 10800 for 3-hourly
     var dtSeconds: Int { get }
     
+    /// How often a domain is updated in seconds. `3600` for updates every hour
+    var updateIntervalSeconds: Int { get }
+    
     /// If true, domain has yearly files
     var hasYearlyFiles: Bool { get }
     

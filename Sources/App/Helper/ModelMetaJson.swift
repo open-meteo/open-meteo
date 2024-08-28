@@ -60,7 +60,7 @@ struct ModelUpdateMetaJson: Codable {
     let data_end_time: Int
     
     /// E.g. `3600` for updates every 1 hour
-    //let update_interval_seconds: Int
+    let update_interval_seconds: Int
     
     /// Write a new meta data JSON
     static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws {
@@ -70,7 +70,8 @@ struct ModelUpdateMetaJson: Codable {
             last_run_availability_time: now.timeIntervalSince1970,
             temporal_resolution_seconds: domain.dtSeconds,
             //data_start_time: 0,
-            data_end_time: end.timeIntervalSince1970
+            data_end_time: end.timeIntervalSince1970,
+            update_interval_seconds: domain.updateIntervalSeconds
         )
         let path = OmFileManagerReadable.meta(domain: domain.domainRegistry)
         try path.createDirectory()
@@ -85,7 +86,8 @@ struct ModelUpdateMetaJson: Codable {
             last_run_modification_time: last_run_modification_time,
             last_run_availability_time: last_run_availability_time.timeIntervalSince1970,
             temporal_resolution_seconds: temporal_resolution_seconds,
-            data_end_time: data_end_time
+            data_end_time: data_end_time,
+            update_interval_seconds: update_interval_seconds
         )
     }
     
