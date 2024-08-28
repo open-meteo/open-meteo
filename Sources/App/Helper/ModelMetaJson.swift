@@ -34,11 +34,19 @@ enum ModelTimeVariable: String, GenericVariable {
     }
 }
 
+
 /**
  TODO:
  - CAMS, IconWave, GloFas, seasonal forecast, CMIP, satellite
  - run end lenght might be too short for side-runs
- - updates per day? updates every n hours? update_frequency_seconds
+ - license
+ - name of provider
+ - spatial resolution
+ - area / region
+ - grid system / proj string?
+ - list of variables? pressure levels, model levels?
+ - forecast length (per run?)
+ - model forecast steps with 1,3,6 hour switching?
  */
 struct ModelUpdateMetaJson: Codable {
     /// Model initilsiation time as unix timestamp. E.g. 0z
@@ -90,10 +98,13 @@ struct ModelUpdateMetaJson: Codable {
             update_interval_seconds: update_interval_seconds
         )
     }
-    
+}
+
+extension Encodable {
     /// Write to as an atomic operation
     func writeTo(path: String) throws {
         let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
         let fn = try FileHandle.createNewFile(file: "\(path)~")
         try fn.write(contentsOf: try encoder.encode(self))
         try fn.close()
