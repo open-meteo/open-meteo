@@ -187,7 +187,7 @@ struct SyncCommand: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                         // Another process might be updating this file right now. E.g. Second sync operation
                         FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
-                        if localFile.hasPrefix("/meta.json") {
+                        if localFile.hasSuffix("/meta.json") {
                             /// Update the `last_run_availability_time` within meta.json
                             try await curl
                                 .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)

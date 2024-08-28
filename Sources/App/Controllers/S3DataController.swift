@@ -143,11 +143,15 @@ struct S3DataController: RouteCollection {
     /// Serve file through nginx send file
     func get(_ req: Request) async throws -> Response {
         let params = try req.query.decode(DownloadParams.self)
-        guard let apikey = params.apikey, Self.syncApiKeys.contains(where: {$0 == apikey}) else {
-            throw SyncError.invalidApiKey
+        let path = req.url.path.sanitisedPath
+        let isJson = path.hasSuffix(".json")
+        if !isJson {
+            /// Only require API keys for non-json calls
+            guard let apikey = params.apikey, Self.syncApiKeys.contains(where: {$0 == apikey}) else {
+                throw SyncError.invalidApiKey
+            }
         }
         
-        let path = req.url.path.sanitisedPath
         guard path.last != "/", path.starts(with: "/data/") else {
             throw Abort(.forbidden)
         }
