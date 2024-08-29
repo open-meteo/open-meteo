@@ -258,9 +258,9 @@ extension Curl {
     }
     
     fileprivate func cleanupCdsApiJob(job: CdsApiResponse, apikey: String, server: String) async throws {
-        /*var request = HTTPClientRequest(url: "\(server)/tasks/\(job.request_id)")
+        var request = HTTPClientRequest(url: "\(server)/api/retrieve/v1/jobs/\(job.jobID)")
         request.method = .DELETE
-        request.headers.add(name: "Authorization", value: "Basic \(apikey.base64String())")
-        let _ = try await client.executeRetry(request, logger: logger)*/
+        request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
+        let _ = try await client.executeRetry(request, logger: logger)
     }
 }
