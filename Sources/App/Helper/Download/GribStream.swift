@@ -105,7 +105,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
             
             while true {
                 // repeat until GRIB header is found
-                guard var seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
+                guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
@@ -125,26 +125,25 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 }
                 
                 // If length is greater than 8388607, this is some ECMWF extension https://confluence.ecmwf.int/display/FCST/Detailed+information+of+implementation+of+IFS+cycle+41r2#DetailedinformationofimplementationofIFScycle41r2-GRIBedition1messagesize
-                if seek.gribVersion == 1 && seek.length >= 8388607 {
-                    let totalSize = try buffer.withUnsafeReadableBytes({
-                        let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
-                        let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
-                        return messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
-                    })
-                    // Repeat until enough data is available
-                    while buffer.readableBytes < seek.offset + totalSize {
-                        guard let input = try await self.iterator.next() else {
-                            return nil
-                        }
-                        buffer.writeImmutableBuffer(input)
+                //if seek.gribVersion == 1 && seek.length >= 8388607 {
+                // 2024-08-29: Always validate GRIB length via ECCODES because some attributes aprear to add more data the length
+                let totalSize = try buffer.withUnsafeReadableBytes({
+                    let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
+                    let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
+                    return messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
+                })
+                // Repeat until enough data is available
+                while buffer.readableBytes < seek.offset + totalSize {
+                    guard let input = try await self.iterator.next() else {
+                        return nil
                     }
-                    seek.length = totalSize
+                    buffer.writeImmutableBuffer(input)
                 }
                 
                 messages = try buffer.readWithUnsafeReadableBytes({
-                    let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
+                    let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+totalSize])
                     let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
-                    let totalSize = messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
+                    //let totalSize = messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
                     return (seek.offset+totalSize, messages)
                 })
                 buffer.discardReadBytes()
