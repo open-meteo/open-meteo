@@ -229,9 +229,9 @@ extension Curl {
                     let error = try await response.readStringImmutable() ?? ""
                     fatalError("Could not decode \(error)")
                 }
-                /*if job.error!.reason.contains("None of the data you have requested is available yet") {
+                if results.traceback.contains("The job failed with: ValueError") {
                     throw CdsApiError.restrictedAccessToValidData
-                }*/
+                }
                 throw CdsApiError.error(message: results.title, reason: results.traceback)
             case .successful:
                 var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)/results")
@@ -247,7 +247,7 @@ extension Curl {
     }
     
     fileprivate func cleanupCdsApiJob(job: CdsApiResponse, apikey: String, server: String) async throws {
-        var request = HTTPClientRequest(url: "\(server)/api/retrieve/v1/jobs/\(job.jobID)")
+        var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)")
         request.method = .DELETE
         request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
         let _ = try await client.executeRetry(request, logger: logger)
