@@ -115,30 +115,6 @@ enum CdsApiError: Error {
     case restrictedAccessToValidData
 }
 
-enum CdsStateOld: String, Decodable {
-    case queued
-    case failed
-    case completed
-    case running
-}
-
-fileprivate struct CdsApiResponseOld: Decodable {
-    let state: CdsState
-    let request_id: String
-    let error: Error?
-    
-    /// if completed
-    let location: String?
-    let content_length: Int?
-    let content_type: String?
-    
-    struct Error: Decodable {
-        let message: String
-        let url: String
-        let reason: String
-    }
-}
-
 enum CdsState: String, Decodable {
     case accepted
     case failed
@@ -175,6 +151,13 @@ fileprivate struct CdsApiResults: Decodable {
             case local_path = "file:local_path"
         }
     }
+}
+
+fileprivate struct CdsApiResultsError: Decodable {
+    let type: String
+    let title: String
+    let status: Int
+    let traceback: String
 }
 
 
@@ -239,11 +222,17 @@ extension Curl {
                 }
                 job = jobNext
             case .failed:
+                var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)/results")
+                request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
+                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
+                guard let results = try await response.readJSONDecodable(CdsApiResultsError.self) else {
+                    let error = try await response.readStringImmutable() ?? ""
+                    fatalError("Could not decode \(error)")
+                }
                 /*if job.error!.reason.contains("None of the data you have requested is available yet") {
                     throw CdsApiError.restrictedAccessToValidData
-                }
-                throw CdsApiError.error(message: job.error!.message, reason: job.error!.reason)*/
-                fatalError()
+                }*/
+                throw CdsApiError.error(message: results.title, reason: results.traceback)
             case .successful:
                 var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)/results")
                 request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
