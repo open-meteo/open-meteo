@@ -177,7 +177,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs025_ens:
             fallthrough
         case .gfswave025_ens:
-            return Array(stride(from: 0, through: 384, by: 3))
+            return Array(stride(from: 0, through: 240, by: 3))
         case .gfs013:
             fallthrough
         case .gfs025:
