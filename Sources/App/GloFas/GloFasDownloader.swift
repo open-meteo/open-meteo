@@ -240,7 +240,8 @@ struct GloFasDownloader: AsyncCommand {
     
     struct GlofasQuery: Encodable {
         let system_version: String
-        let format = "grib"
+        let data_format = "grib"
+        let download_format = "unarchived"
         let variable = "river_discharge_in_the_last_24_hours"
         let hyear: String
         let hmonth: [String]
