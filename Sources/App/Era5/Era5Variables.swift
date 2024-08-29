@@ -100,6 +100,9 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .soil_moisture_100_to_255cm: return "volumetric_soil_water_layer_4"
             // NOTE: snow depth uses different definitions in ERA5 and ECMWF IFS. Only ERA5-land returns the actual height directly
         case .snow_depth: return "snow_depth"
+        case .wave_height: return "significant_height_of_combined_wind_waves_and_swell"
+        case .wave_direction: return "mean_wave_direction"
+        case .wave_period: return "mean_wave_period"
         default: return nil
         }
     }
