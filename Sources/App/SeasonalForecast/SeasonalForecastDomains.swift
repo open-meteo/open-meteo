@@ -93,7 +93,7 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
         case .cmcc:
             fatalError()
         case .ncep:
-            return RegularGrid(nx: 384, ny: 190, latMin: -89.2767, lonMin: -180, dx: (89.2767*2)/190, dy: 359.062/384)
+            return RegularGrid(nx: 384, ny: 190, latMin: -89.2767, lonMin: -180, dx: (89.2767*2)/190, dy: 359.062/384, searchRadius: 0)
         case .jma:
             fatalError()
         case .eccc:
