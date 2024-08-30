@@ -32,8 +32,8 @@
 #pragma warning( disable : 4068)
 
 #define VINT_IN
-#define BITPACK_DAC
-#define TURBOPFOR_DAC
+//#define BITPACK_DAC
+//#define TURBOPFOR_DAC
 #define BITUTIL_IN
 #include "conf.h"
 #include "bitutil.h"
@@ -108,7 +108,9 @@ extern char _shuffle_16[256][16];
 #define  BITUNPACKD  bitunpack  // integrated unpack
 #define _BITUNPACKD  bitunpack  // integrated pfor
 
-#define  P4DECX  // direct access no 64 bits
+#ifdef TURBOPFOR_DAC
+  #define  P4DECX  // direct access no 64 bits
+#endif
 #define USIZE 8
 #include "vp4d.c"
 #define USIZE 16
@@ -116,7 +118,9 @@ extern char _shuffle_16[256][16];
 #define USIZE 32
 #include "vp4d.c"
 
-#undef  P4DECX
+#ifdef TURBOPFOR_DAC
+  #undef  P4DECX
+#endif
 #define USIZE 64
 #include "vp4d.c"
 
