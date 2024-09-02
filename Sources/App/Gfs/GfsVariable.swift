@@ -224,7 +224,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .backwards
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
-        case .freezing_level_height, .boundary_layer_height:
+        case .freezing_level_height:
             return .linear
         case .shortwave_radiation:
             return .solar_backwards_averaged
@@ -242,6 +242,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linear
         case .convective_inhibition:
             return .hermite(bounds: nil)
+        case .boundary_layer_height:
+            return .hermite(bounds: 0...10e9)
         }
     }
     

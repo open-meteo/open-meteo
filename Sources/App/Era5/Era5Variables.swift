@@ -27,6 +27,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case shortwave_radiation
     case precipitation
     case direct_radiation
+    case boundary_layer_height
     
     case wave_height
     case wave_direction
@@ -103,6 +104,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wave_height: return "significant_height_of_combined_wind_waves_and_swell"
         case .wave_direction: return "mean_wave_direction"
         case .wave_period: return "mean_wave_period"
+        case .boundary_layer_height: return "boundary_layer_height"
         default: return nil
         }
     }
@@ -159,6 +161,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .soil_moisture_28_to_100cm, .soil_moisture_28_to_100cm_spread: return 1000
         case .soil_moisture_100_to_255cm, .soil_moisture_100_to_255cm_spread: return 1000
         case .snow_depth, .snow_depth_spread: return 100 // 1 cm resolution
+        case .boundary_layer_height:
+            return 0.2 // 5m resolution
         case .wave_height:
             return 50 // 0.02m resolution
         case .wave_direction:
@@ -224,6 +228,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .linearDegrees
         case .wave_period:
             return .hermite(bounds: nil)
+        case .boundary_layer_height:
+            return .hermite(bounds: 0...10e9)
         }
     }
     
@@ -250,7 +256,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         
         if domain == .ecmwf_ifs_analysis_long_window || domain == .ecmwf_ifs_analysis {
             switch self {
-            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation:
+            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation, .boundary_layer_height:
                 return false
             default:
                 return true
@@ -342,6 +348,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             fatalError("Not supported")
         case .wave_period:
             fatalError("Not supported")
+        case .boundary_layer_height:
+            return "159.128"
         default:
             fatalError("Not supported")
         }
@@ -380,6 +388,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wave_period:
             return .seconds
         case .dew_point_2m_spread, .temperature_2m_spread, .soil_temperature_0_to_7cm_spread, .soil_temperature_7_to_28cm_spread, .soil_temperature_28_to_100cm_spread, .soil_temperature_100_to_255cm_spread: return .kelvin
+        case .boundary_layer_height:
+            return .metre
         }
     }
     
@@ -420,6 +430,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             case "swvl3": return .soil_moisture_28_to_100cm_spread
             case "swvl4": return .soil_moisture_100_to_255cm_spread
             case "sde": return .snow_depth_spread
+            case "blh": return .boundary_layer_height
             default:
                 return nil
             }
@@ -449,6 +460,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case "swvl2": return .soil_moisture_7_to_28cm
         case "swvl3": return .soil_moisture_28_to_100cm
         case "swvl4": return .soil_moisture_100_to_255cm
+        case "blh": return .boundary_layer_height
         case "sde": return .snow_depth
         case "swh": return .wave_height
         case "mwd": return .wave_direction
