@@ -357,6 +357,12 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .precipitation, aggregation: .spread, previousDay: previousDay)
         case .direct_radiation_spread:
             return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+        case .boundary_layer_height:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, previousDay: previousDay)
+        case .boundary_layer_height_spread:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
         }
     }
 }
