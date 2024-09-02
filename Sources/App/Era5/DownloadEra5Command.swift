@@ -642,7 +642,7 @@ struct DownloadEra5Command: AsyncCommand {
                         var stepRange = attributes.stepRange
                         
                         // Deaccumulate data. Data is marked as `instant` in GRIB although data is accumulated
-                        if deaccumulatePrecipitation && [Era5Variable.shortwave_radiation, .direct_radiation, .precipitation, .snowfall_water_equivalent, .uv_index].contains(variable) {
+                        if deaccumulatePrecipitation && [Era5Variable.shortwave_radiation, .direct_radiation, .precipitation, .snowfall_water_equivalent].contains(variable) {
                             if attributes.stepRange == "0" {
                                 return nil
                             }

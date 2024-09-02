@@ -363,8 +363,6 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .boundary_layer_height_spread:
             // TODO register PBL height
             return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
-        case .uv_index_spread:
-            return .init(variable: .uvIndex, aggregation: .spread, previousDay: previousDay)
         }
     }
 }

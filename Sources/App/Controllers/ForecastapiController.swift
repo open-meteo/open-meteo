@@ -916,7 +916,6 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case precipitation_spread
     case direct_radiation_spread
     case boundary_layer_height_spread
-    case uv_index_spread
     
     /// Some variables are kept for backwards compatibility
     var remapped: Self {
