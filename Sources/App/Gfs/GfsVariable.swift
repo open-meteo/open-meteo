@@ -75,6 +75,10 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case visibility
     
+    case boundary_layer_height
+    
+    case total_column_integrated_water_vapour
+    
     
     var storePreviousForecast: Bool {
         switch self {
@@ -140,6 +144,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .latent_heat_flux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
         case .wind_gusts_10m: return 10
         case .freezing_level_height:  return 0.1 // zero height 10 meter resolution
+        case .boundary_layer_height: return 0.2 // 5m precision
         case .showers: return 10
         case .pressure_msl: return 10
         case .shortwave_radiation: return 1
@@ -152,6 +157,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky: return 20
         case .categorical_freezing_rain: return 1
         case .convective_inhibition: return 1
+        case .total_column_integrated_water_vapour: return 10
         }
     }
     
@@ -239,6 +245,10 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linear
         case .convective_inhibition:
             return .hermite(bounds: nil)
+        case .boundary_layer_height:
+            return .hermite(bounds: 0...10e9)
+        case .total_column_integrated_water_vapour:
+            return .hermite(bounds: nil)
         }
     }
     
@@ -273,7 +283,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .latent_heat_flux: return .wattPerSquareMetre
         case .showers: return .millimetre
         case .wind_gusts_10m: return .metrePerSecond
-        case .freezing_level_height: return .metre
+        case .freezing_level_height, .boundary_layer_height: return .metre
         case .pressure_msl: return .hectopascal
         case .shortwave_radiation: return .wattPerSquareMetre
         case .frozen_precipitation_percent: return .percentage
@@ -285,6 +295,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky: return .dimensionless
         case .categorical_freezing_rain: return .dimensionless
         case .convective_inhibition: return .joulePerKilogram
+        case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         }
     }
     
