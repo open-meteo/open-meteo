@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/async-http-client.git",
       "state" : {
-        "revision" : "0ae99db85b2b9d1e79b362bd31fd1ffe492f7c47",
-        "version" : "1.21.2"
+        "revision" : "e8babad8226b9b3f956a252d5b80e36b0c9d62a9",
+        "version" : "1.22.0"
       }
     },
     {
