@@ -28,7 +28,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case precipitation
     case direct_radiation
     case boundary_layer_height
-    case uv_index
     case total_column_integrated_water_vapour
     
     case wave_height
@@ -60,7 +59,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case precipitation_spread
     case direct_radiation_spread
     case boundary_layer_height_spread
-    case uv_index_spread
     case total_column_integrated_water_vapour_spread
     
     /// Name used to query the ECMWF CDS API via python
@@ -95,7 +93,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wave_direction: return "mean_wave_direction"
         case .wave_period: return "mean_wave_period"
         case .boundary_layer_height: return "boundary_layer_height"
-        case .uv_index: return "downward_uv_radiation_at_the_surface"
         case .total_column_integrated_water_vapour: return ""
         default: return nil
         }
@@ -117,9 +114,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .shortwave_radiation, .shortwave_radiation_spread: return (0, 1/Float(domain.dtSeconds)) // joules to watt
         case .precipitation, .precipitation_spread: return (0, 1000) // meter to millimeter
         case .direct_radiation, .direct_radiation_spread: return (0, 1/Float(domain.dtSeconds))
-        case .uv_index, .uv_index_spread:
-            // 0.025 m2/W to get the uv index
-            return (0, 0.025/Float(domain.dtSeconds))
         default:
             return nil
         }
@@ -164,8 +158,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return 1
         case .wave_period:
             return 20 // 0.05s resolution
-        case .uv_index, .uv_index_spread:
-            return 20
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
             return 10
         }
@@ -229,8 +221,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .hermite(bounds: nil)
         case .boundary_layer_height, .boundary_layer_height_spread:
             return .hermite(bounds: 0...10e9)
-        case .uv_index, .uv_index_spread:
-            return .solar_backwards_averaged
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
             return .hermite(bounds: nil)
         }
@@ -259,7 +249,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         
         if domain == .ecmwf_ifs_analysis_long_window || domain == .ecmwf_ifs_analysis {
             switch self {
-            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation, .boundary_layer_height, .uv_index:
+            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation, .boundary_layer_height:
                 return false
             default:
                 return true
@@ -353,8 +343,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             fatalError("Not supported")
         case .boundary_layer_height:
             return "159.128"
-        case .uv_index:
-            return "57.128"
         case .total_column_integrated_water_vapour:
             return "137.128"
         default:
@@ -397,8 +385,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .dew_point_2m_spread, .temperature_2m_spread, .soil_temperature_0_to_7cm_spread, .soil_temperature_7_to_28cm_spread, .soil_temperature_28_to_100cm_spread, .soil_temperature_100_to_255cm_spread: return .kelvin
         case .boundary_layer_height, .boundary_layer_height_spread:
             return .metre
-        case .uv_index, .uv_index_spread:
-            return .dimensionless
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
             return .kilogramPerSquareMetre
         }
@@ -442,7 +428,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             case "swvl4": return .soil_moisture_100_to_255cm_spread
             case "sde": return .snow_depth_spread
             case "blh": return .boundary_layer_height_spread
-            case "uvb": return .uv_index_spread
             case "tcwv": return .total_column_integrated_water_vapour_spread
             default:
                 return nil
@@ -475,7 +460,6 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case "swvl4": return .soil_moisture_100_to_255cm
         case "blh": return .boundary_layer_height
         case "tcwv": return .total_column_integrated_water_vapour
-        case "uvb": return .uv_index
         case "sde": return .snow_depth
         case "swh": return .wave_height
         case "mwd": return .wave_direction

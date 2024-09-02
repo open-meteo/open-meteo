@@ -74,6 +74,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":CDUVB:surface:"
             case .boundary_layer_height:
                 return ":HPBL:surface:"
+            case .total_column_integrated_water_vapour:
+                return ":PWAT:entire atmosphere (considered as a single layer):"
             default:
                 return nil
             }
@@ -175,6 +177,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":VIS:surface:"
             case .boundary_layer_height:
                 return ":HPBL:surface:"
+            case .total_column_integrated_water_vapour:
+                return ":PWAT:entire atmosphere (considered as a single layer):"
             default:
                 return nil
             }

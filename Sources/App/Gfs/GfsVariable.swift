@@ -77,6 +77,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case boundary_layer_height
     
+    case total_column_integrated_water_vapour
+    
     
     var storePreviousForecast: Bool {
         switch self {
@@ -155,6 +157,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky: return 20
         case .categorical_freezing_rain: return 1
         case .convective_inhibition: return 1
+        case .total_column_integrated_water_vapour: return 10
         }
     }
     
@@ -244,6 +247,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .boundary_layer_height:
             return .hermite(bounds: 0...10e9)
+        case .total_column_integrated_water_vapour:
+            return .hermite(bounds: nil)
         }
     }
     
@@ -290,6 +295,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .uv_index_clear_sky: return .dimensionless
         case .categorical_freezing_rain: return .dimensionless
         case .convective_inhibition: return .joulePerKilogram
+        case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         }
     }
     
