@@ -345,15 +345,20 @@ fileprivate extension Array where Element == S3DataController.S3ListV2File {
     /// Compare remote files to local files. Only keep files that are not available locally or older.
     func includeFiles(compareLocalDirectory: String) -> [Element] {
         let resourceKeys = Set<URLResourceKey>([.contentModificationDateKey, .fileSizeKey])
-        return self.filter({ file in
-            let pathNoData = file.name[file.name.index(file.name.startIndex, offsetBy: 5)..<file.name.endIndex]
+        return self.filter({ remoteFile in
+            let pathNoData = remoteFile.name[remoteFile.name.index(remoteFile.name.startIndex, offsetBy: 5)..<remoteFile.name.endIndex]
             let fileURL = URL(fileURLWithPath: "\(compareLocalDirectory)\(pathNoData)")
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                   let size = resourceValues.fileSize,
                   let modificationTime = resourceValues.contentModificationDate else {
                 return true
             }
-            return file.fileSize != size || modificationTime > file.modificationTime
+            if remoteFile.name.contains("meta.json") {
+                /// meta.json is modified during sync to replace the `last_run_availability_time`.
+                /// Size might be different. Only check for modification time.
+                return remoteFile.modificationTime > modificationTime
+            }
+            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime
         })
     }
 }
