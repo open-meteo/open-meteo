@@ -889,6 +889,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case shortwave_radiation_clear_sky
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
+    case boundary_layer_height
     
     
     case wind_speed_10m_spread

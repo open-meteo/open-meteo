@@ -72,6 +72,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":DUVB:surface:"
             case .uv_index_clear_sky:
                 return ":CDUVB:surface:"
+            case .boundary_layer_height:
+                return ":HPBL:surface:"
             default:
                 return nil
             }
@@ -171,6 +173,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":CAPE:surface:"
             case .visibility:
                 return ":VIS:surface:"
+            case .boundary_layer_height:
+                return ":HPBL:surface:"
             default:
                 return nil
             }

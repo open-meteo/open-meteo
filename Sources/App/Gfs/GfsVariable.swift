@@ -75,6 +75,8 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case visibility
     
+    case boundary_layer_height
+    
     
     var storePreviousForecast: Bool {
         switch self {
@@ -140,6 +142,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .latent_heat_flux: return 0.144 // round watts to 7.. results in 0.01 resolution in evpotrans
         case .wind_gusts_10m: return 10
         case .freezing_level_height:  return 0.1 // zero height 10 meter resolution
+        case .boundary_layer_height: return 0.2 // 5m precision
         case .showers: return 10
         case .pressure_msl: return 10
         case .shortwave_radiation: return 1
@@ -221,7 +224,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .backwards
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
-        case .freezing_level_height:
+        case .freezing_level_height, .boundary_layer_height:
             return .linear
         case .shortwave_radiation:
             return .solar_backwards_averaged
@@ -273,7 +276,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .latent_heat_flux: return .wattPerSquareMetre
         case .showers: return .millimetre
         case .wind_gusts_10m: return .metrePerSecond
-        case .freezing_level_height: return .metre
+        case .freezing_level_height, .boundary_layer_height: return .metre
         case .pressure_msl: return .hectopascal
         case .shortwave_radiation: return .wattPerSquareMetre
         case .frozen_precipitation_percent: return .percentage
