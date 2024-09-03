@@ -93,7 +93,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wave_direction: return "mean_wave_direction"
         case .wave_period: return "mean_wave_period"
         case .boundary_layer_height: return "boundary_layer_height"
-        case .total_column_integrated_water_vapour: return ""
+        case .total_column_integrated_water_vapour: return "total_column_water_vapour"
         default: return nil
         }
     }
