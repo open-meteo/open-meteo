@@ -542,8 +542,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let uSpread = try get(raw: .wind_u_component_10m_spread, time: time)
             let vSpread = try get(raw: .wind_v_component_10m_spread, time: time)
             let speed = zip(zip(u.data, uSpread.data), zip(v.data, vSpread.data)).map({
-                return Meteorology.windspeed(u: $0.0 + $0.1, v: $1.0 + $1.1)
-                    - Meteorology.windspeed(u: $0.0, v: $1.0)
+                return Meteorology.windspeed(u: abs($0.0) + $0.1, v: abs($1.0) + $1.1)
+                    - Meteorology.windspeed(u: abs($0.0), v: abs($1.0))
             })
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_100m_spread:
@@ -553,8 +553,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let uSpread = try get(raw: .wind_u_component_100m_spread, time: time)
             let vSpread = try get(raw: .wind_v_component_100m_spread, time: time)
             let speed = zip(zip(u.data, uSpread.data), zip(v.data, vSpread.data)).map({
-                return Meteorology.windspeed(u: $0.0 + $0.1, v: $1.0 + $1.1)
-                    - Meteorology.windspeed(u: $0.0, v: $1.0)
+                return Meteorology.windspeed(u: abs($0.0) + $0.1, v: abs($1.0) + $1.1)
+                    - Meteorology.windspeed(u: abs($0.0), v: abs($1.0))
             })
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_10m_spread:
@@ -563,10 +563,10 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let uSpread = try get(raw: .wind_u_component_10m_spread, time: time)
             let vSpread = try get(raw: .wind_v_component_10m_spread, time: time)
             let winddirectionWithSpread = Meteorology.windirectionFast(
-                u: zip(u.data, uSpread.data).map(+),
-                v: zip(v.data, vSpread.data).map(+)
+                u: zip(u.data, uSpread.data).map({abs($0)+$1}),
+                v: zip(v.data, vSpread.data).map({abs($0)+$1})
             )
-            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            let direction = Meteorology.windirectionFast(u: u.data.map(abs), v: v.data.map(abs))
             let spread = zip(winddirectionWithSpread, direction).map{(abs($0-$1))}
             return DataAndUnit(spread, .degreeDirection)
         case .wind_direction_100m_spread:
@@ -575,10 +575,10 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let uSpread = try get(raw: .wind_u_component_100m_spread, time: time)
             let vSpread = try get(raw: .wind_v_component_100m_spread, time: time)
             let winddirectionWithSpread = Meteorology.windirectionFast(
-                u: zip(u.data, uSpread.data).map(+),
-                v: zip(v.data, vSpread.data).map(+)
+                u: zip(u.data, uSpread.data).map({abs($0)+$1}),
+                v: zip(v.data, vSpread.data).map({abs($0)+$1})
             )
-            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            let direction = Meteorology.windirectionFast(u: u.data.map(abs), v: v.data.map(abs))
             let spread = zip(winddirectionWithSpread, direction).map{(abs($0-$1))}
             return DataAndUnit(spread, .degreeDirection)
         case .snowfall_spread:
