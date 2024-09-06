@@ -50,6 +50,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
         if case let .surface(surface) = raw {
+            if surface == .direct_radiation {
+                // Original ICON direct radiation data may contain small negative values like -0.2.
+                // Limit to 0. See https://github.com/open-meteo/open-meteo/issues/932
+                let direct = try reader.get(variable: .surface(.direct_radiation), time: time)
+                return DataAndUnit(direct.data.map({max($0,0)}), direct.unit)
+            }
+            
             // ICON-EPS stores total shortwave radiation in diffuse_radiation
             // It would be possible to only use `shortwave_radiation`, but this would invalidate all archives
             if reader.domain == .iconEps,surface == .diffuse_radiation {
