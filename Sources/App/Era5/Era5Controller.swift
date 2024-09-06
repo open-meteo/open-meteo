@@ -269,9 +269,13 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .wind_speed_10m_spread:
             try prefetchData(raw: .wind_u_component_10m_spread, time: time)
             try prefetchData(raw: .wind_v_component_10m_spread, time: time)
+            try prefetchData(raw: .wind_u_component_10m, time: time)
+            try prefetchData(raw: .wind_v_component_10m, time: time)
         case .wind_speed_100m_spread:
             try prefetchData(raw: .wind_u_component_100m_spread, time: time)
             try prefetchData(raw: .wind_v_component_100m_spread, time: time)
+            try prefetchData(raw: .wind_u_component_100m, time: time)
+            try prefetchData(raw: .wind_v_component_100m, time: time)
         case .snowfall_spread:
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
@@ -530,14 +534,26 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .wind_speed_10m_spread:
-            let u = try get(raw: .wind_u_component_10m_spread, time: time)
-            let v = try get(raw: .wind_v_component_10m_spread, time: time)
-            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            // Windspeed vector U/V needs to be added to the spread vector U/V
+            let u = try get(raw: .wind_u_component_10m, time: time)
+            let v = try get(raw: .wind_v_component_10m, time: time)
+            let uSpread = try get(raw: .wind_u_component_10m_spread, time: time)
+            let vSpread = try get(raw: .wind_v_component_10m_spread, time: time)
+            let speed = zip(zip(u.data, uSpread.data), zip(v.data, vSpread.data)).map({
+                return Meteorology.windspeed(u: $0.0 + $0.1, v: $1.0 + $1.1)
+                    - Meteorology.windspeed(u: $0.0, v: $1.0)
+            })
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_100m_spread:
-            let u = try get(raw: .wind_u_component_100m_spread, time: time)
-            let v = try get(raw: .wind_v_component_100m_spread, time: time)
-            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            // Windspeed vector U/V needs to be added to the spread vector U/V
+            let u = try get(raw: .wind_u_component_100m, time: time)
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let uSpread = try get(raw: .wind_u_component_100m_spread, time: time)
+            let vSpread = try get(raw: .wind_v_component_100m_spread, time: time)
+            let speed = zip(zip(u.data, uSpread.data), zip(v.data, vSpread.data)).map({
+                return Meteorology.windspeed(u: $0.0 + $0.1, v: $1.0 + $1.1)
+                    - Meteorology.windspeed(u: $0.0, v: $1.0)
+            })
             return DataAndUnit(speed, .metrePerSecond)
         case .snowfall_spread:
             let snowwater = try get(raw: .snowfall_water_equivalent_spread, time: time).data
