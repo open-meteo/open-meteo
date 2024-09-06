@@ -59,6 +59,8 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     
     case wind_speed_10m_spread
     case wind_speed_100m_spread
+    case wind_direction_10m_spread
+    case wind_direction_100m_spread
     case snowfall_spread
     
     var requiresOffsetCorrectionForMixing: Bool {
@@ -266,12 +268,12 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .dew_point_2m, time: time)
         case .sunshine_duration:
             try prefetchData(raw: .direct_radiation, time: time)
-        case .wind_speed_10m_spread:
+        case .wind_speed_10m_spread, .wind_direction_10m_spread:
             try prefetchData(raw: .wind_u_component_10m_spread, time: time)
             try prefetchData(raw: .wind_v_component_10m_spread, time: time)
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
-        case .wind_speed_100m_spread:
+        case .wind_speed_100m_spread, .wind_direction_100m_spread:
             try prefetchData(raw: .wind_u_component_100m_spread, time: time)
             try prefetchData(raw: .wind_v_component_100m_spread, time: time)
             try prefetchData(raw: .wind_u_component_100m, time: time)
@@ -555,6 +557,30 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
                     - Meteorology.windspeed(u: $0.0, v: $1.0)
             })
             return DataAndUnit(speed, .metrePerSecond)
+        case .wind_direction_10m_spread:
+            let u = try get(raw: .wind_u_component_10m, time: time)
+            let v = try get(raw: .wind_v_component_10m, time: time)
+            let uSpread = try get(raw: .wind_u_component_10m_spread, time: time)
+            let vSpread = try get(raw: .wind_v_component_10m_spread, time: time)
+            let winddirectionWithSpread = Meteorology.windirectionFast(
+                u: zip(u.data, uSpread.data).map(+),
+                v: zip(v.data, vSpread.data).map(+)
+            )
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            let spread = zip(winddirectionWithSpread, direction).map{(abs($0-$1))}
+            return DataAndUnit(spread, .degreeDirection)
+        case .wind_direction_100m_spread:
+            let u = try get(raw: .wind_u_component_100m, time: time)
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let uSpread = try get(raw: .wind_u_component_100m_spread, time: time)
+            let vSpread = try get(raw: .wind_v_component_100m_spread, time: time)
+            let winddirectionWithSpread = Meteorology.windirectionFast(
+                u: zip(u.data, uSpread.data).map(+),
+                v: zip(v.data, vSpread.data).map(+)
+            )
+            let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+            let spread = zip(winddirectionWithSpread, direction).map{(abs($0-$1))}
+            return DataAndUnit(spread, .degreeDirection)
         case .snowfall_spread:
             let snowwater = try get(raw: .snowfall_water_equivalent_spread, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }

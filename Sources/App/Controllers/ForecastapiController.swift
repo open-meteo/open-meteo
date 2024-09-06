@@ -894,6 +894,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     
     case wind_speed_10m_spread
     case wind_speed_100m_spread
+    case wind_direction_10m_spread
+    case wind_direction_100m_spread
     case snowfall_spread
     case temperature_2m_spread
     case wind_gusts_10m_spread
