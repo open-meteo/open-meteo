@@ -54,7 +54,11 @@ struct MetNoDownloader: AsyncCommand {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let openDap = "https://thredds.met.no/thredds/dodsC/metpplatest/met_forecast_1_0km_nordic_\(run.format_YYYYMMdd)T\(run.hour.zeroPadded(len: 2))Z.nc"
+        let useArchive = run.olderThan(days: 2)
+        
+        let file = "met_forecast_1_0km_nordic_\(run.format_YYYYMMdd)T\(run.hour.zeroPadded(len: 2))Z.nc"
+        let server = "https://thredds.met.no/thredds/dodsC"
+        let openDap = useArchive ? "\(server)/metpparchive/\(run.format_directoriesYYYYMMdd)/\(file)" : "\(server)/metpplatest/\(file)"
         
         // Wait up to 30 minutes until data is availble
         let ncFile = try NetCDF.openOrWait(path: openDap, deadline: Date().addingTimeInterval(30*60), logger: logger)
@@ -143,7 +147,9 @@ struct MetNoDownloader: AsyncCommand {
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
                 for (i,l) in locationRange.enumerated() {
-                    for h in 0..<nTime {
+                    /// Make sure to keep hour 0 filled with NaNs for solar radiation. Otherwise they contain "0".
+                    let start = variable.isAccumulatedSinceModelStart ? 1 : 0
+                    for h in start..<nTime {
                         data2d[i, h] = spatial[h, l]
                     }
                 }
