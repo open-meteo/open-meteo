@@ -152,9 +152,13 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
+        let dim2Read = dim1Read
+        let dim3Read = dim2Read
         
         let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
         let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
+        let nDim2Chunks = dim2.divideRoundedUp(divisor: chunk2)
+        let nDim3Chunks = dim3.divideRoundedUp(divisor: chunk3)
         
         let nChunks = nDim0Chunks * nDim1Chunks
         fn.withUnsafeBytes { ptr in
@@ -170,56 +174,67 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             case .p4nzdec256:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                 for c0 in dim0Read.divide(by: chunk0) {
-                    let c1Range = dim1Read.divide(by: chunk1)
-                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
+                   
+                    //let c1Chunks = c1Range.add(c0 * nDim1Chunks)
                     // pre-read chunk table at specific offset
-                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                    for c1 in c1Range {
-                        // load chunk into buffer
-                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                        
-                        let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
-                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                        
-                        /// The chunk coordinates in global space... e.g. 600..<1000
-                        let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
-                        let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
-                        
-                        /// This chunk clamped to read coodinates... e.g. 650..<950
-                        let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
-                        let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
-                        
-                        // load chunk from mmap
-                        let chunkNum = c0 * nDim1Chunks + c1
-                        precondition(chunkNum < nChunks, "invalid chunkNum")
-                        let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                        precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
-                        let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                        fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                        let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
-                        precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
-                        
-                        // 2D delta decoding
-                        delta2d_decode(length0, length1, chunkBuffer)
-                        
-                        /// Moved to local coordinates... e.g. 50..<350
-                        let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
-                        
-                        for d0 in clampedLocal0 {
-                            let readStart = clampedLocal1 + d0 * length1
-                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                            for i in 0..<clampedGlobal1.count {
-                                let posBuffer = readStart + i
-                                let posOut = localRange + i
-                                let val = chunkBuffer[posBuffer]
-                                if val == Int16.max {
-                                    into.advanced(by: posOut).pointee = .nan
-                                } else {
-                                    let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                                    into.advanced(by: posOut).pointee = unscaled
+                    //fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
+                    for c1 in dim1Read.divide(by: chunk1) {
+                        for c2 in dim2Read.divide(by: chunk2) {
+                            for c3 in dim3Read.divide(by: chunk3) {
+                                // load chunk into buffer
+                                // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
+                                
+                                let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
+                                let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
+                                let length2 = min((c2+1) * chunk2, dim2) - c2 * chunk2
+                                let length3 = min((c3+1) * chunk3, dim3) - c3 * chunk3
+                                
+                                /// The chunk coordinates in global space... e.g. 600..<1000
+                                let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
+                                let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
+                                let chunkGlobal2 = c2 * chunk2 ..< c2 * chunk2 + length2
+                                let chunkGlobal3 = c3 * chunk3 ..< c3 * chunk3 + length3
+                                
+                                /// This chunk clamped to read coodinates... e.g. 650..<950
+                                let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
+                                let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
+                                let clampedGlobal2 = chunkGlobal2.clamped(to: dim2Read)
+                                let clampedGlobal3 = chunkGlobal3.clamped(to: dim3Read)
+                                
+                                // load chunk from mmap
+                                let chunkNum = ((c0 * nDim1Chunks + c1) * nDim2Chunks + c2) * nDim3Chunks + c3
+                                
+                                precondition(chunkNum < nChunks, "invalid chunkNum")
+                                let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
+                                precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
+                                let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
+                                fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
+                                let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
+                                precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
+                                
+                                // 2D delta decoding
+                                delta2d_decode(length0, length1, chunkBuffer)
+                                
+                                /// Moved to local coordinates... e.g. 50..<350
+                                let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
+                                let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
+                                
+                                for d0 in clampedLocal0 {
+                                    let readStart = clampedLocal1 + d0 * length1
+                                    let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
+                                    let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
+                                    let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
+                                    for i in 0..<clampedGlobal1.count {
+                                        let posBuffer = readStart + i
+                                        let posOut = localRange + i
+                                        let val = chunkBuffer[posBuffer]
+                                        if val == Int16.max {
+                                            into.advanced(by: posOut).pointee = .nan
+                                        } else {
+                                            let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
+                                            into.advanced(by: posOut).pointee = unscaled
+                                        }
+                                    }
                                 }
                             }
                         }
