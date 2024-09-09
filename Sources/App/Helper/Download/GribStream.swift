@@ -129,23 +129,23 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 // 2024-08-29: Always validate GRIB length via ECCODES because some attributes aprear to add more data the length
                 let totalSize = try buffer.withUnsafeReadableBytes({
                     let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
-                    let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
+                    // Note: For size determination, multiSupport must be off!
+                    let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: false)
                     return messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
                 })
-                // Repeat until enough data is available OR try to decode whatever data got send
+                // Repeat until enough data is available
                 while buffer.readableBytes < seek.offset + totalSize {
                     guard let input = try await self.iterator.next() else {
-                        break
+                        return nil
                     }
                     buffer.writeImmutableBuffer(input)
                 }
                 
                 messages = try buffer.readWithUnsafeReadableBytes({
-                    let size = Swift.min($0.count - seek.offset, seek.offset+totalSize)
-                    let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+size])
+                    let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+totalSize])
                     let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
                     //let totalSize = messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
-                    return (seek.offset+size, messages)
+                    return (seek.offset+totalSize, messages)
                 })
                 buffer.discardReadBytes()
                 if let next = messages?.popLast() {
