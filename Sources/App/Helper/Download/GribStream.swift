@@ -23,35 +23,18 @@ struct GribAsyncStreamHelper {
         guard let offset = search.withCString({memory.firstRange(of: UnsafeRawBufferPointer(start: $0, count: strlen($0)))})?.lowerBound else {
             return nil
         }
-        guard offset <= (1 << 40), offset + MemoryLayout<Grib2Header>.size <= memory.count else {
+        guard offset <= (1 << 40), offset + 16 <= memory.count else {
             return nil
         }
-        // https://codes.ecmwf.int/grib/format/grib2/sections/0/
-        struct Grib2Header {
-            /// "GRIB"
-            let magic: UInt32
-            
-            let reserved: UInt16
-            
-            /// 0 - for Meteorological Products, 2 for Land Surface Products, 10 - for Oceanographic Products
-            let type: UInt8
-            
-            /// Version 1 and 2 supported
-            let version: UInt8
-            
-            /// Endian needs to be swapped
-            let length: UInt64
-        }
+        /// GRIB version in 1 and 2 is always at byte 8
+        /// https://codes.ecmwf.int/grib/format/grib2/sections/0/
+        let edition = base.advanced(by: offset + 7).assumingMemoryBound(to: UInt8.self).pointee
         
-        let header = base.advanced(by: offset).assumingMemoryBound(to: Grib2Header.self).pointee
-        
-        switch header.version {
+        switch edition {
         case 1:
             // 1-4 identifier = GRIB
             // 5-7 totalLength = 4284072
             // 8 editionNumber = 1
-            // Read 24 bytes as bigEndian and turn into UInt32
-            // If length is greater than 8388607, this is a large GRIB1 message
             let length = base.advanced(by: offset + 4).uint24
             guard length <= (1 << 24) else {
                 return nil
@@ -59,9 +42,6 @@ struct GribAsyncStreamHelper {
             if length >= 0x800000 {
                 // large GRIB >8MB messages size
                 var sectionOffset = offset + 8
-                guard memory.count >= sectionOffset + 3 + 4 + 1 else {
-                    return nil
-                }
                 let section1Length = base.advanced(by: sectionOffset).uint24
                 let flags = base.advanced(by: sectionOffset + 3 + 4).assumingMemoryBound(to: UInt8.self).pointee
                 sectionOffset += Int(section1Length)
@@ -101,13 +81,13 @@ struct GribAsyncStreamHelper {
             }
             return (offset, Int(length), 1)
         case 2:
-            let length = header.length.bigEndian
+            let length = base.advanced(by: offset + 8).assumingMemoryBound(to: UInt64.self).pointee.bigEndian
             guard length <= (1 << 40) else {
                 return nil
             }
             return (offset, Int(length), 2)
         default:
-            fatalError("Unknown GRIB version \(header.version)")
+            fatalError("Unknown GRIB version \(edition)")
         }
     }
 }
