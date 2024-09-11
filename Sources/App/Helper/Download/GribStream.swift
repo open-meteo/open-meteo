@@ -149,17 +149,20 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 // Repeat until enough data is available
                 while buffer.readableBytes < seek.offset + seek.length {
                     guard let input = try await self.iterator.next() else {
-                        return nil
+                        // If EOF is reached before message length, still try to decode it with eccodes
+                        continue
                     }
                     buffer.writeImmutableBuffer(input)
                 }
                 
+                // Deocode message with eccodes
                 messages = try buffer.readWithUnsafeReadableBytes({
-                    let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
+                    let range = seek.offset ..< Swift.min(seek.offset+seek.length, $0.count)
+                    let memory = UnsafeRawBufferPointer(rebasing: $0[range])
                     let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
-                    //let totalSize = messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
                     return (seek.offset+seek.length, messages)
                 })
+                
                 buffer.discardReadBytes()
                 if let next = messages?.popLast() {
                     return next
