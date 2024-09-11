@@ -23,11 +23,11 @@ struct GribAsyncStreamHelper {
         guard let offset = search.withCString({memory.firstRange(of: UnsafeRawBufferPointer(start: $0, count: strlen($0)))})?.lowerBound else {
             return nil
         }
-        guard offset <= (1 << 40), offset + MemoryLayout<GribHeader>.size <= memory.count else {
+        guard offset <= (1 << 40), offset + MemoryLayout<Grib2Header>.size <= memory.count else {
             return nil
         }
         // https://codes.ecmwf.int/grib/format/grib2/sections/0/
-        struct GribHeader {
+        struct Grib2Header {
             /// "GRIB"
             let magic: UInt32
             
@@ -43,7 +43,7 @@ struct GribAsyncStreamHelper {
             let length: UInt64
         }
         
-        let header = base.advanced(by: offset).assumingMemoryBound(to: GribHeader.self).pointee
+        let header = base.advanced(by: offset).assumingMemoryBound(to: Grib2Header.self).pointee
         
         switch header.version {
         case 1:
@@ -51,25 +51,72 @@ struct GribAsyncStreamHelper {
             // 5-7 totalLength = 4284072
             // 8 editionNumber = 1
             // Read 24 bytes as bigEndian and turn into UInt32
-            // If length is greater than 8388607, this is some ECMWF extension https://confluence.ecmwf.int/display/FCST/Detailed+information+of+implementation+of+IFS+cycle+41r2#DetailedinformationofimplementationofIFScycle41r2-GRIBedition1messagesize
-            let base = base.advanced(by: offset + 4).assumingMemoryBound(to: UInt32.self).pointee
-            let masked = (base & 0x00ffffff)
-            let shifted = (masked << 8)
-            let length = shifted.bigEndian
+            // If length is greater than 8388607, this is a large GRIB1 message
+            let length = base.advanced(by: offset + 4).uint24
             guard length <= (1 << 24) else {
                 return nil
+            }
+            if length >= 0x800000 {
+                // large GRIB >8MB messages size
+                var sectionOffset = offset + 8
+                guard memory.count >= sectionOffset + 3 + 4 + 1 else {
+                    return nil
+                }
+                let section1Length = base.advanced(by: sectionOffset).uint24
+                let flags = base.advanced(by: sectionOffset + 3 + 4).assumingMemoryBound(to: UInt8.self).pointee
+                sectionOffset += Int(section1Length)
+                //print("Section 1 length \(section1Length); flags \(flags)")
+                
+                // Section 2
+                if flags & (1 << 7) != 0 {
+                    guard memory.count >= sectionOffset + 3 else {
+                        return nil
+                    }
+                    let section2Length = base.advanced(by: sectionOffset).uint24
+                    sectionOffset += Int(section2Length)
+                    //print("Section 2 length \(section2Length)")
+                }
+                
+                // Section 3
+                if flags & (1 << 6) != 0 {
+                    guard memory.count >= sectionOffset + 3 else {
+                        return nil
+                    }
+                    let section3Length = base.advanced(by: sectionOffset).uint24
+                    sectionOffset += Int(section3Length)
+                    //print("Section 3 length \(section3Length)")
+                }
+                
+                guard memory.count >= sectionOffset + 3 else {
+                    return nil
+                }
+                let section4Length = base.advanced(by: sectionOffset).uint24
+                //print("Section 4 length \(section4Length)")
+
+                if section4Length < 120 {
+                    // "Special Coding"
+                    let correctedLength = (Int(length) & 0x7fffff) * 120 - Int(section4Length) + 4
+                    return (offset, correctedLength, 1)
+                }
             }
             return (offset, Int(length), 1)
         case 2:
             let length = header.length.bigEndian
-            
-            guard (1...2).contains(header.version), length <= (1 << 40) else {
+            guard length <= (1 << 40) else {
                 return nil
             }
             return (offset, Int(length), 2)
         default:
             fatalError("Unknown GRIB version \(header.version)")
         }
+    }
+}
+
+fileprivate extension UnsafeRawPointer {
+    /// Decode next 3 bytes and return as UInt32
+    var uint24: UInt32 {
+        let u = self.assumingMemoryBound(to: UInt8.self)
+        return (UInt32(u.pointee) << 16) | (UInt32(u.advanced(by: 1).pointee) << 8) | UInt32(u.advanced(by: 2).pointee)
     }
 }
 
@@ -108,11 +155,11 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
             
             while true {
                 // repeat until GRIB header is found
-                guard var seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
+                guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
-                    guard buffer.readableBytes < 2*4096 else {
+                    guard buffer.readableBytes < 64*1024 else {
                         throw GribAsyncStreamError.didNotFindGibHeader
                     }
                     buffer.writeImmutableBuffer(input)
@@ -125,26 +172,6 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                         return nil
                     }
                     buffer.writeImmutableBuffer(input)
-                }
-                
-                // If length is greater than 8388607, this is some ECMWF extension https://confluence.ecmwf.int/display/FCST/Detailed+information+of+implementation+of+IFS+cycle+41r2#DetailedinformationofimplementationofIFScycle41r2-GRIBedition1messagesize
-                if seek.gribVersion == 1 && seek.length >= 8388607 {
-                    print("IS LARGE GRIB")
-                // 2024-09-09: download issues for IFS04 and concurrent 4. Always validate size
-                    let totalSize = try buffer.withUnsafeReadableBytes({
-                        let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
-                        // Note: For size determination, multiSupport must be off!
-                        let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: false)
-                        return messages.reduce(0, {$0 + ($1.getLong(attribute: "totalLength") ?? 0)})
-                    })
-                    // Repeat until enough data is available
-                    while buffer.readableBytes < seek.offset + totalSize {
-                        guard let input = try await self.iterator.next() else {
-                            return nil
-                        }
-                        buffer.writeImmutableBuffer(input)
-                    }
-                    seek.length = totalSize
                 }
                 
                 messages = try buffer.readWithUnsafeReadableBytes({
