@@ -26,6 +26,7 @@ struct GribAsyncStreamHelper {
         guard offset <= (1 << 40), offset + MemoryLayout<GribHeader>.size <= memory.count else {
             return nil
         }
+        // https://codes.ecmwf.int/grib/format/grib2/sections/0/
         struct GribHeader {
             /// "GRIB"
             let magic: UInt32
@@ -44,8 +45,8 @@ struct GribAsyncStreamHelper {
         
         let header = base.advanced(by: offset).assumingMemoryBound(to: GribHeader.self).pointee
         
-        // GRIB1 detection
-        if header.version == 1 {
+        switch header.version {
+        case 1:
             // 1-4 identifier = GRIB
             // 5-7 totalLength = 4284072
             // 8 editionNumber = 1
@@ -59,14 +60,16 @@ struct GribAsyncStreamHelper {
                 return nil
             }
             return (offset, Int(length), 1)
+        case 2:
+            let length = header.length.bigEndian
+            
+            guard (1...2).contains(header.version), length <= (1 << 40) else {
+                return nil
+            }
+            return (offset, Int(length), 2)
+        default:
+            fatalError("Unknown GRIB version \(header.version)")
         }
-        
-        let length = header.length.bigEndian
-        
-        guard (1...2).contains(header.version), length <= (1 << 40) else {
-            return nil
-        }
-        return (offset, Int(length), 2)
     }
 }
 
@@ -125,7 +128,8 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 }
                 
                 // If length is greater than 8388607, this is some ECMWF extension https://confluence.ecmwf.int/display/FCST/Detailed+information+of+implementation+of+IFS+cycle+41r2#DetailedinformationofimplementationofIFScycle41r2-GRIBedition1messagesize
-                //if seek.gribVersion == 1 && seek.length >= 8388607 {
+                if seek.gribVersion == 1 && seek.length >= 8388607 {
+                    print("IS LARGE GRIB")
                 // 2024-09-09: download issues for IFS04 and concurrent 4. Always validate size
                     let totalSize = try buffer.withUnsafeReadableBytes({
                         let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
@@ -141,7 +145,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                         buffer.writeImmutableBuffer(input)
                     }
                     seek.length = totalSize
-                //}
+                }
                 
                 messages = try buffer.readWithUnsafeReadableBytes({
                     let memory = UnsafeRawBufferPointer(rebasing: $0[seek.offset ..< seek.offset+seek.length])
