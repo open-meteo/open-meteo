@@ -131,6 +131,10 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
     }
     
+    func read(dim0: Range<Int>, dim1: Range<Int>, dim2: Range<Int>, dim3: Range<Int>, into: HyperCubeSlice) {
+        
+    }
+    
     /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
     ///
     /// This code could be moved to C/Rust for better performance. The 2D delta and scaling code is not yet using vector instructions yet
@@ -209,7 +213,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                                 precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
                                 let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
                                 fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                                let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
+                                let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1 * length2 * length3, chunkBuffer)
                                 precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
                                 
                                 // 2D delta decoding
@@ -217,22 +221,38 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                                 
                                 /// Moved to local coordinates... e.g. 50..<350
                                 let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                                let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
+                                let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
+                                let clampedLocal2 = clampedGlobal2.substract(c2 * chunk2)
+                                let clampedLocal3 = clampedGlobal3.substract(c3 * chunk2)
                                 
                                 for d0 in clampedLocal0 {
-                                    let readStart = clampedLocal1 + d0 * length1
-                                    let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                                    let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                                    let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                                    for i in 0..<clampedGlobal1.count {
-                                        let posBuffer = readStart + i
-                                        let posOut = localRange + i
-                                        let val = chunkBuffer[posBuffer]
-                                        if val == Int16.max {
-                                            into.advanced(by: posOut).pointee = .nan
-                                        } else {
-                                            let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                                            into.advanced(by: posOut).pointee = unscaled
+                                    for d1 in clampedLocal1 {
+                                        for d2 in clampedLocal2 {
+                                            //let readStart = clampedLocal1.lowerBound + d0 * length1
+                                            
+                                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
+                                            
+                                            
+                                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
+                                            
+                                            let localRange = localOut0 * arrayDim1Length + localOut1 + arrayDim1Range.lowerBound
+                                            
+                                            
+                                            for (i,d3) in clampedLocal3.enumerated() {
+                                                
+                                                let posBuffer = ((d0 * length1 + d1) * length2 + d2) * length3 + d3
+                                                
+                                                let posOut = localRange + i
+                                                
+                                                
+                                                let val = chunkBuffer[posBuffer]
+                                                if val == Int16.max {
+                                                    into.advanced(by: posOut).pointee = .nan
+                                                } else {
+                                                    let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
+                                                    into.advanced(by: posOut).pointee = unscaled
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -296,4 +316,22 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             }
         }
     }
+}
+
+
+struct HyperCube {
+    let dim0: Int
+    let dim1: Int
+    let dim2: Int
+    let dim3: Int
+    let data: UnsafeMutableBufferPointer<Float>
+}
+
+struct HyperCubeSlice {
+    let cube: HyperCube
+    /// same as offset+count
+    let coord0: Range<Int>
+    let coord1: Range<Int>
+    let coord2: Range<Int>
+    let coord3: Range<Int>
 }
