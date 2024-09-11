@@ -542,13 +542,13 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let speed = zip(u.data,v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_10m_spread:
-            let u = try get(raw: .wind_u_component_10m, time: time).data
-            let v = try get(raw: .wind_v_component_10m, time: time).data
+            let u = try get(raw: .wind_u_component_10m_spread, time: time).data
+            let v = try get(raw: .wind_v_component_10m_spread, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .wind_direction_100m_spread:
-            let u = try get(raw: .wind_u_component_100m, time: time).data
-            let v = try get(raw: .wind_v_component_100m, time: time).data
+            let u = try get(raw: .wind_u_component_100m_spread, time: time).data
+            let v = try get(raw: .wind_v_component_100m_spread, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v)
             return DataAndUnit(direction, .degreeDirection)
         case .snowfall_spread:
