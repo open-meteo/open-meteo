@@ -311,6 +311,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .cloudBase, previousDay: previousDay)
         case .cloud_top:
             return .init(variable: .cloudTop, previousDay: previousDay)
+        case .mass_density_8m:
+            return .init(variable: .massDensity, altitude: 8, previousDay: previousDay)
         case .wind_speed_10m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 10, previousDay: previousDay)
         case .wind_speed_100m_spread:
