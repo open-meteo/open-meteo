@@ -131,10 +131,6 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
     }
     
-    func read(dim0: Range<Int>, dim1: Range<Int>, dim2: Range<Int>, dim3: Range<Int>, into: HyperCubeSlice) {
-        
-    }
-    
     /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
     ///
     /// This code could be moved to C/Rust for better performance. The 2D delta and scaling code is not yet using vector instructions yet
@@ -146,7 +142,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
     /// `arrayDim1Length` if dim0Slow.count is greater than 1, the arrayDim1Length will be used as a stride. Like `nTime` in a 2d fast time array
     /// `dim0Slow` the slow dimension to read. Typically a location range
     /// `dim1Read` the fast dimension to read. Tpyicall a time range
-    public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+    public func read(dim0 dim0Read: Range<Int>, dim1 dim1Read: Range<Int>, dim2 dim2Read: Range<Int>, dim3 dim3Read: Range<Int>, into: HyperCubeSlice, chunkBuffer: UnsafeMutableRawPointer) throws {
         
         //assert(arrayDim1Range.count == dim1Read.count)
         
@@ -156,8 +152,18 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
             throw SwiftPFor2DError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
-        let dim2Read = dim1Read
-        let dim3Read = dim2Read
+        guard dim2Read.lowerBound >= 0 && dim2Read.lowerBound <= dim2 && dim2Read.upperBound <= dim2 else {
+            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim2Read, allowed: dim2)
+        }
+        guard dim3Read.lowerBound >= 0 && dim3Read.lowerBound <= dim3 && dim3Read.upperBound <= dim3 else {
+            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim3Read, allowed: dim3)
+        }
+        let chunk0 = self.chunk0
+        let chunk1 = self.chunk1
+        let chunk2 = self.chunk2
+        let chunk3 = self.chunk3
+        
+        // TODO validate hyper chunk coordinates
         
         let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
         let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
@@ -219,38 +225,40 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                                 // 2D delta decoding
                                 delta2d_decode(length0, length1, chunkBuffer)
                                 
-                                /// Moved to local coordinates... e.g. 50..<350
+                                // Moved to local coordinates... e.g. 50..<350. Coordinates of the current chunk
                                 let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
                                 let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
                                 let clampedLocal2 = clampedGlobal2.substract(c2 * chunk2)
                                 let clampedLocal3 = clampedGlobal3.substract(c3 * chunk2)
                                 
+                                /// Read coordinate in current chunk buffer
                                 for d0 in clampedLocal0 {
+                                    /// Target coordinate in hyperchunk. Range `0...dim0Read`
+                                    let t0 = chunkGlobal0.lowerBound - dim0Read.lowerBound + d0
+                                    /// Target coordinate in hyperchube
+                                    let q0 = t0 + into.coord0.lowerBound
+                                    
                                     for d1 in clampedLocal1 {
+                                        let t1 = chunkGlobal1.lowerBound - dim1Read.lowerBound + d1
+                                        let q1 = t1 + into.coord1.lowerBound
+                                        
                                         for d2 in clampedLocal2 {
-                                            //let readStart = clampedLocal1.lowerBound + d0 * length1
-                                            
-                                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                                            
-                                            
-                                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                                            
-                                            let localRange = localOut0 * arrayDim1Length + localOut1 + arrayDim1Range.lowerBound
-                                            
+                                            let t2 = chunkGlobal2.lowerBound - dim2Read.lowerBound + d2
+                                            let q2 = t2 + into.coord2.lowerBound
                                             
                                             for (i,d3) in clampedLocal3.enumerated() {
+                                                let t3 = chunkGlobal3.lowerBound - dim3Read.lowerBound + d3
+                                                let q3 = t3 + into.coord3.lowerBound
                                                 
                                                 let posBuffer = ((d0 * length1 + d1) * length2 + d2) * length3 + d3
-                                                
-                                                let posOut = localRange + i
-                                                
+                                                let posOut = ((q0 * into.cube.dim1 + q1) * into.cube.dim2 + q2) * into.cube.dim3 + q3
                                                 
                                                 let val = chunkBuffer[posBuffer]
                                                 if val == Int16.max {
-                                                    into.advanced(by: posOut).pointee = .nan
+                                                    into.cube.data.baseAddress?.advanced(by: posOut).pointee = Float.nan
                                                 } else {
                                                     let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                                                    into.advanced(by: posOut).pointee = unscaled
+                                                    into.cube.data.baseAddress?.advanced(by: posOut).pointee = unscaled
                                                 }
                                             }
                                         }
@@ -261,7 +269,8 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                     }
                 }
             case .fpxdec32:
-                let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
+                break
+                /*let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
                 
                 for c0 in dim0Read.divide(by: chunk0) {
@@ -312,14 +321,14 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                             }
                         }
                     }
-                }
+                }*/
             }
         }
     }
 }
 
 
-struct HyperCube {
+public struct HyperCube {
     let dim0: Int
     let dim1: Int
     let dim2: Int
@@ -327,7 +336,7 @@ struct HyperCube {
     let data: UnsafeMutableBufferPointer<Float>
 }
 
-struct HyperCubeSlice {
+public struct HyperCubeSlice {
     let cube: HyperCube
     /// same as offset+count
     let coord0: Range<Int>
