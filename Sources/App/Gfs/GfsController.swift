@@ -54,6 +54,7 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case latent_heatflux
     case windgusts_10m
     case freezinglevel_height
+    case mass_density_8m
     
     case sunshine_duration
     
@@ -362,6 +363,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.freezing_level_height), time: time)
             case .sunshine_duration:
                 try prefetchData(derived: .surface(.direct_radiation), time: time)
+            case .mass_density_8m:
+                try prefetchData(derived: .surface(.mass_density_8m), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -583,6 +586,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .surface(.wind_gusts_10m), time: time)
             case .freezinglevel_height:
                 return try get(raw: .surface(.freezing_level_height), time: time)
+            case .mass_density_8m:
+                return try get(raw: .surface(.mass_density_8m), time: time)
             case .sunshine_duration:
                 let directRadiation = try get(derived: .surface(.direct_radiation), time: time)
                 let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
