@@ -112,7 +112,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var timeoutHours: Double {
         switch self {
         case .arpege_europe, .arpege_world:
-            return 5.5
+            // Arpege has sometimes larger delays
+            return 7.5
         case .arome_france, .arome_france_hd:
             // Arome has sometimes larger delays
             return 4.5
