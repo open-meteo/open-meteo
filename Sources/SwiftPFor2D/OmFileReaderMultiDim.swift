@@ -131,6 +131,47 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
     }
     
+    public static func test() {
+        let chunks = [10, 20, 30, 40]
+        let dims = [100, 200, 300, 400]
+        let dimRead = [5..<6, 5..<6, 50..<80, 50..<100]
+        
+        // Find starting position
+        var nChunksToRead = 1
+        var globalChunkNum = 0
+        for i in 0..<dims.count {
+            let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+            nChunksToRead *= nChunksInThisDimension
+            let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
+            globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
+        }
+        
+        // Loop over all chunks that need to be read
+        for c in 0..<nChunksToRead {
+            
+            // load chunk from mmap
+            //precondition(globalChunkNum < nChunks, "invalid chunkNum")
+            //let startPos = globalChunkNum == 0 ? 0 : chunkOffsets[globalChunkNum-1]
+            //precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
+            //let lengthCompressedBytes = chunkOffsets[globalChunkNum] - startPos
+            //fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
+            //let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1 * length2 * length3, chunkBuffer)
+            //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
+            
+            // Iterate dimensions and move `globalChunkNum` to next position
+            var chunkOffset = 1
+            for i in 0..<dims.count {
+                let nextChunk = c + 1
+                let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                if nextChunk % nChunksInThisDimension == 0 {
+                    let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
+                    chunkOffset = chunkOffset * nChunksInThisDimension + firstChunkInThisDimension
+                }
+            }
+            globalChunkNum += chunkOffset
+        }
+    }
+    
     /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
     ///
     /// This code could be moved to C/Rust for better performance. The 2D delta and scaling code is not yet using vector instructions yet
@@ -170,7 +211,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         let nDim2Chunks = dim2.divideRoundedUp(divisor: chunk2)
         let nDim3Chunks = dim3.divideRoundedUp(divisor: chunk3)
         
-        let nChunks = nDim0Chunks * nDim1Chunks
+        let nChunks = nDim0Chunks * nDim1Chunks * nDim2Chunks * nDim3Chunks
         fn.withUnsafeBytes { ptr in
             //fn.preRead(offset: OmHeader.length, count: nChunks * MemoryLayout<Int>.stride)
             let chunkOffsets = ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self, capacity: nChunks)
@@ -183,6 +224,47 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                 fallthrough
             case .p4nzdec256:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                
+                let chunks = [chunk0, chunk1, chunk2, chunk3]
+                let dims = [dim0, dim1, dim2, dim3]
+                let dimRead = [dim0Read, dim1Read, dim2Read, dim3Read]
+                
+                // Find starting position
+                var nChunksToRead = 1
+                var globalChunkNum = 0
+                for i in 0..<dims.count {
+                    let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                    nChunksToRead *= nChunksInThisDimension
+                    let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
+                    globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
+                }
+                
+                // Loop over all chunks that need to be read
+                for c in 0..<nChunksToRead {
+                    
+                    // load chunk from mmap
+                    precondition(globalChunkNum < nChunks, "invalid chunkNum")
+                    let startPos = globalChunkNum == 0 ? 0 : chunkOffsets[globalChunkNum-1]
+                    precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
+                    let lengthCompressedBytes = chunkOffsets[globalChunkNum] - startPos
+                    fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
+                    //let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1 * length2 * length3, chunkBuffer)
+                    //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
+                    
+                    // Iterate dimensions and move `globalChunkNum` to next position
+                    var chunkOffset = 1
+                    for i in 0..<dims.count {
+                        let nextChunk = c + 1
+                        let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                        if nextChunk % nChunksInThisDimension == 0 {
+                            let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
+                            chunkOffset = chunkOffset * nChunksInThisDimension + firstChunkInThisDimension
+                        }
+                    }
+                    globalChunkNum += chunkOffset
+                }
+                
+                
                 for c0 in dim0Read.divide(by: chunk0) {
                    
                     //let c1Chunks = c1Range.add(c0 * nDim1Chunks)
