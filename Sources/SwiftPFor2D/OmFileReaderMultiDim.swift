@@ -132,23 +132,26 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public static func test() {
-        let chunks = [10, 20, 30, 40]
-        let dims = [100, 200, 300, 400]
-        let dimRead = [5..<6, 5..<6, 50..<80, 50..<100]
+        let chunks = [10, 10, 10, 10]
+        let dims = [100, 100, 100, 100]
+        let dimRead = [15..<16, 15..<26, 15..<26, 15..<26]
         
         // Find starting position
         var nChunksToRead = 1
         var globalChunkNum = 0
         for i in 0..<dims.count {
             let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-            let nChunksInThisDimension = chunkInThisDimension.count
-            nChunksToRead *= nChunksInThisDimension
+            let nChunksReadInThisDimension = chunkInThisDimension.count
+            nChunksToRead *= nChunksReadInThisDimension
             let firstChunkInThisDimension = chunkInThisDimension.lowerBound
+            let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
+            print(nChunksReadInThisDimension, firstChunkInThisDimension)
+
         }
         print("nChunksToRead \(nChunksToRead)")
         print("globalChunkNum \(globalChunkNum)")
-
+                
         // Loop over all chunks that need to be read
         for c in 0..<nChunksToRead {
             print("c=\(c) globalChunkNum=\(globalChunkNum)")
@@ -163,17 +166,25 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
             
             // Iterate dimensions and move `globalChunkNum` to next position
-            var chunkOffset = 1
-            for i in 0..<dims.count {
-                let nextChunk = c + 1
+            var rollingMultiplty = 1
+            for i in (0..<dims.count).reversed() {
+                // E.g. 10
+                let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                
+                // E.g. 2..<4
                 let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-                let nChunksInThisDimension = chunkInThisDimension.count
-                if nextChunk % nChunksInThisDimension == 0 {
-                    let firstChunkInThisDimension = chunkInThisDimension.lowerBound
-                    chunkOffset = chunkOffset * nChunksInThisDimension + firstChunkInThisDimension
+                                
+                // Move forward by one
+                globalChunkNum += rollingMultiplty
+                // Check for overflow in limited read coordinates
+                
+                let posInDim = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+                if posInDim != chunkInThisDimension.upperBound {
+                    break // no overflow in this dimension, break
                 }
+                globalChunkNum -= chunkInThisDimension.count * rollingMultiplty
+                rollingMultiplty *= nChunksInThisDimension
             }
-            globalChunkNum += chunkOffset
         }
     }
     
