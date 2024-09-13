@@ -139,6 +139,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         // Find starting position
         var nChunksToRead = 1
         var globalChunkNum = 0
+        var totalChunks = 1
         for i in 0..<dims.count {
             let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
             let nChunksReadInThisDimension = chunkInThisDimension.count
@@ -147,14 +148,15 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
             print(nChunksReadInThisDimension, firstChunkInThisDimension)
-
+            totalChunks *= nChunksInThisDimension
         }
         print("nChunksToRead \(nChunksToRead)")
         print("globalChunkNum \(globalChunkNum)")
+        print("totalChunks \(totalChunks)")
                 
         // Loop over all chunks that need to be read
-        for c in 0..<nChunksToRead {
-            print("c=\(c) globalChunkNum=\(globalChunkNum)")
+        outer: while true {
+            print("globalChunkNum=\(globalChunkNum)")
             
             // load chunk from mmap
             //precondition(globalChunkNum < nChunks, "invalid chunkNum")
@@ -184,6 +186,10 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                 }
                 globalChunkNum -= chunkInThisDimension.count * rollingMultiplty
                 rollingMultiplty *= nChunksInThisDimension
+                if i == 0 {
+                    // All chunks have been read. End of iteration
+                    break outer
+                }
             }
         }
     }
