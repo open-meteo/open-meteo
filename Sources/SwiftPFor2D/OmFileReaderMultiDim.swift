@@ -140,14 +140,18 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         var nChunksToRead = 1
         var globalChunkNum = 0
         for i in 0..<dims.count {
-            let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+            let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
+            let nChunksInThisDimension = chunkInThisDimension.count
             nChunksToRead *= nChunksInThisDimension
-            let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
+            let firstChunkInThisDimension = chunkInThisDimension.lowerBound
             globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
         }
-        
+        print("nChunksToRead \(nChunksToRead)")
+        print("globalChunkNum \(globalChunkNum)")
+
         // Loop over all chunks that need to be read
         for c in 0..<nChunksToRead {
+            print("c=\(c) globalChunkNum=\(globalChunkNum)")
             
             // load chunk from mmap
             //precondition(globalChunkNum < nChunks, "invalid chunkNum")
@@ -162,9 +166,10 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             var chunkOffset = 1
             for i in 0..<dims.count {
                 let nextChunk = c + 1
-                let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
+                let nChunksInThisDimension = chunkInThisDimension.count
                 if nextChunk % nChunksInThisDimension == 0 {
-                    let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
+                    let firstChunkInThisDimension = chunkInThisDimension.lowerBound
                     chunkOffset = chunkOffset * nChunksInThisDimension + firstChunkInThisDimension
                 }
             }
@@ -238,10 +243,12 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                     let firstChunkInThisDimension = dimRead[i].lowerBound / chunks[i]
                     globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
                 }
+                print("nChunksToRead \(nChunksToRead)")
+                print("globalChunkNum \(globalChunkNum)")
                 
                 // Loop over all chunks that need to be read
                 for c in 0..<nChunksToRead {
-                    
+                    print("c=\(c) globalChunkNum=\(globalChunkNum)")
                     // load chunk from mmap
                     precondition(globalChunkNum < nChunks, "invalid chunkNum")
                     let startPos = globalChunkNum == 0 ? 0 : chunkOffsets[globalChunkNum-1]
