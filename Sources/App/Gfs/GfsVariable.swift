@@ -159,7 +159,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .categorical_freezing_rain: return 1
         case .convective_inhibition: return 1
         case .total_column_integrated_water_vapour: return 10
-        case .mass_density_8m: return 1
+        case .mass_density_8m: return 0.1
         }
     }
     
