@@ -12,6 +12,7 @@ enum CurlError: Error {
     case sizeTooSmall
     case didNotGetAllGribMessages(got: Int, expected: Int)
     case downloadFailed(code: HTTPStatus)
+    case unauthorized
     case fileNotFound
     case timeoutReached
     case timeoutPerChunkReached

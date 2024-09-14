@@ -116,7 +116,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return 7.5
         case .arome_france, .arome_france_hd:
             // Arome has sometimes larger delays
-            return 4.5
+            return 5.5
         case .arome_france_15min, .arome_france_hd_15min:
             return 1.5
         }
