@@ -134,7 +134,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
     public static func test() {
         let chunks = [10, 10, 10, 10]
         let dims = [100, 100, 100, 100]
-        let dimRead = [5..<6, 5..<6, 15..<26, 15..<26]
+        let dimRead = [5..<6, 5..<6, 5..<16, 15..<26]
         let intoCoordLower = [0, 0, 0, 0]
         
         // Find starting position
@@ -160,6 +160,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             print("globalChunkNum=\(globalChunkNum)")
             
             var rollingMultiplty = 1
+            var rollingMultiplyChunkLength = 1
             var rollingMultiplyDimRead = 1
             
             /// Read coordinate from temporary buffer
@@ -187,13 +188,14 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                 
                 let q0 = t0 + intoCoordLower[i]
                 
-                d = d + rollingMultiplyDimRead * d0
+                d = d + rollingMultiplyChunkLength * d0
                 q = q + rollingMultiplyDimRead * q0
                 
                 lengthInChunk *= length0
                 
                 rollingMultiplty *= nChunksInThisDimension
-                rollingMultiplyDimRead *= length0
+                rollingMultiplyDimRead *= dimRead[i].count
+                rollingMultiplyChunkLength *= length0
             }
             
             print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
@@ -208,13 +210,12 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
             
             loopBuffer: for x in 0..<10000 {
-                print("read buffer pos=\(d) and write to \(q)")
-                
-                /// Note there is somethere a off-by-1 error in `q`
-                
+                print("read buffer from pos=\(d) and write to \(q)")
+                                
                 // Iterate dimensions and move `globalChunkNum` to next position
                 rollingMultiplty = 1
                 rollingMultiplyDimRead = 1
+                rollingMultiplyChunkLength = 1
                 for i in (0..<dims.count).reversed() {
                     let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
                     let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
@@ -224,19 +225,20 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                     let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
                     
                     /// More forward t
-                    d += rollingMultiplyDimRead
+                    d += rollingMultiplyChunkLength
                     q += rollingMultiplyDimRead
                     
-                    let d0 = (d / rollingMultiplyDimRead) % length0
+                    let d0 = (d / rollingMultiplyChunkLength) % length0
                     if d0 != clampedLocal0.upperBound && d0 != 0 {
                         break // no overflow in this dimension, break
                     }
                     
-                    d -= clampedLocal0.count * rollingMultiplyDimRead
+                    d -= clampedLocal0.count * rollingMultiplyChunkLength
                     q -= clampedLocal0.count * rollingMultiplyDimRead
                     
                     rollingMultiplty *= nChunksInThisDimension
-                    rollingMultiplyDimRead *= length0
+                    rollingMultiplyDimRead *= dimRead[i].count
+                    rollingMultiplyChunkLength *= length0
                     if i == 0 {
                         // All chunks have been read. End of iteration
                         break loopBuffer
