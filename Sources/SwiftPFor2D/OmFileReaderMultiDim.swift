@@ -132,28 +132,38 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public static func test() {
-        let chunks = [10, 10, 10, 10]
+        /// The dimensions of the file
         let dims = [100, 100, 100, 100]
+        
+        /// How the dimensions are chunked
+        let chunks = [10, 10, 10, 10]
+        
+        /// Which values to read
         let dimRead = [5..<6, 5..<6, 5..<16, 15..<26]
+        
+        /// The offset the result should be placed into the target cube. E.g. a slice or a chunk of a cube
         let intoCoordLower = [0, 0, 0, 0]
         
-        // Find starting position
-        var nChunksToRead = 1
+        /// The target cube dimensions. E.g. Reading 2 years of data may read data from mutliple files
+        let intoCubeDimension = dimRead.map { $0.count }
+        
+        // Find the first chunk that needs to be read
+        //var nChunksToRead = 1
         var globalChunkNum = 0
-        var totalChunks = 1
+        //var totalChunks = 1
         for i in 0..<dims.count {
             let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
             let nChunksReadInThisDimension = chunkInThisDimension.count
-            nChunksToRead *= nChunksReadInThisDimension
+            //nChunksToRead *= nChunksReadInThisDimension
             let firstChunkInThisDimension = chunkInThisDimension.lowerBound
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
             print(nChunksReadInThisDimension, firstChunkInThisDimension)
-            totalChunks *= nChunksInThisDimension
+            //totalChunks *= nChunksInThisDimension
         }
-        print("nChunksToRead \(nChunksToRead)")
-        print("globalChunkNum \(globalChunkNum)")
-        print("totalChunks \(totalChunks)")
+        //print("nChunksToRead \(nChunksToRead)")
+        print("first chunk to read: globalChunkNum \(globalChunkNum)")
+        //print("totalChunks \(totalChunks)")
                 
         // Loop over all chunks that need to be read
         outer: while true {
@@ -161,16 +171,13 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             
             var rollingMultiplty = 1
             var rollingMultiplyChunkLength = 1
-            var rollingMultiplyDimRead = 1
+            var rollingMultiplyTargetCube = 1
             
-            /// Read coordinate from temporary buffer
+            /// Read coordinate from temporary chunk buffer
             var d = 0
             
-            /// Write coordinate to output chunk
+            /// Write coordinate to output cube
             var q = 0
-            
-            /// How many elements are in this chunk
-            var lengthInChunk = 1
             
             /// Count length in chunk and find first buffer offset position
             for i in (0..<dims.count).reversed() {
@@ -189,15 +196,15 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                 let q0 = t0 + intoCoordLower[i]
                 
                 d = d + rollingMultiplyChunkLength * d0
-                q = q + rollingMultiplyDimRead * q0
-                
-                lengthInChunk *= length0
-                
+                q = q + rollingMultiplyTargetCube * q0
+                                
                 rollingMultiplty *= nChunksInThisDimension
-                rollingMultiplyDimRead *= dimRead[i].count
+                rollingMultiplyTargetCube *= intoCubeDimension[i]
                 rollingMultiplyChunkLength *= length0
             }
             
+            /// How many elements are in this chunk
+            let lengthInChunk = rollingMultiplyTargetCube
             print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
             
             // load chunk from mmap
@@ -209,12 +216,15 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             //let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), lengthInChunk, chunkBuffer)
             //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
             
-            loopBuffer: for x in 0..<10000 {
+            // TODO multi dimensional encode/decode
+            
+            /// Loop over all values need to be copied to the output buffer
+            loopBuffer: while true {
                 print("read buffer from pos=\(d) and write to \(q)")
                                 
-                // Iterate dimensions and move `globalChunkNum` to next position
+                /// Move `q` and `d` to next position
                 rollingMultiplty = 1
-                rollingMultiplyDimRead = 1
+                rollingMultiplyTargetCube = 1
                 rollingMultiplyChunkLength = 1
                 for i in (0..<dims.count).reversed() {
                     let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
@@ -224,9 +234,9 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                     let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
                     let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
                     
-                    /// More forward t
+                    /// More forward
                     d += rollingMultiplyChunkLength
-                    q += rollingMultiplyDimRead
+                    q += rollingMultiplyTargetCube
                     
                     let d0 = (d / rollingMultiplyChunkLength) % length0
                     if d0 != clampedLocal0.upperBound && d0 != 0 {
@@ -234,10 +244,10 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                     }
                     
                     d -= clampedLocal0.count * rollingMultiplyChunkLength
-                    q -= clampedLocal0.count * rollingMultiplyDimRead
+                    q -= clampedLocal0.count * rollingMultiplyTargetCube
                     
                     rollingMultiplty *= nChunksInThisDimension
-                    rollingMultiplyDimRead *= dimRead[i].count
+                    rollingMultiplyTargetCube *= intoCubeDimension[i]
                     rollingMultiplyChunkLength *= length0
                     if i == 0 {
                         // All chunks have been read. End of iteration
@@ -247,7 +257,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             }
 
             
-            // Iterate dimensions and move `globalChunkNum` to next position
+            // Move `globalChunkNum` to next position
             rollingMultiplty = 1
             for i in (0..<dims.count).reversed() {
                 // E.g. 10
