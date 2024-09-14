@@ -72,6 +72,10 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":DUVB:surface:"
             case .uv_index_clear_sky:
                 return ":CDUVB:surface:"
+            case .boundary_layer_height:
+                return ":HPBL:surface:"
+            case .total_column_integrated_water_vapour:
+                return ":PWAT:entire atmosphere (considered as a single layer):"
             default:
                 return nil
             }
@@ -171,6 +175,12 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
                 return ":CAPE:surface:"
             case .visibility:
                 return ":VIS:surface:"
+            case .boundary_layer_height:
+                return ":HPBL:surface:"
+            case .total_column_integrated_water_vapour:
+                return ":PWAT:entire atmosphere (considered as a single layer):"
+            case .mass_density_8m:
+                return ":MASSDEN:8 m above ground:"
             default:
                 return nil
             }
@@ -411,6 +421,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
             return (18.9 * 0.025, 0)
+        case .mass_density_8m:
+            return (1e9, 0)  // convert kg/m³ to µg/m³
         default:
             return nil
         }

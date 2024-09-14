@@ -201,7 +201,28 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
     }
     
     var interpolation: ReaderInterpolation {
-        fatalError("Interpolation from 6h data to 1h not supported")
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .temperature_2m_max, .temperature_2m_min:
+            return .linear
+        case .soil_moisture_0_to_10cm, .soil_moisture_10_to_40cm, .soil_moisture_40_to_100cm, .soil_moisture_100_to_200cm:
+            return .hermite(bounds: nil)
+        case .soil_temperature_0_to_10cm:
+            return .hermite(bounds: nil)
+        case .shortwave_radiation:
+            return .solar_backwards_averaged
+        case .cloud_cover:
+            return .hermite(bounds: 0...100)
+        case .wind_u_component_10m, .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .precipitation, .showers:
+            return .backwards_sum
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        }
     }
     
     var requiresOffsetCorrectionForMixing: Bool {
