@@ -134,7 +134,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
     public static func test() {
         let chunks = [10, 10, 10, 10]
         let dims = [100, 100, 100, 100]
-        let dimRead = [15..<16, 15..<26, 15..<26, 15..<26]
+        let dimRead = [5..<6, 5..<6, 15..<26, 15..<26]
         
         // Find starting position
         var nChunksToRead = 1
@@ -158,17 +158,85 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
         outer: while true {
             print("globalChunkNum=\(globalChunkNum)")
             
+            var rollingMultiplty = 1
+            var rollingMultiplyDimRead = 1
+            
+            /// Read coordinate in ouput buffer
+            var d = 0
+            
+            /// How many elements are in this chunk
+            var lengthInChunk = 1
+            
+            /// Count length in chunk and find first buffer offset position
+            for i in (0..<dims.count).reversed() {
+                let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+                let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
+                let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+                let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
+                let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
+                
+                /// start only!
+                let d0 = clampedLocal0.lowerBound
+                /// Target coordinate in hyperchunk. Range `0...dim0Read`
+                //let t0 = chunkGlobal0.lowerBound - dimRead[i].lowerBound + d0
+                
+                d = d + rollingMultiplyDimRead * d0
+                
+                lengthInChunk *= length0
+                
+                rollingMultiplty *= nChunksInThisDimension
+                rollingMultiplyDimRead *= length0
+            }
+            
+            print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
+            
             // load chunk from mmap
             //precondition(globalChunkNum < nChunks, "invalid chunkNum")
             //let startPos = globalChunkNum == 0 ? 0 : chunkOffsets[globalChunkNum-1]
             //precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
             //let lengthCompressedBytes = chunkOffsets[globalChunkNum] - startPos
             //fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-            //let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1 * length2 * length3, chunkBuffer)
+            //let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), lengthInChunk, chunkBuffer)
             //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
             
+            loopBuffer: for x in 0..<10000 {
+                print("read buffer pos=\(d) and write to \(x)")
+                
+                
+                // Iterate dimensions and move `globalChunkNum` to next position
+                rollingMultiplty = 1
+                rollingMultiplyDimRead = 1
+                for i in (0..<dims.count).reversed() {
+                    let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                    let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+                    let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
+                    let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+                    let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
+                    let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
+                    
+                    /// More forward t
+                    d += rollingMultiplyDimRead
+                    
+                    let d0 = (d / rollingMultiplyDimRead) % length0
+                    if d0 != clampedLocal0.upperBound && d0 != 0 {
+                        break // no overflow in this dimension, break
+                    }
+                    
+                    d -= clampedLocal0.count * rollingMultiplyDimRead
+                    
+                    rollingMultiplty *= nChunksInThisDimension
+                    rollingMultiplyDimRead *= length0
+                    if i == 0 {
+                        // All chunks have been read. End of iteration
+                        break loopBuffer
+                    }
+                }
+            }
+
+            
             // Iterate dimensions and move `globalChunkNum` to next position
-            var rollingMultiplty = 1
+            rollingMultiplty = 1
             for i in (0..<dims.count).reversed() {
                 // E.g. 10
                 let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
@@ -180,8 +248,8 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
                 globalChunkNum += rollingMultiplty
                 // Check for overflow in limited read coordinates
                 
-                let posInDim = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
-                if posInDim != chunkInThisDimension.upperBound {
+                let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+                if c0 != chunkInThisDimension.upperBound && c0 != 0 {
                     break // no overflow in this dimension, break
                 }
                 globalChunkNum -= chunkInThisDimension.count * rollingMultiplty
