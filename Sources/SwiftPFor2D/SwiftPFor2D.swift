@@ -676,6 +676,14 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     loopBuffer: while true {
                         print("read buffer from pos=\(d) and write to \(q)")
                         
+                        let val = chunkBuffer[d]
+                        if val == Int16.max {
+                            into.advanced(by: q).pointee = .nan
+                        } else {
+                            let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
+                            into.advanced(by: q).pointee = unscaled
+                        }
+                        
                         // TODO for the last dimension, it would be better to have a range copy
                         // The loop below could be expensive....
                                         
