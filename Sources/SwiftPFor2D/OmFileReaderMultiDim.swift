@@ -204,7 +204,7 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             }
             
             /// How many elements are in this chunk
-            let lengthInChunk = rollingMultiplyTargetCube
+            let lengthInChunk = rollingMultiplyChunkLength
             print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
             
             // load chunk from mmap
@@ -221,6 +221,9 @@ public final class OmFileReader2<Backend: OmFileReaderBackend> {
             /// Loop over all values need to be copied to the output buffer
             loopBuffer: while true {
                 print("read buffer from pos=\(d) and write to \(q)")
+                
+                // TODO for the last dimension, it would be better to have a range copy
+                // The loop below could be expensive....
                                 
                 /// Move `q` and `d` to next position
                 rollingMultiplty = 1
