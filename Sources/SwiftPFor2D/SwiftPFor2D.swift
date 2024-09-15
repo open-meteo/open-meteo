@@ -622,7 +622,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     /// Write coordinate to output cube
                     var q = 0
                     
-                    var length00 = 0
+                    var lengthLast = 0
                     
                     /// Count length in chunk and find first buffer offset position
                     for i in (0..<dims.count).reversed() {
@@ -633,8 +633,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
                         
-                        if i == 0 {
-                            length00 = length0
+                        if i == dims.count-1 {
+                            lengthLast = length0
                         }
                         
                         /// start only!
@@ -666,7 +666,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
                     
                     // TODO multi dimensional encode/decode
-                    delta2d_decode(length00, lengthInChunk / length00, chunkBuffer)
+                    delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
                     
                     
                     /// Loop over all values need to be copied to the output buffer
