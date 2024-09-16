@@ -582,168 +582,18 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             case.p4nzdec256logarithmic:
                 fallthrough
             case .p4nzdec256:
-                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                //let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                 
-                let dims = [dim0, dim1]
-                let chunks = [chunk0, chunk1]
-                let dimRead = [dim0Read, dim1Read]
-                let intoCoordLower = [0, arrayDim1Range.lowerBound]
-                let intoCubeDimension = [dim0Read.count, arrayDim1Length]
-                
-                // Find the first chunk that needs to be read
-                //var nChunksToRead = 1
-                var globalChunkNum = 0
-                //var totalChunks = 1
-                for i in 0..<dims.count {
-                    let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-                    let nChunksReadInThisDimension = chunkInThisDimension.count
-                    //nChunksToRead *= nChunksReadInThisDimension
-                    let firstChunkInThisDimension = chunkInThisDimension.lowerBound
-                    let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                    globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
-                    print(nChunksReadInThisDimension, firstChunkInThisDimension)
-                    //totalChunks *= nChunksInThisDimension
-                }
-                //print("nChunksToRead \(nChunksToRead)")
-                print("first chunk to read: globalChunkNum \(globalChunkNum)")
-                //print("totalChunks \(totalChunks)")
-                        
-                // Loop over all chunks that need to be read
-                outer: while true {
-                    print("globalChunkNum=\(globalChunkNum)")
-                    
-                    var rollingMultiplty = 1
-                    var rollingMultiplyChunkLength = 1
-                    var rollingMultiplyTargetCube = 1
-                    
-                    /// Read coordinate from temporary chunk buffer
-                    var d = 0
-                    
-                    /// Write coordinate to output cube
-                    var q = 0
-                    
-                    var lengthLast = 0
-                    
-                    /// Count length in chunk and find first buffer offset position
-                    for i in (0..<dims.count).reversed() {
-                        let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                        let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
-                        let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-                        let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                        let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
-                        let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
-                        
-                        if i == dims.count-1 {
-                            lengthLast = length0
-                        }
-                        
-                        /// start only!
-                        let d0 = clampedLocal0.lowerBound
-                        /// Target coordinate in hyperchunk. Range `0...dim0Read`
-                        let t0 = chunkGlobal0.lowerBound - dimRead[i].lowerBound + d0
-                        
-                        let q0 = t0 + intoCoordLower[i]
-                        
-                        d = d + rollingMultiplyChunkLength * d0
-                        q = q + rollingMultiplyTargetCube * q0
-                                        
-                        rollingMultiplty *= nChunksInThisDimension
-                        rollingMultiplyTargetCube *= intoCubeDimension[i]
-                        rollingMultiplyChunkLength *= length0
-                    }
-                    
-                    /// How many elements are in this chunk
-                    let lengthInChunk = rollingMultiplyChunkLength
-                    print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
-                    
-                    // load chunk from mmap
-                    precondition(globalChunkNum < nChunks, "invalid chunkNum")
-                    let startPos = globalChunkNum == 0 ? 0 : chunkOffsets[globalChunkNum-1]
-                    precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
-                    let lengthCompressedBytes = chunkOffsets[globalChunkNum] - startPos
-                    fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                    let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), lengthInChunk, chunkBuffer)
-                    precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
-                    
-                    // TODO multi dimensional encode/decode
-                    delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
-                    
-                    
-                    /// Loop over all values need to be copied to the output buffer
-                    loopBuffer: while true {
-                        print("read buffer from pos=\(d) and write to \(q)")
-                        
-                        let val = chunkBuffer[d]
-                        if val == Int16.max {
-                            into.advanced(by: q).pointee = .nan
-                        } else {
-                            let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                            into.advanced(by: q).pointee = unscaled
-                        }
-                        
-                        // TODO for the last dimension, it would be better to have a range copy
-                        // The loop below could be expensive....
-                                        
-                        /// Move `q` and `d` to next position
-                        rollingMultiplty = 1
-                        rollingMultiplyTargetCube = 1
-                        rollingMultiplyChunkLength = 1
-                        for i in (0..<dims.count).reversed() {
-                            let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                            let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
-                            let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-                            let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                            let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
-                            let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
-                            
-                            /// More forward
-                            d += rollingMultiplyChunkLength
-                            q += rollingMultiplyTargetCube
-                            
-                            let d0 = (d / rollingMultiplyChunkLength) % length0
-                            if d0 != clampedLocal0.upperBound && d0 != 0 {
-                                break // no overflow in this dimension, break
-                            }
-                            
-                            d -= clampedLocal0.count * rollingMultiplyChunkLength
-                            q -= clampedLocal0.count * rollingMultiplyTargetCube
-                            
-                            rollingMultiplty *= nChunksInThisDimension
-                            rollingMultiplyTargetCube *= intoCubeDimension[i]
-                            rollingMultiplyChunkLength *= length0
-                            if i == 0 {
-                                // All chunks have been read. End of iteration
-                                break loopBuffer
-                            }
-                        }
-                    }
-
-                    
-                    // Move `globalChunkNum` to next position
-                    rollingMultiplty = 1
-                    for i in (0..<dims.count).reversed() {
-                        // E.g. 10
-                        let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                        
-                        // E.g. 2..<4
-                        let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-                                        
-                        // Move forward by one
-                        globalChunkNum += rollingMultiplty
-                        // Check for overflow in limited read coordinates
-                        
-                        let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
-                        if c0 != chunkInThisDimension.upperBound && c0 != 0 {
-                            break // no overflow in this dimension, break
-                        }
-                        globalChunkNum -= chunkInThisDimension.count * rollingMultiplty
-                        rollingMultiplty *= nChunksInThisDimension
-                        if i == 0 {
-                            // All chunks have been read. End of iteration
-                            break outer
-                        }
-                    }
-                }
+                let r = OmFileReadRequest(
+                    scalefactor: scalefactor,
+                    compression: compression,
+                    dims: [dim0, dim1],
+                    chunks: [chunk0, chunk1],
+                    dimRead: [dim0Read, dim1Read],
+                    intoCoordLower: [0, arrayDim1Range.lowerBound],
+                    intoCubeDimension: [dim0Read.count, arrayDim1Length]
+                )
+                r.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer)
                 
                 /*for c0 in dim0Read.divide(by: chunk0) {
                     let c1Range = dim1Read.divide(by: chunk1)
