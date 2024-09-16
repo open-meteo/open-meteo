@@ -108,6 +108,10 @@ struct UkmoDownload: AsyncCommand {
     }
     
     func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
+        
+        /*try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: ["/Users/patrick/Downloads/UKMO_static/uk2km_ground_land-cover+model-terrain-height_00.grib2"], createNetCdf: createNetcdf, shift180LongitudeAndFlipLatitude: false)
+        fatalError()*/
+        
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if domain != .uk_deterministic_2km {

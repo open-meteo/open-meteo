@@ -283,18 +283,32 @@ struct DownloadEra5Command: AsyncCommand {
             try await client.shutdown()
         }
         
+        try Self.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted().map{$0}, createNetCdf: false, shift180LongitudeAndFlipLatitude: domain.isGlobal && domain != .ecmwf_ifs)
+        
+        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
+        if let tempDownloadGribFile2 {
+            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile2)
+        }
+        if let tempDownloadGribFile3 {
+            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile3)
+        }
+    }
+    
+    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, shift180LongitudeAndFlipLatitude: Bool) throws {
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            return
+        }
+        try domain.surfaceElevationFileOm.createDirectory()
+        
         var landmask: [Float]? = nil
         var elevation: [Float]? = nil
         var soilType: [Float]? = nil
-        for file in [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted() {
+        for file in files {
             try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
                 var data = try message.getDouble().map(Float.init)
-                if domain.isGlobal && domain != .ecmwf_ifs {
-                    data.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-                }
                 switch shortName {
-                case "orog":
+                case "orog", "mterh":
                     elevation = data
                 case "z":
                     data.multiplyAdd(multiply: 1/9.80665, add: 0)
@@ -323,11 +337,6 @@ struct DownloadEra5Command: AsyncCommand {
             try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
         }
         
-        /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
-        try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-        let a2 = Array2DFastSpace(data: landmask, nLocations: domain.grid.count, nTime: 1)
-        try a2.writeNetcdf(filename: "\(downloadDir)/landmask_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)*/
-        
         // Set all sea grid points to -999
         precondition(elevation.count == landmask.count)
         for i in elevation.indices {
@@ -335,16 +344,14 @@ struct DownloadEra5Command: AsyncCommand {
                 elevation[i] = -999
             }
         }
+        
+        if createNetCdf {
+            let file = domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc")
+            let elevation = Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny)
+            try elevation.writeNetcdf(filename: file)
+        }
 
         try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
-        
-        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
-        if let tempDownloadGribFile2 {
-            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile2)
-        }
-        if let tempDownloadGribFile3 {
-            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile3)
-        }
     }
     
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
