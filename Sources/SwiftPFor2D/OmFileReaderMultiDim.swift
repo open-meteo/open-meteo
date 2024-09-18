@@ -84,7 +84,7 @@ struct OmFileReadRequest {
         })
     }
     
-    
+    /// Return the total number of chunks in this file
     func number_of_chunks() -> Int {
         var n = 1
         for i in 0..<dims.count {
@@ -149,8 +149,7 @@ struct OmFileReadRequest {
             let dataStartPos = data.advanced(by: next - indexStartChunk - startOffset).pointee
             let dataEndPos = data.advanced(by: next - indexStartChunk - startOffset + 1).pointee
             
-            //print("Next IO read size: \(dataEndPos - startPos), merge distance \(dataStartPos - endPos)")
-            
+            /// Merge and split IO requests
             if dataEndPos - startPos > io_size_max,
                 dataStartPos - endPos > io_size_merge {
                 break
@@ -206,7 +205,8 @@ struct OmFileReadRequest {
             let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
             
             if dimRead[i].upperBound <= chunkGlobal0.lowerBound || dimRead[i].lowerBound >= chunkGlobal0.upperBound {
-                // There is no data in this chunk that should be read
+                // There is no data in this chunk that should be read. This happens if IO is merged, combining mutliple read blocks.
+                // The returned bytes count still needs to be computed
                 //print("Not reading chunk \(globalChunkNum)")
                 no_data = true
             }
@@ -237,21 +237,12 @@ struct OmFileReadRequest {
         let lengthInChunk = rollingMultiplyChunkLength
         //print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
         
-        // load chunk from mmap
-        //precondition(globalChunkNum < nChunks, "invalid chunkNum")
-        //let startPos = globalChunkNum == 0 ? 0 : chunkOffsets[globalChunkNum-1]
-        //precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
-        //let lengthCompressedBytes = chunkOffsets[globalChunkNum] - startPos
-        //fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
         let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
         let uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
-        //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
         
         if no_data {
             return uncompressedBytes
         }
-        
-        // TODO chunks could actually contain no relevant data due.
         
         // TODO multi dimensional encode/decode
         delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
@@ -309,22 +300,19 @@ struct OmFileReadRequest {
         return uncompressedBytes
     }
     
+    /// Find the first chunk index that needs to be processed
     func get_first_chunk_position() -> Int {
         var globalChunkNum = 0
-        //var totalChunks = 1
         for i in 0..<dims.count {
             let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-            //let nChunksReadInThisDimension = chunkInThisDimension.count
-            //nChunksToRead *= nChunksReadInThisDimension
             let firstChunkInThisDimension = chunkInThisDimension.lowerBound
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             globalChunkNum = globalChunkNum * nChunksInThisDimension + firstChunkInThisDimension
-            //print(nChunksReadInThisDimension, firstChunkInThisDimension)
-            //totalChunks *= nChunksInThisDimension
         }
         return globalChunkNum
     }
     
+    /// Find the next chunk index that should be processed to satisfy the read request. Nil if not further chunks need to be read
     func get_next_chunk_position(globalChunkNum: Int) -> Int? {
         var nextChunk = globalChunkNum
         
