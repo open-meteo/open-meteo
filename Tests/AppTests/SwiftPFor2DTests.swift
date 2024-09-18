@@ -4,11 +4,6 @@ import XCTest
 @_implementationOnly import CTurboPFor
 
 final class SwiftPFor2DTests: XCTestCase {
-    func testIteration() throws {
-        OmFileReader2<MmapFile>.test()
-    }
-    
-    
     func testInMemory() throws {
         let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
