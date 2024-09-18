@@ -593,7 +593,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     intoCoordLower: [0, arrayDim1Range.lowerBound],
                     intoCubeDimension: [dim0Read.count, arrayDim1Length]
                 )
-                r.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer)
+                r.read_from_file2(fn: fn, into: into, chunkBuffer: chunkBuffer)
                 
                 /*for c0 in dim0Read.divide(by: chunk0) {
                     let c1Range = dim1Read.divide(by: chunk1)

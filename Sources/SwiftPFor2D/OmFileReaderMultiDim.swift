@@ -39,10 +39,10 @@ struct OmFileReadRequest {
     /// Automatically merge and break up IO to ideal sizes
     /// Merging is important to reduce the number of IO operations for the lookup table
     /// A maximum size will break up chunk reads. Otherwise a full file read could result in a single 20GB read.
-    let io_size_merge: Int // 512
+    let io_size_merge: Int = 512
     
     /// Maximum length of a return IO read
-    let io_size_max: Int // 65536
+    let io_size_max: Int = 65536
     
     /// Actually read data from a file
     /// TODO: The read offset calculation is not ideal
@@ -73,6 +73,7 @@ struct OmFileReadRequest {
         })
     }
     
+    /// With IO merging
     func read_from_file2<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
         
         var chunkIndex = get_first_chunk_position()
@@ -84,17 +85,23 @@ struct OmFileReadRequest {
             while let readIndexInstruction = get_next_index_read(globalChunkNum: &chunkIndex) {
                 var chunkIndexRead = readIndexInstruction.indexChunkNumStart
                 let indexEndChunk = chunkIndex
+                
+                print("read index \(readIndexInstruction), chunkIndexRead=\(chunkIndexRead), indexEndChunk=\(indexEndChunk)")
+                
+                
+                
                 // actually "read" index data from file
                 let indexData = ptr.baseAddress!.advanced(by: OmHeader.length + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
                 
                 /// Loop over data blocks
                 while let readDataInstruction = get_next_data_read(globalChunkNum: &chunkIndexRead, indexStartChunk: readIndexInstruction.indexChunkNumStart, indexEndChunk: indexEndChunk, indexData: indexData) {
-                    let dataEndChunk = chunkIndexRead
+                    print("read data \(readDataInstruction)")
                     // actually "read" compressed chunk data from file
                     let dataData = ptr.baseAddress!.advanced(by: OmHeader.length + nChunks*8 + readDataInstruction.offset)
                     //decode_chunk_into_array(globalChunkNum: chunkIndex, data: dataData, into: into, chunkBuffer: chunkBuffer)
                     
-                    decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, indexData: <#T##UnsafeRawPointer#>, dataEndChunk: <#T##Int#>, data: <#T##UnsafeRawPointer#>)
+                    decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: chunkIndexRead, data: dataData, into: into, chunkBuffer: chunkBuffer)
+                    // TODO validate read size
                 }
             }
         })
@@ -125,7 +132,7 @@ struct OmFileReadRequest {
             return nil
         }
         if indexStartChunk == 0 {
-            return (0, globalChunkNum * 8, indexStartChunk)
+            return (0, (globalChunkNum + 1) * 8, indexStartChunk)
         }
         return ((indexStartChunk-1) * 8, (globalChunkNum - indexStartChunk + 1) * 8, indexStartChunk)
     }
@@ -137,15 +144,18 @@ struct OmFileReadRequest {
         // index is a flat Int64 array
         let data = indexData.assumingMemoryBound(to: Int.self)
         
-        /// index data relative to startindex, needs special care because startpos==0 reads one value less
-        let startPos = indexStartChunk == 0 ? 0 : data.advanced(by: indexStartChunk - globalChunkNum - 1).pointee
+        /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
+        let startOffset = indexStartChunk == 0 ? 1 : 0
+        
+        /// Index data relative to startindex, needs special care because startpos==0 reads one value less
+        let startPos = globalChunkNum == 0 ? 0 : data.advanced(by: indexStartChunk - globalChunkNum - startOffset).pointee
         var endPos = data.advanced(by: globalChunkNum == 0 ? 0 : 1).pointee
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while let next = get_next_chunk_position(globalChunkNum: globalChunkNum), next <= indexEndChunk {
             
-            let dataStartPos = data.advanced(by: indexStartChunk - next - 1).pointee
-            let dataEndPos = data.advanced(by: indexStartChunk - next).pointee
+            let dataStartPos = data.advanced(by: next - indexStartChunk - startOffset).pointee
+            let dataEndPos = data.advanced(by: next - indexStartChunk - startOffset + 1).pointee
             
             print("Next IO read size: \(dataEndPos - startPos), merge distance \(dataStartPos - endPos)")
             
@@ -158,18 +168,32 @@ struct OmFileReadRequest {
             endPos = dataEndPos
         }
         if globalChunkNum == indexStartChunk {
+            print("Stop index chunk start")
             return nil
         }
         if globalChunkNum == dataStartChunk {
+            print("Stop data chunk start")
             return nil
         }
+        print("Read \(startPos)-\(endPos) (\(endPos - startPos) bytes)")
         return (startPos, endPos - startPos, dataStartChunk)
     }
     
-    public func decode_chunks(globalChunkNum: Int, indexData: UnsafeRawPointer, indexStartChunk: Int, dataEndChunk: Int, data: UnsafeRawPointer) {
+    /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
+    public func decode_chunks(globalChunkNum: Int, lastChunk: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
         
+        // Multiple chunks inside `data`
         // umcompress first block
         // try to move forward
+        
+        var pos = 0
+        
+        for chunkNum in globalChunkNum ... lastChunk {
+            let uncompressedBytes = decode_chunk_into_array(globalChunkNum: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
+            pos += uncompressedBytes
+        }
+        
+        // alternatively, it could rely on the "compressed bytes" return from Pfor (only check total bytes in the end)
         
     }
     
@@ -201,7 +225,9 @@ struct OmFileReadRequest {
     }
     
     /// Writes a chunk index into the
-    public func decode_chunk_into_array(globalChunkNum: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
+    /// Return number of uncompressed bytes from the data
+    @discardableResult
+    public func decode_chunk_into_array(globalChunkNum: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
         print("globalChunkNum=\(globalChunkNum)")
         
         let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
@@ -224,6 +250,7 @@ struct OmFileReadRequest {
             let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
             let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
             let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+            
             let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
             let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
             
@@ -259,6 +286,9 @@ struct OmFileReadRequest {
         let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
         let uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
         //precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
+        
+        
+        // TODO chunks could actually contain no relevant data due.
         
         // TODO multi dimensional encode/decode
         delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
@@ -312,6 +342,8 @@ struct OmFileReadRequest {
                 }
             }
         }
+        
+        return uncompressedBytes
     }
     
     func get_first_chunk_position() -> Int {
