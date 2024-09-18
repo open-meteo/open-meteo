@@ -39,10 +39,10 @@ struct OmFileReadRequest {
     /// Automatically merge and break up IO to ideal sizes
     /// Merging is important to reduce the number of IO operations for the lookup table
     /// A maximum size will break up chunk reads. Otherwise a full file read could result in a single 20GB read.
-    //let io_size_merge: Int // 512
+    let io_size_merge: Int // 512
     
     /// Maximum length of a return IO read
-    //let io_size_max: Int // 65536
+    let io_size_max: Int // 65536
     
     /// Actually read data from a file
     /// TODO: The read offset calculation is not ideal
@@ -73,12 +73,104 @@ struct OmFileReadRequest {
         })
     }
     
+    func read_from_file2<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
+        
+        var chunkIndex = get_first_chunk_position()
+        
+        let nChunks = number_of_chunks()
+        
+        fn.withUnsafeBytes({ ptr in
+            /// Loop over index blocks
+            while let readIndexInstruction = get_next_index_read(globalChunkNum: &chunkIndex) {
+                var chunkIndexRead = readIndexInstruction.indexChunkNumStart
+                let indexEndChunk = chunkIndex
+                // actually "read" index data from file
+                let indexData = ptr.baseAddress!.advanced(by: OmHeader.length + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
+                
+                /// Loop over data blocks
+                while let readDataInstruction = get_next_data_read(globalChunkNum: &chunkIndexRead, indexStartChunk: readIndexInstruction.indexChunkNumStart, indexEndChunk: indexEndChunk, indexData: indexData) {
+                    let dataEndChunk = chunkIndexRead
+                    // actually "read" compressed chunk data from file
+                    let dataData = ptr.baseAddress!.advanced(by: OmHeader.length + nChunks*8 + readDataInstruction.offset)
+                    //decode_chunk_into_array(globalChunkNum: chunkIndex, data: dataData, into: into, chunkBuffer: chunkBuffer)
+                    
+                    decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, indexData: <#T##UnsafeRawPointer#>, dataEndChunk: <#T##Int#>, data: <#T##UnsafeRawPointer#>)
+                }
+            }
+        })
+    }
+    
+    
     func number_of_chunks() -> Int {
         var n = 1
         for i in 0..<dims.count {
             n *= dims[i].divideRoundedUp(divisor: chunks[i])
         }
         return n
+    }
+    
+    /// Return the next data-block to read from the lookup table. Merges reads from mutliple chunks adress lookups.
+    /// Modifies `globalChunkNum` to keep as a internal reference counter
+    /// Should be called in a loop. Return `nil` once all blocks have been processed and the hyperchunk read is complete
+    public func get_next_index_read(globalChunkNum: inout Int) -> (offset: Int, count: Int, indexChunkNumStart: Int)? {
+        let indexStartChunk = globalChunkNum
+        
+        /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
+        while let next = get_next_chunk_position(globalChunkNum: globalChunkNum),
+              (next - globalChunkNum)*8 <= io_size_merge,
+              (next - indexStartChunk)*8 <= io_size_max {
+            globalChunkNum = next
+        }
+        if globalChunkNum == indexStartChunk {
+            return nil
+        }
+        if indexStartChunk == 0 {
+            return (0, globalChunkNum * 8, indexStartChunk)
+        }
+        return ((indexStartChunk-1) * 8, (globalChunkNum - indexStartChunk + 1) * 8, indexStartChunk)
+    }
+    
+    
+    /// Data = index of global chunk num
+    public func get_next_data_read(globalChunkNum: inout Int, indexStartChunk: Int, indexEndChunk: Int, indexData: UnsafeRawPointer) -> (offset: Int, count: Int, dataStartChunk: Int)? {
+        let dataStartChunk = globalChunkNum
+        // index is a flat Int64 array
+        let data = indexData.assumingMemoryBound(to: Int.self)
+        
+        /// index data relative to startindex, needs special care because startpos==0 reads one value less
+        let startPos = indexStartChunk == 0 ? 0 : data.advanced(by: indexStartChunk - globalChunkNum - 1).pointee
+        var endPos = data.advanced(by: globalChunkNum == 0 ? 0 : 1).pointee
+        
+        /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
+        while let next = get_next_chunk_position(globalChunkNum: globalChunkNum), next <= indexEndChunk {
+            
+            let dataStartPos = data.advanced(by: indexStartChunk - next - 1).pointee
+            let dataEndPos = data.advanced(by: indexStartChunk - next).pointee
+            
+            print("Next IO read size: \(dataEndPos - startPos), merge distance \(dataStartPos - endPos)")
+            
+            if dataEndPos - startPos > io_size_max,
+                dataStartPos - endPos > io_size_merge {
+                break
+            }
+            
+            globalChunkNum = next
+            endPos = dataEndPos
+        }
+        if globalChunkNum == indexStartChunk {
+            return nil
+        }
+        if globalChunkNum == dataStartChunk {
+            return nil
+        }
+        return (startPos, endPos - startPos, dataStartChunk)
+    }
+    
+    public func decode_chunks(globalChunkNum: Int, indexData: UnsafeRawPointer, indexStartChunk: Int, dataEndChunk: Int, data: UnsafeRawPointer) {
+        
+        // umcompress first block
+        // try to move forward
+        
     }
     
     // Return the address to read the lookup table
