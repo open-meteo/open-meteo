@@ -100,10 +100,11 @@ struct OmFileReadRequest {
                     print("read data \(readDataInstruction)")
                     // actually "read" compressed chunk data from file
                     let dataData = ptr.baseAddress!.advanced(by: OmHeader.length + nChunks*8 + readDataInstruction.offset)
-                    //decode_chunk_into_array(globalChunkNum: chunkIndex, data: dataData, into: into, chunkBuffer: chunkBuffer)
                     
-                    decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
-                    // TODO validate read size
+                    let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
+                    if uncompressedSize != readDataInstruction.count {
+                        fatalError("Uncompressed size missmatch")
+                    }
                 }
             }
         })
@@ -194,21 +195,17 @@ struct OmFileReadRequest {
     }
     
     /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
-    public func decode_chunks(globalChunkNum: Int, lastChunk: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
-        
-        // Multiple chunks inside `data`
-        // umcompress first block
-        // try to move forward
-        
+    /// Returns number of processed bytes from input
+    public func decode_chunks(globalChunkNum: Int, lastChunk: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
+
+        // Note: Relays on the correct number of uncompressed bytes from the compression library...
+        // Maybe we need a differnet way that is independenet of this information
         var pos = 0
-        
         for chunkNum in globalChunkNum ... lastChunk {
             let uncompressedBytes = decode_chunk_into_array(globalChunkNum: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
         }
-        
-        // alternatively, it could rely on the "compressed bytes" return from Pfor (only check total bytes in the end)
-        
+        return pos
     }
     
     // Return the address to read the lookup table
@@ -376,7 +373,7 @@ struct OmFileReadRequest {
         //var totalChunks = 1
         for i in 0..<dims.count {
             let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-            let nChunksReadInThisDimension = chunkInThisDimension.count
+            //let nChunksReadInThisDimension = chunkInThisDimension.count
             //nChunksToRead *= nChunksReadInThisDimension
             let firstChunkInThisDimension = chunkInThisDimension.lowerBound
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
