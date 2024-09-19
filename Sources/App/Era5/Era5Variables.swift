@@ -126,10 +126,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     /// Scalefactor to compress data
     var scalefactor: Float {
         switch self {
-        case .wind_u_component_100m, .wind_u_component_100m_spread: return 10
-        case .wind_v_component_100m, .wind_v_component_100m_spread: return 10
-        case .wind_u_component_10m, .wind_u_component_10m_spread: return 10
-        case .wind_v_component_10m, .wind_v_component_10m_spread: return 10
+        case .wind_u_component_100m, .wind_v_component_100m,
+                .wind_u_component_10m, .wind_v_component_10m: return 20 // 0.05 m/s resolution. Typically 10, but want to have sligthly higher resolution
+        case .wind_u_component_100m_spread, .wind_v_component_100m_spread,
+                .wind_u_component_10m_spread, .wind_v_component_10m_spread: return 50 // 0.02 m/s resolution
         case .cloud_cover_low, .cloud_cover_low_spread: return 1
         case .cloud_cover_mid, .cloud_cover_mid_spread: return 1
         case .cloud_cover_high, .cloud_cover_high_spread: return 1
