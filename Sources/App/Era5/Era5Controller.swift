@@ -557,7 +557,10 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             /// sqrt((u^2 U^2 + v^2 V^2)/(U^2 + V^2))
             let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
                 let ((u,v),(σu,σv)) = arg
-                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u / v*v))
+                if (u*u + v*v) == 0 {
+                    return 0
+                }
+                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u + v*v))
             }
             return DataAndUnit(σr, .metrePerSecond)
         case .wind_speed_100m_spread:
@@ -567,7 +570,10 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let v = try get(raw: .wind_v_component_100m, time: time)
             let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
                 let ((u,v),(σu,σv)) = arg
-                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u / v*v))
+                if (u*u + v*v) == 0 {
+                    return 0
+                }
+                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u + v*v))
             }
             return DataAndUnit(σr, .metrePerSecond)
         case .wind_direction_10m_spread:
@@ -580,6 +586,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             /// (180 sqrt((u^2 V^2 + U^2 v^2)/(U^2 + V^2)^2))/π
             let σ = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
                 let ((u,v),(σu,σv)) = arg
+                if (u*u + v*v) == 0 {
+                    return 0
+                }
                 return sqrt((u*u * σv*σv + v*v * σu*σu) / ((u*u + v*v)*(u*u + v*v))) * 180 / .pi
             }
             return DataAndUnit(σ, .degreeDirection)
@@ -590,6 +599,9 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let v = try get(raw: .wind_v_component_100m, time: time)
             let σ = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
                 let ((u,v),(σu,σv)) = arg
+                if (u*u + v*v) == 0 {
+                    return 0
+                }
                 return sqrt((u*u * σv*σv + v*v * σu*σu) / ((u*u + v*v)*(u*u + v*v))) * 180 / .pi
             }
             return DataAndUnit(σ, .degreeDirection)
