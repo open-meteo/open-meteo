@@ -271,9 +271,13 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .wind_speed_10m_spread, .wind_direction_10m_spread:
             try prefetchData(raw: .wind_u_component_10m_spread, time: time)
             try prefetchData(raw: .wind_v_component_10m_spread, time: time)
+            try prefetchData(raw: .wind_u_component_10m, time: time)
+            try prefetchData(raw: .wind_v_component_10m, time: time)
         case .wind_speed_100m_spread, .wind_direction_100m_spread:
             try prefetchData(raw: .wind_u_component_100m_spread, time: time)
             try prefetchData(raw: .wind_v_component_100m_spread, time: time)
+            try prefetchData(raw: .wind_u_component_100m, time: time)
+            try prefetchData(raw: .wind_v_component_100m, time: time)
         case .snowfall_spread:
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
@@ -532,25 +536,53 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .wind_speed_10m_spread:
-            let u = try get(raw: .wind_u_component_10m_spread, time: time)
-            let v = try get(raw: .wind_v_component_10m_spread, time: time)
-            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .metrePerSecond)
+            let σu = try get(raw: .wind_u_component_10m_spread, time: time)
+            let σv = try get(raw: .wind_v_component_10m_spread, time: time)
+            let u = try get(raw: .wind_u_component_10m, time: time)
+            let v = try get(raw: .wind_v_component_10m, time: time)
+            /// Calculate propagation of uncertainty. See https://en.wikipedia.org/wiki/Propagation_of_uncertainty
+            /// https://www.wolframalpha.com/input?i=Simplify%5BSqrt%5BFold%5B%231%2B%232+%26%2CD%5B%5B%2F%2Fmath%3Asqrt%28U*U%2BV*V%29%2F%2F%5D%2C%7B%7B%5B%2F%2Fmath%3AU%2CV%2F%2F%5D%7D%7D%5D%5E2*%7B%5B%2F%2Fmath%3Au%2Cv%2F%2F%5D%7D%5E2%5D%5D%5D
+            /// Simplify[Sqrt[Fold[#1+#2 &,D[[//math:sqrt(U*U+V*V)//],{{[//math:U,V//]}}]^2*{[//math:u,v//]}^2]]]
+            /// sqrt((u^2 U^2 + v^2 V^2)/(U^2 + V^2))
+            let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u,v),(σu,σv)) = arg
+                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u / v*v))
+            }
+            return DataAndUnit(σr, .metrePerSecond)
         case .wind_speed_100m_spread:
-            let u = try get(raw: .wind_u_component_100m_spread, time: time)
-            let v = try get(raw: .wind_v_component_100m_spread, time: time)
-            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
-            return DataAndUnit(speed, .metrePerSecond)
+            let σu = try get(raw: .wind_u_component_100m_spread, time: time)
+            let σv = try get(raw: .wind_v_component_100m_spread, time: time)
+            let u = try get(raw: .wind_u_component_100m, time: time)
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u,v),(σu,σv)) = arg
+                let r = sqrt(u*u + v*v)
+                return sqrt((u/r)*(u/r) * σu*σu + (v/r)*(v/r) * σv*σv)
+            }
+            return DataAndUnit(σr, .metrePerSecond)
         case .wind_direction_10m_spread:
-            let u = try get(raw: .wind_u_component_10m_spread, time: time).data
-            let v = try get(raw: .wind_v_component_10m_spread, time: time).data
-            let direction = Meteorology.windirectionFast(u: u, v: v)
-            return DataAndUnit(direction, .degreeDirection)
+            let σu = try get(raw: .wind_u_component_10m_spread, time: time)
+            let σv = try get(raw: .wind_v_component_10m_spread, time: time)
+            let u = try get(raw: .wind_u_component_10m, time: time)
+            let v = try get(raw: .wind_v_component_10m, time: time)
+            /// https://www.wolframalpha.com/input?i=Simplify%5BSqrt%5BFold%5B%231%2B%232+%26%2CD%5B%5B%2F%2Fmath%3Aatan2%28U%2CV%29*180%2FPI+%2B+180%2F%2F%5D%2C%7B%7B%5B%2F%2Fmath%3AU%2CV%2F%2F%5D%7D%7D%5D%5E2*%7B%5B%2F%2Fmath%3Au%2Cv%2F%2F%5D%7D%5E2%5D%5D%5D
+            /// Simplify[Sqrt[Fold[#1+#2 &,D[[//math:atan2(U,V)*180/PI + 180//],{{[//math:U,V//]}}]^2*{[//math:u,v//]}^2]]]
+            /// (180 sqrt((u^2 V^2 + U^2 v^2)/(U^2 + V^2)^2))/π
+            let σ = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u,v),(σu,σv)) = arg
+                return sqrt((u*u * σv*σv + v*v * σu*σu) / ((u*u + v*v)*(u*u + v*v))) * 180 / .pi
+            }
+            return DataAndUnit(σ, .degreeDirection)
         case .wind_direction_100m_spread:
-            let u = try get(raw: .wind_u_component_100m_spread, time: time).data
-            let v = try get(raw: .wind_v_component_100m_spread, time: time).data
-            let direction = Meteorology.windirectionFast(u: u, v: v)
-            return DataAndUnit(direction, .degreeDirection)
+            let σu = try get(raw: .wind_u_component_100m_spread, time: time)
+            let σv = try get(raw: .wind_v_component_100m_spread, time: time)
+            let u = try get(raw: .wind_u_component_100m, time: time)
+            let v = try get(raw: .wind_v_component_100m, time: time)
+            let σ = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u,v),(σu,σv)) = arg
+                return sqrt((u*u * σv*σv + v*v * σu*σu) / ((u*u + v*v)*(u*u + v*v))) * 180 / .pi
+            }
+            return DataAndUnit(σ, .degreeDirection)
         case .snowfall_spread:
             let snowwater = try get(raw: .snowfall_water_equivalent_spread, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
