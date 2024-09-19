@@ -500,7 +500,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .era5_seamless:
             return [try Era5Factory.makeEra5CombinedLand(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5:
-            return [try Era5Factory.makeReader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+            // If explicitly selected ERA5, combine with ensemble to read spread variables
+            return [try Era5Factory.makeEra5WithEnsemble(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5_land:
             return [try Era5Factory.makeReader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .cerra:
@@ -895,6 +896,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     
     case wind_speed_10m_spread
     case wind_speed_100m_spread
+    case wind_direction_10m_spread
+    case wind_direction_100m_spread
     case snowfall_spread
     case temperature_2m_spread
     case wind_gusts_10m_spread
