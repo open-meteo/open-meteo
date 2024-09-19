@@ -84,6 +84,17 @@ struct Era5Factory {
         return .init(reader: GenericReaderCached(reader: reader), options: options)
     }
     
+    /// Combine ERA5 and ensemble spread. Used to generate wind speed uncertainties scaled from 0.5° ERA5-Ensemble to 0.25° ERA5.
+    public static func makeEra5WithEnsemble(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
+        guard let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
+              let era5ens = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode)
+        else {
+            // should not be possible
+            throw ForecastapiError.noDataAvilableForThisLocation
+        }
+        return .init(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5ens), GenericReaderCached(reader: era5)]), options: options)
+    }
+    
     /**
      Build a combined ERA5 and ERA5-Land reader.
      Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5
@@ -556,8 +567,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let v = try get(raw: .wind_v_component_100m, time: time)
             let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
                 let ((u,v),(σu,σv)) = arg
-                let r = sqrt(u*u + v*v)
-                return sqrt((u/r)*(u/r) * σu*σu + (v/r)*(v/r) * σv*σv)
+                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u / v*v))
             }
             return DataAndUnit(σr, .metrePerSecond)
         case .wind_direction_10m_spread:
