@@ -47,6 +47,11 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let variables = onlyVariables ?? CamsVariable.allCases
         switch domain {
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+            guard let cdskey = signature.cdskey else {
+                fatalError("cds key is required")
+            }
+            try await downloadCamsEuropeReanalysis(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
         case .cams_global:
             guard let ftpuser = signature.ftpuser else {
                 fatalError("ftpuser is required")
@@ -174,14 +179,66 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     struct CamsEuropeQuery: Encodable {
-        let model = "ensemble"
-        let date: String
-        let type = "forecast"
-        let data_format = "netcdf"
+        let model = ["ensemble"]
+        let date: String?
+        let type: [String]
+        let data_format: String?
         let variable: [String]
-        let level = "0"
-        let time: String
-        let leadtime_hour: [String]
+        let level = ["0"]
+        let time: String?
+        let leadtime_hour: [String]?
+        let year: [String]?
+        let month: [String]?
+    }
+    
+    /// Download one month of reanalysis data as a zipped NetCDF file
+    func downloadCamsEuropeReanalysis(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) async throws {
+        
+        let type: String
+        switch domain {
+        case .cams_europe_reanalysis_validated:
+            type = "validated_reanalysis"
+        case .cams_europe_reanalysis_interim:
+            type = "interim_reanalysis"
+        default:
+            fatalError()
+        }
+        
+        let logger = application.logger
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+        let date = run.toComponents()
+        
+        for variable in variables {
+            guard let meta = variable.getCamsEuMeta() else {
+                continue
+            }
+            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+            let downloadFile = "\(domain.downloadDirectory)download.nc.zip"
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.vra.ENSa.\(meta.fileName).l0.2020-01.nc"
+            
+            if FileManager.default.fileExists(atPath: targetFile) {
+                continue
+            }
+            let query = CamsEuropeQuery(
+                date: nil,
+                type: [type],
+                data_format: nil,
+                variable: [meta.apiName],
+                time: nil,
+                leadtime_hour: nil,
+                year: [String(date.year)],
+                month: [date.month.zeroPadded(len: 2)]
+            )
+            
+            try await curl.downloadCdsApi(
+                dataset: "cams-europe-air-quality-reanalyses",
+                query: query,
+                apikey: cdskey,
+                server: "https://ads-beta.atmosphere.copernicus.eu/api",
+                destinationFile: downloadFile
+            )
+            try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
+        }
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
@@ -190,7 +247,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let downloadFile = "\(domain.downloadDirectory)download.nc"
+        let downloadFile = "\(domain.downloadDirectory)download.nc.zip"
         
         if skipFilesIfExisting && FileManager.default.fileExists(atPath: downloadFile) {
             return
@@ -199,9 +256,13 @@ struct DownloadCamsCommand: AsyncCommand {
         let date = run.iso8601_YYYY_MM_dd
         let query = CamsEuropeQuery(
             date: "\(date)/\(date)",
+            type: ["forecast"],
+            data_format: "netcdf",
             variable: variables.compactMap { $0.getCamsEuMeta()?.apiName },
             time: "\(run.hour.zeroPadded(len: 2)):00",
-            leadtime_hour: (0..<domain.forecastHours).map(String.init)
+            leadtime_hour: (0..<domain.forecastHours).map(String.init),
+            year: nil,
+            month: nil
         )
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
@@ -222,7 +283,6 @@ struct DownloadCamsCommand: AsyncCommand {
                 throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
             }
         }
-        //try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
     }
     
     /// Process each variable and update time-series optimised files

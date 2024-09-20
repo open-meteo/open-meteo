@@ -6,6 +6,8 @@ import SwiftPFor2D
 enum CamsDomain: String, GenericDomain, CaseIterable {
     case cams_global
     case cams_europe
+    case cams_europe_reanalysis_interim
+    case cams_europe_reanalysis_validated
     
     /// count of forecast hours
     var forecastHours: Int {
@@ -14,6 +16,8 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return 121
         case .cams_europe:
             return 97
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+            return 0
         }
     }
     
@@ -25,6 +29,8 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return t.with(hour: t.hour > 14 ? 12 : 0)
         case .cams_europe:
             return t.with(hour: 0)
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+            return t
         }
     }
     
@@ -34,6 +40,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return .cams_global
         case .cams_europe:
             return .cams_europe
+        case .cams_europe_reanalysis_interim:
+            return .cams_europe_reanalysis_interim
+        case .cams_europe_reanalysis_validated:
+            return .cams_europe_reanalysis_validated
         }
     }
     
@@ -63,6 +73,8 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return 12*3600
         case .cams_europe:
             return 12*3600
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+            return 0
         }
     }
     
@@ -70,7 +82,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .cams_global:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
-        case .cams_europe:
+        case .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
             return RegularGrid(nx: 700, ny: 420, latMin: /*30.05*/ 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
         }
     }
@@ -201,14 +213,14 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     }
     
     /// Name of the variable in the CDS API, if available
-    func getCamsEuMeta() -> (apiName: String, gribName: String)? {
+    func getCamsEuMeta() -> (apiName: String, gribName: String, fileName: String)? {
         switch self {
         case .pm10:
-            return ("particulate_matter_10um", "pm10_conc")
+            return ("particulate_matter_10um", "pm10_conc", "pm10")
         case .pm2_5:
-            return ("particulate_matter_2.5um", "pm2p5_conc")
+            return ("particulate_matter_2.5um", "pm2p5_conc", "pm2p5")
         case .dust:
-            return ("dust", "dust")
+            return ("dust", "dust", "dust")
         case .carbon_monoxide:
             return ("carbon_monoxide", "co_conc")
         case .nitrogen_dioxide:

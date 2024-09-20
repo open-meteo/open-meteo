@@ -15,6 +15,8 @@ enum DomainRegistry: String, CaseIterable {
     
     case cams_europe
     case cams_global
+    case cams_europe_reanalysis_interim
+    case cams_europe_reanalysis_validated
     
     case copernicus_dem90
     case copernicus_cerra
@@ -273,6 +275,10 @@ enum DomainRegistry: String, CaseIterable {
             return UkmoDomain.global_deterministic_10km
         case .ukmo_uk_deterministic_2km:
             return UkmoDomain.uk_deterministic_2km
+        case .cams_europe_reanalysis_interim:
+            return CamsDomain.cams_europe_reanalysis_interim
+        case .cams_europe_reanalysis_validated:
+            return CamsDomain.cams_europe_reanalysis_validated
         }
     }
 }
