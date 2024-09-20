@@ -74,6 +74,7 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             try await downloadCamsGlobal(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
             try convertCamsGlobal(logger: logger, domain: domain, run: run, variables: variables)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
@@ -87,6 +88,7 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, forecastHours: nil)
             try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
         }
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -215,11 +217,14 @@ struct DownloadCamsCommand: AsyncCommand {
     func downloadCamsEuropeReanalysis(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) async throws {
         
         let type: String
+        let type2: String
         switch domain {
         case .cams_europe_reanalysis_validated:
             type = "validated_reanalysis"
+            type2 = "vra"
         case .cams_europe_reanalysis_interim:
             type = "interim_reanalysis"
+            type2 = "ira"
         default:
             fatalError()
         }
@@ -234,7 +239,7 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             let downloadFile = "\(domain.downloadDirectory)download.nc.zip"
-            let targetFile = "\(domain.downloadDirectory)cams.eaq.vra.ENSa.\(fname).l0.2020-01.nc"
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.2020-01.nc"
             
             if FileManager.default.fileExists(atPath: targetFile) {
                 continue
@@ -265,11 +270,22 @@ struct DownloadCamsCommand: AsyncCommand {
     func convertCamsEuropeReanalysis(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
         let om = OmFileSplitter(domain)
         
+        let type2: String
+        switch domain {
+        case .cams_europe_reanalysis_validated:
+            type2 = "vra"
+        case .cams_europe_reanalysis_interim:
+            type2 = "ira"
+        default:
+            fatalError()
+        }
+        
+        
         for variable in variables {
             guard let meta = variable.getCamsEuMeta(), let fname = meta.reanalysisFileName else {
                 continue
             }
-            let targetFile = "\(domain.downloadDirectory)cams.eaq.vra.ENSa.\(fname).l0.2020-01.nc"
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.2020-01.nc"
             guard let ncFile = try NetCDF.open(path: targetFile, allowUpdate: false) else {
                 fatalError("Could not open '\(targetFile)'")
             }
