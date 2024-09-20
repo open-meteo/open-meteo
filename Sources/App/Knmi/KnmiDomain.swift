@@ -60,6 +60,13 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .harmonie_arome_europe, .harmonie_arome_netherlands:
+            return 3600
+        }
+    }
+    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()

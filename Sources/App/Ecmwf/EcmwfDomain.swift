@@ -82,6 +82,19 @@ enum EcmwfDomain: String, GenericDomain {
         
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .ifs04, .ifs04_ensemble:
+            return 6*3600
+        case .ifs025, .ifs025_ensemble:
+            return 6*3600
+        case .wam025, .wam025_ensemble:
+            return 6*3600
+        case .aifs025:
+            return 6*3600
+        }
+    }
+    
     var grid: Gridable {
         switch self {
         case .ifs04, .ifs04_ensemble:

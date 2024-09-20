@@ -71,6 +71,13 @@ enum BomDomain: String, GenericDomain, CaseIterable {
         }
     }*/
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .access_global, .access_global_ensemble:
+            return 6*3600
+        }
+    }
+    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()

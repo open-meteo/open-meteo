@@ -51,6 +51,13 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .grapes_global:
+            return 6*3600
+        }
+    }
+    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()

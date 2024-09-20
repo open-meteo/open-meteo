@@ -57,6 +57,15 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         return forecastHours + 4*24
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .cams_global:
+            return 12*3600
+        case .cams_europe:
+            return 12*3600
+        }
+    }
+    
     var grid: Gridable {
         switch self {
         case .cams_global:

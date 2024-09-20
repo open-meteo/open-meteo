@@ -40,6 +40,10 @@ struct Dem90: GenericDomain {
     var omFileLength: Int {
         return 0
     }
+    
+    var updateIntervalSeconds: Int {
+        return 0
+    }
 
     /// Get elevation for coordinate. Access to om files is cached.
     static func read(lat: Float, lon: Float) throws -> Float {

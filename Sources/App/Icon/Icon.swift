@@ -92,6 +92,21 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .icon:
+            return 6*3600
+        case .iconEu, .iconD2, .iconD2_15min:
+            return 3*3600
+        case .iconEps:
+            return 12*3600
+        case .iconEuEps:
+            return 6*3600
+        case .iconD2Eps:
+            return 3*3600
+        }
+    }
+    
     /// Numer of avaialble forecast steps differs from run
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
     func getDownloadForecastSteps(run: Int) -> [Int] {
