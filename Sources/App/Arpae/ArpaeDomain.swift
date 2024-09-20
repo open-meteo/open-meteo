@@ -79,6 +79,17 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .cosmo_2i:
+            return 12*3600
+        case .cosmo_2i_ruc:
+            return 3*3600
+        case .cosmo_5m:
+            return 12*3600
+        }
+    }
+    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()

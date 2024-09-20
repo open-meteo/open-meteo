@@ -53,6 +53,15 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .gwam:
+            return 12*3600
+        case .ewam:
+            return 12*3600
+        }
+    }
+    
     /// Number of actual forecast timesteps per run
     var countForecastHours: Int {
         switch self {

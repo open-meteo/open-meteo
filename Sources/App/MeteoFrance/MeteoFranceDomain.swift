@@ -83,6 +83,17 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         return self == .arpege_world
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .arpege_europe, .arpege_world:
+            return 6*3600
+        case .arome_france, .arome_france_hd:
+            return 3*3600
+        case .arome_france_15min, .arome_france_hd_15min:
+            return 3600
+        }
+    }
+    
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
@@ -101,9 +112,11 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var timeoutHours: Double {
         switch self {
         case .arpege_europe, .arpege_world:
-            return 5.5
+            // Arpege has sometimes larger delays
+            return 7.5
         case .arome_france, .arome_france_hd:
-            return 3.5
+            // Arome has sometimes larger delays
+            return 5.5
         case .arome_france_15min, .arome_france_hd_15min:
             return 1.5
         }

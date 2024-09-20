@@ -103,6 +103,33 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         return 24 * 21
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .era5:
+            return 24*3600
+        case .era5_daily:
+            return 0
+        case .era5_ocean:
+            return 24*3600
+        case .era5_land:
+            return 24*3600
+        case .era5_land_daily:
+            return 0
+        case .era5_ensemble:
+            return 24*3600
+        case .cerra:
+            return 0
+        case .ecmwf_ifs:
+            return 24*3600
+        case .ecmwf_ifs_analysis:
+            return 24*3600
+        case .ecmwf_ifs_analysis_long_window:
+            return 24*3600
+        case .ecmwf_ifs_long_window:
+            return 24*3600
+        }
+    }
+    
     var grid: Gridable {
         switch self {
         case .era5, .era5_daily:

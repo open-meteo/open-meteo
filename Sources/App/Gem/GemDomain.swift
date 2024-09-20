@@ -60,6 +60,17 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return true
         }
     }
+    
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .gem_global:
+            return 12*3600
+        case .gem_regional, .gem_hrdps_continental:
+            return 6*3600
+        case .gem_global_ensemble:
+            return 12*3600
+        }
+    }
 
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {

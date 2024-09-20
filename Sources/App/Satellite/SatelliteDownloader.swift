@@ -218,6 +218,13 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return Timestamp(2000,06,01) ..< Timestamp(2023, 1, 1)
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .imerg_daily:
+            0
+        }
+    }
+    
     /// Use store 14 days per om file
     var omFileLength: Int {
         // 24 hours over 21 days = 504 timesteps per file

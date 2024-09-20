@@ -186,8 +186,17 @@ struct SyncCommand: AsyncCommand {
                         let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
                         try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
                         // Another process might be updating this file right now. E.g. Second sync operation
-                        FileManager.default.waitIfFileWasRecentlyModified(at: "~\(localFile)", waitTimeMinutes: 1)
-                        try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                        FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
+                        if localFile.hasSuffix("/meta.json") {
+                            /// Update the `last_run_availability_time` within meta.json
+                            try await curl
+                                .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
+                                .readJSONDecodable(ModelUpdateMetaJson.self)?
+                                .with(last_run_availability_time: .now())
+                                .writeTo(path: localFile)
+                        } else {
+                            try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                        }
                         if let cacheDirectory = OpenMeteo.cacheDirectory {
                             // Delete cached file, in case cache is active
                             let cacheFile = "\(cacheDirectory)/\(pathNoData)"
@@ -336,15 +345,21 @@ fileprivate extension Array where Element == S3DataController.S3ListV2File {
     /// Compare remote files to local files. Only keep files that are not available locally or older.
     func includeFiles(compareLocalDirectory: String) -> [Element] {
         let resourceKeys = Set<URLResourceKey>([.contentModificationDateKey, .fileSizeKey])
-        return self.filter({ file in
-            let pathNoData = file.name[file.name.index(file.name.startIndex, offsetBy: 5)..<file.name.endIndex]
+        return self.filter({ remoteFile in
+            let pathNoData = remoteFile.name[remoteFile.name.index(remoteFile.name.startIndex, offsetBy: 5)..<remoteFile.name.endIndex]
             let fileURL = URL(fileURLWithPath: "\(compareLocalDirectory)\(pathNoData)")
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                   let size = resourceValues.fileSize,
                   let modificationTime = resourceValues.contentModificationDate else {
                 return true
             }
-            return file.fileSize != size || modificationTime > file.modificationTime
+            if remoteFile.name.contains("meta.json") {
+                /// meta.json is modified during sync to replace the `last_run_availability_time`.
+                /// Size might be different. Only check for modification time.
+                return remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
+            }
+            // Add one seconds delay due to inaccuracy in timestamps
+            return remoteFile.fileSize != size || remoteFile.modificationTime > modificationTime.addingTimeInterval(1)
         })
     }
 }

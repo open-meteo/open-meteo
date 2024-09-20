@@ -71,6 +71,13 @@ enum DmiDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .harmonie_arome_europe:
+            return 3*3600
+        }
+    }
+    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()
