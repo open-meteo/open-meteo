@@ -255,14 +255,19 @@ struct DownloadCamsCommand: AsyncCommand {
                 month: [date.month.zeroPadded(len: 2)]
             )
             
-            try await curl.downloadCdsApi(
-                dataset: "cams-europe-air-quality-reanalyses",
-                query: query,
-                apikey: cdskey,
-                server: "https://ads-beta.atmosphere.copernicus.eu/api",
-                destinationFile: downloadFile
-            )
-            try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
+            do {
+                try await curl.downloadCdsApi(
+                    dataset: "cams-europe-air-quality-reanalyses",
+                    query: query,
+                    apikey: cdskey,
+                    server: "https://ads-beta.atmosphere.copernicus.eu/api",
+                    destinationFile: downloadFile
+                )
+                try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
+            } catch {
+                logger.info("Ignoring error \(error)")
+                continue
+            }
         }
     }
     
@@ -287,7 +292,8 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.\(date.year)-\(date.month.zeroPadded(len: 2)).nc"
             guard let ncFile = try NetCDF.open(path: targetFile, allowUpdate: false) else {
-                fatalError("Could not open '\(targetFile)'")
+                logger.info("Missing file, skipping. \(targetFile)")
+                continue
             }
             
             logger.info("Converting \(variable)")

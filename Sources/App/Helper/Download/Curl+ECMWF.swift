@@ -87,7 +87,7 @@ extension Curl {
                 logger.info("Grib file at: \(location)")
                 return location
             }
-            guard let status = try await response.checkCode200AndReadJSONDecodable(EcmwfApiResponse.self) else {
+            guard let status = try await response.readJSONDecodable(EcmwfApiResponse.self) else {
                 let error = try await response.readStringImmutable() ?? ""
                 fatalError("Could not decode \(error)")
             }

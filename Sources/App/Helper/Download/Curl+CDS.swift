@@ -225,7 +225,7 @@ extension Curl {
                 var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)/results")
                 request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
                 let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
-                guard let results = try await response.checkCode200AndReadJSONDecodable(CdsApiResultsError.self) else {
+                guard let results = try await response.readJSONDecodable(CdsApiResultsError.self) else {
                     let error = try await response.readStringImmutable() ?? ""
                     fatalError("Could not decode \(error)")
                 }
