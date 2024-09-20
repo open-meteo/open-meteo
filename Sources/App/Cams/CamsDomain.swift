@@ -17,7 +17,8 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         case .cams_europe:
             return 97
         case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
-            return 0
+            // Downloaded in 1 month files
+            return 14*24
         }
     }
     
@@ -213,7 +214,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     }
     
     /// Name of the variable in the CDS API, if available
-    func getCamsEuMeta() -> (apiName: String, gribName: String, fileName: String)? {
+    func getCamsEuMeta() -> (apiName: String, gribName: String, reanalysisFileName: String?)? {
         switch self {
         case .pm10:
             return ("particulate_matter_10um", "pm10_conc", "pm10")
@@ -222,31 +223,31 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .dust:
             return ("dust", "dust", "dust")
         case .carbon_monoxide:
-            return ("carbon_monoxide", "co_conc")
+            return ("carbon_monoxide", "co_conc", "co")
         case .nitrogen_dioxide:
-            return ("nitrogen_dioxide", "no2_conc")
+            return ("nitrogen_dioxide", "no2_conc", "no2")
         case .ammonia:
-            return ("ammonia", "nh3_conc")
+            return ("ammonia", "nh3_conc", "nh3")
         case .ozone:
-            return ("ozone", "o3_conc")
+            return ("ozone", "o3_conc", "o3")
         case .sulphur_dioxide:
-            return ("sulphur_dioxide", "so2_conc")
+            return ("sulphur_dioxide", "so2_conc", "so2")
         case .uv_index:
             return nil
         case .uv_index_clear_sky:
             return nil
         case .alder_pollen:
-            return ("alder_pollen", "apg_conc")
+            return ("alder_pollen", "apg_conc", nil)
         case .birch_pollen:
-            return ("birch_pollen", "bpg_conc")
+            return ("birch_pollen", "bpg_conc", nil)
         case .grass_pollen:
-            return ("grass_pollen", "gpg_conc")
+            return ("grass_pollen", "gpg_conc", nil)
         case .mugwort_pollen:
-            return ("mugwort_pollen", "mpg_conc")
+            return ("mugwort_pollen", "mpg_conc", nil)
         case .olive_pollen:
-            return ("olive_pollen", "opg_conc")
+            return ("olive_pollen", "opg_conc", nil)
         case .ragweed_pollen:
-            return ("ragweed_pollen", "rwpg_conc")
+            return ("ragweed_pollen", "rwpg_conc", nil)
         case .aerosol_optical_depth:
             return nil
         }
