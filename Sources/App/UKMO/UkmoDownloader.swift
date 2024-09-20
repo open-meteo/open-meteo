@@ -7,10 +7,7 @@ import SwiftNetCDF
  Download UK MetOffice models from AWS rolling archive
  
  TODO:
- - land and sea mask
- - direct radiation to global conversion?
- - additional processing server?
- - deploy on prod server
+ - Only direct radiation is available for the global domain. A reverse solar separation model could be used to get global horizonal radiation.
  */
 struct UkmoDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -108,6 +105,11 @@ struct UkmoDownload: AsyncCommand {
     }
     
     func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
+        
+        // UKMO Global data has been manually converted from GRIB files
+        /*try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: ["/Users/patrick/Downloads/UKMO_static/uk2km_ground_land-cover+model-terrain-height_00.grib2"], createNetCdf: createNetcdf, shift180LongitudeAndFlipLatitude: false)
+        fatalError()*/
+        
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if domain != .uk_deterministic_2km {
