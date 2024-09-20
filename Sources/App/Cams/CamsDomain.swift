@@ -118,6 +118,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case residential_elementary_carbon
     case total_elementary_carbon
     case pm2_5_total_organic_matter
+    case sea_salt_aerosol
     case nitrogen_monoxide
     
     var storePreviousForecast: Bool {
@@ -201,6 +202,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return .microgramsPerCubicMetre
         case .nitrogen_monoxide:
             return .microgramsPerCubicMetre
+        case .sea_salt_aerosol:
+            return .microgramsPerCubicMetre
         }
     }
     
@@ -260,6 +263,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .pm2_5_total_organic_matter:
             return 10
         case .nitrogen_monoxide:
+            return 10
+        case .sea_salt_aerosol:
             return 10
         }
     }
@@ -321,6 +326,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return ("pm2.5_total_organic_matter", "pm2p5_total_om_conc", nil)
         case .nitrogen_monoxide:
             return ("nitrogen_monoxide", "no_conc", "no")
+        case .sea_salt_aerosol:
+            return ("pm10_sea_salt_dry", "pm10_ss_conc", nil)
         }
     }
     
@@ -385,6 +392,8 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return nil
         case .nitrogen_monoxide:
             return ("no", true, massMixingToUgm3)
+        case .sea_salt_aerosol:
+            return ("aermr03", true, massMixingToUgm3)
         }
     }
 }
