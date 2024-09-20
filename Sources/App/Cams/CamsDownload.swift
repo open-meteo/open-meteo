@@ -177,9 +177,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let model = "ensemble"
         let date: String
         let type = "forecast"
-        let format = "netcdf"
-        let data_format = "netcdf"
-        let download_format = "unarchived"
+        let data_format = "netcdf_zip"
         let variable: [String]
         let level = "0"
         let time: String

@@ -115,7 +115,7 @@ extension Curl {
 
 extension HTTPClientResponse {
     public func checkCode200AndReadJSONDecodable<T: Decodable>(_ type: T.Type, upTo: Int = 1024*1024) async throws -> T? {
-        guard status.code == 200 else {
+        guard (200..<300).contains(status.code) else {
             if let error = try await readStringImmutable() {
                 print(error)
             }
