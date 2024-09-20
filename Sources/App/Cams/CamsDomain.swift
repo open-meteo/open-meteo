@@ -109,6 +109,17 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case olive_pollen
     case ragweed_pollen
     
+    case formaldehyde
+    case glyoxal
+    case non_methane_volatile_organic_compounds
+    case pm10_wildfires
+    case peroxyacyl_nitrates
+    case secondary_inorganic_aerosol
+    case residential_elementary_carbon
+    case total_elementary_carbon
+    case pm2_5_total_organic_matter
+    case nitrogen_monoxide
+    
     var storePreviousForecast: Bool {
         return false
     }
@@ -170,6 +181,26 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return .grainsPerCubicMetre
         case .ragweed_pollen:
             return .grainsPerCubicMetre
+        case .formaldehyde:
+            return .microgramsPerCubicMetre
+        case .glyoxal:
+            return .microgramsPerCubicMetre
+        case .non_methane_volatile_organic_compounds:
+            return .microgramsPerCubicMetre
+        case .pm10_wildfires:
+            return .microgramsPerCubicMetre
+        case .peroxyacyl_nitrates:
+            return .microgramsPerCubicMetre
+        case .secondary_inorganic_aerosol:
+            return .microgramsPerCubicMetre
+        case .residential_elementary_carbon:
+            return .microgramsPerCubicMetre
+        case .total_elementary_carbon:
+            return .microgramsPerCubicMetre
+        case .pm2_5_total_organic_matter:
+            return .microgramsPerCubicMetre
+        case .nitrogen_monoxide:
+            return .microgramsPerCubicMetre
         }
     }
     
@@ -209,6 +240,26 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .olive_pollen:
             return 10
         case .ragweed_pollen:
+            return 10
+        case .formaldehyde:
+            return 10
+        case .glyoxal:
+            return 100
+        case .non_methane_volatile_organic_compounds:
+            return 1
+        case .pm10_wildfires:
+            return 10
+        case .peroxyacyl_nitrates:
+            return 10
+        case .secondary_inorganic_aerosol:
+            return 10
+        case .residential_elementary_carbon:
+            return 100
+        case .total_elementary_carbon:
+            return 100
+        case .pm2_5_total_organic_matter:
+            return 10
+        case .nitrogen_monoxide:
             return 10
         }
     }
@@ -250,6 +301,26 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return ("ragweed_pollen", "rwpg_conc", nil)
         case .aerosol_optical_depth:
             return nil
+        case .formaldehyde:
+            return ("formaldehyde", "hcho_conc", "hcho")
+        case .glyoxal:
+            return ("glyoxal", "chocho_conc", "chocho")
+        case .non_methane_volatile_organic_compounds:
+            return ("non_methane_vocs", "nmvoc_conc", "nmvo")
+        case .pm10_wildfires:
+            return ("pm10_wildfires", "pmwf_conc", "pmwf")
+        case .peroxyacyl_nitrates:
+            return ("peroxyacyl_nitrates", "pans_conc", "pans")
+        case .secondary_inorganic_aerosol:
+            return ("secondary_inorganic_aerosol", "sia_conc", "sia")
+        case .residential_elementary_carbon:
+            return ("residential_elementary_carbon", "ecres_conc", "ecres")
+        case .total_elementary_carbon:
+            return ("total_elementary_carbon", "ectot_conc", "ectot")
+        case .pm2_5_total_organic_matter:
+            return ("pm2.5_total_organic_matter", "pm2p5_total_om_conc", nil)
+        case .nitrogen_monoxide:
+            return ("nitrogen_monoxide", "no_conc", "no")
         }
     }
     
@@ -294,6 +365,26 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return nil
         case .aerosol_optical_depth:
             return ("aod550", false, 1)
+        case .formaldehyde:
+            return nil
+        case .glyoxal:
+            return nil
+        case .non_methane_volatile_organic_compounds:
+            return nil
+        case .pm10_wildfires:
+            return nil
+        case .peroxyacyl_nitrates:
+            return nil
+        case .secondary_inorganic_aerosol:
+            return nil
+        case .residential_elementary_carbon:
+            return nil
+        case .total_elementary_carbon:
+            return nil
+        case .pm2_5_total_organic_matter:
+            return nil
+        case .nitrogen_monoxide:
+            return nil
         }
     }
 }

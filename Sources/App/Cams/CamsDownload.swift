@@ -239,7 +239,7 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             let downloadFile = "\(domain.downloadDirectory)download.nc.zip"
-            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.2020-01.nc"
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.\(date.year)-\(date.month.zeroPadded(len: 2)).nc"
             
             if FileManager.default.fileExists(atPath: targetFile) {
                 continue
@@ -279,13 +279,13 @@ struct DownloadCamsCommand: AsyncCommand {
         default:
             fatalError()
         }
-        
+        let date = run.toComponents()
         
         for variable in variables {
             guard let meta = variable.getCamsEuMeta(), let fname = meta.reanalysisFileName else {
                 continue
             }
-            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.2020-01.nc"
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.\(date.year)-\(date.month.zeroPadded(len: 2)).nc"
             guard let ncFile = try NetCDF.open(path: targetFile, allowUpdate: false) else {
                 fatalError("Could not open '\(targetFile)'")
             }
@@ -319,7 +319,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let downloadFile = "\(domain.downloadDirectory)download.nc.zip"
+        let downloadFile = "\(domain.downloadDirectory)download.nc"
         
         if skipFilesIfExisting && FileManager.default.fileExists(atPath: downloadFile) {
             return

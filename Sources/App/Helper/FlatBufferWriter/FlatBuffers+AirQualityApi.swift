@@ -40,6 +40,9 @@ extension CamsVariable: FlatBuffersVariable {
             return .init(variable: .olivePollen)
         case .ragweed_pollen:
             return .init(variable: .ragweedPollen)
+        default:
+            // NOTE TODO
+            fatalError()
         }
     }
 }
