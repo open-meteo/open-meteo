@@ -177,7 +177,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let model = "ensemble"
         let date: String
         let type = "forecast"
-        let data_format = "netcdf_zip"
+        let data_format = "netcdf"
         let variable: [String]
         let level = "0"
         let time: String
@@ -222,6 +222,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
             }
         }
+        //try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
     }
     
     /// Process each variable and update time-series optimised files
