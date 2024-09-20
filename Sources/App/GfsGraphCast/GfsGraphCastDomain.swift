@@ -35,7 +35,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     }
     
     func forecastHours(run: Int) -> [Int] {
-        return Array(stride(from: 6, through: 240, by: 6))
+        return Array(stride(from: 6, through: 384, by: 6))
     }
     
     var levels: [Int] {
