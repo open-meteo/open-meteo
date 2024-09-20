@@ -306,9 +306,9 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .glyoxal:
             return ("glyoxal", "chocho_conc", "chocho")
         case .non_methane_volatile_organic_compounds:
-            return ("non_methane_vocs", "nmvoc_conc", "nmvo")
+            return ("non_methane_vocs", "nmvoc_conc", "nmvoc")
         case .pm10_wildfires:
-            return ("pm10_wildfires", "pmwf_conc", "pmwf")
+            return ("pm10_wildfires", "pmwf_conc", "pmwildfire")
         case .peroxyacyl_nitrates:
             return ("peroxyacyl_nitrates", "pans_conc", "pans")
         case .secondary_inorganic_aerosol:
