@@ -342,7 +342,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .nitrogen_dioxide:
             return ("no2", true, massMixingToUgm3)
         case .ammonia:
-            return nil
+            return nil // no ml137
         case .ozone:
             return ("go3", true, massMixingToUgm3)
         case .sulphur_dioxide:
@@ -366,15 +366,15 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .aerosol_optical_depth:
             return ("aod550", false, 1)
         case .formaldehyde:
-            return nil
+            return ("hcho", true, massMixingToUgm3)
         case .glyoxal:
-            return nil
+            return ("glyoxal", true, massMixingToUgm3)
         case .non_methane_volatile_organic_compounds:
             return nil
         case .pm10_wildfires:
             return nil
         case .peroxyacyl_nitrates:
-            return nil
+            return ("pan", true, massMixingToUgm3)
         case .secondary_inorganic_aerosol:
             return nil
         case .residential_elementary_carbon:
@@ -384,7 +384,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .pm2_5_total_organic_matter:
             return nil
         case .nitrogen_monoxide:
-            return nil
+            return ("no", true, massMixingToUgm3)
         }
     }
 }
