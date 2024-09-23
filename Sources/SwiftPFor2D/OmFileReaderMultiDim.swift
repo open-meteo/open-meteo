@@ -60,17 +60,16 @@ struct OmFileReadRequest {
                 let readIndexInstruction = get_next_index_read(chunkIndex: chunkIndexStart)
                 chunkIndex = readIndexInstruction.nextChunk
                 var chunkData: Range<Int>? = chunkIndexStart
-                let indexEndChunk = readIndexInstruction.endChunk
                 
                 // actually "read" index data from file
-                print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0), indexEndChunk=\(indexEndChunk)")
+                print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
                 let indexData = ptr.baseAddress!.advanced(by: OmHeader.length + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
                 print(ptr.baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
                       
                 
                 /// Loop over data blocks
                 while let chunkDataStart = chunkData {
-                    let readDataInstruction = get_next_data_read(chunkIndex: chunkDataStart, indexStartChunk: chunkIndexStart.lowerBound, indexEndChunk: indexEndChunk, indexData: indexData)
+                    let readDataInstruction = get_next_data_read(chunkIndex: chunkDataStart, indexRange: readIndexInstruction.indexRange, indexData: indexData)
                     chunkData = readDataInstruction.nextChunk
                     
                     // actually "read" compressed chunk data from file
@@ -96,20 +95,20 @@ struct OmFileReadRequest {
     }
     
     /// Return the next data-block to read from the lookup table. Merges reads from mutliple chunks adress lookups.
-    /// Modifies `globalChunkNum` to keep as a internal reference counter
+    /// Modifies `chunkIndex` to keep as a internal reference counter
     /// Should be called in a loop. Return `nil` once all blocks have been processed and the hyperchunk read is complete
-    public func get_next_index_read(chunkIndex indexStartChunk: Range<Int>) -> (offset: Int, count: Int, endChunk: Int, nextChunk: Range<Int>?) {
+    public func get_next_index_read(chunkIndex chunkIndexStart: Range<Int>) -> (offset: Int, count: Int, indexRange: Range<Int>, nextChunk: Range<Int>?) {
         
-        var globalChunkNum = indexStartChunk.lowerBound
-        var nextChunkOut: Range<Int>? = indexStartChunk
+        var chunkIndex = chunkIndexStart.lowerBound
+        var nextChunkOut: Range<Int>? = chunkIndexStart
         
-        var rangeEnd = indexStartChunk.upperBound
+        var rangeEnd = chunkIndexStart.upperBound
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while true {
-            var next = globalChunkNum + 1
+            var next = chunkIndex + 1
             if next >= rangeEnd {
-                guard let nextRange = get_next_chunk_position(globalChunkNum: globalChunkNum) else {
+                guard let nextRange = get_next_chunk_position(globalChunkNum: chunkIndex) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
                     nextChunkOut = nil
                     break
@@ -119,21 +118,21 @@ struct OmFileReadRequest {
             }
             nextChunkOut = next ..< rangeEnd
             
-            guard (next - globalChunkNum)*8 <= io_size_merge, (next - indexStartChunk.lowerBound)*8 <= io_size_max else {
+            guard (next - chunkIndex)*8 <= io_size_merge, (next - chunkIndexStart.lowerBound)*8 <= io_size_max else {
                 // the next read would exceed IO limitons
                 break
             }
-            globalChunkNum = next
+            chunkIndex = next
         }
-        if indexStartChunk.lowerBound == 0 {
-            return (0, (globalChunkNum + 1) * 8, globalChunkNum, nextChunkOut)
+        if chunkIndexStart.lowerBound == 0 {
+            return (0, (chunkIndex + 1) * 8, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
         }
-        return ((indexStartChunk.lowerBound-1) * 8, (globalChunkNum - indexStartChunk.lowerBound + 1) * 8, globalChunkNum, nextChunkOut)
+        return ((chunkIndexStart.lowerBound-1) * 8, (chunkIndex - chunkIndexStart.lowerBound + 1) * 8, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
     }
     
     
     /// Data = index of global chunk num
-    public func get_next_data_read(chunkIndex dataStartChunk: Range<Int>, indexStartChunk: Int, indexEndChunk: Int, indexData: UnsafeRawPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
+    public func get_next_data_read(chunkIndex dataStartChunk: Range<Int>, indexRange: Range<Int>, indexData: UnsafeRawPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
         var globalChunkNum = dataStartChunk.lowerBound
         var nextChunkOut: Range<Int>? = dataStartChunk
         
@@ -141,11 +140,11 @@ struct OmFileReadRequest {
         let data = indexData.assumingMemoryBound(to: Int.self)
         
         /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
-        let startOffset = indexStartChunk == 0 ? 1 : 0
+        let startOffset = indexRange.lowerBound == 0 ? 1 : 0
         
         /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-        let startPos = indexStartChunk == 0 ? 0 : data.advanced(by: indexStartChunk - dataStartChunk.lowerBound - startOffset).pointee
-        var endPos = data.advanced(by: indexStartChunk == 0 ? 0 : 1).pointee
+        let startPos = indexRange.lowerBound == 0 ? 0 : data.advanced(by: indexRange.lowerBound - dataStartChunk.lowerBound - startOffset).pointee
+        var endPos = data.advanced(by: indexRange.lowerBound == 0 ? 0 : 1).pointee
         
         var rangeEnd = dataStartChunk.upperBound
         
@@ -161,14 +160,14 @@ struct OmFileReadRequest {
                 rangeEnd = nextRange.upperBound
                 next = nextRange.lowerBound
             }
-            guard next <= indexEndChunk else {
+            guard next < indexRange.upperBound else {
                 nextChunkOut = nil
                 break
             }
             nextChunkOut = next ..< rangeEnd
             
-            let dataStartPos = data.advanced(by: next - indexStartChunk - startOffset).pointee
-            let dataEndPos = data.advanced(by: next - indexStartChunk - startOffset + 1).pointee
+            let dataStartPos = data.advanced(by: next - indexRange.lowerBound - startOffset).pointee
+            let dataEndPos = data.advanced(by: next - indexRange.lowerBound - startOffset + 1).pointee
             
             /// Merge and split IO requests
             if dataEndPos - startPos > io_size_max,
