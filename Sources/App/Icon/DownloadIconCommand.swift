@@ -199,6 +199,11 @@ struct DownloadIconCommand: AsyncCommand {
                     messages = [messages[0]]
                 }
                 
+                // Make sure to skip wind gusts hour0 which only contains `0` values
+                if variable.skipHour(hour: hour, domain: domain, forDownload: false, run: run) {
+                    return
+                }
+                
                 // Contains more than 1 message for ensemble models
                 for (member, message) in messages.enumerated() {
                     try grib2d.load(message: message)
