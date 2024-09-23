@@ -21,7 +21,7 @@ public final class OmFileEncoder {
     private var chunkOffsetBytes: [Int]
     
     /// Buffer where chunks are moved to, before compression them. => input for compression call
-    private var readBuffer: UnsafeMutableRawBufferPointer
+    private var chunkBuffer: UnsafeMutableRawBufferPointer
     
     /// All data is written to this buffer. The current offset is in `writeBufferPos`. This buffer must be written out before it is full.
     private var writeBuffer: UnsafeMutableBufferPointer<UInt8>
@@ -51,7 +51,7 @@ public final class OmFileEncoder {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public init(dimensions: [Int], chunkDimensions: [Int], compression: CompressionType, scalefactor: Float) throws {
+    public init(dimensions: [Int], chunkDimensions: [Int], compression: CompressionType, scalefactor: Float) {
         var nChunks = 1
         for i in 0..<dimensions.count {
             nChunks *= dimensions[i].divideRoundedUp(divisor: chunkDimensions[i])
@@ -71,16 +71,99 @@ public final class OmFileEncoder {
         let bufferSize = P4NENC256_BOUND(n: chunkDimensions.reduce(1, *), bytesPerElement: 4)
         
         // Read buffer needs to be a bit larger for AVX 256 bit alignment
-        self.readBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
+        self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
         self.writeBuffer = .allocate(capacity: max(1024 * 1024, bufferSize))
     }
     
-    public func write(array: [Float], fn: FileHandle) {
-        // write header
-        
-        // loop over all chunks
-        //   extract chunk from array and write in temporary array
-        //   compress and write chunk
+    public func write<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle) throws {
+        writeHeader()
+                
+        // Loop over all chunks
+        for chunkIndex in 0..<number_of_chunks() {
+            // Calculate number of elements in this chunk
+            var rollingMultiplty = 1
+            var rollingMultiplyChunkLength = 1
+            var rollingMultiplyTargetCube = 1
+            
+            /// Read coordinate from input array
+            var q = 0
+            
+            /// Used for 2d delta coding
+            var lengthLast = 0
+            
+            /// Count length in chunk and find first buffer offset position
+            for i in (0..<dims.count).reversed() {
+                let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
+                let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
+                let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+                
+                if i == dims.count-1 {
+                    lengthLast = length0
+                }
+                let q0 = chunkGlobal0.lowerBound + arrayRead[i].lowerBound
+                q = q + rollingMultiplyTargetCube * q0
+           
+                rollingMultiplty *= nChunksInThisDimension
+                rollingMultiplyTargetCube *= arrayDimensions[i]
+                rollingMultiplyChunkLength *= length0
+            }
+            
+            /// How many elements are in this chunk
+            let lengthInChunk = rollingMultiplyChunkLength
+            
+            // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
+            for i in 0..<lengthInChunk {
+                let val = array[q]
+                if val.isNaN {
+                    // Int16.min is not representable because of zigzag coding
+                    chunkBuffer.assumingMemoryBound(to: Int16.self)[i] = Int16.max
+                }
+                let scaled = compression == .p4nzdec256logarithmic ? (log10(1+val) * scalefactor) : (val * scalefactor)
+                chunkBuffer.assumingMemoryBound(to: Int16.self)[i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                
+                // Move `q` to next position
+                rollingMultiplty = 1
+                rollingMultiplyTargetCube = 1
+                rollingMultiplyChunkLength = 1
+                for i in (0..<dims.count).reversed() {
+                    let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+                    let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
+                    let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
+                    let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+                    //let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
+                    //let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
+                    
+                    /// Move forward
+                    q += rollingMultiplyTargetCube
+                    
+                    let d0 = (q / rollingMultiplyChunkLength) % length0
+                    if d0 != 0 {
+                        break // no overflow in this dimension, break
+                    }
+                    
+                    q -= length0 * rollingMultiplyTargetCube
+                    
+                    rollingMultiplty *= nChunksInThisDimension
+                    rollingMultiplyTargetCube *= arrayDimensions[i]
+                    rollingMultiplyChunkLength *= length0
+                }
+            }
+            
+            // 2D encoding
+            delta2d_encode(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
+            
+            // Compress chunk
+            let writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress, lengthInChunk, writeBuffer.baseAddress?.advanced(by: writeBufferPos))
+            writeBufferPos += writeLength
+            totalBytesWritten += totalBytesWritten
+            
+            // Store chunk offset in LUT
+            chunkOffsetBytes[chunkIndex] = totalBytesWritten
+            
+            try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+            writeBufferPos = 0
+        }
         
         // write LUT
         // write trailer
@@ -92,19 +175,17 @@ public final class OmFileEncoder {
     }
     
     deinit {
-        readBuffer.deallocate()
+        chunkBuffer.deallocate()
         writeBuffer.deallocate()
     }
     
-    /// Write header, return `nil` if the buffer is too small, otherwise returns bytes written.
-    public func writeHeader() throws -> Int? {
-        guard writeBuffer.count - writeBufferPos >= 3 else {
-            return nil
-        }
+    /// Write header
+    public func writeHeader() {
         writeBuffer[writeBufferPos + 0] = OmHeader.magicNumber1
         writeBuffer[writeBufferPos + 1] = OmHeader.magicNumber2
         writeBuffer[writeBufferPos + 2] = 3
-        return 3
+        writeBufferPos += 3
+        totalBytesWritten += 3
     }
 }
 
