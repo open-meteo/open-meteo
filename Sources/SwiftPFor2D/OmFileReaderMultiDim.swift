@@ -213,8 +213,16 @@ struct OmFileReadRequest {
         /// Write coordinate to output cube
         var q = 0
         
+        /// Copy multiple elements from the decoded chunk into the output buffer. For long time-series this drastically improves copy performance.
+        var linearReadCount = 1
+        
+        /// Internal state to keep track if everything is kept linear
+        var linearRead = true
+        
+        /// Used for 2d delta coding
         var lengthLast = 0
         
+        /// If no data needs to be read from this chunk, it will still be decompressed to caclculate the number of compressed bytes
         var no_data = false
         
         /// Count length in chunk and find first buffer offset position
@@ -247,6 +255,20 @@ struct OmFileReadRequest {
             
             d = d + rollingMultiplyChunkLength * d0
             q = q + rollingMultiplyTargetCube * q0
+            
+            if i == dims.count-1 && !(clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
+                // if fast dimension and only partially read
+                linearReadCount = length0
+                linearRead = false
+            }
+            if linearRead && clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
+                // dimension is read entirely
+                // and can be copied linearly into the output buffer
+                linearReadCount *= length0
+            } else {
+                // dimension is read partly, cannot merge further reads
+                linearRead = false
+            }
                             
             rollingMultiplty *= nChunksInThisDimension
             rollingMultiplyTargetCube *= intoCubeDimension[i]
@@ -269,24 +291,26 @@ struct OmFileReadRequest {
         
         /// Loop over all values need to be copied to the output buffer
         loopBuffer: while true {
-            //print("read buffer from pos=\(d) and write to \(q)")
+            print("read buffer from pos=\(d) and write to \(q), count=\(linearReadCount)")
             
-            let val = chunkBuffer[d]
-            if val == Int16.max {
-                into.advanced(by: q).pointee = .nan
-            } else {
-                let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                into.advanced(by: q).pointee = unscaled
+            for i in 0..<linearReadCount {
+                let val = chunkBuffer[d+i]
+                if val == Int16.max {
+                    into.advanced(by: q+i).pointee = .nan
+                } else {
+                    let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
+                    into.advanced(by: q+i).pointee = unscaled
+                }
             }
-            
-            
-            // TODO for the last dimension, it would be better to have a range copy
-            // The loop below could be expensive....
+            q += linearReadCount-1
+            d += linearReadCount-1
                             
             /// Move `q` and `d` to next position
             rollingMultiplty = 1
             rollingMultiplyTargetCube = 1
             rollingMultiplyChunkLength = 1
+            linearReadCount = 1
+            linearRead = true
             for i in (0..<dims.count).reversed() {
                 let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
                 let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
@@ -298,6 +322,20 @@ struct OmFileReadRequest {
                 /// More forward
                 d += rollingMultiplyChunkLength
                 q += rollingMultiplyTargetCube
+                
+                if i == dims.count-1 && !(clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
+                    // if fast dimension and only partially read
+                    linearReadCount = clampedLocal0.count
+                    linearRead = false
+                }
+                if linearRead && clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
+                    // dimension is read entirely
+                    // and can be copied linearly into the output buffer
+                    linearReadCount *= length0
+                } else {
+                    // dimension is read partly, cannot merge further reads
+                    linearRead = false
+                }
                 
                 let d0 = (d / rollingMultiplyChunkLength) % length0
                 if d0 != clampedLocal0.upperBound && d0 != 0 {
@@ -350,7 +388,7 @@ struct OmFileReadRequest {
         /// Number of consecutive chunks that can be read linearly
         var linearReadCount = 1
         
-        var linearRead = false
+        var linearRead = true
         
         for i in (0..<dims.count).reversed() {
             // E.g. 10
@@ -371,7 +409,6 @@ struct OmFileReadRequest {
             }
             if linearRead && dims[i] == dimRead[i].count {
                 // dimension is read entirely
-                // TODO this needs some testing
                 linearReadCount *= nChunksInThisDimension
             } else {
                 // dimension is read partly, cannot merge further reads
