@@ -258,7 +258,7 @@ struct OmFileReadRequest {
             
             if i == dims.count-1 && !(clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
                 // if fast dimension and only partially read
-                linearReadCount = length0
+                linearReadCount = clampedLocal0.count
                 linearRead = false
             }
             if linearRead && clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
@@ -292,7 +292,7 @@ struct OmFileReadRequest {
         /// Loop over all values need to be copied to the output buffer
         loopBuffer: while true {
             print("read buffer from pos=\(d) and write to \(q), count=\(linearReadCount)")
-            
+            //linearReadCount=1
             for i in 0..<linearReadCount {
                 let val = chunkBuffer[d+i]
                 if val == Int16.max {
