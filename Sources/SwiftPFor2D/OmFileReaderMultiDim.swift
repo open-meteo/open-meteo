@@ -9,6 +9,72 @@ import Foundation
 @_implementationOnly import CTurboPFor
 @_implementationOnly import CHelper
 
+
+struct OmFileDecoder<Backend: OmFileReaderBackend> {
+    let fn: Backend
+    
+    /// The scalefactor that is applied to all write data
+    public let scalefactor: Float
+    
+    /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
+    public let compression: CompressionType
+    
+    /// The dimensions of the file
+    let dims: [Int]
+    
+    /// How the dimensions are chunked
+    let chunks: [Int]
+    
+    let lutStart: Int
+    
+    public static func open_file(fn: Backend) -> Self {
+        // read header
+        
+        // switch version 2 and 3
+        
+        // if version 3, read trailer
+        
+        return fn.withUnsafeBytes({ptr in
+            
+            let lutStart = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
+            let nDims = ptr.baseAddress!.advanced(by: fn.count - 16).assumingMemoryBound(to: Int.self).pointee
+            
+            let dimensions = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
+                memcpy($0.baseAddress, ptr.baseAddress!.advanced(by: fn.count - 16 - 2*nDims*8), nDims*8)
+                $1 = nDims
+            })
+            
+            let chunks = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
+                memcpy($0.baseAddress, ptr.baseAddress!.advanced(by: fn.count - 16 - nDims*8), nDims*8)
+                $1 = nDims
+            })
+            
+            print(lutStart, nDims, dimensions, chunks)
+            
+            return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart)
+        })
+    }
+    
+    public func read(into: UnsafeMutablePointer<Float>, dimRead: [Range<Int>], intoCoordLower: [Int], intoCubeDimension: [Int]) {
+        let chunkLength = chunks.reduce(1, *)
+        let bufferSize = P4NDEC256_BOUND(n: chunkLength, bytesPerElement: compression.bytesPerElement)
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
+        let read = OmFileReadRequest(scalefactor: scalefactor, compression: compression, dims: dims, chunks: chunks, dimRead: dimRead, intoCoordLower: intoCoordLower, intoCubeDimension: intoCubeDimension)
+        read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3, lutStart: lutStart)
+        chunkBuffer.deallocate()
+    }
+    
+    public func read(_ dimRead: [Range<Int>]) -> [Float] {
+        let outDims = dimRead.map({$0.count})
+        let n = outDims.reduce(1, *)
+        var out = [Float](repeating: .nan, count: n)
+        out.withUnsafeMutableBufferPointer({
+            read(into: $0.baseAddress!, dimRead: dimRead, intoCoordLower: .init(repeating: 0, count: dimRead.count), intoCubeDimension: outDims)
+        })
+        return out
+    }
+}
+
 /**
  TODO:
  - differnet compression implementation
@@ -46,13 +112,16 @@ struct OmFileReadRequest {
     
     /// Actually read data from a file. Merges IO for optimal sizes
     /// TODO: The read offset calculation is not ideal
-    func read_from_file<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
+    func read_from_file<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer, version: Int = 2, lutStart: Int? = nil) {
         
         var chunkIndex: Range<Int>? = get_first_chunk_position()
         
         print("new read \(self), start \(chunkIndex ?? 0..<0)")
         
         let nChunks = number_of_chunks()
+        
+        let lutStart = lutStart ?? OmHeader.length
+        let dataStart = version == 3 ? 32 : OmHeader.length + nChunks*8
         
         fn.withUnsafeBytes({ ptr in
             /// Loop over index blocks
@@ -63,8 +132,8 @@ struct OmFileReadRequest {
                 
                 // actually "read" index data from file
                 print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
-                let indexData = ptr.baseAddress!.advanced(by: OmHeader.length + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
-                print(ptr.baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
+                let indexData = ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
+                print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
                       
                 
                 /// Loop over data blocks
@@ -74,7 +143,7 @@ struct OmFileReadRequest {
                     
                     // actually "read" compressed chunk data from file
                     print("read data \(readDataInstruction)")
-                    let dataData = ptr.baseAddress!.advanced(by: OmHeader.length + nChunks*8 + readDataInstruction.offset)
+                    let dataData = ptr.baseAddress!.advanced(by: dataStart + readDataInstruction.offset)
                     
                     let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
                     if uncompressedSize != readDataInstruction.count {
