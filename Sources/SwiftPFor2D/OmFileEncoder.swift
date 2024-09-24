@@ -78,6 +78,9 @@ public final class OmFileEncoder {
     public func write<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle) throws {
         writeHeader()
         
+        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+        writeBufferPos = 0
+        
         // TODO check dimensions of arrayDimensions and arrayRead
                 
         // Loop over all chunks
@@ -90,6 +93,14 @@ public final class OmFileEncoder {
             /// Read coordinate from input array
             var q = 0
             
+            var d = 0
+            
+            /// Copy multiple elements from the decoded chunk into the output buffer. For long time-series this drastically improves copy performance.
+            var linearReadCount = 1
+            
+            /// Internal state to keep track if everything is kept linear
+            var linearRead = true
+            
             /// Used for 2d delta coding
             var lengthLast = 0
             
@@ -99,12 +110,28 @@ public final class OmFileEncoder {
                 let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
                 let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
                 //let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                // TODO add c0
+                //let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
+                //let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
+                
                 if i == dims.count-1 {
                     lengthLast = length0
                 }
 
-                q = q + rollingMultiplyTargetCube * arrayRead[i].lowerBound
+                q = q + rollingMultiplyTargetCube * (c0 * chunks[i] + arrayRead[i].lowerBound)
+                
+                if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
+                    // if fast dimension and only partially read
+                    linearReadCount = length0
+                    linearRead = false
+                }
+                if linearRead && arrayRead[i].count == length0 && arrayDimensions[i] == length0 {
+                    // dimension is read entirely
+                    // and can be copied linearly into the output buffer
+                    linearReadCount *= length0
+                } else {
+                    // dimension is read partly, cannot merge further reads
+                    linearRead = false
+                }
            
                 rollingMultiplty *= nChunksInThisDimension
                 rollingMultiplyTargetCube *= arrayDimensions[i]
@@ -114,15 +141,23 @@ public final class OmFileEncoder {
             /// How many elements are in this chunk
             let lengthInChunk = rollingMultiplyChunkLength
             
+            print("compress chunk \(chunkIndex) lengthInChunk \(lengthInChunk)")
+            
             // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
-            for i in 0..<lengthInChunk {
-                let val = array[q]
-                if val.isNaN {
-                    // Int16.min is not representable because of zigzag coding
-                    chunkBuffer.assumingMemoryBound(to: Int16.self)[i] = Int16.max
+            loopBuffer: while true {
+                print("q=\(q) d=\(d), count=\(linearReadCount)")
+                
+                for i in 0..<linearReadCount {
+                    let val = array[q+i]
+                    if val.isNaN {
+                        // Int16.min is not representable because of zigzag coding
+                        chunkBuffer.assumingMemoryBound(to: Int16.self)[d+i] = Int16.max
+                    }
+                    let scaled = compression == .p4nzdec256logarithmic ? (log10(1+val) * scalefactor) : (val * scalefactor)
+                    chunkBuffer.assumingMemoryBound(to: Int16.self)[d+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
                 }
-                let scaled = compression == .p4nzdec256logarithmic ? (log10(1+val) * scalefactor) : (val * scalefactor)
-                chunkBuffer.assumingMemoryBound(to: Int16.self)[i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                q += linearReadCount-1
+                d += linearReadCount-1
                 
                 // Move `q` to next position
                 rollingMultiplty = 1
@@ -132,23 +167,43 @@ public final class OmFileEncoder {
                     let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
                     let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
                     let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-                    //let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                    //let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
-                    //let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
+                    let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+                    let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
+                    let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
                     
-                    /// Move forward
+                    /// More forward
+                    d += rollingMultiplyChunkLength
                     q += rollingMultiplyTargetCube
                     
-                    let d0 = (q / rollingMultiplyChunkLength) % length0
-                    if d0 != 0 {
+                    if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
+                        // if fast dimension and only partially read
+                        linearReadCount = length0
+                        linearRead = false
+                    }
+                    if linearRead && arrayRead[i].count == length0 && arrayDimensions[i] == length0 {
+                        // dimension is read entirely
+                        // and can be copied linearly into the output buffer
+                        linearReadCount *= length0
+                    } else {
+                        // dimension is read partly, cannot merge further reads
+                        linearRead = false
+                    }
+                    
+                    let d0 = (d / rollingMultiplyChunkLength) % length0
+                    if d0 != clampedLocal0.upperBound && d0 != 0 {
                         break // no overflow in this dimension, break
                     }
                     
-                    q -= arrayRead[i].count * rollingMultiplyTargetCube
+                    d -= clampedLocal0.count * rollingMultiplyChunkLength
+                    q -= clampedLocal0.count * rollingMultiplyTargetCube
                     
                     rollingMultiplty *= nChunksInThisDimension
                     rollingMultiplyTargetCube *= arrayDimensions[i]
                     rollingMultiplyChunkLength *= length0
+                    if i == 0 {
+                        // All chunks have been read. End of iteration
+                        break loopBuffer
+                    }
                 }
             }
             
@@ -157,11 +212,13 @@ public final class OmFileEncoder {
             
             // Compress chunk
             let writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress, lengthInChunk, writeBuffer.baseAddress?.advanced(by: writeBufferPos))
+            print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
             writeBufferPos += writeLength
             totalBytesWritten += writeLength
             
             // Store chunk offset in LUT
-            chunkOffsetBytes[chunkIndex] = totalBytesWritten
+            // TODO: `-3` to remove the header size. Reconsider this impl
+            chunkOffsetBytes[chunkIndex] = totalBytesWritten - 3
             
             try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
             writeBufferPos = 0

@@ -121,7 +121,7 @@ struct OmFileReadRequest {
         let nChunks = number_of_chunks()
         
         let lutStart = lutStart ?? OmHeader.length
-        let dataStart = version == 3 ? 32 : OmHeader.length + nChunks*8
+        let dataStart = version == 3 ? 3 : OmHeader.length + nChunks*8
         
         fn.withUnsafeBytes({ ptr in
             /// Loop over index blocks
@@ -258,6 +258,7 @@ struct OmFileReadRequest {
         // Maybe we need a differnet way that is independenet of this information
         var pos = 0
         for chunkNum in globalChunkNum ... lastChunk {
+            print("decompress chunk \(chunkNum), pos \(pos)")
             let uncompressedBytes = decode_chunk_into_array(globalChunkNum: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
         }
@@ -350,6 +351,8 @@ struct OmFileReadRequest {
         
         let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
         let uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
+        
+        print("uncompressed bytes", uncompressedBytes, "lengthInChunk", lengthInChunk)
         
         if no_data {
             return uncompressedBytes
