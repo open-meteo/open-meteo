@@ -40,12 +40,12 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             let nDims = ptr.baseAddress!.advanced(by: fn.count - 16).assumingMemoryBound(to: Int.self).pointee
             
             let dimensions = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
-                memcpy($0.baseAddress, ptr.baseAddress!.advanced(by: fn.count - 16 - 2*nDims*8), nDims*8)
+                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 16 - 2*nDims*8), nDims*8)
                 $1 = nDims
             })
             
             let chunks = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
-                memcpy($0.baseAddress, ptr.baseAddress!.advanced(by: fn.count - 16 - nDims*8), nDims*8)
+                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 16 - nDims*8), nDims*8)
                 $1 = nDims
             })
             

@@ -101,7 +101,7 @@ public final class OmFileEncoder {
         let lutStart = totalBytesWritten
         print("LUT start \(lutStart), \(chunkOffsetBytes)")
         let len = chunkOffsetBytes.withUnsafeBytes({
-            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
+            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             return $0.count
         })
         writeBufferPos += len
@@ -110,14 +110,14 @@ public final class OmFileEncoder {
         // TODO: pad to 64 bit
         
         let len2 = dims.withUnsafeBytes({
-            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
+            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             return $0.count
         })
         writeBufferPos += len2
         totalBytesWritten += len2
         
         let len3 = chunks.withUnsafeBytes({
-            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
+            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             return $0.count
         })
         writeBufferPos += len3
