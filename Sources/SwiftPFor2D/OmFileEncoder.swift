@@ -91,6 +91,13 @@ public final class OmFileEncoder {
             writeBufferPos = 0
         }
         
+        self.writeTrailer()
+        
+        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+        writeBufferPos = 0
+    }
+    
+    public func writeTrailer() {
         let lutStart = totalBytesWritten
         print("LUT start \(lutStart), \(chunkOffsetBytes)")
         let len = chunkOffsetBytes.withUnsafeBytes({
@@ -99,9 +106,6 @@ public final class OmFileEncoder {
         })
         writeBufferPos += len
         totalBytesWritten += len
-        
-        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
-        writeBufferPos = 0
         
         // TODO: pad to 64 bit
         
@@ -130,14 +134,6 @@ public final class OmFileEncoder {
         totalBytesWritten += 8
         
         // TODO LUT compressed chunk size
-        
-        
-        
-        // write LUT
-        // write trailer
-        
-        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
-        writeBufferPos = 0
     }
     
     /// Data must be exactly of the size of the next chunk or chunks!
@@ -272,7 +268,7 @@ public final class OmFileEncoder {
             delta2d_encode(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
             
             // Compress chunk
-            let writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress, lengthInChunk, writeBuffer.baseAddress?.advanced(by: writeBufferPos))
+            let writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
             print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
             writeBufferPos += writeLength
             totalBytesWritten += writeLength
