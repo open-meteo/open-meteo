@@ -203,7 +203,7 @@ public final class OmFileEncoder {
             // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
             loopBuffer: while true {
                 print("q=\(q) d=\(d), count=\(linearReadCount)")
-                
+                //linearReadCount = 1
                 for i in 0..<linearReadCount {
                     let val = array[q+i]
                     if val.isNaN {
@@ -246,8 +246,16 @@ public final class OmFileEncoder {
                         linearRead = false
                     }
                     
+                    /// TODO have to figure out how to get length0 withouh chunk offset
                     let d0 = (d / rollingMultiplyChunkLength) % length0
-                    if d0 != clampedLocal0.upperBound && d0 != 0 {
+                    let q0 = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) % chunks[i]
+                    let breakQ = q0 == 0 || q0 == length0
+                    let breakD = d0 == clampedLocal0.upperBound || d0 == 0
+                    print("dim=\(i) d0=\(d0) q0=\(q0) break=\(breakD) break_Q=\(breakQ) length0=\(length0)")
+                    if breakD != breakQ {
+                        print("MISS MATCH")
+                    }
+                    if !breakQ {
                         break // no overflow in this dimension, break
                     }
                     
@@ -259,6 +267,7 @@ public final class OmFileEncoder {
                     rollingMultiplyChunkLength *= length0
                     if i == 0 {
                         // All chunks have been read. End of iteration
+                        
                         break loopBuffer
                     }
                 }
