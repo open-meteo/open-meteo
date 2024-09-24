@@ -66,54 +66,54 @@ final class SwiftPFor2DTests: XCTestCase {
         
         
         
-        let a = try read.read([0..<5, 0..<5])
+        let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
-        /*
+        
         // single index
-        for x in 0..<read.dim0 {
-            for y in 0..<read.dim1 {
-                XCTAssertEqual(try read.read(dim0Slow: x..<x+1, dim1: y..<y+1), [Float(x*5 + y)])
+        for x in 0..<read.dims[0] {
+            for y in 0..<read.dims[1] {
+                XCTAssertEqual(read.read([x..<x+1, y..<y+1]), [Float(x*5 + y)])
             }
         }
         
         // 2x in fast dim
-        for x in 0..<read.dim0 {
-            for y in 0..<read.dim1-1 {
-                XCTAssertEqual(try read.read(dim0Slow: x..<x+1, dim1: y..<y+2), [Float(x*5 + y), Float(x*5 + y + 1)])
+        for x in 0..<read.dims[0] {
+            for y in 0..<read.dims[1]-1 {
+                XCTAssertEqual(read.read([x..<x+1, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1)])
             }
         }
         
         // 2x in slow dim
-        for x in 0..<read.dim0-1 {
-            for y in 0..<read.dim1 {
-                XCTAssertEqual(try read.read(dim0Slow: x..<x+2, dim1: y..<y+1), [Float(x*5 + y), Float((x+1)*5 + y)])
+        for x in 0..<read.dims[0]-1 {
+            for y in 0..<read.dims[1] {
+                XCTAssertEqual(read.read([x..<x+2, y..<y+1]), [Float(x*5 + y), Float((x+1)*5 + y)])
             }
         }
         
         // 2x2
-        for x in 0..<read.dim0-1 {
-            for y in 0..<read.dim1-1 {
-                XCTAssertEqual(try read.read(dim0Slow: x..<x+2, dim1: y..<y+2), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
+        for x in 0..<read.dims[0]-1 {
+            for y in 0..<read.dims[1]-1 {
+                XCTAssertEqual(read.read([x..<x+2, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
             }
         }
         // 3x3
-        for x in 0..<read.dim0-2 {
-            for y in 0..<read.dim1-2 {
-                XCTAssertEqual(try read.read(dim0Slow: x..<x+3, dim1: y..<y+3), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
+        for x in 0..<read.dims[0]-2 {
+            for y in 0..<read.dims[1]-2 {
+                XCTAssertEqual(read.read([x..<x+3, y..<y+3]), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
             }
         }
         
         // 1x5
-        for x in 0..<read.dim1 {
-            XCTAssertEqual(try read.read(dim0Slow: x..<x+1, dim1: 0..<5), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
+        for x in 0..<read.dims[1] {
+            XCTAssertEqual(read.read([x..<x+1, 0..<5]), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
         }
         
         // 5x1
-        for x in 0..<read.dim0 {
-            XCTAssertEqual(try read.read(dim0Slow: 0..<5, dim1: x..<x+1), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
+        for x in 0..<read.dims[0] {
+            XCTAssertEqual(read.read([0..<5, x..<x+1]), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
         }
         
-        // test interpolation
+        /*// test interpolation
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.5, dim0Y: 0, dim0YFraction: 0.5, dim0Nx: 2, dim1: 0..<5), [7.5, 8.5, 9.5, 10.5, 11.5], accuracy: 0.001)
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.1, dim0Y: 0, dim0YFraction: 0.2, dim0Nx: 2, dim1: 0..<5), [2.5, 3.4999998, 4.5, 5.5, 6.5], accuracy: 0.001)
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.9, dim0Y: 0, dim0YFraction: 0.2, dim0Nx: 2, dim1: 0..<5), [6.5, 7.5, 8.5, 9.5, 10.5], accuracy: 0.001)
