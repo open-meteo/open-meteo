@@ -31,7 +31,7 @@ public final class OmFileEncoder {
     public var totalBytesWritten = 0
     
     /// Position of last chunk that has been written
-    public var c0: Int = 0
+    public var chunkIndex: Int = 0
 
     
     /// Return the total number of chunks in this file
@@ -82,16 +82,77 @@ public final class OmFileEncoder {
         writeBufferPos = 0
         
         // TODO check dimensions of arrayDimensions and arrayRead
-                
+        
         // Loop over all chunks
-        for chunkIndex in 0..<number_of_chunks() {
+        var q: Int? = 0
+        while let qIn = q {
+            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, qOffset: 0)
+            try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+            writeBufferPos = 0
+        }
+        
+        let lutStart = totalBytesWritten
+        print("LUT start \(lutStart), \(chunkOffsetBytes)")
+        let len = chunkOffsetBytes.withUnsafeBytes({
+            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
+            return $0.count
+        })
+        writeBufferPos += len
+        totalBytesWritten += len
+        
+        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+        writeBufferPos = 0
+        
+        // TODO: pad to 64 bit
+        
+        let len2 = dims.withUnsafeBytes({
+            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
+            return $0.count
+        })
+        writeBufferPos += len2
+        totalBytesWritten += len2
+        
+        let len3 = chunks.withUnsafeBytes({
+            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
+            return $0.count
+        })
+        writeBufferPos += len3
+        totalBytesWritten += len3
+        
+        // n dimensions
+        writeBuffer.baseAddress!.advanced(by: writeBufferPos).assumingMemoryBound(to: Int.self, capacity: 1)[0] = dims.count
+        writeBufferPos += 8
+        totalBytesWritten += 8
+        
+        // LUT start offset
+        writeBuffer.baseAddress!.advanced(by: writeBufferPos).assumingMemoryBound(to: Int.self, capacity: 1)[0] = lutStart
+        writeBufferPos += 8
+        totalBytesWritten += 8
+        
+        // TODO LUT compressed chunk size
+        
+        
+        
+        // write LUT
+        // write trailer
+        
+        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+        writeBufferPos = 0
+    }
+    
+    /// Data must be exactly of the size of the next chunk or chunks!
+    /// Return true if all inpupt data base been processed
+    ///
+    /// TODO: figure out how to do streaming writes
+    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], qOffset: Int) -> Int? {
+        while true {
             // Calculate number of elements in this chunk
             var rollingMultiplty = 1
             var rollingMultiplyChunkLength = 1
             var rollingMultiplyTargetCube = 1
             
             /// Read coordinate from input array
-            var q = 0
+            var q = qOffset
             
             var d = 0
             
@@ -219,63 +280,16 @@ public final class OmFileEncoder {
             // Store chunk offset in LUT
             // TODO: `-3` to remove the header size. Reconsider this impl
             chunkOffsetBytes[chunkIndex] = totalBytesWritten - 3
+            chunkIndex += 1
+            // TODO return early
             
-            try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
-            writeBufferPos = 0
+            if chunkIndex == number_of_chunks() {
+                return nil
+            }
+            
+            // TODO: Only return if buffer is getting full
+            return q
         }
-        
-        let lutStart = totalBytesWritten
-        print("LUT start \(lutStart), \(chunkOffsetBytes)")
-        let len = chunkOffsetBytes.withUnsafeBytes({
-            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
-            return $0.count
-        })
-        writeBufferPos += len
-        totalBytesWritten += len
-        
-        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
-        writeBufferPos = 0
-        
-        // TODO: pad to 64 bit
-        
-        let len2 = dims.withUnsafeBytes({
-            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
-            return $0.count
-        })
-        writeBufferPos += len2
-        totalBytesWritten += len2
-        
-        let len3 = chunks.withUnsafeBytes({
-            memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress, $0.count)
-            return $0.count
-        })
-        writeBufferPos += len3
-        totalBytesWritten += len3
-        
-        // n dimensions
-        writeBuffer.baseAddress!.advanced(by: writeBufferPos).assumingMemoryBound(to: Int.self, capacity: 1)[0] = dims.count
-        writeBufferPos += 8
-        totalBytesWritten += 8
-        
-        // LUT start offset
-        writeBuffer.baseAddress!.advanced(by: writeBufferPos).assumingMemoryBound(to: Int.self, capacity: 1)[0] = lutStart
-        writeBufferPos += 8
-        totalBytesWritten += 8
-        
-        // TODO LUT compressed chunk size
-        
-        
-        
-        // write LUT
-        // write trailer
-        
-        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
-        writeBufferPos = 0
-    }
-    
-    /// Data must be exactly of the size of the next chunk!
-    public func writeNextChunk(data: [Float]) {
-        
     }
     
     deinit {
