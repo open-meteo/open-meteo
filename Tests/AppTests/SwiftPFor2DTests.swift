@@ -95,6 +95,33 @@ final class SwiftPFor2DTests: XCTestCase {
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
     }
     
+    func testWrite3D() throws {
+        let file = "writetest.om"
+        try FileManager.default.removeItemIfExists(at: file)
+        
+        let writer = OmFileEncoder(dimensions: [3,3,3], chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
+        let fn = try FileHandle.createNewFile(file: file)
+        
+        let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0]
+        try writer.write(array: data, arrayDimensions: [3,3,3], arrayRead: [0..<3, 0..<3, 0..<3], fn: fn)
+        
+        let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
+        let read = OmFileDecoder.open_file(fn: readFn)
+        
+        
+        let a = read.read([0..<3, 0..<3, 0..<3])
+        XCTAssertEqual(a, data)
+        
+        // single index
+        for x in 0..<read.dims[0] {
+            for y in 0..<read.dims[1] {
+                for z in 0..<read.dims[2] {
+                    XCTAssertEqual(read.read([x..<x+1, y..<y+1, z..<z+1]), [Float(x*3*3 + y*3 + z)])
+                }
+            }
+        }
+    }
+    
     func testWritev3() throws {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
