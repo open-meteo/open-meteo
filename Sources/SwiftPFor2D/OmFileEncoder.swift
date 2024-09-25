@@ -88,9 +88,15 @@ public final class OmFileEncoder {
     /// Can be all, a single or multiple chunks
     public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle) throws {
         // TODO check dimensions of arrayDimensions and arrayRead
+        
+        var numberOfChunksInArray = 1
+        for i in 0..<dims.count {
+            numberOfChunksInArray *= arrayRead[i].count.divideRoundedUp(divisor: chunks[i])
+        }
+        
         var q: Int? = 0
         while let qIn = q {
-            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, cOffset: qIn)
+            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, cOffset: qIn, numberOfChunksInArray: numberOfChunksInArray)
             try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
             writeBufferPos = 0
         }
@@ -147,15 +153,10 @@ public final class OmFileEncoder {
     ///
     /// `cOffset=0` if chunks are feed one by one
     /// Otherwise `cOffset` is incremented while looping over a large array
-    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], cOffset: Int) -> Int? {
+    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], cOffset: Int, numberOfChunksInArray: Int) -> Int? {
         assert(array.count == arrayDimensions.reduce(1, *))
         
         var cOffset = cOffset
-        
-        var number_of_chunks_in_array = 1
-        for i in 0..<dims.count {
-            number_of_chunks_in_array *= arrayRead[i].count.divideRoundedUp(divisor: chunks[i])
-        }
         
         while true {
             // Calculate number of elements in this chunk
@@ -305,11 +306,17 @@ public final class OmFileEncoder {
             
             // 2D coding and compression
             let writeLength: Int
+            let minimumBuffer: Int
             switch compression {
             case .p4nzdec256, .p4nzdec256logarithmic:
+                minimumBuffer = P4NENC256_BOUND(n: lengthInChunk, bytesPerElement: 4)
+                assert(writeBuffer.count - writeBufferPos >= minimumBuffer)
+                /// TODO check delta encoding if done correctly
                 delta2d_encode(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
                 writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
             case .fpxdec32:
+                minimumBuffer = P4NENC256_BOUND(n: lengthInChunk, bytesPerElement: 4)
+                assert(writeBuffer.count - writeBufferPos >= minimumBuffer)
                 delta2d_encode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
                 writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos), 0)
             }
@@ -325,12 +332,14 @@ public final class OmFileEncoder {
             cOffset += 1
             
             //print("cOffset", cOffset, "number_of_chunks_in_array", number_of_chunks_in_array)
-            if cOffset == number_of_chunks_in_array {
+            if cOffset == numberOfChunksInArray {
                 return nil
             }
             
-            // TODO: Only return if buffer is getting full
-            return cOffset
+            // Return to caller if the next chunk would not fit into the buffer
+            if writeBuffer.count - writeBufferPos <= minimumBuffer {
+                return cOffset
+            }
         }
     }
     
