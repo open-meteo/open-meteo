@@ -299,39 +299,45 @@ struct OmFileReadRequest {
         for i in (0..<dims.count).reversed() {
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+            /// Number of elements in this dim in this chunk
             let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-            let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
             
-            if dimRead[i].upperBound <= chunkGlobal0.lowerBound || dimRead[i].lowerBound >= chunkGlobal0.upperBound {
+            let chunkGlobal0Start = c0 * chunks[i]
+            let chunkGlobal0End = chunkGlobal0Start + length0
+            let clampedGlobal0Start = max(chunkGlobal0Start, dimRead[i].lowerBound)
+            let clampedGlobal0End = min(chunkGlobal0End, dimRead[i].upperBound)
+            let clampedLocal0Start = clampedGlobal0Start - c0 * chunks[i]
+            //let clampedLocal0End = clampedGlobal0End - c0 * chunks[i]
+            /// Numer of elements read in this chunk
+            let lengthRead = clampedGlobal0End - clampedGlobal0Start
+            
+            if dimRead[i].upperBound <= chunkGlobal0Start || dimRead[i].lowerBound >= chunkGlobal0End {
                 // There is no data in this chunk that should be read. This happens if IO is merged, combining mutliple read blocks.
                 // The returned bytes count still needs to be computed
                 //print("Not reading chunk \(globalChunkNum)")
                 no_data = true
             }
             
-            let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
-            let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
-            
             if i == dims.count-1 {
                 lengthLast = length0
             }
             
             /// start only!
-            let d0 = clampedLocal0.lowerBound
+            let d0 = clampedLocal0Start
             /// Target coordinate in hyperchunk. Range `0...dim0Read`
-            let t0 = chunkGlobal0.lowerBound - dimRead[i].lowerBound + d0
+            let t0 = chunkGlobal0Start - dimRead[i].lowerBound + d0
             
             let q0 = t0 + intoCoordLower[i]
             
             d = d + rollingMultiplyChunkLength * d0
             q = q + rollingMultiplyTargetCube * q0
             
-            if i == dims.count-1 && !(clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
+            if i == dims.count-1 && !(lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
                 // if fast dimension and only partially read
-                linearReadCount = clampedLocal0.count
+                linearReadCount = lengthRead
                 linearRead = false
             }
-            if linearRead && clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
+            if linearRead && lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
                 // dimension is read entirely
                 // and can be copied linearly into the output buffer
                 linearReadCount *= length0
@@ -386,21 +392,27 @@ struct OmFileReadRequest {
             for i in (0..<dims.count).reversed() {
                 let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
                 let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+                /// Number of elements in this dim in this chunk
                 let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-                let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                let clampedGlobal0 = chunkGlobal0.clamped(to: dimRead[i])
-                let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
+                let chunkGlobal0Start = c0 * chunks[i]
+                let chunkGlobal0End = chunkGlobal0Start + length0
+                let clampedGlobal0Start = max(chunkGlobal0Start, dimRead[i].lowerBound)
+                let clampedGlobal0End = min(chunkGlobal0End, dimRead[i].upperBound)
+                //let clampedLocal0Start = clampedGlobal0Start - c0 * chunks[i]
+                let clampedLocal0End = clampedGlobal0End - c0 * chunks[i]
+                /// Numer of elements read in this chunk
+                let lengthRead = clampedGlobal0End - clampedGlobal0Start
                 
                 /// More forward
                 d += rollingMultiplyChunkLength
                 q += rollingMultiplyTargetCube
                 
-                if i == dims.count-1 && !(clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
+                if i == dims.count-1 && !(lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
                     // if fast dimension and only partially read
-                    linearReadCount = clampedLocal0.count
+                    linearReadCount = lengthRead
                     linearRead = false
                 }
-                if linearRead && clampedLocal0.count == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
+                if linearRead && lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
                     // dimension is read entirely
                     // and can be copied linearly into the output buffer
                     linearReadCount *= length0
@@ -410,12 +422,12 @@ struct OmFileReadRequest {
                 }
                 
                 let d0 = (d / rollingMultiplyChunkLength) % length0
-                if d0 != clampedLocal0.upperBound && d0 != 0 {
+                if d0 != clampedLocal0End && d0 != 0 {
                     break // no overflow in this dimension, break
                 }
                 
-                d -= clampedLocal0.count * rollingMultiplyChunkLength
-                q -= clampedLocal0.count * rollingMultiplyTargetCube
+                d -= lengthRead * rollingMultiplyChunkLength
+                q -= lengthRead * rollingMultiplyTargetCube
                 
                 rollingMultiplty *= nChunksInThisDimension
                 rollingMultiplyTargetCube *= intoCubeDimension[i]
@@ -467,7 +479,9 @@ struct OmFileReadRequest {
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             
             // E.g. 2..<4
-            let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
+            let chunkInThisDimensionLower = dimRead[i].lowerBound / chunks[i]
+            let chunkInThisDimensionUpper = dimRead[i].upperBound.divideRoundedUp(divisor: chunks[i])
+            let chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower
                             
             // Move forward by one
             nextChunk += rollingMultiplty
@@ -476,7 +490,7 @@ struct OmFileReadRequest {
             
             if i == dims.count-1 && dims[i] != dimRead[i].count {
                 // if fast dimension and only partially read
-                linearReadCount = chunkInThisDimension.count
+                linearReadCount = chunkInThisDimensionCount
                 linearRead = false
             }
             if linearRead && dims[i] == dimRead[i].count {
@@ -488,10 +502,10 @@ struct OmFileReadRequest {
             }
             
             let c0 = (nextChunk / rollingMultiplty) % nChunksInThisDimension
-            if c0 != chunkInThisDimension.upperBound && c0 != 0 {
+            if c0 != chunkInThisDimensionUpper && c0 != 0 {
                 break // no overflow in this dimension, break
             }
-            nextChunk -= chunkInThisDimension.count * rollingMultiplty
+            nextChunk -= chunkInThisDimensionCount * rollingMultiplty
             rollingMultiplty *= nChunksInThisDimension
             if i == 0 {
                 // All chunks have been read. End of iteration
