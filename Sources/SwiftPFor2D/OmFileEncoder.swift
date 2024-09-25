@@ -75,26 +75,32 @@ public final class OmFileEncoder {
         self.writeBuffer = .allocate(capacity: max(1024 * 1024, bufferSize))
     }
     
-    public func write<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle) throws {
+    public func writeHeader<FileHandle: OmFileWriterBackend>(fn: FileHandle) throws {
         writeHeader()
-        
         try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
         writeBufferPos = 0
-        
+    }
+    public func writeTrailer<FileHandle: OmFileWriterBackend>(fn: FileHandle) throws {
+        self.writeTrailer()
+        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
+        writeBufferPos = 0
+    }
+    /// Can be all, a single or multiple chunks
+    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle) throws {
         // TODO check dimensions of arrayDimensions and arrayRead
-        
-        // Loop over all chunks
         var q: Int? = 0
         while let qIn = q {
-            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, qOffset: 0)
+            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, cOffset: qIn)
             try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
             writeBufferPos = 0
         }
-        
-        self.writeTrailer()
-        
-        try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
-        writeBufferPos = 0
+    }
+    
+    /// Write header, data and trailer
+    public func write<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle) throws {
+        try writeHeader(fn: fn)
+        try writeData(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, fn: fn)
+        try writeTrailer(fn: fn)
     }
     
     public func writeTrailer() {
@@ -139,8 +145,18 @@ public final class OmFileEncoder {
     /// Data must be exactly of the size of the next chunk or chunks!
     /// Return true if all inpupt data base been processed
     ///
-    /// TODO: figure out how to do streaming writes
-    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], qOffset: Int) -> Int? {
+    /// `cOffset=0` if chunks are feed one by one
+    /// Otherwise `cOffset` is incremented while looping over a large array
+    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], cOffset: Int) -> Int? {
+        assert(array.count == arrayDimensions.reduce(1, *))
+        
+        var cOffset = cOffset
+        
+        var number_of_chunks_in_array = 1
+        for i in 0..<dims.count {
+            number_of_chunks_in_array *= arrayRead[i].count.divideRoundedUp(divisor: chunks[i])
+        }
+        
         while true {
             // Calculate number of elements in this chunk
             var rollingMultiplty = 1
@@ -148,7 +164,7 @@ public final class OmFileEncoder {
             var rollingMultiplyTargetCube = 1
             
             /// Read coordinate from input array
-            var q = qOffset
+            var q = 0
             
             var d = 0
             
@@ -165,6 +181,7 @@ public final class OmFileEncoder {
             for i in (0..<dims.count).reversed() {
                 let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
                 let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
+                let c0Offset = (cOffset / rollingMultiplty) % nChunksInThisDimension
                 let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
                 //let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
                 //let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
@@ -174,7 +191,7 @@ public final class OmFileEncoder {
                     lengthLast = length0
                 }
 
-                q = q + rollingMultiplyTargetCube * (c0 * chunks[i] + arrayRead[i].lowerBound)
+                q = q + rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayRead[i].lowerBound)
                 
                 if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
                     // if fast dimension and only partially read
@@ -206,6 +223,7 @@ public final class OmFileEncoder {
                 //linearReadCount = 1
                 for i in 0..<linearReadCount {
                     let val = array[q+i]
+                    print("WRITE ",val)
                     if val.isNaN {
                         // Int16.min is not representable because of zigzag coding
                         chunkBuffer.assumingMemoryBound(to: Int16.self)[d+i] = Int16.max
@@ -266,14 +284,15 @@ public final class OmFileEncoder {
             // TODO: `-3` to remove the header size. Reconsider this impl
             chunkOffsetBytes[chunkIndex] = totalBytesWritten - 3
             chunkIndex += 1
-            // TODO return early
+            cOffset += 1
             
-            if chunkIndex == number_of_chunks() {
+            //print("cOffset", cOffset, "number_of_chunks_in_array", number_of_chunks_in_array)
+            if cOffset == number_of_chunks_in_array {
                 return nil
             }
             
             // TODO: Only return if buffer is getting full
-            return q
+            return cOffset
         }
     }
     

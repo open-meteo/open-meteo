@@ -51,7 +51,33 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItem(atPath: "\(file)~")
     }
     
-    func testWritev3() throws {
+    func testWriteChunks() throws {
+        let file = "writetest.om"
+        try FileManager.default.removeItemIfExists(at: file)
+        
+        let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
+        let fn = try FileHandle.createNewFile(file: file)
+        // Directly feed individual chunks
+        try writer.writeHeader(fn: fn)
+        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn)
+        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn)
+        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn)
+        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn)
+        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn)
+        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn)
+        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn)
+        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn)
+        try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1], fn: fn)
+        try writer.writeTrailer(fn: fn)
+        
+        let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
+        let read = OmFileDecoder.open_file(fn: readFn)
+        
+        let a = read.read([0..<5, 0..<5])
+        XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
+    }
+    
+    func testOffsetWrite() throws {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
@@ -62,14 +88,27 @@ final class SwiftPFor2DTests: XCTestCase {
         let data = [.nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan, Float(0.0), 1.0, 2.0, 3.0, 4.0, .nan, .nan, 5.0, 6.0, 7.0, 8.0, 9.0, .nan, .nan, 10.0, 11.0, 12.0, 13.0, 14.0, .nan, .nan, 15.0, 16.0, 17.0, 18.0, 19.0, .nan, .nan, 20.0, 21.0, 22.0, 23.0, 24.0, .nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan]
         try writer.write(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6], fn: fn)
         
-        //let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-        //try writer.write(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn)
+        let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
+        let read = OmFileDecoder.open_file(fn: readFn)
+        
+        let a = read.read([0..<5, 0..<5])
+        XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
+    }
+    
+    func testWritev3() throws {
+        let file = "writetest.om"
+        try FileManager.default.removeItemIfExists(at: file)
+        
+        let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
+        let fn = try FileHandle.createNewFile(file: file)
+        
+        let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
+        try writer.write(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
         let read = OmFileDecoder.open_file(fn: readFn)
         
-        
-        
+
         let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
         
