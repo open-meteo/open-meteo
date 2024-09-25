@@ -105,7 +105,7 @@ public final class OmFileEncoder {
     
     public func writeTrailer() {
         let lutStart = totalBytesWritten
-        print("LUT start \(lutStart), \(chunkOffsetBytes)")
+        //print("LUT start \(lutStart), \(chunkOffsetBytes)")
         let len = chunkOffsetBytes.withUnsafeBytes({
             memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             return $0.count
@@ -192,7 +192,9 @@ public final class OmFileEncoder {
                 }
 
                 q = q + rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayRead[i].lowerBound)
-                
+                //print("i", i, "arrayRead[i].count", arrayRead[i].count, "length0", length0, "arrayDimensions[i]", arrayDimensions[i])
+                assert(length0 <= arrayRead[i].count)
+                assert(length0 <= arrayDimensions[i])
                 if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
                     // if fast dimension and only partially read
                     linearReadCount = length0
@@ -215,15 +217,17 @@ public final class OmFileEncoder {
             /// How many elements are in this chunk
             let lengthInChunk = rollingMultiplyChunkLength
             
-            print("compress chunk \(chunkIndex) lengthInChunk \(lengthInChunk)")
+            //print("compress chunk \(chunkIndex) lengthInChunk \(lengthInChunk)")
             
             // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
             loopBuffer: while true {
-                print("q=\(q) d=\(d), count=\(linearReadCount)")
+                //print("q=\(q) d=\(d), count=\(linearReadCount)")
                 //linearReadCount = 1
                 for i in 0..<linearReadCount {
+                    assert(q+i < array.count)
+                    assert(d+i < lengthInChunk)
                     let val = array[q+i]
-                    print("WRITE ",val)
+                    //print("WRITE ",val)
                     if val.isNaN {
                         // Int16.min is not representable because of zigzag coding
                         chunkBuffer.assumingMemoryBound(to: Int16.self)[d+i] = Int16.max
@@ -237,6 +241,8 @@ public final class OmFileEncoder {
                 
                 // Move `q` to next position
                 rollingMultiplyTargetCube = 1
+                linearRead = true
+                linearReadCount = 1
                 for i in (0..<dims.count).reversed() {
                     let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) / chunks[i]
                     let length0 = min((qPos+1) * chunks[i], arrayRead[i].count) - qPos * chunks[i]
@@ -276,7 +282,7 @@ public final class OmFileEncoder {
             
             // Compress chunk
             let writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
-            print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
+            //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
             writeBufferPos += writeLength
             totalBytesWritten += writeLength
             

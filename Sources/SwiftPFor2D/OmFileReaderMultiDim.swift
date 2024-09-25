@@ -49,7 +49,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
                 $1 = nDims
             })
             
-            print(lutStart, nDims, dimensions, chunks)
+            //print(lutStart, nDims, dimensions, chunks)
             
             return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart)
         })
@@ -116,7 +116,7 @@ struct OmFileReadRequest {
         
         var chunkIndex: Range<Int>? = get_first_chunk_position()
         
-        print("new read \(self), start \(chunkIndex ?? 0..<0)")
+        //print("new read \(self), start \(chunkIndex ?? 0..<0)")
         
         let nChunks = number_of_chunks()
         
@@ -131,9 +131,9 @@ struct OmFileReadRequest {
                 var chunkData: Range<Int>? = chunkIndexStart
                 
                 // actually "read" index data from file
-                print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
+                //print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
                 let indexData = ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
-                print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
+                //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
                       
                 
                 /// Loop over data blocks
@@ -142,7 +142,7 @@ struct OmFileReadRequest {
                     chunkData = readDataInstruction.nextChunk
                     
                     // actually "read" compressed chunk data from file
-                    print("read data \(readDataInstruction)")
+                    //print("read data \(readDataInstruction)")
                     let dataData = ptr.baseAddress!.advanced(by: dataStart + readDataInstruction.offset)
                     
                     let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
@@ -258,7 +258,7 @@ struct OmFileReadRequest {
         // Maybe we need a differnet way that is independenet of this information
         var pos = 0
         for chunkNum in globalChunkNum ... lastChunk {
-            print("decompress chunk \(chunkNum), pos \(pos)")
+            //print("decompress chunk \(chunkNum), pos \(pos)")
             let uncompressedBytes = decode_chunk_into_array(globalChunkNum: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
         }
@@ -352,7 +352,7 @@ struct OmFileReadRequest {
         let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
         let uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
         
-        print("uncompressed bytes", uncompressedBytes, "lengthInChunk", lengthInChunk)
+        //print("uncompressed bytes", uncompressedBytes, "lengthInChunk", lengthInChunk)
         
         if no_data {
             return uncompressedBytes
@@ -363,7 +363,7 @@ struct OmFileReadRequest {
         
         /// Loop over all values need to be copied to the output buffer
         loopBuffer: while true {
-            print("read buffer from pos=\(d) and write to \(q), count=\(linearReadCount)")
+            //print("read buffer from pos=\(d) and write to \(q), count=\(linearReadCount)")
             //linearReadCount=1
             for i in 0..<linearReadCount {
                 let val = chunkBuffer[d+i]
