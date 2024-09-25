@@ -51,6 +51,23 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItem(atPath: "\(file)~")
     }
     
+    /*func testWriteLarge() throws {
+        let file = "writetest.om"
+        try FileManager.default.removeItemIfExists(at: file)
+        
+        let writer = OmFileEncoder(dimensions: [100,100,10], chunkDimensions: [10,10,10], compression: .p4nzdec256, scalefactor: 1)
+        let fn = try FileHandle.createNewFile(file: file)
+        
+        let data = (0..<100000).map({Float($0 % 10000)})
+        try writer.write(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10], fn: fn)
+        
+        let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
+        let read = OmFileDecoder.open_file(fn: readFn)
+                
+        let a = read.read([0..<100, 0..<100, 0..<10])
+        XCTAssertEqual(a, data)
+    }*/
+    
     func testWriteChunks() throws {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)

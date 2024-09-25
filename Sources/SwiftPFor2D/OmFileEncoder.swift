@@ -113,6 +113,22 @@ public final class OmFileEncoder {
         let lutStart = totalBytesWritten
         //print("LUT start \(lutStart), \(chunkOffsetBytes)")
         let len = chunkOffsetBytes.withUnsafeBytes({
+            /*var maxLength = 0
+            let indexChunkLength = 128
+            for i in 0..<$0.count.divideRoundedUp(divisor: indexChunkLength) {
+                let rangeStart = i*indexChunkLength
+                let rangeEnd = max((i+1)*indexChunkLength, $0.count)
+                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.assumingMemoryBound(to: UInt64.self).baseAddress), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
+                if len > maxLength { maxLength = len }
+                print(len)
+            }
+            for i in 0..<$0.count.divideRoundedUp(divisor: indexChunkLength) {
+                let rangeStart = i*indexChunkLength
+                let rangeEnd = max((i+1)*indexChunkLength, $0.count)
+                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.assumingMemoryBound(to: UInt64.self).baseAddress), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
+                writeBufferPos += maxLength
+            }
+            print("Index size", $0.count*8, " compressed to ", maxLength*$0.count.divideRoundedUp(divisor: indexChunkLength))*/
             memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             return $0.count
         })
@@ -139,6 +155,8 @@ public final class OmFileEncoder {
         writeBuffer.baseAddress!.advanced(by: writeBufferPos).assumingMemoryBound(to: Int.self, capacity: 1)[0] = dims.count
         writeBufferPos += 8
         totalBytesWritten += 8
+        
+        // TODO scalefactor, version, magic number
         
         // LUT start offset
         writeBuffer.baseAddress!.advanced(by: writeBufferPos).assumingMemoryBound(to: Int.self, capacity: 1)[0] = lutStart
