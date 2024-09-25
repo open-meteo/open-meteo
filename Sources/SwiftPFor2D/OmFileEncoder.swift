@@ -228,6 +228,9 @@ public final class OmFileEncoder {
                     let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
                     let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
                     
+                    let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) / chunks[i]
+                    let qLenght0 = min((qPos+1) * chunks[i], dims[i]) - qPos * chunks[i]
+                    
                     /// More forward
                     d += rollingMultiplyChunkLength
                     q += rollingMultiplyTargetCube
@@ -246,13 +249,13 @@ public final class OmFileEncoder {
                         linearRead = false
                     }
                     
-                    /// TODO have to figure out how to get length0 withouh chunk offset
+
                     let d0 = (d / rollingMultiplyChunkLength) % length0
                     let q0 = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) % chunks[i]
                     let breakQ = q0 == 0 || q0 == length0
                     let breakD = d0 == clampedLocal0.upperBound || d0 == 0
-                    print("dim=\(i) d0=\(d0) q0=\(q0) break=\(breakD) break_Q=\(breakQ) length0=\(length0)")
-                    if breakD != breakQ {
+                    print("dim=\(i) d0=\(d0) q0=\(q0) break=\(breakD) break_Q=\(breakQ) length0=\(length0) qLenght0=\(qLenght0)")
+                    if length0 != qLenght0 {
                         print("MISS MATCH")
                     }
                     if !breakQ {
