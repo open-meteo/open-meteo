@@ -221,7 +221,7 @@ public final class OmFileEncoder {
                 rollingMultiplyTargetCube = 1
                 for i in (0..<dims.count).reversed() {
                     let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) / chunks[i]
-                    let length0 = min((qPos+1) * chunks[i], dims[i]) - qPos * chunks[i]
+                    let length0 = min((qPos+1) * chunks[i], arrayRead[i].count) - qPos * chunks[i]
                     
                     /// More forward
                     q += rollingMultiplyTargetCube
