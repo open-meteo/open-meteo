@@ -215,24 +215,15 @@ public final class OmFileEncoder {
                 }
                 q += linearReadCount-1
                 d += linearReadCount-1
+                d += 1
                 
                 // Move `q` to next position
-                rollingMultiplty = 1
                 rollingMultiplyTargetCube = 1
-                rollingMultiplyChunkLength = 1
                 for i in (0..<dims.count).reversed() {
-                    let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                    let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
-                    let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-                    let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                    let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
-                    let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
-                    
                     let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) / chunks[i]
-                    let qLenght0 = min((qPos+1) * chunks[i], dims[i]) - qPos * chunks[i]
+                    let length0 = min((qPos+1) * chunks[i], dims[i]) - qPos * chunks[i]
                     
                     /// More forward
-                    d += rollingMultiplyChunkLength
                     q += rollingMultiplyTargetCube
                     
                     if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
@@ -248,29 +239,15 @@ public final class OmFileEncoder {
                         // dimension is read partly, cannot merge further reads
                         linearRead = false
                     }
-                    
-
-                    let d0 = (d / rollingMultiplyChunkLength) % length0
                     let q0 = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) % chunks[i]
-                    let breakQ = q0 == 0 || q0 == length0
-                    let breakD = d0 == clampedLocal0.upperBound || d0 == 0
-                    print("dim=\(i) d0=\(d0) q0=\(q0) break=\(breakD) break_Q=\(breakQ) length0=\(length0) qLenght0=\(qLenght0)")
-                    if length0 != qLenght0 {
-                        print("MISS MATCH")
-                    }
-                    if !breakQ {
+                    if q0 != 0 && q0 != length0 {
                         break // no overflow in this dimension, break
                     }
+                    q -= length0 * rollingMultiplyTargetCube
                     
-                    d -= clampedLocal0.count * rollingMultiplyChunkLength
-                    q -= clampedLocal0.count * rollingMultiplyTargetCube
-                    
-                    rollingMultiplty *= nChunksInThisDimension
                     rollingMultiplyTargetCube *= arrayDimensions[i]
-                    rollingMultiplyChunkLength *= length0
                     if i == 0 {
                         // All chunks have been read. End of iteration
-                        
                         break loopBuffer
                     }
                 }
