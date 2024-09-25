@@ -96,7 +96,7 @@ public final class OmFileEncoder {
         
         var q: Int? = 0
         while let qIn = q {
-            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayRead: arrayRead, cOffset: qIn, numberOfChunksInArray: numberOfChunksInArray)
+            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayOffset: arrayRead.map({$0.lowerBound}), arrayCount: arrayRead.map({$0.count}), cOffset: qIn, numberOfChunksInArray: numberOfChunksInArray)
             try fn.write(contentsOf: writeBuffer[0..<writeBufferPos].map({$0}))
             writeBufferPos = 0
         }
@@ -153,7 +153,7 @@ public final class OmFileEncoder {
     ///
     /// `cOffset=0` if chunks are feed one by one
     /// Otherwise `cOffset` is incremented while looping over a large array
-    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], cOffset: Int, numberOfChunksInArray: Int) -> Int? {
+    public func writeNextChunks(array: [Float], arrayDimensions: [Int], arrayOffset: [Int], arrayCount: [Int], cOffset: Int, numberOfChunksInArray: Int) -> Int? {
         assert(array.count == arrayDimensions.reduce(1, *))
         
         var cOffset = cOffset
@@ -192,16 +192,16 @@ public final class OmFileEncoder {
                     lengthLast = length0
                 }
 
-                q = q + rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayRead[i].lowerBound)
+                q = q + rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayOffset[i])
                 //print("i", i, "arrayRead[i].count", arrayRead[i].count, "length0", length0, "arrayDimensions[i]", arrayDimensions[i])
-                assert(length0 <= arrayRead[i].count)
+                assert(length0 <= arrayCount[i])
                 assert(length0 <= arrayDimensions[i])
-                if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
+                if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
                     // if fast dimension and only partially read
                     linearReadCount = length0
                     linearRead = false
                 }
-                if linearRead && arrayRead[i].count == length0 && arrayDimensions[i] == length0 {
+                if linearRead && arrayCount[i] == length0 && arrayDimensions[i] == length0 {
                     // dimension is read entirely
                     // and can be copied linearly into the output buffer
                     linearReadCount *= length0
@@ -271,18 +271,18 @@ public final class OmFileEncoder {
                 linearRead = true
                 linearReadCount = 1
                 for i in (0..<dims.count).reversed() {
-                    let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) / chunks[i]
-                    let length0 = min((qPos+1) * chunks[i], arrayRead[i].count) - qPos * chunks[i]
+                    let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunks[i]
+                    let length0 = min((qPos+1) * chunks[i], arrayCount[i]) - qPos * chunks[i]
                     
                     /// More forward
                     q += rollingMultiplyTargetCube
                     
-                    if i == dims.count-1 && !(arrayRead[i].count == length0 && arrayDimensions[i] == length0) {
+                    if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
                         // if fast dimension and only partially read
                         linearReadCount = length0
                         linearRead = false
                     }
-                    if linearRead && arrayRead[i].count == length0 && arrayDimensions[i] == length0 {
+                    if linearRead && arrayCount[i] == length0 && arrayDimensions[i] == length0 {
                         // dimension is read entirely
                         // and can be copied linearly into the output buffer
                         linearReadCount *= length0
@@ -290,7 +290,7 @@ public final class OmFileEncoder {
                         // dimension is read partly, cannot merge further reads
                         linearRead = false
                     }
-                    let q0 = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayRead[i].lowerBound) % chunks[i]
+                    let q0 = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % chunks[i]
                     if q0 != 0 && q0 != length0 {
                         break // no overflow in this dimension, break
                     }
