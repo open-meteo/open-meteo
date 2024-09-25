@@ -223,18 +223,44 @@ public final class OmFileEncoder {
             loopBuffer: while true {
                 //print("q=\(q) d=\(d), count=\(linearReadCount)")
                 //linearReadCount = 1
-                for i in 0..<linearReadCount {
-                    assert(q+i < array.count)
-                    assert(d+i < lengthInChunk)
-                    let val = array[q+i]
-                    //print("WRITE ",val)
-                    if val.isNaN {
-                        // Int16.min is not representable because of zigzag coding
-                        chunkBuffer.assumingMemoryBound(to: Int16.self)[d+i] = Int16.max
+                
+                switch compression {
+                case .p4nzdec256:
+                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                    for i in 0..<linearReadCount {
+                        assert(q+i < array.count)
+                        assert(d+i < lengthInChunk)
+                        let val = array[q+i]
+                        if val.isNaN {
+                            // Int16.min is not representable because of zigzag coding
+                            chunkBuffer[d+i] = Int16.max
+                        }
+                        let scaled = val * scalefactor
+                        chunkBuffer[d+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
                     }
-                    let scaled = compression == .p4nzdec256logarithmic ? (log10(1+val) * scalefactor) : (val * scalefactor)
-                    chunkBuffer.assumingMemoryBound(to: Int16.self)[d+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                case .fpxdec32:
+                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+                    for i in 0..<linearReadCount {
+                        assert(q+i < array.count)
+                        assert(d+i < lengthInChunk)
+                        chunkBuffer[d+i] = array[q+i]
+                    }
+                case .p4nzdec256logarithmic:
+                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                    for i in 0..<linearReadCount {
+                        assert(q+i < array.count)
+                        assert(d+i < lengthInChunk)
+                        let val = array[q+i]
+                        if val.isNaN {
+                            // Int16.min is not representable because of zigzag coding
+                            chunkBuffer[d+i] = Int16.max
+                        }
+                        let scaled = log10(1+val) * scalefactor
+                        chunkBuffer[d+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                    }
                 }
+                
+
                 q += linearReadCount-1
                 d += linearReadCount-1
                 d += 1
@@ -277,11 +303,17 @@ public final class OmFileEncoder {
                 }
             }
             
-            // 2D encoding
-            delta2d_encode(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
-            
-            // Compress chunk
-            let writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
+            // 2D coding and compression
+            let writeLength: Int
+            switch compression {
+            case .p4nzdec256, .p4nzdec256logarithmic:
+                delta2d_encode(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
+                writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
+            case .fpxdec32:
+                delta2d_encode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
+                writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, lengthInChunk, writeBuffer.baseAddress!.advanced(by: writeBufferPos), 0)
+            }
+
             //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
             writeBufferPos += writeLength
             totalBytesWritten += writeLength

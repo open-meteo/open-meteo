@@ -86,7 +86,6 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
 
 /**
  TODO:
- - differnet compression implementation
  - consider if we need to access the index LUT inside decompress call instead of relying on returned data size
  */
 struct OmFileReadRequest {
@@ -283,8 +282,6 @@ struct OmFileReadRequest {
     public func decode_chunk_into_array(globalChunkNum: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
         //print("globalChunkNum=\(globalChunkNum)")
         
-        let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
-        
         var rollingMultiplty = 1
         var rollingMultiplyChunkLength = 1
         var rollingMultiplyTargetCube = 1
@@ -367,31 +364,71 @@ struct OmFileReadRequest {
         let lengthInChunk = rollingMultiplyChunkLength
         //print("lengthInChunk \(lengthInChunk), t sstart=\(d)")
         
-        let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
-        let uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
+        
+        let uncompressedBytes: Int
+        
+        switch compression {
+        case .p4nzdec256, .p4nzdec256logarithmic:
+            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+            let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
+            uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
+        case .fpxdec32:
+            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt32.self)
+            let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
+            uncompressedBytes = fpxdec32(mutablePtr, lengthInChunk, chunkBuffer, 0)
+        }
         
         //print("uncompressed bytes", uncompressedBytes, "lengthInChunk", lengthInChunk)
         
         if no_data {
             return uncompressedBytes
         }
+
+        switch compression {
+        case .p4nzdec256, .p4nzdec256logarithmic:
+            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+            delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+        case .fpxdec32:
+            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+            delta2d_decode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+        }
         
-        // TODO multi dimensional encode/decode
-        delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
         
         /// Loop over all values need to be copied to the output buffer
         loopBuffer: while true {
             //print("read buffer from pos=\(d) and write to \(q), count=\(linearReadCount)")
             //linearReadCount=1
-            for i in 0..<linearReadCount {
-                let val = chunkBuffer[d+i]
-                if val == Int16.max {
-                    into.advanced(by: q+i).pointee = .nan
-                } else {
-                    let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                    into.advanced(by: q+i).pointee = unscaled
+            
+            switch compression {
+            case .p4nzdec256:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+                for i in 0..<linearReadCount {
+                    let val = chunkBuffer[d+i]
+                    if val == Int16.max {
+                        into.advanced(by: q+i).pointee = .nan
+                    } else {
+                        let unscaled = Float(val) / scalefactor
+                        into.advanced(by: q+i).pointee = unscaled
+                    }
+                }
+            case .fpxdec32:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+                for i in 0..<linearReadCount {
+                    into.advanced(by: q+i).pointee = chunkBuffer[d+i]
+                }
+            case .p4nzdec256logarithmic:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+                for i in 0..<linearReadCount {
+                    let val = chunkBuffer[d+i]
+                    if val == Int16.max {
+                        into.advanced(by: q+i).pointee = .nan
+                    } else {
+                        let unscaled = powf(10, Float(val) / scalefactor) - 1
+                        into.advanced(by: q+i).pointee = unscaled
+                    }
                 }
             }
+
             q += linearReadCount-1
             d += linearReadCount-1
                             
