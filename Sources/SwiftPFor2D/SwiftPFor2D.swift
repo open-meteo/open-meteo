@@ -589,7 +589,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     compression: compression,
                     dims: [dim0, dim1],
                     chunks: [chunk0, chunk1],
-                    dimRead: [dim0Read, dim1Read],
+                    dimReadOffset: [dim0Read.lowerBound, dim1Read.lowerBound],
+                    dimReadCount: [dim0Read.count, dim1Read.count],
                     intoCoordLower: [0, arrayDim1Range.lowerBound],
                     intoCubeDimension: [dim0Read.count, arrayDim1Length]
                 )

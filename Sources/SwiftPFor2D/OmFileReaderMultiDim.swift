@@ -59,7 +59,16 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
         let chunkLength = chunks.reduce(1, *)
         let bufferSize = P4NDEC256_BOUND(n: chunkLength, bytesPerElement: compression.bytesPerElement)
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
-        let read = OmFileReadRequest(scalefactor: scalefactor, compression: compression, dims: dims, chunks: chunks, dimRead: dimRead, intoCoordLower: intoCoordLower, intoCubeDimension: intoCubeDimension)
+        let read = OmFileReadRequest(
+            scalefactor: scalefactor,
+            compression: compression,
+            dims: dims,
+            chunks: chunks,
+            dimReadOffset: dimRead.map{$0.lowerBound},
+            dimReadCount: dimRead.map{$0.count},
+            intoCoordLower: intoCoordLower,
+            intoCubeDimension: intoCubeDimension
+        )
         read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3, lutStart: lutStart)
         chunkBuffer.deallocate()
     }
@@ -94,7 +103,10 @@ struct OmFileReadRequest {
     let chunks: [Int]
     
     /// Which values to read
-    let dimRead: [Range<Int>]
+    let dimReadOffset: [Int]
+    
+    /// Which values to read
+    let dimReadCount: [Int]
     
     /// The offset the result should be placed into the target cube. E.g. a slice or a chunk of a cube
     let intoCoordLower: [Int]
@@ -304,14 +316,14 @@ struct OmFileReadRequest {
             
             let chunkGlobal0Start = c0 * chunks[i]
             let chunkGlobal0End = chunkGlobal0Start + length0
-            let clampedGlobal0Start = max(chunkGlobal0Start, dimRead[i].lowerBound)
-            let clampedGlobal0End = min(chunkGlobal0End, dimRead[i].upperBound)
+            let clampedGlobal0Start = max(chunkGlobal0Start, dimReadOffset[i])
+            let clampedGlobal0End = min(chunkGlobal0End, dimReadOffset[i] + dimReadCount[i])
             let clampedLocal0Start = clampedGlobal0Start - c0 * chunks[i]
             //let clampedLocal0End = clampedGlobal0End - c0 * chunks[i]
             /// Numer of elements read in this chunk
             let lengthRead = clampedGlobal0End - clampedGlobal0Start
             
-            if dimRead[i].upperBound <= chunkGlobal0Start || dimRead[i].lowerBound >= chunkGlobal0End {
+            if dimReadOffset[i] + dimReadCount[i] <= chunkGlobal0Start || dimReadOffset[i] >= chunkGlobal0End {
                 // There is no data in this chunk that should be read. This happens if IO is merged, combining mutliple read blocks.
                 // The returned bytes count still needs to be computed
                 //print("Not reading chunk \(globalChunkNum)")
@@ -325,19 +337,19 @@ struct OmFileReadRequest {
             /// start only!
             let d0 = clampedLocal0Start
             /// Target coordinate in hyperchunk. Range `0...dim0Read`
-            let t0 = chunkGlobal0Start - dimRead[i].lowerBound + d0
+            let t0 = chunkGlobal0Start - dimReadOffset[i] + d0
             
             let q0 = t0 + intoCoordLower[i]
             
             d = d + rollingMultiplyChunkLength * d0
             q = q + rollingMultiplyTargetCube * q0
             
-            if i == dims.count-1 && !(lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
+            if i == dims.count-1 && !(lengthRead == length0 && dimReadCount[i] == length0 && intoCubeDimension[i] == length0) {
                 // if fast dimension and only partially read
                 linearReadCount = lengthRead
                 linearRead = false
             }
-            if linearRead && lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
+            if linearRead && lengthRead == length0 && dimReadCount[i] == length0 && intoCubeDimension[i] == length0 {
                 // dimension is read entirely
                 // and can be copied linearly into the output buffer
                 linearReadCount *= length0
@@ -396,8 +408,8 @@ struct OmFileReadRequest {
                 let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
                 let chunkGlobal0Start = c0 * chunks[i]
                 let chunkGlobal0End = chunkGlobal0Start + length0
-                let clampedGlobal0Start = max(chunkGlobal0Start, dimRead[i].lowerBound)
-                let clampedGlobal0End = min(chunkGlobal0End, dimRead[i].upperBound)
+                let clampedGlobal0Start = max(chunkGlobal0Start, dimReadOffset[i])
+                let clampedGlobal0End = min(chunkGlobal0End, dimReadOffset[i] + dimReadCount[i])
                 //let clampedLocal0Start = clampedGlobal0Start - c0 * chunks[i]
                 let clampedLocal0End = clampedGlobal0End - c0 * chunks[i]
                 /// Numer of elements read in this chunk
@@ -407,12 +419,12 @@ struct OmFileReadRequest {
                 d += rollingMultiplyChunkLength
                 q += rollingMultiplyTargetCube
                 
-                if i == dims.count-1 && !(lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0) {
+                if i == dims.count-1 && !(lengthRead == length0 && dimReadCount[i] == length0 && intoCubeDimension[i] == length0) {
                     // if fast dimension and only partially read
                     linearReadCount = lengthRead
                     linearRead = false
                 }
-                if linearRead && lengthRead == length0 && dimRead.count == length0 && intoCubeDimension[i] == length0 {
+                if linearRead && lengthRead == length0 && dimReadCount[i] == length0 && intoCubeDimension[i] == length0 {
                     // dimension is read entirely
                     // and can be copied linearly into the output buffer
                     linearReadCount *= length0
@@ -447,16 +459,20 @@ struct OmFileReadRequest {
         var chunkStart = 0
         var chunkEnd = 1
         for i in 0..<dims.count {
-            let chunkInThisDimension = dimRead[i].divide(by: chunks[i])
-            let firstChunkInThisDimension = chunkInThisDimension.lowerBound
+            // E.g. 2..<4
+            let chunkInThisDimensionLower = dimReadOffset[i] / chunks[i]
+            let chunkInThisDimensionUpper = (dimReadOffset[i] + dimReadCount[i]).divideRoundedUp(divisor: chunks[i])
+            let chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower
+                            
+            let firstChunkInThisDimension = chunkInThisDimensionLower
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             chunkStart = chunkStart * nChunksInThisDimension + firstChunkInThisDimension
-            if dimRead[i].count == dims[i] {
+            if dimReadCount[i] == dims[i] {
                 // The entire dimension is read
                 chunkEnd = chunkEnd * nChunksInThisDimension
             } else {
                 // Only parts of this dimension are read
-                chunkEnd = chunkStart + chunkInThisDimension.count
+                chunkEnd = chunkStart + chunkInThisDimensionCount
             }
         }
         return chunkStart..<chunkEnd
@@ -479,8 +495,8 @@ struct OmFileReadRequest {
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
             
             // E.g. 2..<4
-            let chunkInThisDimensionLower = dimRead[i].lowerBound / chunks[i]
-            let chunkInThisDimensionUpper = dimRead[i].upperBound.divideRoundedUp(divisor: chunks[i])
+            let chunkInThisDimensionLower = dimReadOffset[i] / chunks[i]
+            let chunkInThisDimensionUpper = (dimReadOffset[i] + dimReadCount[i]).divideRoundedUp(divisor: chunks[i])
             let chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower
                             
             // Move forward by one
@@ -488,12 +504,12 @@ struct OmFileReadRequest {
             // Check for overflow in limited read coordinates
             
             
-            if i == dims.count-1 && dims[i] != dimRead[i].count {
+            if i == dims.count-1 && dims[i] != dimReadCount[i] {
                 // if fast dimension and only partially read
                 linearReadCount = chunkInThisDimensionCount
                 linearRead = false
             }
-            if linearRead && dims[i] == dimRead[i].count {
+            if linearRead && dims[i] == dimReadCount[i] {
                 // dimension is read entirely
                 linearReadCount *= nChunksInThisDimension
             } else {
