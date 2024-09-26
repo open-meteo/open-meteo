@@ -87,7 +87,7 @@ ERA5 is driving the Historical Weather API and can be downloaded for the past. Y
 
 From your Copernicus account, you need an API key in form `234234:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`. The CDS key is a required argument in the next step.
 
-To download most recent ERA5 data, simply run `<exe> download-era5 <domain> --cdskey 234234:XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`. This will download the last 2 weeks of era5 data,
+To download most recent ERA5 data, simply run `<exe> download-era5 <domain> --cdskey XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX`. This will download the last 2 weeks of era5 data,
 where domain must be one of the following options.
 - era5
 - era5_land
@@ -108,7 +108,7 @@ Download ERA5 from the ECMWF climate data store and convert
 Options:
   timeinterval Timeinterval to download with format 20220101-20220131
           year Download one year
-        cdskey CDS API user and key like: 123456:8ec08f...
+        cdskey CDS API key like: f412e2d2-4123-456...
 ```
 
 ### Digital elevation model

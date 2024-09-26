@@ -14,6 +14,7 @@ enum OmFileManagerType: String {
 enum OmFileManagerReadable: Hashable {
     case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
+    case meta(domain: DomainRegistry)
     
     /// Assemble the full file system path
     func getFilePath() -> String {
@@ -35,6 +36,8 @@ enum OmFileManagerReadable: Hashable {
                 return "\(domain.rawValue)/static/\(variable)_\(chunk).om"
             }
             return "\(domain.rawValue)/static/\(variable).om"
+        case .meta(let domain):
+            return "\(domain.rawValue)/static/meta.json"
         }
     }
     
@@ -73,108 +76,19 @@ enum OmFileManagerReadable: Hashable {
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 struct OmFileManager {
-    /// A file might exist and is open, or it is missing
-    enum OmFileState {
-        case exists(file: OmFileReader<MmapFileCached>)
-        case missing(path: String)
-    }
-    
-    /// Non existing files are set to nil
-    private let cached = NIOLockedValueBox<[Int: OmFileState]>(.init())
-    
-    private let statistics = NIOLockedValueBox<(count: Double, elapsed: Double, max: Double)>((0,0,0))
-    
-    public static var instance = OmFileManager()
+    public static var instance = GenericFileManager<OmFileReader<MmapFileCached>>()
     
     private init() {}
-    
-    /// Called every 2 conds from a life cycle handler on any available thread
-    @Sendable func backgroundTask(application: Application) {
-        let logger = application.logger
-        var (count, elapsed, max) = statistics.withLockedValue({$0})
-        
-        let start = DispatchTime.now()
-        let stats = self.secondlyCallback()
-        let dt = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
-        if dt > max {
-            max = dt
-        }
-        elapsed += dt
-        count += 1
-        if count >= 10 {
-            if (stats.open > 0) {
-                let buf = OmFileReader<MmapFile>.getStatistics()
-                logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint). Buffers \(buf.count) total=\(buf.totalSize.bytesHumanReadable) max=\(buf.maxSize.bytesHumanReadable)")
-            }
-            count = 0
-            elapsed = 0
-            max = 0
-        }
-        statistics.withLockedValue({ $0 = (count, elapsed, max) })
-    }
-    
-    /// Called every couple of seconds to check for any file modifications
-    func secondlyCallback() -> (open: Int, missing: Int, ejected: Int) {
-        // Could be later used to expose some metrics
-        var countExisting = 0
-        var countMissing = 0
-        var countEjected = 0
-        
-        let copy = cached.withLockedValue {
-            return $0
-        }
-        
-        for e in copy {
-            switch e.value {
-            case .exists(file: let file):
-                // Remove file from cache, if it was deleted
-                if file.wasDeleted() {
-                    cached.withLockedValue({
-                        $0.removeValue(forKey: e.key)
-                        countEjected += 1
-                    })
-                }
-                countExisting += 1
-            case .missing(path: let path):
-                // Remove file from cache, if it is now available, so the next open, will make it available
-                if FileManager.default.fileExists(atPath: path) {
-                    cached.withLockedValue({
-                        let _ = $0.removeValue(forKey: e.key)
-                        countEjected += 1
-                    })
-                }
-                countMissing += 1
-            }
-        }
-        return (countExisting, countMissing, countEjected)
-        //logger.info("OmFileManager tracking \(countExisting) open files, \(countMissing) missing files. \(countEjected) were ejected in this update.")
-    }
     
     /// Get cached file or return nil, if the files does not exist
     public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
         try instance.get(file)
     }
+}
 
-    /// Get cached file or return nil, if the files does not exist
-    public func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
-        let key = file.hashValue
-        
-        return try cached.withLockedValue { cached in
-            if let file = cached[key] {
-                switch file {
-                case .exists(file: let file):
-                    return file
-                case .missing(path: _):
-                    return nil
-                }
-            }
-            guard let file = try file.openReadCached() else {
-                cached[key] = .missing(path: file.getFilePath())
-                return nil
-            }
-            cached[key] = .exists(file: file)
-            return file
-        }
+extension OmFileReader: GenericFileManagable where Backend == MmapFileCached {
+    static func open(from path: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
+        return try path.openReadCached()
     }
 }
 
@@ -184,16 +98,7 @@ fileprivate var buffers = [Thread: UnsafeMutableRawBufferPointer]()
 /// Thread safe access to buffers
 fileprivate let lockBuffers = NIOLock()
 
-extension OmFileReader {
-    /// Basic buffer usage statistics
-    public static func getStatistics() -> (count: Int, totalSize: Int, maxSize: Int) {
-        return lockBuffers.withLock {
-            let total = buffers.reduce(0, {$0 + $1.value.count})
-            let max = buffers .max(by: {$0.value.count > $1.value.count})?.value.count ?? 0
-            return (buffers.count, total, max)
-        }
-    }
-    
+extension OmFileReader {    
     /// Thread safe buffer provider that automatically reallocates buffers
     public static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
         return lockBuffers.withLock {

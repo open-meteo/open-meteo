@@ -23,6 +23,12 @@ extension HTTPClientResponse {
             .gatewayTimeout
         ].contains(status)
     }
+
+    func throwOnFatalError() throws {
+        if status == .unauthorized {
+            throw CurlError.unauthorized
+        }
+    }
 }
 
 extension HTTPClient {
@@ -40,14 +46,19 @@ extension HTTPClient {
         let startTime = Date()
         var n = 0
         while true {
-            n += 1
             do {
+                n += 1
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
+                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status), from URL \(request.url)")
                 try response.throwOnTransientError()
+                try response.throwOnFatalError()
                 if error404WaitTime != nil && response.status == .notFound {
                     throw CurlError.fileNotFound
                 }
                 return response
+            } catch CurlError.unauthorized {
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key.")
+                throw CurlError.unauthorized
             } catch {
                 var wait = TimeAmount.nanoseconds(min(backoffFactor.nanoseconds * Int64(pow(2, Double(n-1))), backoffMaximum.nanoseconds))
                 
@@ -69,7 +80,7 @@ extension HTTPClient {
                     logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]'")
                     throw CurlError.timeoutReached
                 }
-                try await _Concurrency.Task.sleep(nanoseconds: 0)
+                try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
             }
         }
     }

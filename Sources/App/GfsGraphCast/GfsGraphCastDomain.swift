@@ -27,6 +27,10 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         return 6*3600
     }
     
+    var updateIntervalSeconds: Int {
+        return 6*3600
+    }
+    
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
@@ -35,7 +39,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     }
     
     func forecastHours(run: Int) -> [Int] {
-        return Array(stride(from: 6, through: 240, by: 6))
+        return Array(stride(from: 6, through: 384, by: 6))
     }
     
     var levels: [Int] {

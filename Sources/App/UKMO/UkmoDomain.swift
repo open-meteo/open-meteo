@@ -75,6 +75,15 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         return 1
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .global_deterministic_10km:
+            return 6*3600
+        case .uk_deterministic_2km:
+            return 3600
+        }
+    }
+    
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()

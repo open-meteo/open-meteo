@@ -317,7 +317,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .relative_humidity_2m:
             return (0, 100) // fraction to %
         case .precipitation, .rain, .snowfall_water_equivalent, .showers, .hail:
-            return (0, 100) // m to mm
+            return (0, 1000) // m to mm
         case .uv_index:
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv

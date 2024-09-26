@@ -51,6 +51,15 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
         }
     }
     
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .mfwave:
+            return 12*3600
+        case .mfcurrents:
+            return 24*3600
+        }
+    }
+    
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {

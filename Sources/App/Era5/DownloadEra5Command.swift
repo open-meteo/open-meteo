@@ -23,7 +23,7 @@ struct DownloadEra5Command: AsyncCommand {
         @Option(name: "prefetch-factor", short: "p", help: "Prefetch factor for bias calculation. Default 2")
         var prefetchFactor: Int?
         
-        @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
+        @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
         
         @Option(name: "email", help: "Email for the ECMWF API service")
@@ -114,8 +114,7 @@ struct DownloadEra5Command: AsyncCommand {
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: concurrent)
-        
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: {$0.time < $1.time})?.time ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
@@ -223,6 +222,8 @@ struct DownloadEra5Command: AsyncCommand {
                 struct Query: Encodable {
                     let product_type = "reanalysis"
                     let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
                     let variable = ["significant_height_of_combined_wind_waves_and_swell"]
                     let time = "00:00"
                     let day = "01"
@@ -250,6 +251,8 @@ struct DownloadEra5Command: AsyncCommand {
                 struct Query: Encodable {
                     let product_type: String
                     let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
                     let variable = ["geopotential", "land_sea_mask", "soil_type"]
                     let time = "00:00"
                     let day = "01"
@@ -271,6 +274,8 @@ struct DownloadEra5Command: AsyncCommand {
                     let data_type = "reanalysis"
                     let level_type = "surface_or_atmosphere"
                     let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
                     let variable = ["land_sea_mask", "orography"] //, "soil_type"]
                     let time = "00:00"
                     let day = "21"
@@ -283,18 +288,32 @@ struct DownloadEra5Command: AsyncCommand {
             try await client.shutdown()
         }
         
+        try Self.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted().map{$0}, createNetCdf: false, shift180LongitudeAndFlipLatitude: domain.isGlobal && domain != .ecmwf_ifs)
+        
+        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
+        if let tempDownloadGribFile2 {
+            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile2)
+        }
+        if let tempDownloadGribFile3 {
+            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile3)
+        }
+    }
+    
+    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, shift180LongitudeAndFlipLatitude: Bool) throws {
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            return
+        }
+        try domain.surfaceElevationFileOm.createDirectory()
+        
         var landmask: [Float]? = nil
         var elevation: [Float]? = nil
         var soilType: [Float]? = nil
-        for file in [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted() {
+        for file in files {
             try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
                 var data = try message.getDouble().map(Float.init)
-                if domain.isGlobal && domain != .ecmwf_ifs {
-                    data.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-                }
                 switch shortName {
-                case "orog":
+                case "orog", "mterh":
                     elevation = data
                 case "z":
                     data.multiplyAdd(multiply: 1/9.80665, add: 0)
@@ -323,11 +342,6 @@ struct DownloadEra5Command: AsyncCommand {
             try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
         }
         
-        /*let a1 = Array2DFastSpace(data: elevation, nLocations: domain.grid.count, nTime: 1)
-        try a1.writeNetcdf(filename: "\(downloadDir)/elevation_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-        let a2 = Array2DFastSpace(data: landmask, nLocations: domain.grid.count, nTime: 1)
-        try a2.writeNetcdf(filename: "\(downloadDir)/landmask_converted.nc", nx: domain.grid.nx, ny: domain.grid.ny)*/
-        
         // Set all sea grid points to -999
         precondition(elevation.count == landmask.count)
         for i in elevation.indices {
@@ -335,16 +349,14 @@ struct DownloadEra5Command: AsyncCommand {
                 elevation[i] = -999
             }
         }
+        
+        if createNetCdf {
+            let file = domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc")
+            let elevation = Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny)
+            try elevation.writeNetcdf(filename: file)
+        }
 
         try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
-        
-        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
-        if let tempDownloadGribFile2 {
-            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile2)
-        }
-        if let tempDownloadGribFile3 {
-            try FileManager.default.removeItemIfExists(at: tempDownloadGribFile3)
-        }
     }
     
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
@@ -387,6 +399,8 @@ struct DownloadEra5Command: AsyncCommand {
     struct CdsQuery: Encodable {
         let product_type: [String]
         let format = "grib"
+        let data_format = "grib"
+        let download_format = "unarchived"
         let year: String
         let month: String
         let day: String
@@ -695,6 +709,8 @@ struct DownloadEra5Command: AsyncCommand {
         struct CdsQuery: Encodable {
             let product_type: [String]
             let format = "grib"
+            let data_format = "grib"
+            let download_format = "unarchived"
             let level_type: String?
             let data_type = "reanalysis"
             let height_level: String?

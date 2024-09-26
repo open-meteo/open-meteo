@@ -172,6 +172,8 @@ struct MetNoDownloader: AsyncCommand {
                 try spatial.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", nx: nx, ny: ny)
             }
         }
+        
+        try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: nTime * domain.dtSeconds))
     }
 }
 

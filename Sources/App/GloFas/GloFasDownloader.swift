@@ -20,7 +20,7 @@ struct GloFasDownloader: AsyncCommand {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
-        @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
+        @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
         
         @Option(name: "ftpuser", short: "u", help: "Username for the ECMWF CAMS FTP server")
@@ -240,7 +240,8 @@ struct GloFasDownloader: AsyncCommand {
     
     struct GlofasQuery: Encodable {
         let system_version: String
-        let format = "grib"
+        let data_format = "grib"
+        let download_format = "unarchived"
         let variable = "river_discharge_in_the_last_24_hours"
         let hyear: String
         let hmonth: [String]
@@ -576,6 +577,27 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
             return 60
         case .seasonal:
             return 215
+        }
+    }
+    
+    var updateIntervalSeconds: Int {
+        switch self {
+        case .forecast:
+            return 12*3600
+        case .consolidated:
+            return 0
+        case .seasonal:
+            return 12*3600
+        case .intermediate:
+            return 0
+        case .forecastv3:
+            return 12*3600
+        case .consolidatedv3:
+            return 0
+        case .seasonalv3:
+            return 12*3600
+        case .intermediatev3:
+            return 0
         }
     }
 }

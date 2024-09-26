@@ -4,11 +4,14 @@ import Vapor
 
 struct DemController {
     struct Query: Content {
-        let latitude: [Float]
-        let longitude: [Float]
+        let latitude: [String]
+        let longitude: [String]
         let apikey: String?
         
-        func validate() throws {
+        func validate() throws -> (latitude: [Float], longitude: [Float]) {
+            let latitude = try Float.load(commaSeparated: self.latitude)
+            let longitude = try Float.load(commaSeparated: self.longitude)
+            
             guard latitude.count == longitude.count else {
                 throw ForecastapiError.latitudeAndLongitudeSameCount
             }
@@ -26,6 +29,7 @@ struct DemController {
                     throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
                 }
             }
+            return (latitude, longitude)
         }
     }
 
@@ -34,11 +38,11 @@ struct DemController {
         let params = req.method == .POST ? try req.content.decode(Query.self) : try req.query.decode(Query.self)
         try await req.ensureApiKey("api", apikey: params.apikey)
         
-        try params.validate()
+        let (latitude, longitude) = try params.validate()
         await req.incrementRateLimiter(weight: 1)
         // Run query on separat thread pool to not block the main pool
         return try await ForecastapiController.runLoop.next().submit({
-            let elevation = try zip(params.latitude, params.longitude).map { (latitude, longitude) in
+            let elevation = try zip(latitude, longitude).map { (latitude, longitude) in
                 try Dem90.read(lat: latitude, lon: longitude)
             }
             var headers = HTTPHeaders()

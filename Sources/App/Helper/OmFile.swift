@@ -38,10 +38,10 @@ struct OmFileSplitter {
         max(6, 3072 / nTimePerFile)
     }
     
-    init<Domain: GenericDomain>(_ domain: Domain, nMembers: Int? = nil, chunknLocations: Int? = nil) {
+    init<Domain: GenericDomain>(_ domain: Domain, nLocations: Int? = nil, nMembers: Int? = nil, chunknLocations: Int? = nil) {
         self.init(
             domain: domain.domainRegistry,
-            nLocations: domain.grid.count * max(nMembers ?? 1, 1),
+            nLocations: nLocations ?? (domain.grid.count * max(nMembers ?? 1, 1)),
             nTimePerFile: domain.omFileLength,
             hasYearlyFiles: domain.hasYearlyFiles,
             masterTimeRange: domain.masterTimeRange,
@@ -55,12 +55,12 @@ struct OmFileSplitter {
         self.nTimePerFile = nTimePerFile
         self.hasYearlyFiles = hasYearlyFiles
         self.masterTimeRange = masterTimeRange
-        self.chunknLocations = chunknLocations ?? Self.calcChunknLocations(nTimePerFile: nTimePerFile)
+        self.chunknLocations = chunknLocations ?? min(nLocations, Self.calcChunknLocations(nTimePerFile: nTimePerFile))
     }
     
     // optimise to use 8 MB memory, but aligned to even `chunknLocations`
     var nLocationsPerChunk: Int {
-        8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations
+        min(nLocations, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations)
     }
 
     /// Prefetch all required data into memory

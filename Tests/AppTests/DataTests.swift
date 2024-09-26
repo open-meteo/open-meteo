@@ -12,6 +12,24 @@ final class DataTests: XCTestCase {
         #endif
     }
     
+    /*func testGribDecode() throws {
+        let file = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-010-7a527896970b09a4fc90fa37bf98d3ff-wvAa7C.grib"
+        //let file = "/Users/patrick/Downloads/Z__C_RJTD_20240909060000_MSM_GPV_Rjp_Lsurf_FH00-15_grib2.bin"
+        let data = try Data(contentsOf: URL(fileURLWithPath: file))
+        data.withUnsafeBytes({ ptr in
+            var offset = 0
+            while offset < ptr.count {
+                let mem = UnsafeRawBufferPointer(rebasing: ptr[offset..<ptr.count])
+                guard let s = GribAsyncStreamHelper.seekGrib(memory: mem) else {
+                    break
+                }
+                print(s)
+                offset += s.offset + s.length
+            }
+
+        })
+    }*/
+    
     /*func testGribStream() async throws {
         let url = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-009-d4755d5b313f7cded016e66ba0cd989b-hyELHH.grib"
         let fileSystem = FileSystem.shared

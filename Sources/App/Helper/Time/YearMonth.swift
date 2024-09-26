@@ -21,6 +21,11 @@ public struct YearMonth: Strideable, Comparable {
         self.monthsSince1970 = monthSince1970
     }
     
+    public init(timestamp: Timestamp) {
+        let components = timestamp.toComponents()
+        self.init(year: components.year, month: components.month)
+    }
+    
     public func distance(to other: YearMonth) -> Int {
         other.monthsSince1970 - monthsSince1970
     }

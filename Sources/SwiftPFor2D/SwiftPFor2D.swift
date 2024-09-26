@@ -463,6 +463,11 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     /// Number of elements to chunk in dimension 1. Must be lower or equals `chunk1`
     public let chunk1: Int
     
+    /// Number of elements in this file
+    public var count: Int {
+        return dim0 * dim1
+    }
+    
     public init(fn: Backend) throws {
         // Fetch header
         fn.preRead(offset: 0, count: OmHeader.length)
