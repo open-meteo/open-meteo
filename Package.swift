@@ -31,7 +31,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/google/flatbuffers.git", from: "24.3.25"),
-        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.15.0"),
+        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.16.0"),
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.1.2"),
