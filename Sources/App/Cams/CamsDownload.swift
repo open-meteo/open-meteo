@@ -18,7 +18,7 @@ struct DownloadCamsCommand: AsyncCommand {
         @Option(name: "only-variables")
         var onlyVariables: String?
         
-        @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
+        @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
         
         @Option(name: "ftpuser", short: "u", help: "Username for the ECMWF CAMS FTP server")
@@ -29,6 +29,9 @@ struct DownloadCamsCommand: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
     }
 
     var help: String {
@@ -47,6 +50,21 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let variables = onlyVariables ?? CamsVariable.allCases
         switch domain {
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+            guard let cdskey = signature.cdskey else {
+                fatalError("cds key is required")
+            }
+            if let timeinterval = signature.timeinterval {
+                let interval = try Timestamp.parseRange(yyyymmdd: timeinterval)
+                for month in YearMonth(timestamp: interval.lowerBound)..<YearMonth(timestamp: interval.upperBound) {
+                    let run = month.timestamp
+                    try await downloadCamsEuropeReanalysis(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+                    try convertCamsEuropeReanalysis(logger: logger, domain: domain, run: run, variables: variables)
+                }
+                return
+            }
+            try await downloadCamsEuropeReanalysis(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+            try convertCamsEuropeReanalysis(logger: logger, domain: domain, run: run, variables: variables)
         case .cams_global:
             guard let ftpuser = signature.ftpuser else {
                 fatalError("ftpuser is required")
@@ -56,12 +74,21 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             try await downloadCamsGlobal(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
             try convertCamsGlobal(logger: logger, domain: domain, run: run, variables: variables)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
+            if let timeinterval = signature.timeinterval {
+                for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400) {
+                    try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, forecastHours: 24)
+                    try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
+                }
+                return
+            }
+            try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, forecastHours: nil)
             try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
+            try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
         }
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -174,18 +201,126 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     struct CamsEuropeQuery: Encodable {
-        let model = "ensemble"
-        let date: String
-        let type = "forecast"
-        let format = "netcdf"
+        let model = ["ensemble"]
+        let date: String?
+        let type: [String]
+        let data_format: String?
         let variable: [String]
-        let level = "0"
-        let time: String
-        let leadtime_hour: [String]
+        let level = ["0"]
+        let time: String?
+        let leadtime_hour: [String]?
+        let year: [String]?
+        let month: [String]?
+    }
+    
+    /// Download one month of reanalysis data as a zipped NetCDF file
+    func downloadCamsEuropeReanalysis(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) async throws {
+        
+        let type: String
+        let type2: String
+        switch domain {
+        case .cams_europe_reanalysis_validated:
+            type = "validated_reanalysis"
+            type2 = "vra"
+        case .cams_europe_reanalysis_interim:
+            type = "interim_reanalysis"
+            type2 = "ira"
+        default:
+            fatalError()
+        }
+        
+        let logger = application.logger
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+        let date = run.toComponents()
+        
+        for variable in variables {
+            guard let meta = variable.getCamsEuMeta(), let fname = meta.reanalysisFileName else {
+                continue
+            }
+            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+            let downloadFile = "\(domain.downloadDirectory)download.nc.zip"
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.\(date.year)-\(date.month.zeroPadded(len: 2)).nc"
+            
+            if FileManager.default.fileExists(atPath: targetFile) {
+                continue
+            }
+            let query = CamsEuropeQuery(
+                date: nil,
+                type: [type],
+                data_format: nil,
+                variable: [meta.apiName],
+                time: nil,
+                leadtime_hour: nil,
+                year: [String(date.year)],
+                month: [date.month.zeroPadded(len: 2)]
+            )
+            
+            do {
+                try await curl.downloadCdsApi(
+                    dataset: "cams-europe-air-quality-reanalyses",
+                    query: query,
+                    apikey: cdskey,
+                    server: "https://ads-beta.atmosphere.copernicus.eu/api",
+                    destinationFile: downloadFile
+                )
+                try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
+            } catch {
+                logger.info("Ignoring error \(error)")
+                continue
+            }
+        }
+    }
+    
+    /// Process each variable and update time-series optimised files
+    func convertCamsEuropeReanalysis(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
+        let om = OmFileSplitter(domain)
+        
+        let type2: String
+        switch domain {
+        case .cams_europe_reanalysis_validated:
+            type2 = "vra"
+        case .cams_europe_reanalysis_interim:
+            type2 = "ira"
+        default:
+            fatalError()
+        }
+        let date = run.toComponents()
+        
+        for variable in variables {
+            guard let meta = variable.getCamsEuMeta(), let fname = meta.reanalysisFileName else {
+                continue
+            }
+            let targetFile = "\(domain.downloadDirectory)cams.eaq.\(type2).ENSa.\(fname).l0.\(date.year)-\(date.month.zeroPadded(len: 2)).nc"
+            guard let ncFile = try NetCDF.open(path: targetFile, allowUpdate: false) else {
+                logger.info("Missing file, skipping. \(targetFile)")
+                continue
+            }
+            
+            logger.info("Converting \(variable)")
+            guard let ncVar = ncFile.getVariable(name: fname) else {
+                fatalError("Could not open variable \(fname)")
+            }
+            guard let ncFloat = ncVar.asType(Float.self) else {
+                fatalError("Could not open float variable \(fname)")
+            }
+            let nTime = ncVar.dimensions.first!.length
+            var data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: nTime).transpose()
+            for i in data2d.data.indices {
+                if data2d.data[i] <= -999 {
+                    data2d.data[i] = .nan
+                }
+            }
+            
+            logger.info("Create om file")
+            let startOm = DispatchTime.now()
+            let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
+            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast)
+            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
+        }
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String) async throws {
+    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String, forecastHours: Int?) async throws {
         
         let logger = application.logger
         
@@ -195,13 +330,17 @@ struct DownloadCamsCommand: AsyncCommand {
         if skipFilesIfExisting && FileManager.default.fileExists(atPath: downloadFile) {
             return
         }
-        
+        let forecastHours = forecastHours ?? domain.forecastHours
         let date = run.iso8601_YYYY_MM_dd
         let query = CamsEuropeQuery(
             date: "\(date)/\(date)",
+            type: ["forecast"],
+            data_format: "netcdf",
             variable: variables.compactMap { $0.getCamsEuMeta()?.apiName },
             time: "\(run.hour.zeroPadded(len: 2)):00",
-            leadtime_hour: (0..<domain.forecastHours).map(String.init)
+            leadtime_hour: (0..<forecastHours).map(String.init),
+            year: nil,
+            month: nil
         )
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
@@ -211,7 +350,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 dataset: "cams-europe-air-quality-forecasts",
                 query: query,
                 apikey: cdskey,
-                server: "https://ads.atmosphere.copernicus.eu/api/v2",
+                server: "https://ads-beta.atmosphere.copernicus.eu/api",
                 destinationFile: downloadFile
             )
         } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
@@ -243,7 +382,8 @@ struct DownloadCamsCommand: AsyncCommand {
             guard let ncFloat = ncVar.asType(Float.self) else {
                 fatalError("Could not open float variable \(meta.gribName)")
             }
-            var data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: domain.forecastHours).transpose()
+            let nTime = ncVar.dimensions.first!.length
+            var data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: nTime).transpose()
             for i in data2d.data.indices {
                 if data2d.data[i] <= -999 {
                     data2d.data[i] = .nan

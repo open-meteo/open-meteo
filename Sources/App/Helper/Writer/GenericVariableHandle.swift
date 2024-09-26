@@ -39,7 +39,7 @@ struct GenericVariableHandle {
         if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10" ].contains($0.variable.omFileName.file)}) {
             let end = handles.max(by: {$0.time < $1.time})?.time.add(domain.dtSeconds) ?? Timestamp(0)
             
-            let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
+            //let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
             
             // generate model update timeseries
             //let range = TimerangeDt(start: run, to: end, dtSeconds: domain.dtSeconds)

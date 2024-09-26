@@ -53,7 +53,7 @@ extension Curl {
         request.body = .bytes(ByteBuffer(data: try JSONEncoder().encode(query)))
         
         let response = try await client.executeRetry(request, logger: logger, deadline: .hours(6))
-        guard let job = try await response.readJSONDecodable(EcmwfApiResponse.self) else {
+        guard let job = try await response.checkCode200AndReadJSONDecodable(EcmwfApiResponse.self) else {
             let error = try await response.readStringImmutable() ?? ""
             fatalError("Could not decode \(error)")
         }
@@ -114,13 +114,29 @@ extension Curl {
 }
 
 extension HTTPClientResponse {
-    public func readJSONDecodable<T: Decodable>(_ type: T.Type) async throws -> T? {
-        var a = try await self.body.collect(upTo: 1024*1024)
+    public func checkCode200AndReadJSONDecodable<T: Decodable>(_ type: T.Type, upTo: Int = 1024*1024) async throws -> T? {
+        guard (200..<300).contains(status.code) else {
+            if let error = try await readStringImmutable() {
+                print(error)
+            }
+            fatalError("ERROR: Response code \(status.code)")
+        }
+        return try await readJSONDecodable(type, upTo: upTo)
+    }
+    
+    public func readJSONDecodable<T: Decodable>(_ type: T.Type, upTo: Int = 1024*1024) async throws -> T? {
+        var a = try await self.body.collect(upTo: upTo)
+        if a.readableBytes == upTo {
+            fatalError("Response size too large")
+        }
         return try a.readJSONDecodable(type, length: a.readableBytes)
     }
     
-    public func readStringImmutable() async throws -> String? {
-        var b = try await self.body.collect(upTo: 1024*1024)
+    public func readStringImmutable(upTo: Int = 1024*1024) async throws -> String? {
+        var b = try await self.body.collect(upTo: upTo)
+        if b.readableBytes == upTo {
+            fatalError("Response size too large")
+        }
         return b.readString(length: b.readableBytes)
     }
 }

@@ -40,6 +40,28 @@ extension CamsVariable: FlatBuffersVariable {
             return .init(variable: .olivePollen)
         case .ragweed_pollen:
             return .init(variable: .ragweedPollen)
+        case .formaldehyde:
+            return .init(variable: .formaldehyde)
+        case .glyoxal:
+            return .init(variable: .glyoxal)
+        case .non_methane_volatile_organic_compounds:
+            return .init(variable: .nonMethaneVolatileOrganicCompounds)
+        case .pm10_wildfires:
+            return .init(variable: .pm10Wildfires)
+        case .peroxyacyl_nitrates:
+            return .init(variable: .peroxyacylNitrates)
+        case .secondary_inorganic_aerosol:
+            return .init(variable: .secondaryInorganicAerosol)
+        case .residential_elementary_carbon:
+            return .init(variable: .residentialElementaryCarbon)
+        case .total_elementary_carbon:
+            return .init(variable: .totalElementaryCarbon)
+        case .pm2_5_total_organic_matter:
+            return .init(variable: .pm25TotalOrganicMatter)
+        case .sea_salt_aerosol:
+            return .init(variable: .seaSaltAerosol)
+        case .nitrogen_monoxide:
+            return .init(variable: .nitrogenMonoxide)
         }
     }
 }

@@ -23,7 +23,7 @@ struct DownloadEra5Command: AsyncCommand {
         @Option(name: "prefetch-factor", short: "p", help: "Prefetch factor for bias calculation. Default 2")
         var prefetchFactor: Int?
         
-        @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
+        @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
         
         @Option(name: "email", help: "Email for the ECMWF API service")
@@ -222,6 +222,8 @@ struct DownloadEra5Command: AsyncCommand {
                 struct Query: Encodable {
                     let product_type = "reanalysis"
                     let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
                     let variable = ["significant_height_of_combined_wind_waves_and_swell"]
                     let time = "00:00"
                     let day = "01"
@@ -249,6 +251,8 @@ struct DownloadEra5Command: AsyncCommand {
                 struct Query: Encodable {
                     let product_type: String
                     let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
                     let variable = ["geopotential", "land_sea_mask", "soil_type"]
                     let time = "00:00"
                     let day = "01"
@@ -270,6 +274,8 @@ struct DownloadEra5Command: AsyncCommand {
                     let data_type = "reanalysis"
                     let level_type = "surface_or_atmosphere"
                     let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
                     let variable = ["land_sea_mask", "orography"] //, "soil_type"]
                     let time = "00:00"
                     let day = "21"
@@ -393,6 +399,8 @@ struct DownloadEra5Command: AsyncCommand {
     struct CdsQuery: Encodable {
         let product_type: [String]
         let format = "grib"
+        let data_format = "grib"
+        let download_format = "unarchived"
         let year: String
         let month: String
         let day: String
@@ -701,6 +709,8 @@ struct DownloadEra5Command: AsyncCommand {
         struct CdsQuery: Encodable {
             let product_type: [String]
             let format = "grib"
+            let data_format = "grib"
+            let download_format = "unarchived"
             let level_type: String?
             let data_type = "reanalysis"
             let height_level: String?
