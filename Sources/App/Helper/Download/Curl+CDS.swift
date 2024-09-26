@@ -165,7 +165,7 @@ extension Curl {
     /**
      Get GRIB data from the CDS API
      */
-    func withCdsApi<Query: Encodable, T>(dataset: String, query: Query, apikey: String, server: String = "https://cds-beta.climate.copernicus.eu/api", body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+    func withCdsApi<Query: Encodable, T>(dataset: String, query: Query, apikey: String, server: String = "https://cds.climate.copernicus.eu/api", body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         
         let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
         let results = try await waitForCdsJob(job: job, apikey: apikey, server: server)
@@ -177,7 +177,7 @@ extension Curl {
     /**
      Get GRIB data from the CDS API and store to file
      */
-    func downloadCdsApi<Query: Encodable>(dataset: String, query: Query, apikey: String, server: String = "https://cds-beta.climate.copernicus.eu/api", destinationFile: String) async throws {
+    func downloadCdsApi<Query: Encodable>(dataset: String, query: Query, apikey: String, server: String = "https://cds.climate.copernicus.eu/api", destinationFile: String) async throws {
         
         let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
         let results = try await waitForCdsJob(job: job, apikey: apikey, server: server)
@@ -195,7 +195,7 @@ extension Curl {
         request.headers.add(name: "content-type", value: "application/json")
         request.body = .bytes(ByteBuffer(data: try JSONEncoder().encode(["inputs": query])))
         
-        let response = try await client.executeRetry(request, logger: logger, deadline: .hours(6), error404WaitTime: .minutes(15))
+        let response = try await client.executeRetry(request, logger: logger, deadline: .hours(6))
         guard let job = try await response.checkCode200AndReadJSONDecodable(CdsApiResponse.self) else {
             let error = try await response.readStringImmutable() ?? ""
             fatalError("Could not decode \(error)")
@@ -216,7 +216,7 @@ extension Curl {
                 var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)")
                 request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
                 /// CDS may return error 404 from time to time......
-                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1), error404WaitTime: .minutes(15))
+                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
                 guard let jobNext = try await response.checkCode200AndReadJSONDecodable(CdsApiResponse.self) else {
                     let error = try await response.readStringImmutable() ?? ""
                     fatalError("Could not decode \(error)")
@@ -225,7 +225,7 @@ extension Curl {
             case .failed:
                 var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)/results")
                 request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
-                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1), error404WaitTime: .minutes(15))
+                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
                 guard let results = try await response.readJSONDecodable(CdsApiResultsError.self) else {
                     let error = try await response.readStringImmutable() ?? ""
                     fatalError("Could not decode \(error)")
@@ -237,7 +237,7 @@ extension Curl {
             case .successful:
                 var request = HTTPClientRequest(url: "\(server)/retrieve/v1/jobs/\(job.jobID)/results")
                 request.headers.add(name: "PRIVATE-TOKEN", value: apikey)
-                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1), error404WaitTime: .minutes(15))
+                let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
                 guard let results = try await response.checkCode200AndReadJSONDecodable(CdsApiResults.self) else {
                     let error = try await response.readStringImmutable() ?? ""
                     fatalError("Could not decode \(error)")

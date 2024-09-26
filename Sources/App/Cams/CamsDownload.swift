@@ -260,7 +260,7 @@ struct DownloadCamsCommand: AsyncCommand {
                     dataset: "cams-europe-air-quality-reanalyses",
                     query: query,
                     apikey: cdskey,
-                    server: "https://ads-beta.atmosphere.copernicus.eu/api",
+                    server: "https://ads.atmosphere.copernicus.eu/api",
                     destinationFile: downloadFile
                 )
                 try Process.spawn(cmd: "unzip", args: ["-od", domain.downloadDirectory, downloadFile])
@@ -350,7 +350,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 dataset: "cams-europe-air-quality-forecasts",
                 query: query,
                 apikey: cdskey,
-                server: "https://ads-beta.atmosphere.copernicus.eu/api",
+                server: "https://ads.atmosphere.copernicus.eu/api",
                 destinationFile: downloadFile
             )
         } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
