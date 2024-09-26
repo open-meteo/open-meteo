@@ -20,7 +20,7 @@ struct GloFasDownloader: AsyncCommand {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
-        @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
+        @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
         
         @Option(name: "ftpuser", short: "u", help: "Username for the ECMWF CAMS FTP server")

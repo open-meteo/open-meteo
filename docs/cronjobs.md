@@ -125,8 +125,8 @@ Notes:
 - ECMWF IFS requires an ECMWF API account. This is not publicly available and involves licenses cost.
 
 ```bash
-30 0 * * * /usr/local/bin/openmeteo-api download-era5 era5 --cdskey 10xxxx:8exxxxxxx > ~/log/era5.log 2>&1 || cat ~/log/era5.log
-0  0 * * * /usr/local/bin/openmeteo-api download-era5 era5_land --cdskey 10xxxx:8exxxxxxx > ~/log/era5_land.log 2>&1 || cat ~/log/era5_land.log
+30 0 * * * /usr/local/bin/openmeteo-api download-era5 era5 --cdskey xxxxxx-xxxx-xxx... > ~/log/era5.log 2>&1 || cat ~/log/era5.log
+0  0 * * * /usr/local/bin/openmeteo-api download-era5 era5_land --cdskey xxxxxx-xxxx-xxx... > ~/log/era5_land.log 2>&1 || cat ~/log/era5_land.log
 1  1 * * * /usr/local/bin/openmeteo-api download-era5 ecmwf_ifs --cdskey xxxxxxx --email xxxxxxxx > ~/log/ecmwf_archive.log 2>&1 || cat ~/log/ecmwf_archive.log
 ```
 
@@ -141,7 +141,7 @@ Note:
 30  3,15 * * * /usr/local/bin/openmeteo-api download-iconwave ewam > ~/log/iconwave_ewam.log 2>&1 || cat ~/log/iconwave_ewam.log
 
 # ERA5 Ocean
-30 0 * * * /usr/local/bin/openmeteo-api download-era5 era5_ocean --only-variables wave_height,wave_direction,wave_period --cdskey 10xxxx:8ecxxxx > ~/log/era5_ocean.log 2>&1 || cat ~/log/era5_ocean.log
+30 0 * * * /usr/local/bin/openmeteo-api download-era5 era5_ocean --only-variables wave_height,wave_direction,wave_period --cdskey xxxxxx-xxxx-xxx... > ~/log/era5_ocean.log 2>&1 || cat ~/log/era5_ocean.log
 
 # ECMWF WAM
 45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025 > ~/log/ecmwf_wam025.log 2>&1 || cat ~/log/ecmwf_wam025.log
@@ -165,7 +165,7 @@ Note:
 
 ```bash
 30 8,20 * * * /usr/local/bin/openmeteo-api download-cams cams_global --ftpuser xxxxx --ftppassword xxxxx > ~/log/cams_global.log 2>&1 || cat ~/log/cams_global.log
-30 9 * * * /usr/local/bin/openmeteo-api download-cams cams_europe --cdskey 10xxxx:2bb439xxxxxx > ~/log/cams_europe.log 2>&1 || cat ~/log/cams_europe.log
+30 9 * * * /usr/local/bin/openmeteo-api download-cams cams_europe --cdskey xxxxxx-xxxx-xxx... > ~/log/cams_europe.log 2>&1 || cat ~/log/cams_europe.log
 ```
 
 ## Floods

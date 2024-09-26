@@ -23,7 +23,7 @@ struct DownloadEra5Command: AsyncCommand {
         @Option(name: "prefetch-factor", short: "p", help: "Prefetch factor for bias calculation. Default 2")
         var prefetchFactor: Int?
         
-        @Option(name: "cdskey", short: "k", help: "CDS API user and key like: 123456:8ec08f...")
+        @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
         
         @Option(name: "email", help: "Email for the ECMWF API service")
