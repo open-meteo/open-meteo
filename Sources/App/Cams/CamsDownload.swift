@@ -377,7 +377,8 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             logger.info("Converting \(variable)")
             guard let ncVar = ncFile.getVariable(name: meta.gribName) else {
-                fatalError("Could not open variable \(meta.gribName)")
+                logger.warning("Could not open variable '\(meta.gribName)'")
+                continue
             }
             guard let ncFloat = ncVar.asType(Float.self) else {
                 fatalError("Could not open float variable \(meta.gribName)")
