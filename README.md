@@ -42,7 +42,7 @@ Apps:
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
-- [omWeather](https://github.com/woheller69/omweather) Android Weather App
+- [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
 - [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
