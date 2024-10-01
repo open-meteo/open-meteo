@@ -33,6 +33,8 @@ public final class OmFileEncoder {
     /// Position of last chunk that has been written
     public var chunkIndex: Int = 0
 
+    /// This might be hard coded to 256 in later versions
+    let lutChunkElementCount: Int
     
     /// Return the total number of chunks in this file
     func number_of_chunks() -> Int {
@@ -51,7 +53,7 @@ public final class OmFileEncoder {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public init(dimensions: [Int], chunkDimensions: [Int], compression: CompressionType, scalefactor: Float) {
+    public init(dimensions: [Int], chunkDimensions: [Int], compression: CompressionType, scalefactor: Float, lutChunkElementCount: Int = 256) {
         var nChunks = 1
         for i in 0..<dimensions.count {
             nChunks *= dimensions[i].divideRoundedUp(divisor: chunkDimensions[i])
@@ -73,6 +75,7 @@ public final class OmFileEncoder {
         // Read buffer needs to be a bit larger for AVX 256 bit alignment
         self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
         self.writeBuffer = .allocate(capacity: max(1024 * 1024, bufferSize))
+        self.lutChunkElementCount = lutChunkElementCount
     }
     
     public func writeHeader<FileHandle: OmFileWriterBackend>(fn: FileHandle) throws {
@@ -114,28 +117,35 @@ public final class OmFileEncoder {
         //print("LUT start \(lutStart), \(chunkOffsetBytes)")
         let lutChunkLength = chunkOffsetBytes.withUnsafeBytes({
             var maxLength = 0
-            let indexChunkLength = 256
-            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: indexChunkLength) {
-                let rangeStart = i*indexChunkLength
-                let rangeEnd = min((i+1)*indexChunkLength, chunkOffsetBytes.count)
-                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.assumingMemoryBound(to: UInt64.self).baseAddress), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
+            
+            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount) {
+                let rangeStart = i*lutChunkElementCount
+                let rangeEnd = min((i+1)*lutChunkElementCount, chunkOffsetBytes.count)
+                //print(rangeStart..<rangeEnd)
+                //print(chunkOffsetBytes[rangeStart..<rangeEnd])
+                
+                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
                 if len > maxLength { maxLength = len }
-                //print(len)
+                print(len)
             }
-            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: indexChunkLength) {
-                let rangeStart = i*indexChunkLength
-                let rangeEnd = min((i+1)*indexChunkLength, chunkOffsetBytes.count)
-                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.assumingMemoryBound(to: UInt64.self).baseAddress), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
+            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount) {
+                let rangeStart = i*lutChunkElementCount
+                let rangeEnd = min((i+1)*lutChunkElementCount, chunkOffsetBytes.count)
+                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
                 writeBufferPos += maxLength
                 totalBytesWritten += maxLength
             }
-            //print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: indexChunkLength))
+            print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount))
             //memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             //return $0.count
             return maxLength
         })
         //writeBufferPos += len
         //totalBytesWritten += len
+        
+        // TODO proper AVX alignment for PFor
+        writeBufferPos += 256
+        totalBytesWritten += 256
         
         // TODO: pad to 64 bit
         
