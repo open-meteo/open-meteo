@@ -597,7 +597,9 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     dimReadOffset: [dim0Read.lowerBound, dim1Read.lowerBound],
                     dimReadCount: [dim0Read.count, dim1Read.count],
                     intoCoordLower: [0, arrayDim1Range.lowerBound],
-                    intoCubeDimension: [dim0Read.count, arrayDim1Length]
+                    intoCubeDimension: [dim0Read.count, arrayDim1Length],
+                    lutChunkLength: 8,
+                    lutChunkElementCount: 1
                 )
                 r.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer)
                 

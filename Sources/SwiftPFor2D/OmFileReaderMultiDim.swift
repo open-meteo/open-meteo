@@ -25,7 +25,11 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
     /// How the dimensions are chunked
     let chunks: [Int]
     
+    /// The offset position of the beignning of the LUT
     let lutStart: Int
+    
+    /// How long a chunk inside the LUT is after compression
+    let lutChunkLength: Int
     
     public static func open_file(fn: Backend) -> Self {
         // read header
@@ -37,21 +41,22 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
         return fn.withUnsafeBytes({ptr in
             
             let lutStart = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
-            let nDims = ptr.baseAddress!.advanced(by: fn.count - 16).assumingMemoryBound(to: Int.self).pointee
+            let lutChunkLength = ptr.baseAddress!.advanced(by: fn.count - 16).assumingMemoryBound(to: Int.self).pointee
+            let nDims = ptr.baseAddress!.advanced(by: fn.count - 24).assumingMemoryBound(to: Int.self).pointee
             
             let dimensions = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
-                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 16 - 2*nDims*8), nDims*8)
+                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 24 - 2*nDims*8), nDims*8)
                 $1 = nDims
             })
             
             let chunks = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
-                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 16 - nDims*8), nDims*8)
+                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 24 - nDims*8), nDims*8)
                 $1 = nDims
             })
             
             //print(lutStart, nDims, dimensions, chunks)
             
-            return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart)
+            return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart, lutChunkLength: lutChunkLength)
         })
     }
     
@@ -67,7 +72,9 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             dimReadOffset: dimRead.map{$0.lowerBound},
             dimReadCount: dimRead.map{$0.count},
             intoCoordLower: intoCoordLower,
-            intoCubeDimension: intoCubeDimension
+            intoCubeDimension: intoCubeDimension,
+            lutChunkLength: lutChunkLength,
+            lutChunkElementCount: 256 // `1` if version <2
         )
         read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3, lutStart: lutStart)
         chunkBuffer.deallocate()
@@ -120,6 +127,12 @@ struct OmFileReadRequest {
     
     /// Maximum length of a return IO read
     let io_size_max: Int = 65536
+    
+    /// How long a chunk inside the LUT is after compression
+    let lutChunkLength: Int
+    
+    /// Number of elements in each LUT chunk
+    let lutChunkElementCount: Int
     
     /// Actually read data from a file. Merges IO for optimal sizes
     /// TODO: The read offset calculation is not ideal
@@ -184,6 +197,9 @@ struct OmFileReadRequest {
         
         var rangeEnd = chunkIndexStart.upperBound
         
+        /// The current read start position
+        let readStart = chunkIndexStart.lowerBound == 0 ? 0 : (chunkIndexStart.lowerBound-1) * 8
+        
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while true {
             var next = chunkIndex + 1
@@ -198,16 +214,22 @@ struct OmFileReadRequest {
             }
             nextChunkOut = next ..< rangeEnd
             
-            guard (next - chunkIndex)*8 <= io_size_merge, (next - chunkIndexStart.lowerBound)*8 <= io_size_max else {
+            /// The read end position if the current index would be read
+            let readEndNext = next * 8
+            
+            /// The read end potiions of the previous chunk index. Could be consecutive, or has a huge gap.
+            let readEndPrevious = chunkIndex * 8
+            
+            guard readEndNext - readEndPrevious <= io_size_merge, readEndNext - readStart <= io_size_max else {
                 // the next read would exceed IO limitons
                 break
             }
             chunkIndex = next
         }
         if chunkIndexStart.lowerBound == 0 {
-            return (0, (chunkIndex + 1) * 8, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
+            return (readStart, (chunkIndex + 1) * 8, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
         }
-        return ((chunkIndexStart.lowerBound-1) * 8, (chunkIndex - chunkIndexStart.lowerBound + 1) * 8, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
+        return (readStart, (chunkIndex - chunkIndexStart.lowerBound + 1) * 8, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
     }
     
     

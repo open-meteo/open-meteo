@@ -30,6 +30,18 @@ final class SwiftPFor2DTests: XCTestCase {
         XCTAssertEqual(writeLength, 4)
     }
     
+    
+    /*func testRead() throws {
+        // ERA5 temperature
+        let read = try OmFileReader(file: "/Users/patrick/Downloads/year_1983.om.download/year_1983.om")
+        //let a = try read.read(dim0Slow: 0..<5, dim1: 0..<5)
+        print(read.dim0, read.dim1, read.chunk0, read.chunk1)
+        // dims 6483600 8760
+        // chunks 6 504
+        // 18'781'857.12 chunks
+        // 143 MB index!
+    }*/
+    
     /// Make sure the last chunk has the correct number of chunks
     func testWriteMoreDataThenExpected() throws {
         let file = "writetest.om"
@@ -51,11 +63,11 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItem(atPath: "\(file)~")
     }
     
-    /*func testWriteLarge() throws {
+    func testWriteLarge() throws {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileEncoder(dimensions: [100,100,10], chunkDimensions: [10,10,10], compression: .p4nzdec256, scalefactor: 1)
+        let writer = OmFileEncoder(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
         let data = (0..<100000).map({Float($0 % 10000)})
@@ -66,7 +78,7 @@ final class SwiftPFor2DTests: XCTestCase {
                 
         let a = read.read([0..<100, 0..<100, 0..<10])
         XCTAssertEqual(a, data)
-    }*/
+    }
     
     func testWriteChunks() throws {
         let file = "writetest.om"
