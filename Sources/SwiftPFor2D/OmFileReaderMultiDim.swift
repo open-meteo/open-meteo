@@ -37,7 +37,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
     /// Offset in bytes of data
     let dataStart: Int
     
-    public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) -> Self {
+    public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) throws -> Self {
         // read header
         
         // switch version 2 and 3
@@ -47,9 +47,9 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
         //let lutStart = lutStart ?? OmHeader.length
         //let dataStart = version == 3 ? 3 : OmHeader.length + nChunks*8
         
-        return fn.withUnsafeBytes({ptr in
+        return try fn.withUnsafeBytes({ptr in
             
-            let lutStart = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
+            /*let lutStart = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
             let lutChunkLength = ptr.baseAddress!.advanced(by: fn.count - 16).assumingMemoryBound(to: Int.self).pointee
             let nDims = ptr.baseAddress!.advanced(by: fn.count - 24).assumingMemoryBound(to: Int.self).pointee
             
@@ -61,11 +61,31 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             let chunks = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
                 memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 24 - nDims*8), nDims*8)
                 $1 = nDims
-            })
+            })*/
+            
+            let jsonLength = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
+            let jsonData = Data(
+                bytesNoCopy: UnsafeMutableRawPointer(mutating: (ptr.baseAddress!.advanced(by: fn.count - 8 - jsonLength))),
+                count: jsonLength,
+                deallocator: .none
+            )
+            let json = try JSONDecoder().decode(OmFileJSON.self, from: jsonData)
+            // Just read the first variable. Ignoring the rest.
+            let variable = json.variables[0]
             
             //print(lutStart, nDims, dimensions, chunks)
             
-            return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart, lutChunkLength: lutChunkLength, lutChunkElementCount: lutChunkElementCount, dataStart: 3)
+            return OmFileDecoder(
+                fn: fn,
+                scalefactor: 1,
+                compression: .p4nzdec256,
+                dims: variable.dimensions,
+                chunks: variable.chunks,
+                lutStart: variable.lutOffset,
+                lutChunkLength: variable.lutChunkSize,
+                lutChunkElementCount: lutChunkElementCount,
+                dataStart: variable.dataOffset
+            )
         })
     }
     
@@ -186,7 +206,7 @@ struct OmFileReadRequest {
                     
                     // actually "read" compressed chunk data from file
                     //print("read data \(readDataInstruction)")
-                    let dataData = ptr.baseAddress!.advanced(by: dataStart + readDataInstruction.offset)
+                    let dataData = ptr.baseAddress!.advanced(by: /*dataStart +*/ readDataInstruction.offset)
                     
                     let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
                     if uncompressedSize != readDataInstruction.count {
@@ -311,7 +331,7 @@ struct OmFileReadRequest {
         //var uncompressedLutPreviousEnd = UInt64(0)
         
         /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-        let startPos = indexRange.lowerBound == 0 ? 0 : uncompressedLut[(dataStartChunk.lowerBound - 1) % lutChunkElementCount]
+        let startPos = indexRange.lowerBound == 0 ? UInt64(dataStart) : uncompressedLut[(dataStartChunk.lowerBound - 1) % lutChunkElementCount]
         
         /// For the unlucky case that only th last value of the LUT was required, we now have to decompress the next LUT
         if indexRange.lowerBound / lutChunkElementCount != lutChunk {

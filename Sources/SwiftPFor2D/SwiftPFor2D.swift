@@ -19,7 +19,7 @@ public enum SwiftPFor2DError: Error {
 }
 
 
-public enum CompressionType: UInt8 {
+public enum CompressionType: UInt8, Codable {
     /// Lossy compression using 2D delta coding and scalefactor
     case p4nzdec256 = 0
     
