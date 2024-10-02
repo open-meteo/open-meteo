@@ -162,7 +162,8 @@ struct OmFileReadRequest {
                 // actually "read" index data from file
                 print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
                 assert(readIndexInstruction.offset + readIndexInstruction.count <= lutTotalSize)
-                let indexData = ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
+                let indexData = UnsafeRawBufferPointer(rebasing: ptr[lutStart + readIndexInstruction.offset ..< lutStart + readIndexInstruction.offset + readIndexInstruction.count])
+                //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
                 //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
                       
                 
@@ -233,15 +234,13 @@ struct OmFileReadRequest {
             }
             chunkIndex = next
         }
-        if chunkIndexStart.lowerBound == 0 {
-            return (readStart, (chunkIndex + 1).divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
-        }
-        return (readStart, (chunkIndex - chunkIndexStart.lowerBound + 1).divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
+        let readEnd = (chunkIndex / lutChunkElementCount + 1) * lutChunkLength
+        return (readStart, readEnd - readStart, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
     }
     
     
     /// Data = index of global chunk num
-    public func get_next_data_read(chunkIndex dataStartChunk: Range<Int>, indexRange: Range<Int>, indexData: UnsafeRawPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
+    public func get_next_data_read(chunkIndex dataStartChunk: Range<Int>, indexRange: Range<Int>, indexData: UnsafeRawBufferPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
         var globalChunkNum = dataStartChunk.lowerBound
         var nextChunkOut: Range<Int>? = dataStartChunk
         
@@ -251,7 +250,7 @@ struct OmFileReadRequest {
         // index is a flat Int64 array
         //let data = indexData.assumingMemoryBound(to: Int.self)
         
-        let indexData = UnsafeMutablePointer(mutating: indexData.assumingMemoryBound(to: UInt8.self))
+        let indexDataPtr = UnsafeMutablePointer(mutating: indexData.baseAddress!.assumingMemoryBound(to: UInt8.self))
         
         /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
         //let startOffset = indexRange.lowerBound == 0 ? 1 : 0
@@ -267,10 +266,13 @@ struct OmFileReadRequest {
         if indexRange.lowerBound > 0 {
             lutChunk = (dataStartChunk.lowerBound - 1) / lutChunkElementCount
             let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks) - lutChunk * lutChunkElementCount
+            let start = lutChunk * self.lutChunkLength - (indexRange.lowerBound - 1) / lutChunkElementCount * self.lutChunkLength
+            assert(start >= 0)
+            assert(start + self.lutChunkLength <= indexData.count)
             uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                let _ = p4nddec64(indexData.advanced(by: lutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength), thisLutChunkElementCount, dest.baseAddress)
+                let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
             }
-            print("Initial LUT load \(uncompressedLut), \(thisLutChunkElementCount)")
+            print("Initial LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
         
         /// The last value for the previous LUT chunk
@@ -280,13 +282,16 @@ struct OmFileReadRequest {
         let startPos = indexRange.lowerBound == 0 ? 0 : uncompressedLut[(dataStartChunk.lowerBound - 1) % lutChunkElementCount]
         
         /// For the unlucky case that only th last value of the LUT was required, we now have to decompress the next LUT
-        if (indexRange.lowerBound - dataStartChunk.lowerBound) / lutChunkElementCount != lutChunk {
+        if indexRange.lowerBound / lutChunkElementCount != lutChunk {
             lutChunk = dataStartChunk.lowerBound / lutChunkElementCount
             let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks) - lutChunk * lutChunkElementCount
+            let start = lutChunk * self.lutChunkLength - (indexRange.lowerBound - 1) / lutChunkElementCount * self.lutChunkLength
+            assert(start >= 0)
+            assert(start + self.lutChunkLength <= indexData.count)
             uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                let _ = p4nddec64(indexData.advanced(by: lutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength), thisLutChunkElementCount, dest.baseAddress)
+                let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
             }
-            print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount)")
+            print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
         
         var endPos = uncompressedLut[(dataStartChunk.lowerBound) % lutChunkElementCount]
@@ -316,10 +321,13 @@ struct OmFileReadRequest {
             /// Maybe the next LUT chunk needs to be uncompressed
             if nextLutChunk != lutChunk {
                 let nextlutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, nChunks) - nextLutChunk * lutChunkElementCount
+                let start = nextLutChunk * self.lutChunkLength - (indexRange.lowerBound - 1) / lutChunkElementCount * self.lutChunkLength
+                assert(start >= 0)
+                assert(start + self.lutChunkLength <= indexData.count)
                 uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                    let _ = p4nddec64(indexData.advanced(by: nextLutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength), nextlutChunkElementCount, dest.baseAddress)
+                    let _ = p4nddec64(indexDataPtr.advanced(by: start), nextlutChunkElementCount, dest.baseAddress)
                 }
-                print("Next LUT load \(uncompressedLut), \(nextlutChunkElementCount)")
+                print("Next LUT load \(uncompressedLut), \(nextlutChunkElementCount), start=\(start)")
                 //print(uncompressedLut)
                 lutChunk = nextLutChunk
             }
