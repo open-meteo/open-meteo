@@ -37,12 +37,39 @@
       }
     },
     {
+      "identity" : "hdrhistogram-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/HdrHistogram/hdrhistogram-swift",
+      "state" : {
+        "revision" : "a69fa24d7b70421870cafa86340ece900489e17e",
+        "version" : "0.1.2"
+      }
+    },
+    {
       "identity" : "multipart-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/multipart-kit.git",
       "state" : {
         "revision" : "a31236f24bfd2ea2f520a74575881f6731d7ae68",
         "version" : "4.7.0"
+      }
+    },
+    {
+      "identity" : "package-benchmark",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ordo-one/package-benchmark",
+      "state" : {
+        "revision" : "aedd5e65b24fa81dda10d1bdb018caa382c60c3d",
+        "version" : "1.26.0"
+      }
+    },
+    {
+      "identity" : "package-jemalloc",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ordo-one/package-jemalloc",
+      "state" : {
+        "revision" : "e8a5db026963f5bfeac842d9d3f2cc8cde323b49",
+        "version" : "1.0.0"
       }
     },
     {
@@ -70,6 +97,15 @@
       "state" : {
         "revision" : "f6919dfc309e7f1b56224378b11e28bab5bccc42",
         "version" : "1.2.0"
+      }
+    },
+    {
+      "identity" : "swift-argument-parser",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/apple/swift-argument-parser",
+      "state" : {
+        "revision" : "41982a3656a71c768319979febd796c6fd111d5c",
+        "version" : "1.5.0"
       }
     },
     {
@@ -214,6 +250,15 @@
       "state" : {
         "revision" : "1a653bcc6d3e0c5650886aba5c5a277cd49f0bbd",
         "version" : "1.0.7"
+      }
+    },
+    {
+      "identity" : "texttable",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/ordo-one/TextTable",
+      "state" : {
+        "revision" : "a27a07300cf4ae322e0079ca0a475c5583dd575f",
+        "version" : "0.0.2"
       }
     },
     {

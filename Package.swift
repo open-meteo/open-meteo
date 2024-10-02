@@ -38,6 +38,7 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.0.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
+        .package(url: "https://github.com/ordo-one/package-benchmark", .upToNextMajor(from: "1.4.0")),
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.0")
     ] : []),
@@ -65,12 +66,12 @@ let package = Package(
         ),
         .systemLibrary(
             name: "CZlib",
-            pkgConfig: "z",
+            pkgConfig: "zlib",
             providers: [.brew(["zlib"]), .apt(["libz-dev"])]
         ),
         .systemLibrary(
             name: "CBz2lib",
-            pkgConfig: "bz2",
+            pkgConfig: "bzip2",
             providers: [.brew(["bzip2"]), .apt(["libbz2-dev"])]
         ),
         .target(
@@ -99,3 +100,17 @@ let package = Package(
         ),
     ]
 )
+
+// Benchmark of OpenMeteoBenchmarks
+package.targets += [
+    .executableTarget(
+        name: "OpenMeteoBenchmarks",
+        dependencies: [
+            .product(name: "Benchmark", package: "package-benchmark"),
+        ],
+        path: "Benchmarks/OpenMeteoBenchmarks",
+        plugins: [
+            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
+        ]
+    ),
+]
