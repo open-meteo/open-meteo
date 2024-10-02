@@ -202,9 +202,10 @@ public final class OmFileEncoder {
             var rollingMultiplyTargetCube = 1
             
             /// Read coordinate from input array
-            var q = 0
+            var readCoordinate = 0
             
-            var d = 0
+            /// Position to write to in the chunk buffer
+            var writeCoordinate = 0
             
             /// Copy multiple elements from the decoded chunk into the output buffer. For long time-series this drastically improves copy performance.
             var linearReadCount = 1
@@ -229,7 +230,7 @@ public final class OmFileEncoder {
                     lengthLast = length0
                 }
 
-                q = q + rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayOffset[i])
+                readCoordinate = readCoordinate + rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayOffset[i])
                 //print("i", i, "arrayRead[i].count", arrayRead[i].count, "length0", length0, "arrayDimensions[i]", arrayDimensions[i])
                 assert(length0 <= arrayCount[i])
                 assert(length0 <= arrayDimensions[i])
@@ -266,53 +267,53 @@ public final class OmFileEncoder {
                 case .p4nzdec256:
                     let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                     for i in 0..<linearReadCount {
-                        assert(q+i < array.count)
-                        assert(d+i < lengthInChunk)
-                        let val = array[q+i]
+                        assert(readCoordinate+i < array.count)
+                        assert(writeCoordinate+i < lengthInChunk)
+                        let val = array[readCoordinate+i]
                         if val.isNaN {
                             // Int16.min is not representable because of zigzag coding
-                            chunkBuffer[d+i] = Int16.max
+                            chunkBuffer[writeCoordinate+i] = Int16.max
                         }
                         let scaled = val * scalefactor
-                        chunkBuffer[d+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                        chunkBuffer[writeCoordinate+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
                     }
                 case .fpxdec32:
                     let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
                     for i in 0..<linearReadCount {
-                        assert(q+i < array.count)
-                        assert(d+i < lengthInChunk)
-                        chunkBuffer[d+i] = array[q+i]
+                        assert(readCoordinate+i < array.count)
+                        assert(writeCoordinate+i < lengthInChunk)
+                        chunkBuffer[writeCoordinate+i] = array[readCoordinate+i]
                     }
                 case .p4nzdec256logarithmic:
                     let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                     for i in 0..<linearReadCount {
-                        assert(q+i < array.count)
-                        assert(d+i < lengthInChunk)
-                        let val = array[q+i]
+                        assert(readCoordinate+i < array.count)
+                        assert(writeCoordinate+i < lengthInChunk)
+                        let val = array[readCoordinate+i]
                         if val.isNaN {
                             // Int16.min is not representable because of zigzag coding
-                            chunkBuffer[d+i] = Int16.max
+                            chunkBuffer[writeCoordinate+i] = Int16.max
                         }
                         let scaled = log10(1+val) * scalefactor
-                        chunkBuffer[d+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                        chunkBuffer[writeCoordinate+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
                     }
                 }
                 
 
-                q += linearReadCount-1
-                d += linearReadCount-1
-                d += 1
+                readCoordinate += linearReadCount-1
+                writeCoordinate += linearReadCount-1
+                writeCoordinate += 1
                 
                 // Move `q` to next position
                 rollingMultiplyTargetCube = 1
                 linearRead = true
                 linearReadCount = 1
                 for i in (0..<dims.count).reversed() {
-                    let qPos = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunks[i]
+                    let qPos = ((readCoordinate / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunks[i]
                     let length0 = min((qPos+1) * chunks[i], arrayCount[i]) - qPos * chunks[i]
                     
                     /// More forward
-                    q += rollingMultiplyTargetCube
+                    readCoordinate += rollingMultiplyTargetCube
                     
                     if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
                         // if fast dimension and only partially read
@@ -327,11 +328,11 @@ public final class OmFileEncoder {
                         // dimension is read partly, cannot merge further reads
                         linearRead = false
                     }
-                    let q0 = ((q / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % chunks[i]
+                    let q0 = ((readCoordinate / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % chunks[i]
                     if q0 != 0 && q0 != length0 {
                         break // no overflow in this dimension, break
                     }
-                    q -= length0 * rollingMultiplyTargetCube
+                    readCoordinate -= length0 * rollingMultiplyTargetCube
                     
                     rollingMultiplyTargetCube *= arrayDimensions[i]
                     if i == 0 {

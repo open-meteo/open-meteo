@@ -34,12 +34,18 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
     /// Number of elements in index LUT chunk. Might be hardcoded to 256 later
     let lutChunkElementCount: Int
     
+    /// Offset in bytes of data
+    let dataStart: Int
+    
     public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) -> Self {
         // read header
         
         // switch version 2 and 3
         
         // if version 3, read trailer
+        
+        //let lutStart = lutStart ?? OmHeader.length
+        //let dataStart = version == 3 ? 3 : OmHeader.length + nChunks*8
         
         return fn.withUnsafeBytes({ptr in
             
@@ -59,7 +65,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             
             //print(lutStart, nDims, dimensions, chunks)
             
-            return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart, lutChunkLength: lutChunkLength, lutChunkElementCount: lutChunkElementCount)
+            return OmFileDecoder(fn: fn, scalefactor: 1, compression: .p4nzdec256, dims: dimensions, chunks: chunks, lutStart: lutStart, lutChunkLength: lutChunkLength, lutChunkElementCount: lutChunkElementCount, dataStart: 3)
         })
     }
     
@@ -67,6 +73,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
         let chunkLength = chunks.reduce(1, *)
         let bufferSize = P4NDEC256_BOUND(n: chunkLength, bytesPerElement: compression.bytesPerElement)
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
+
         let read = OmFileReadRequest(
             scalefactor: scalefactor,
             compression: compression,
@@ -77,9 +84,11 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             intoCoordLower: intoCoordLower,
             intoCubeDimension: intoCubeDimension,
             lutChunkLength: lutChunkLength,
-            lutChunkElementCount: lutChunkElementCount // `1` if version <2
+            lutChunkElementCount: lutChunkElementCount, // `1` if version <2
+            dataStart: dataStart,
+            lutStart: lutStart
         )
-        read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3, lutStart: lutStart)
+        read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3)
         chunkBuffer.deallocate()
     }
     
@@ -137,9 +146,15 @@ struct OmFileReadRequest {
     /// Number of elements in each LUT chunk
     let lutChunkElementCount: Int
     
+    /// Offset in bytes of data
+    let dataStart: Int
+    
+    /// Offset  in bytes of LUT index
+    let lutStart: Int
+    
     /// Actually read data from a file. Merges IO for optimal sizes
     /// TODO: The read offset calculation is not ideal
-    func read_from_file<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer, version: Int = 2, lutStart: Int? = nil) {
+    func read_from_file<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer, version: Int = 2) {
         
         var chunkIndex: Range<Int>? = get_first_chunk_position()
         
@@ -148,9 +163,6 @@ struct OmFileReadRequest {
         let nChunks = number_of_chunks()
         
         let lutTotalSize = nChunks.divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength
-        
-        let lutStart = lutStart ?? OmHeader.length
-        let dataStart = version == 3 ? 3 : OmHeader.length + nChunks*8
         
         fn.withUnsafeBytes({ ptr in
             /// Loop over index blocks
