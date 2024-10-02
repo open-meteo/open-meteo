@@ -208,7 +208,7 @@ struct OmFileReadRequest {
         let readStart = chunkIndexStart.lowerBound == 0 ? 0 : (chunkIndexStart.lowerBound-1) / lutChunkElementCount * lutChunkLength
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
-        /// TODO: The loop can be optimised by directly computing the range start/end data index positions
+        /// TODO: The loop can be optimised by directly computing the range start/end data index positions. However, breaking up large IO requests will be tricky
         while true {
             var next = chunkIndex + 1
             if next >= rangeEnd {
@@ -257,7 +257,7 @@ struct OmFileReadRequest {
         
         /// Note: This should be stack allocated to a max size of 256 elements
         /// TODO LUT buffer may need to be larger
-        var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount+4)
+        var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount+16)
         
         /// Which LUT chunk is currently loaded into `uncompressedLut`
         var lutChunk = -1

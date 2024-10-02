@@ -143,9 +143,11 @@ public final class OmFileEncoder {
         //writeBufferPos += len
         //totalBytesWritten += len
         
+        
+        
         // TODO proper AVX alignment for PFor
-        writeBufferPos += 256
-        totalBytesWritten += 256
+        //writeBufferPos += 256
+        //totalBytesWritten += 256
         
         // TODO: pad to 64 bit
         
