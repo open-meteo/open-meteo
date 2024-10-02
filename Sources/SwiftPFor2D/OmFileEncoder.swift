@@ -126,7 +126,7 @@ public final class OmFileEncoder {
                 
                 let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, writeBuffer.baseAddress!.advanced(by: writeBufferPos))
                 if len > maxLength { maxLength = len }
-                print(len)
+                //print(len)
             }
             for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount) {
                 let rangeStart = i*lutChunkElementCount
@@ -135,7 +135,7 @@ public final class OmFileEncoder {
                 writeBufferPos += maxLength
                 totalBytesWritten += maxLength
             }
-            print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount))
+            //print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount))
             //memcpy(writeBuffer.baseAddress!.advanced(by: writeBufferPos), $0.baseAddress!, $0.count)
             //return $0.count
             return maxLength

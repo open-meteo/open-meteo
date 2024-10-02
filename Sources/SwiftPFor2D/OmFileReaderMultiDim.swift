@@ -160,7 +160,7 @@ struct OmFileReadRequest {
                 var chunkData: Range<Int>? = chunkIndexStart
                 
                 // actually "read" index data from file
-                print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
+                //print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
                 assert(readIndexInstruction.offset + readIndexInstruction.count <= lutTotalSize)
                 let indexData = UnsafeRawBufferPointer(rebasing: ptr[lutStart + readIndexInstruction.offset ..< lutStart + readIndexInstruction.offset + readIndexInstruction.count])
                 //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
@@ -173,7 +173,7 @@ struct OmFileReadRequest {
                     chunkData = readDataInstruction.nextChunk
                     
                     // actually "read" compressed chunk data from file
-                    print("read data \(readDataInstruction)")
+                    //print("read data \(readDataInstruction)")
                     let dataData = ptr.baseAddress!.advanced(by: dataStart + readDataInstruction.offset)
                     
                     let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
@@ -208,9 +208,15 @@ struct OmFileReadRequest {
         let readStart = chunkIndexStart.lowerBound == 0 ? 0 : (chunkIndexStart.lowerBound-1) / lutChunkElementCount * lutChunkLength
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
-        /// TODO: The loop can be optimised by directly computing the range start/end data index positions. However, breaking up large IO requests will be tricky
         while true {
-            var next = chunkIndex + 1
+            /// The read end potiions of the previous chunk index. Could be consecutive, or has a huge gap.
+            let readEndPrevious = chunkIndex / lutChunkElementCount * lutChunkLength
+            
+            /// How many elements could we read before we reach the maximum IO size
+            let maxRead = io_size_max / lutChunkLength * lutChunkElementCount
+            let nextIncrement = max(1, min(maxRead, rangeEnd - chunkIndex - 1))
+            
+            var next = chunkIndex + nextIncrement
             if next >= rangeEnd {
                 guard let nextRange = get_next_chunk_position(globalChunkNum: chunkIndex) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
@@ -219,16 +225,24 @@ struct OmFileReadRequest {
                 }
                 rangeEnd = nextRange.upperBound
                 next = nextRange.lowerBound
+                
+                nextChunkOut = next ..< rangeEnd
+                let readStartNext = next / lutChunkElementCount * lutChunkLength - lutChunkLength
+                
+                // The new range could be quite far apart.
+                // E.g. A LUT of 10MB and you only need information from the beginning and end
+                // Check how "far" appart the the new read
+                guard readStartNext - readEndPrevious <= io_size_merge else {
+                    // Reads are too far appart. E.g. a lot of unsed data in the middle
+                    break
+                }
             }
             nextChunkOut = next ..< rangeEnd
             
             /// The read end position if the current index would be read
-            let readEndNext = next.divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength
+            let readEndNext = next / lutChunkElementCount * lutChunkLength
             
-            /// The read end potiions of the previous chunk index. Could be consecutive, or has a huge gap.
-            let readEndPrevious = chunkIndex.divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength
-            
-            guard readEndNext - readEndPrevious <= io_size_merge, readEndNext - readStart <= io_size_max else {
+            guard readEndNext - readStart <= io_size_max else {
                 // the next read would exceed IO limitons
                 break
             }
@@ -278,7 +292,7 @@ struct OmFileReadRequest {
                     let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
                 }
             }
-            print("Initial LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
+            //print("Initial LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
         
         /// The last value for the previous LUT chunk
@@ -303,7 +317,7 @@ struct OmFileReadRequest {
                     let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
                 }
             }
-            print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
+            //print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
         
         var endPos = uncompressedLut[(dataStartChunk.lowerBound) % lutChunkElementCount]
@@ -345,7 +359,7 @@ struct OmFileReadRequest {
                         let _ = p4nddec64(indexDataPtr.advanced(by: start), nextlutChunkElementCount, dest.baseAddress)
                     }
                 }
-                print("Next LUT load \(uncompressedLut), \(nextlutChunkElementCount), start=\(start)")
+                //print("Next LUT load \(uncompressedLut), \(nextlutChunkElementCount), start=\(start)")
                 //print(uncompressedLut)
                 lutChunk = nextLutChunk
             }
