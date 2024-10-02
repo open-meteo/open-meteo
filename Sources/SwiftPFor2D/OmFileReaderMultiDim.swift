@@ -193,8 +193,8 @@ struct OmFileReadRequest {
                 
                 // actually "read" index data from file
                 //print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
-                assert(readIndexInstruction.offset + readIndexInstruction.count <= lutTotalSize)
-                let indexData = UnsafeRawBufferPointer(rebasing: ptr[lutStart + readIndexInstruction.offset ..< lutStart + readIndexInstruction.offset + readIndexInstruction.count])
+                assert(readIndexInstruction.offset + readIndexInstruction.count - lutStart <= lutTotalSize)
+                let indexData = UnsafeRawBufferPointer(rebasing: ptr[readIndexInstruction.offset ..< readIndexInstruction.offset + readIndexInstruction.count])
                 //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
                 //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
                       
@@ -206,7 +206,7 @@ struct OmFileReadRequest {
                     
                     // actually "read" compressed chunk data from file
                     //print("read data \(readDataInstruction)")
-                    let dataData = ptr.baseAddress!.advanced(by: /*dataStart +*/ readDataInstruction.offset)
+                    let dataData = ptr.baseAddress!.advanced(by: readDataInstruction.offset)
                     
                     let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
                     if uncompressedSize != readDataInstruction.count {
@@ -281,7 +281,7 @@ struct OmFileReadRequest {
             chunkIndex = next
         }
         let readEnd = (chunkIndex / lutChunkElementCount + 1) * lutChunkLength
-        return (readStart, readEnd - readStart, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
+        return (lutStart + readStart, readEnd - readStart, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
     }
     
     
@@ -289,6 +289,54 @@ struct OmFileReadRequest {
     public func get_next_data_read(chunkIndex dataStartChunk: Range<Int>, indexRange: Range<Int>, indexData: UnsafeRawBufferPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
         var globalChunkNum = dataStartChunk.lowerBound
         var nextChunkOut: Range<Int>? = dataStartChunk
+        
+        /// Version 1 case
+        if lutChunkElementCount == 1 {
+            // index is a flat Int64 array
+            let data = indexData.assumingMemoryBound(to: Int.self).baseAddress!
+            
+            /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
+            let startOffset = indexRange.lowerBound == 0 ? 1 : 0
+            
+            /// Index data relative to startindex, needs special care because startpos==0 reads one value less
+            let startPos = indexRange.lowerBound == 0 ? 0 : data.advanced(by: indexRange.lowerBound - dataStartChunk.lowerBound - startOffset).pointee
+            var endPos = data.advanced(by: indexRange.lowerBound == 0 ? 0 : 1).pointee
+            
+            var rangeEnd = dataStartChunk.upperBound
+            
+            /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
+            while true {
+                var next = globalChunkNum + 1
+                if next >= rangeEnd {
+                    guard let nextRange = get_next_chunk_position(globalChunkNum: globalChunkNum) else {
+                        // there is no next chunk anymore, finish processing the current one and then stop with the next call
+                        nextChunkOut = nil
+                        break
+                    }
+                    rangeEnd = nextRange.upperBound
+                    next = nextRange.lowerBound
+                }
+                guard next < indexRange.upperBound else {
+                    nextChunkOut = nil
+                    break
+                }
+                nextChunkOut = next ..< rangeEnd
+                
+                let dataStartPos = data.advanced(by: next - indexRange.lowerBound - startOffset).pointee
+                let dataEndPos = data.advanced(by: next - indexRange.lowerBound - startOffset + 1).pointee
+                
+                /// Merge and split IO requests
+                if dataEndPos - startPos > io_size_max,
+                    dataStartPos - endPos > io_size_merge {
+                    break
+                }
+                endPos = dataEndPos
+                globalChunkNum = next
+            }
+            //print("Read \(startPos)-\(endPos) (\(endPos - startPos) bytes)")
+            // IMPORTANT: V1 files have a add dataStart
+            return (startPos + dataStart, endPos - startPos, dataStartChunk.lowerBound, globalChunkNum, nextChunkOut)
+        }
         
         /// TODO optimise
         let nChunks = number_of_chunks()
