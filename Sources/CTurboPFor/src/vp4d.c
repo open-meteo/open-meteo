@@ -295,7 +295,7 @@ ALWAYS_INLINE unsigned char *TEMPLATE2(_P4DEC, USIZE)(unsigned char *__restrict 
     uint_t ex[P4D_MAX+64];
     in = TEMPLATE2(bitunpack, USIZE)(in+32, popcnt64(ctou64(in)) + popcnt64(ctou64(in+8)) + popcnt64(ctou64(in+16)) + popcnt64(ctou64(in+24)), ex, bx);
       #endif
-    return TEMPLATE2(_BITUNPACKD, USIZE)(in, n, out P4DELTA(start), b, ex, pb);  // unpack the exceptions
+    return TEMPLATE2(_BITUNPACKD, USIZE)(in, n, out P4DELTA(start), b, ex, pb);  // unpack and merge the exceptions
   }
     #endif
     #if VSIZE < 128 || USIZE == 64     // bitunpack the rest number of elements < 128/256  or when 32 < bitsize <=64 is used
@@ -494,11 +494,11 @@ unsigned char *TEMPLATE2(p4decx, USIZE)(unsigned char *in, unsigned n, uint_t *_
 
   if(unlikely(p4.isx)) {
     #define ITX(k) out[i+k] = TEMPLATE2(p4getx, USIZE)(&p4, in, i+k, b);
-    for(i = 0; i != n&~3; i += 4) { ITX(0); ITX(1); ITX(2); ITX(3); }
+    for(i = 0; i != (n&(~3)); i += 4) { ITX(0); ITX(1); ITX(2); ITX(3); }
     for(     ; i != n;    i++   )   ITX(0);
   } else {
     #define ITY(k) out[i+k] = TEMPLATE2(bitgetx, USIZE)(in, i+k, b);
-    for(i = 0; i != n&~3; i += 4) { ITY(0); ITY(1); ITY(2); ITY(3); }
+    for(i = 0; i != (n&(~3)); i += 4) { ITY(0); ITY(1); ITY(2); ITY(3); }
     for(     ; i != n; i++) ITY(0);
   }
   return in + PAD8(n*b);
@@ -511,11 +511,11 @@ unsigned char *TEMPLATE2(p4f1decx, USIZE)(unsigned char *in, unsigned n, uint_t 
   p4ini(&p4, &in, n, &b);
   if(unlikely(p4.isx)) {
     #define ITX(k) out[i+k] = TEMPLATE2(p4getx, USIZE)(&p4, in, (i+k), b)+start+i+k+1;
-    for(i = 0; i != n&~3; i+=4) { ITX(0); ITX(1); ITX(2); ITX(3); }
+    for(i = 0; i != (n&(~3)); i+=4) { ITX(0); ITX(1); ITX(2); ITX(3); }
     for(     ; i != n; i++) ITX(0);
   } else {
     #define ITY(k) out[i+k] = TEMPLATE2(bitgetx, USIZE)(in, (i+k), b)+start+i+k+1;
-    for(i = 0; i != n&~3; i += 4) { ITY(0); ITY(1); ITY(2); ITY(3); }
+    for(i = 0; i != (n&(~3)); i += 4) { ITY(0); ITY(1); ITY(2); ITY(3); }
     for(     ; i != n; i++) ITY(0);
   }
   return in + PAD8(n*b);
@@ -528,11 +528,11 @@ unsigned char *TEMPLATE2(p4fdecx, USIZE)(unsigned char *in, unsigned n, uint_t *
 
   if(unlikely(p4.isx)) {
     #define ITX(k) out[i+k] = TEMPLATE2(p4getx, USIZE)(&p4, in, i+k, b)+start;
-    for(i = 0; i != n&~3; i+=4) { ITX(0); ITX(1); ITX(2); ITX(3); }
+    for(i = 0; i != (n&(~3)); i+=4) { ITX(0); ITX(1); ITX(2); ITX(3); }
     for(     ; i != n; i++) ITX(0);
   } else {
     #define ITY(k) out[i+k] = TEMPLATE2(bitgetx, USIZE)(in, (i+k), b)+start;
-    for(i = 0; i != n&~3; i+=4) { ITY(0); ITY(1); ITY(2); ITY(3); }
+    for(i = 0; i != (n&(~3)); i+=4) { ITY(0); ITY(1); ITY(2); ITY(3); }
     for(     ; i != n; i++) ITY(0);
   }
   return in + PAD8(n*b);

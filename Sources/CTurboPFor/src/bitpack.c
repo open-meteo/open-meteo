@@ -27,6 +27,7 @@
 
 
 #include <stdio.h>
+#include <string.h>
 #define BITUTIL_IN
 #define VINT_IN
 #include "conf.h"
