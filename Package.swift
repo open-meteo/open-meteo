@@ -1,4 +1,4 @@
-// swift-tools-version:5.7
+// swift-tools-version:5.6
 
 import PackageDescription
 import Foundation
@@ -26,7 +26,7 @@ let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TR
 let package = Package(
     name: "OpenMeteoApi",
     platforms: [
-        .macOS(.v13)
+        .macOS(.v12)
     ],
     products: [
         .library(name: "SwiftPFor2D", targets: ["SwiftPFor2D"]),
@@ -69,12 +69,12 @@ let package = Package(
         ),
         .systemLibrary(
             name: "CZlib",
-            pkgConfig: "zlib",
+            pkgConfig: "z",
             providers: [.brew(["zlib"]), .apt(["libz-dev"])]
         ),
         .systemLibrary(
             name: "CBz2lib",
-            pkgConfig: "bzip2",
+            pkgConfig: "bz2",
             providers: [.brew(["bzip2"]), .apt(["libbz2-dev"])]
         ),
         .target(
