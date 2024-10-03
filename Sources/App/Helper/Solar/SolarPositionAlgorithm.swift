@@ -4,21 +4,21 @@ import CHelper
 /**
  Solar position calculation based on the NREL Solar Position Algorithm SPA
  https://www.nrel.gov/docs/fy08osti/34302.pdf
- 
+
  Only solar declination and equation of time are calculated.
  The Swift version is approx 5 times faster than C by skipping unnecessary calculations.
  Calculation of 50 years hourly solar position requires roughly 700ms.
  */
-struct SolarPositionAlgorithm {
+public struct SolarPositionAlgorithm {
     /// Calculate solar position for a given timerange
-    static func sunPosition(timerange: TimerangeDt) -> (declination: [Float], equationOfTime: [Float]) {
+    public static func sunPosition(timerange: TimerangeDt) -> (declination: [Float], equationOfTime: [Float]) {
         var declination = [Float]()
         var equationOfTime = [Float]()
         declination.reserveCapacity(timerange.count)
         equationOfTime.reserveCapacity(timerange.count)
-        
+
         let spa = SolarPositionAlgorithm()
-        
+
         for time in timerange {
             /*let date = time.toComponents()
             var a = spa_data(
@@ -39,20 +39,20 @@ struct SolarPositionAlgorithm {
                 del_alpha: 0, delta_prime: 0, alpha_prime: 0, h_prime: 0, e0: 0, del_e: 0, e: 0,
                 eot: 0, srha: 0, ssha: 0, sta: 0, zenith: 0, azimuth_astro: 0, azimuth: 0, incidence: 0,
                 suntransit: 0, sunrise: 0, sunset: 0)
-            
+
             guard spa_calculate(&a) == 0 else {
                 fatalError("SPA failed")
             }*/
-            
+
             let a = spa.calculate(julianDate: time.julianDate)
-            
+
             declination.append(Float(a.delta))
             equationOfTime.append(Float(a.eot))
         }
-        
+
         return (declination, equationOfTime)
     }
-    
+
     /*static func zenith(lat: Float, lon: Float, time: Timestamp) -> Float {
      let date = time.toComponents()
      var a = spa_data(
@@ -72,29 +72,29 @@ struct SolarPositionAlgorithm {
      h: 0, xi: 0, del_alpha: 0, delta_prime: 0, alpha_prime: 0, h_prime: 0, e0: 0, del_e: 0, e: 0, eot: 0,
      srha: 0, ssha: 0, sta: 0, zenith: 0, azimuth_astro: 0, azimuth: 0, incidence: 0, suntransit: 0, sunrise: 0,
      sunset: 0)
-     
+
      guard spa_calculate(&a) == 0 else {
      fatalError("SPA failed")
      }
      print(a)
      return Float(a.zenith)
      }*/
-    
+
     @inlinable
     func julian_ephemeris_day(jd: Double, deltaT: Double) -> Double {
         return jd + deltaT / 86400.0
     }
-    
+
     @inlinable
     func julian_ephemeris_century(jde: Double) -> Double {
         return (jde - 2451545.0) / 36525.0
     }
-    
+
     @inlinable
     func julian_ephemeris_millennium(jce: Double) -> Double {
         return jce / 10.0
     }
-    
+
     @inlinable
     func limit_degrees(degrees: Double) -> Double {
         let degrees = degrees / 360.0
@@ -102,38 +102,38 @@ struct SolarPositionAlgorithm {
         if (limited < 0) { limited += 360.0 }
         return limited
     }
-    
+
     func limit_minutes(minutes: Double) -> Double {
         var limited=minutes
-        
+
         if      (limited < -20.0) { limited += 1440.0 }
         else if (limited >  20.0) { limited -= 1440.0 }
-        
+
         return limited
     }
-    
+
     func earth_periodic_term_summation(terms: [[(Double, Double, Double)]], jme: Double) -> Double {
         return terms.enumerated().reduce(0, {
             $0 + $1.element.reduce(0, { $0 + $1.0 * cos($1.2 * jme + $1.1) }) *
             pow(jme, Double($1.offset))
         }) / 1.0e8
     }
-    
+
     func earth_heliocentric_longitude(jme: Double) -> Double {
         let sum = earth_periodic_term_summation(terms: L_TERMS, jme: jme)
         return limit_degrees(degrees: sum.rad2deg)
     }
-    
+
     func earth_heliocentric_latitude(jme: Double) -> Double {
         let sum = earth_periodic_term_summation(terms: B_TERMS, jme: jme)
         return sum.rad2deg
     }
-    
+
     func earth_radius_vector(jme: Double) -> Double {
         let sum = earth_periodic_term_summation(terms: R_TERMS, jme: jme)
         return sum
     }
-    
+
     @inlinable
     func geocentric_longitude(l: Double) -> Double {
         let theta = l + 180.0
@@ -142,43 +142,43 @@ struct SolarPositionAlgorithm {
         }
         return theta
     }
-    
+
     @inlinable
     func geocentric_latitude(b: Double) -> Double {
         return -b
     }
-    
+
     @inlinable
     func third_order_polynomial(_ a: Double, _ b: Double, _ c: Double, _ d: Double, _ x: Double) -> Double {
         let a2 = x * a + b
         let a1 = x * a2 + c
         return x * a1 + d
     }
-    
+
     func mean_elongation_moon_sun(jce: Double) -> Double {
         return third_order_polynomial(1.0/189474.0, -0.0019142, 445267.11148, 297.85036, jce)
     }
-    
+
     func mean_anomaly_sun(jce: Double) -> Double {
         return third_order_polynomial(-1.0/300000.0, -0.0001603, 35999.05034, 357.52772, jce)
     }
-    
+
     func mean_anomaly_moon(jce: Double) -> Double {
         return third_order_polynomial(1.0/56250.0, 0.0086972, 477198.867398, 134.96298, jce)
     }
-    
+
     func argument_latitude_moon(jce: Double) -> Double {
         return third_order_polynomial(1.0/327270.0, -0.0036825, 483202.017538, 93.27191, jce)
     }
-    
+
     func ascending_longitude_moon(jce: Double) -> Double {
         return third_order_polynomial(1.0/450000.0, 0.0020708, -1934.136261, 125.04452, jce)
     }
-    
+
     func nutation_longitude_and_obliquity(jce: Double, x: (Double, Double, Double, Double, Double)) -> (del_psi: Double, del_epsilon: Double) {
         var sum_psi: Double = 0
         var sum_epsilon: Double = 0
-        
+
         for i in 0..<Y_TERMS.count {
             let a0 = x.0 * Y_TERMS[i].0
             let a1 = x.1 * Y_TERMS[i].1 + a0
@@ -189,12 +189,12 @@ struct SolarPositionAlgorithm {
             sum_psi     = (jce * PE_TERMS[i].1 + PE_TERMS[i].0) * sin(xy_term_sum) + sum_psi
             sum_epsilon = (jce * PE_TERMS[i].3 + PE_TERMS[i].2) * cos(xy_term_sum) + sum_epsilon
         }
-        
+
         let del_psi     = sum_psi     / 36000000.0
         let del_epsilon = sum_epsilon / 36000000.0
         return (del_psi, del_epsilon)
     }
-    
+
     func ecliptic_mean_obliquity(jme: Double) -> Double {
         let u = jme/10.0
         let a9 = u * 2.45 + 5.79
@@ -208,36 +208,36 @@ struct SolarPositionAlgorithm {
         let a1 = u * a2 + -4680.93
         return u * a1 + 84381.448
     }
-    
+
     @inlinable
     func ecliptic_true_obliquity(delta_epsilon: Double, epsilon0: Double) -> Double {
         return delta_epsilon + epsilon0/3600.0
     }
-    
+
     @inlinable
     func aberration_correction(r: Double) -> Double {
         return -20.4898 / (3600.0*r)
     }
-    
+
     @inlinable
     func apparent_sun_longitude(theta: Double, delta_psi: Double, delta_tau: Double) -> Double {
         return theta + delta_psi + delta_tau
     }
-    
+
     func geocentric_right_ascension(lamda: Double, epsilon: Double, beta: Double) -> Double {
         let lamda_rad   = lamda.deg2rad
         let epsilon_rad = epsilon.deg2rad
-        
+
         return limit_degrees(degrees: atan2(sin(lamda_rad)*cos(epsilon_rad) - tan(beta.deg2rad)*sin(epsilon_rad), cos(lamda_rad)).rad2deg)
     }
-    
+
     func geocentric_declination(beta: Double, epsilon: Double, lamda: Double) -> Double {
         let beta_rad    = (beta.deg2rad)
         let epsilon_rad = (epsilon.deg2rad)
-        
+
         return (asin(sin(beta_rad)*cos(epsilon_rad) + cos(beta_rad)*sin(epsilon_rad)*sin(lamda.deg2rad))).rad2deg
     }
-    
+
     func sun_mean_longitude(jme: Double) -> Double {
         let a4 = jme * -1/2000000.0 + -1/15300.0
         let a3 = jme * a4 + 1/49931.0
@@ -245,54 +245,54 @@ struct SolarPositionAlgorithm {
         let a1 = jme * a2 + 360007.6982779
         return limit_degrees(degrees: jme * a1 + 280.4664567)
     }
-    
+
     func eot(m: Double, alpha: Double, del_psi: Double, epsilon: Double) -> Double {
         return limit_minutes(minutes: 4.0*(m - 0.0057183 - alpha + del_psi*cos(epsilon.deg2rad)))
     }
-    
-    
+
+
     func calculate(julianDate jd: Double) -> (delta: Double, eot: Double) {
         //double x[TERM_X_COUNT]
         let delta_t: Double = 60
         //spa->jc = julian_century(spa->jd)
-        
+
         let jde = julian_ephemeris_day(jd: jd, deltaT: delta_t)
         let jce = julian_ephemeris_century(jde: jde)
         let jme = julian_ephemeris_millennium(jce: jce)
-        
+
         let l = earth_heliocentric_longitude(jme: jme)
         let b = earth_heliocentric_latitude(jme: jme)
         let r = earth_radius_vector(jme: jme)
-        
+
         let theta = geocentric_longitude(l: l)
         let beta  = geocentric_latitude(b: b)
-        
+
         let x0 = mean_elongation_moon_sun(jce: jce)
         let x1 = mean_anomaly_sun(jce: jce)
         let x2 = mean_anomaly_moon(jce: jce)
         let x3 = argument_latitude_moon(jce: jce)
         let x4 = ascending_longitude_moon(jce: jce)
-        
+
         let (del_psi, del_epsilon) = nutation_longitude_and_obliquity(jce: jce, x: (x0,x1,x2,x3,x4))
-        
+
         let epsilon0 = ecliptic_mean_obliquity(jme: jme)
         let epsilon  = ecliptic_true_obliquity(delta_epsilon: del_epsilon, epsilon0: epsilon0)
-        
+
         let del_tau  = aberration_correction(r: r)
         let lamda    = apparent_sun_longitude(theta: theta, delta_psi: del_psi, delta_tau: del_tau)
         //spa->nu0       = greenwich_mean_sidereal_time (spa->jd, spa->jc)
         //spa->nu        = greenwich_sidereal_time (spa->nu0, spa->del_psi, spa->epsilon)
-        
+
         let alpha = geocentric_right_ascension(lamda: lamda, epsilon: epsilon, beta: beta)
         let delta = geocentric_declination(beta: beta, epsilon: epsilon, lamda: lamda)
-        
+
         let m   = sun_mean_longitude(jme: jme)
         let eot = eot(m: m, alpha: alpha, del_psi: del_psi, epsilon: epsilon)
-        
+
         return (delta, eot)
     }
-    
-    
+
+
     let L_TERMS: [[(Double, Double, Double)]] = [
         [
             (175347046.0,0,0),
@@ -436,7 +436,7 @@ struct SolarPositionAlgorithm {
             (1,3.14,0)
         ]
     ]
-    
+
     let B_TERMS: [[(Double, Double, Double)]] = [
         [
             (280.0,3.199,84334.662),
@@ -450,7 +450,7 @@ struct SolarPositionAlgorithm {
             (6,1.73,5223.69)
         ]
     ]
-    
+
     let R_TERMS: [[(Double, Double, Double)]] = [
         [
             (100013989.0,0,0),
@@ -522,11 +522,11 @@ struct SolarPositionAlgorithm {
             (4,2.56,6283.08)
         ]
     ]
-    
+
     ////////////////////////////////////////////////////////////////
     ///  Periodic Terms for the nutation in longitude and obliquity
     ////////////////////////////////////////////////////////////////
-    
+
     let Y_TERMS: [(Double, Double, Double, Double, Double)] = [
         (0,0,0,0,1),
         (-2,0,0,2,2),
@@ -592,7 +592,7 @@ struct SolarPositionAlgorithm {
         (0,0,3,2,2),
         (2,-1,0,2,2),
     ]
-    
+
     let PE_TERMS: [(Double, Double, Double, Double)] = [
         (-171996,-174.2,92025,8.9),
         (-13187,-1.6,5736,-3.1),
@@ -666,15 +666,15 @@ struct SolarPositionAlgorithm {
 public struct SolarPositonFastLookup {
     let declination: [Float]
     let equationOfTime: [Float]
-    
+
     /// Sample solar declination every 20 days over 200 years. With hermite interpolation, the error is less than a second in sunrise/set
     /// Around 14k memory for each array
     static let referenceTime = TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2050,1,1), dtSeconds: 86400*20)
-    
+
     public init() {
         (declination, equationOfTime) = SolarPositionAlgorithm.sunPosition(timerange: Self.referenceTime)
     }
-    
+
     /// Calculate position of timestamp in refreence time
     private func pos(_ time: Timestamp) -> (quotient: Int, fraction: Float) {
         let start = Self.referenceTime.range.lowerBound.timeIntervalSince1970
@@ -683,13 +683,13 @@ public struct SolarPositonFastLookup {
         let t = time.timeIntervalSince1970
         return (t - start).moduloPositive(count).moduloFraction(dt)
     }
-    
+
     /// Get sun declination for a given time in DEGREE
     public func getDeclination(_ time: Timestamp) -> Float {
         let (index, fraction) = pos(time)
         return declination.interpolateHermiteRing(index, fraction)
     }
-    
+
     /// Get sun equation of time for a given time in MINUTES
     public func getEquationOfTime(_ time: Timestamp) -> Float {
         let (index, fraction) = pos(time)
@@ -702,7 +702,7 @@ extension Double {
     var rad2deg: Double {
         return (180.0 / .pi)*self
     }
-    
+
     @inlinable
     var deg2rad: Double
     {

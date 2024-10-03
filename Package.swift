@@ -103,12 +103,34 @@ let package = Package(
 
 // Benchmark of OpenMeteoBenchmarks
 package.targets += [
+    .target(
+        name: "BmUtils",
+        dependencies: [
+            .product(name: "Benchmark", package: "package-benchmark")
+        ],
+        path: "Benchmarks/Utils"
+    ),
     .executableTarget(
-        name: "OpenMeteoBenchmarks",
+        name: "OmMeteoBenchmarks",
         dependencies: [
             .product(name: "Benchmark", package: "package-benchmark"),
+            "App",
+            "BmUtils",
         ],
-        path: "Benchmarks/OpenMeteoBenchmarks",
+        path: "Benchmarks/Meteo",
+        plugins: [
+            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
+        ]
+    ),
+    .executableTarget(
+        name: "OmFileWriterBenchmarks",
+        dependencies: [
+            .product(name: "Benchmark", package: "package-benchmark"),
+            "SwiftPFor2D",
+            "App",
+            "BmUtils",
+        ],
+        path: "Benchmarks/OmFileWriter",
         plugins: [
             .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
         ]
