@@ -115,7 +115,7 @@ struct GfsDownload: AsyncCommand {
             
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
-        case .gfswave025, .gfswave025_ens:
+        case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing)
             let nConcurrent = signature.concurrent ?? 1
@@ -193,7 +193,7 @@ struct GfsDownload: AsyncCommand {
         
         // GFS025 ensemble does not have elevation information, use non-ensemble version
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0)
-        if ![GfsDomain.hrrr_conus_15min, .gfswave025, .gfswave025_ens].contains(domain) {
+        if ![GfsDomain.hrrr_conus_15min, .gfswave025, .gfswave025_ens, .gfswave016].contains(domain) {
             // 15min hrrr data uses hrrr domain elevation files
             try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         }
@@ -202,7 +202,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs013:
             deadLineHours = 6
-        case .gfs025, .gfswave025:
+        case .gfs025, .gfswave025, .gfswave016:
             deadLineHours = 5
         case .hrrr_conus_15min:
             deadLineHours = 2
