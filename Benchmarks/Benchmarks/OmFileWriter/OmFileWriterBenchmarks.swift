@@ -34,7 +34,9 @@ extension OmFileWriter {
     }
 
     fileprivate var writeToFile: FileHandle {
-        try! self.write(file: testOmBmFile, compressionType: .p4nzdec256, scalefactor: 20, all: data, overwrite: true)
+        try! self.write(
+            file: testOmBmFile, compressionType: .p4nzdec256, scalefactor: 20, all: data,
+            overwrite: true)
     }
 }
 
@@ -78,24 +80,29 @@ let benchmarks = {
 
     Benchmark(
         "Compress to file, small chunks",
-        configuration: .init(thresholds: .p90WallClock(202))
+        configuration: .init(
+            thresholds: .p90WallClock(202),
+            teardown: { cleanUpTestOmBmFile() }
+        )
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(OmFileWriter.smallChunkWriter.writeToFile)
         }
     }
 
-    // we need to make sure the file is always written before reading from it
-    let _ = OmFileWriter.smallChunkWriter.writeToFile
-
     Benchmark(
         "Decompress from file, small chunks",
-        configuration: .init(thresholds: .p90WallClock(46))
+        configuration: .init(
+            thresholds: .p90WallClock(46),
+            setup: {
+                // make sure the file is written before reading from it
+                let _ = OmFileWriter.smallChunkWriter.writeToFile
+            },
+            teardown: { cleanUpTestOmBmFile() }
+        )
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(try OmFileReader(file: testOmBmFile).readAll())
         }
     }
-
-    // cleanUpTestOmBmFile()
 }
