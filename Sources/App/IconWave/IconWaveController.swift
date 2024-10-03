@@ -18,6 +18,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ncep_gfswave025
+    case ncep_gfswave016
     case ncep_gefswave025
     case meteofrance_wave
     case meteofrance_currents
@@ -70,6 +71,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ncep_gefswave025:
             return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
+        case .ncep_gfswave016:
+            return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         }
     }
 }

@@ -8,7 +8,7 @@ protocol GfsVariableDownloadable: GenericVariable {
 extension GfsSurfaceVariable: GfsVariableDownloadable {
     func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String? {
         switch domain {
-        case .gfswave025, .gfswave025_ens:
+        case .gfswave025, .gfswave025_ens, .gfswave016:
             return nil
         case .gfs013:
             // gfs013 https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20230510/00/atmos/gfs.t00z.sfluxgrbf000.grib2.idx
@@ -398,7 +398,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             fallthrough
         case .precipitation:
             switch domain {
-            case .gfswave025, .gfswave025_ens:
+            case .gfswave025, .gfswave025_ens, .gfswave016:
                 return nil
             case .gfs013:
                 fallthrough
@@ -453,7 +453,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             return ":RH:\(level) mb:"
         case .vertical_velocity:
             switch domain {
-            case .gfswave025, .gfswave025_ens:
+            case .gfswave025, .gfswave025_ens, .gfswave016:
                 return nil
             case .gfs013:
                 return nil

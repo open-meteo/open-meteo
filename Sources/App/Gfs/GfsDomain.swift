@@ -29,6 +29,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     
     case gfswave025
     
+    case gfswave016
+    
     case gfswave025_ens
     
     var domainRegistry: DomainRegistry {
@@ -49,6 +51,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return .ncep_gfswave025
         case .gfswave025_ens:
             return .ncep_gefswave025
+        case .gfswave016:
+            return .ncep_gfswave016
         }
     }
     
@@ -83,7 +87,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .gfs025_ens, .gfs05_ens:
             return 6*3600
-        case .gfswave025, .gfswave025_ens:
+        case .gfswave025, .gfswave025_ens, .gfswave016:
             return 6*3600
         }
     }
@@ -102,7 +106,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3*3600
         case .hrrr_conus_15min:
             return 3600/4
-        case .gfswave025:
+        case .gfswave025, .gfswave016:
             return 3600
         }
     }
@@ -121,7 +125,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return true
         case .hrrr_conus_15min:
             return false
-        case .gfswave025:
+        case .gfswave025, .gfswave016:
             return true
         }
     }
@@ -136,7 +140,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             fallthrough
         case .gfs013:
             fallthrough
-        case .gfs025, .gfswave025:
+        case .gfs025, .gfswave025, .gfswave016:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
             return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
         //case .nam_conus:
@@ -184,7 +188,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return (run % 6 == 0) ? Array(0...48) : Array(0...18)
         case .hrrr_conus_15min:
             return Array(0...18*4)
-        case .gfswave025:
+        case .gfswave025, .gfswave016:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
         }
     }
@@ -217,7 +221,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             //return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         case .hrrr_conus_15min:
             return []
-        case .gfswave025, .gfswave025_ens:
+        case .gfswave025, .gfswave025_ens, .gfswave016:
             return []
         }
         
@@ -239,7 +243,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 48 + 1 + 4*24
         case .hrrr_conus_15min:
             return 48*4*2
-        case .gfswave025:
+        case .gfswave025, .gfswave016:
             return 384 + 1 + 4*24
         case .gfswave025_ens:
             return (384 + 4*24)/3 + 1
@@ -261,6 +265,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
             let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
             return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)*/
+        case .gfswave016:
+            /// 0.166° resolution
+            return RegularGrid(nx: 2160, ny: 406, latMin: -15, lonMin: -180, dx: 360/2160, dy: (52.5 + 15)/(406-1))
         case .hrrr_conus_15min:
             fallthrough
         case .hrrr_conus:
@@ -320,6 +327,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20240619/00/wave/gridded/gfswave.t00z.global.0p25.f000.grib2
             let base = "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/wave/gridded"
             return ["\(base)/gfswave.t\(hh)z.global.0p25.f\(fHHH).grib2"]
+        case .gfswave016:
+            let base = "\(useArchive ? gfsAws : gfsNomads)gfs.\(yyyymmdd)/\(hh)/wave/gridded"
+            return ["\(base)/gfswave.t\(hh)z.global.0p16.f\(fHHH).grib2"]
         case .gfswave025_ens:
             // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20240619/00/wave/gridded/gefs.wave.t00z.c00.global.0p25.f000.grib2
             let memberString = member == 0 ? "c00" : "p\(member.zeroPadded(len: 2))"

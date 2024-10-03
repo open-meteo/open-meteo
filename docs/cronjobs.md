@@ -155,6 +155,7 @@ Note:
 
 # GFS Wave
 40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfswave025 > ~/log/gfswave025.log 2>&1 || cat ~/log/gfswave025.log
+40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfswave016 > ~/log/gfswave016.log 2>&1 || cat ~/log/gfswave016.log
 40 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs gfswave025_gfs > ~/log/gfswave025_gfs.log 2>&1 || cat ~/log/gfswave025_gfs.log
 ```
 
