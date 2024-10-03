@@ -68,6 +68,7 @@ Repositories:
 - [Homepage](https://github.com/benphelps/homepage/) A highly customizable homepage (or startpage / application dashboard) with Docker and service API integrations.
 - [Spots Guru](https://www.spots.guru) Weather forecast for lazy, the best wind & wave spots around you.
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
+- [DIY Arduino esp8266 weather station](https://github.com/AlexeyMal/esp8266-weather-station) esp8266 weather station using Open-Meteo API, an embedded C++ implementation example
 
 Other:
 - [Menubar Weather](https://www.raycast.com/koinzhang/menubar-weather) A Raycast extension that displays live weather information in your menu bar
