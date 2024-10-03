@@ -5,6 +5,11 @@ import SwiftPFor2D
 
 /**
 Meteofrance Arome, Arpge downloader
+ 
+ TODO:
+ - AROME 0.025 PI added direct radiation
+ - Correct old shortwave radiaiton files
+ - AROME 0.01 PI has low clouds, AROME PRI 0.025 mid and high, should be combined to total clouds
  */
 struct MeteoFranceDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -470,13 +475,13 @@ struct MeteoFranceDownload: AsyncCommand {
                 if seconds == 0 && variable.skipHour0(domain: domain) {
                     continue
                 }
-                let coverage = variable.getCoverageId()
+                let coverage = variable.getCoverageId(domain: domain)
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
                 let subsetPressure = coverage.pressure.map { "&subset=pressure(\($0))" } ?? ""
                 let subsetTime = "&subset=time(\(seconds))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
-                let is3H = domain == .arpege_world && (seconds/3600) >= 51
-                let period = coverage.isPeriod ? domain.dtSeconds == 900 ? "_PT15M" : is3H ? "_PT3H" : "_PT1H" : ""
+                //let is3H = domain == .arpege_world && (seconds/3600) >= 51
+                let period = coverage.periodMinutes.map { $0 >= 60 ? "_PT\($0/60)H" : "_PT\($0)M" } ?? ""
                 
                 let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetPressure)\(subsetTime)&format=application%2Fwmo-grib"
                 
