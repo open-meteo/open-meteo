@@ -1,4 +1,4 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.7
 
 import PackageDescription
 import Foundation
@@ -26,7 +26,11 @@ let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TR
 let package = Package(
     name: "OpenMeteoApi",
     platforms: [
-        .macOS(.v12)
+        .macOS(.v13)
+    ],
+    products: [
+        .library(name: "SwiftPFor2D", targets: ["SwiftPFor2D"]),
+        .library(name: "App", targets: ["App"]),
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
@@ -38,7 +42,6 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.0.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
-        .package(url: "https://github.com/ordo-one/package-benchmark", .upToNextMajor(from: "1.4.0")),
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.0")
     ] : []),
@@ -100,39 +103,3 @@ let package = Package(
         ),
     ]
 )
-
-// Benchmark of OpenMeteoBenchmarks
-package.targets += [
-    .target(
-        name: "BmUtils",
-        dependencies: [
-            .product(name: "Benchmark", package: "package-benchmark")
-        ],
-        path: "Benchmarks/Utils"
-    ),
-    .executableTarget(
-        name: "OmMeteoBenchmarks",
-        dependencies: [
-            .product(name: "Benchmark", package: "package-benchmark"),
-            "App",
-            "BmUtils",
-        ],
-        path: "Benchmarks/Meteo",
-        plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
-        ]
-    ),
-    .executableTarget(
-        name: "OmFileWriterBenchmarks",
-        dependencies: [
-            .product(name: "Benchmark", package: "package-benchmark"),
-            "SwiftPFor2D",
-            "App",
-            "BmUtils",
-        ],
-        path: "Benchmarks/OmFileWriter",
-        plugins: [
-            .plugin(name: "BenchmarkPlugin", package: "package-benchmark")
-        ]
-    ),
-]

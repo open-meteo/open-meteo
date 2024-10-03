@@ -25,16 +25,18 @@ fileprivate extension Zensun {
 }
 
 let benchmarks = {
+    Benchmark.defaultConfiguration.maxDuration = .seconds(6)
+
     Benchmark(
         "Solar Position Calculation for 50 years, hourly",
-        configuration: .init(thresholds: .p50WallClock(625))
+        configuration: .init(thresholds: .p90WallClock(625))
     ) { bm in
-        blackHole(SolarPositionAlgorithm.sunPosition(timerange: TimerangeDt.exradTime))
+        let _ = SolarPositionAlgorithm.sunPosition(timerange: TimerangeDt.exradTime)
     }
 
     Benchmark(
         "Calculate extra terrestrial radiation (100 years, hourly)",
-        configuration: .init(thresholds: .p50WallClock(47))
+        configuration: .init(thresholds: .p90WallClock(47))
     ) { bm in
         blackHole(Zensun.calcExtraTerrestrialRadiationBackwards)
     }
@@ -43,7 +45,7 @@ let benchmarks = {
 
     Benchmark(
         "Interpolate radiation to 15 minutes",
-        configuration: .init(thresholds: .p50WallClock(246))
+        configuration: .init(thresholds: .p90WallClock(246))
     ) { bm in
         let dtNew = TimerangeDt.exradTime.dtSeconds / 4
         let timeNew = TimerangeDt.exradTime.range.add(-TimerangeDt.exradTime.dtSeconds + dtNew).range(dtSeconds: dtNew)

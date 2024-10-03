@@ -39,6 +39,8 @@ extension OmFileWriter {
 }
 
 let benchmarks = {
+    Benchmark.defaultConfiguration.maxDuration = .seconds(6)
+
     // Make sure directory exists
     try? FileManager.default.createDirectory(
         atPath: OpenMeteo.dataDirectory,
@@ -47,7 +49,7 @@ let benchmarks = {
 
     Benchmark(
         "Compression in memory, large chunks",
-        configuration: .init(thresholds: .p50WallClock(191))
+        configuration: .init(thresholds: .p90WallClock(191))
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(OmFileWriter.largeChunkWriter.writeToMemory)
@@ -56,7 +58,7 @@ let benchmarks = {
 
     Benchmark(
         "Compression in memory, small chunks",
-        configuration: .init(thresholds: .p50WallClock(199))
+        configuration: .init(thresholds: .p90WallClock(199))
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(OmFileWriter.smallChunkWriter.writeToMemory)
@@ -67,7 +69,7 @@ let benchmarks = {
 
     Benchmark(
         "Decompress from memory, small chunks",
-        configuration: .init(thresholds: .p50WallClock(44))
+        configuration: .init(thresholds: .p90WallClock(44))
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(try OmFileReader(fn: DataAsClass(data: compressed)).readAll())
@@ -76,7 +78,7 @@ let benchmarks = {
 
     Benchmark(
         "Compress to file, small chunks",
-        configuration: .init(thresholds: .p50WallClock(202))
+        configuration: .init(thresholds: .p90WallClock(202))
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(OmFileWriter.smallChunkWriter.writeToFile)
@@ -88,7 +90,7 @@ let benchmarks = {
 
     Benchmark(
         "Decompress from file, small chunks",
-        configuration: .init(thresholds: .p50WallClock(46))
+        configuration: .init(thresholds: .p90WallClock(46))
     ) { bm in
         for _ in bm.scaledIterations {
             blackHole(try OmFileReader(file: testOmBmFile).readAll())
