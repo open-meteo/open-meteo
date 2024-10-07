@@ -147,8 +147,8 @@ public final class OmFileEncoder {
         if chunkSizeByte > 1024 * 1024 * 4 {
             print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
         }
-        
-        self.chunkOffsetBytes = .init(repeating: 0, count: nChunks)
+        // +1 to store also the start address
+        self.chunkOffsetBytes = .init(repeating: 0, count: nChunks + 1)
         self.dims = dimensions
         self.chunks = chunkDimensions
         self.scalefactor = scalefactor
@@ -439,13 +439,19 @@ public final class OmFileEncoder {
                 delta2d_encode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
                 writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, lengthInChunk, out.buffer.baseAddress!.advanced(by: out.writePosition), 0)
             }
+            
+            if chunkIndex == 0 {
+                // Store data start address
+                chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
+            }
 
             //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
             out.writePosition += writeLength
             out.totalBytesWritten += writeLength
             
+            
             // Store chunk offset in LUT
-            chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
+            chunkOffsetBytes[chunkIndex+1] = out.totalBytesWritten
             chunkIndex += 1
             cOffset += 1
             
