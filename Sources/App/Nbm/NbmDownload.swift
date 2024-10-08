@@ -165,9 +165,14 @@ struct NbmDownload: AsyncCommand {
                 if domain.isGlobal {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
                 }
+                
+                /// NBM scan lines are alternating https://github.com/ecmwf/cfgrib/issues/276
+                if message.getLong(attribute: "alternativeRowScanning") == 1 {
+                    grib2d.array.flipEverySecondScanLine()
+                }
                 //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
                 
-                guard let shortName = message.get(attribute: "shortName"),
+                guard /*let shortName = message.get(attribute: "shortName"),*/
                       let stepRange = message.get(attribute: "stepRange"),
                       let stepType = message.get(attribute: "stepType") else {
                     fatalError("could not get step range or type")

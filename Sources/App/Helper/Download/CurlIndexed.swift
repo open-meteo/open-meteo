@@ -78,7 +78,7 @@ extension Curl {
                         return false
                     }
                     if $0.exactMatch {
-                        return idx.hasPrefix(gribIndexName)
+                        return idx.hasSuffix(gribIndexName)
                     }
                     return idx.contains(gribIndexName)
                 }) else {

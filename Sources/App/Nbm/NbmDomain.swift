@@ -119,7 +119,7 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.20220813/00/atmos/gfs.t00z.pgrb2.0p25.f084.idx
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.20220818/nam.t00z.conusnest.hiresf00.tm00.grib2.idx
         //https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.20220818/conus/hrrr.t00z.wrfnatf00.grib2
-        let fHH = forecastHour.zeroPadded(len: 2)
+        //let fHH = forecastHour.zeroPadded(len: 2)
         let fHHH = forecastHour.zeroPadded(len: 3)
         // Files older than 48 hours are not available anymore on nomads
         let useArchive = (Timestamp.now().timeIntervalSince1970 - run.timeIntervalSince1970) > 36*3600
