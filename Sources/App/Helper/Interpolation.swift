@@ -3,7 +3,7 @@ import Foundation
 
 extension Array where Element == Float {
     /// bounds: Apply min and max after interpolation
-    func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
+    public func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
         switch type {
         case .backwards:
             return interpolateNearest(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
