@@ -155,6 +155,10 @@ struct GfsDownload: AsyncCommand {
                     return ":LAND:surface:"
                 }
             }
+            
+            var exactMatch: Bool {
+                return false
+            }
         }
         
         var height: Array2D? = nil
@@ -449,6 +453,10 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
     let variable: any GfsVariableDownloadable
     let domain: GfsDomain
     let timestep: Int?
+    
+    var exactMatch: Bool {
+        return false
+    }
     
     var gribIndexName: String? {
         return variable.gribIndexName(for: domain, timestep: timestep)
