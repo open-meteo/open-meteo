@@ -20,7 +20,8 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_speed_80m
     case wind_direction_80m
     
-    case surface_temperature
+    /// Only sea surface temperture
+    //case surface_temperature
     
     case snow_fall_water_equivalent
 
@@ -67,7 +68,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .precipitation: return 10
         case .wind_speed_10m, .wind_speed_80m: return 10
         case .wind_direction_10m, .wind_direction_80m: return 1
-        case .surface_temperature: return 20
+        //case .surface_temperature: return 20
         case .snow_fall_water_equivalent: return 10
         case .wind_gusts_10m: return 10
         //case .pressure_msl: return 10
@@ -97,8 +98,8 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
-        case .surface_temperature:
-            return .hermite(bounds: nil)
+        //case .surface_temperature:
+        //    return .hermite(bounds: nil)
         case .snow_fall_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
@@ -124,7 +125,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .precipitation, .snow_fall_water_equivalent: return .millimetre
         case .wind_speed_10m, .wind_speed_80m: return .metrePerSecond
         case .wind_direction_10m, .wind_direction_80m: return .degreeDirection
-        case .surface_temperature: return .celsius
+        //case .surface_temperature: return .celsius
         case .wind_gusts_10m: return .metrePerSecond
         //case .pressure_msl: return .hectopascal
         case .shortwave_radiation: return .wattPerSquareMetre
@@ -139,8 +140,8 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var isElevationCorrectable: Bool {
         switch self {
-        case .surface_temperature:
-            fallthrough
+        //case .surface_temperature:
+        //    fallthrough
         case .temperature_2m:
             return true
         default:

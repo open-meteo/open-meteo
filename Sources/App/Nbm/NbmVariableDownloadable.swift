@@ -16,13 +16,13 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             case .shortwave_radiation:
                 return ":DSWRF:surface:\(timestep) hour fcst:"
             case .precipitation:
-                return ":APCP:surface:\(previousTimestep)-\(timestep) hour acc fcst:"
+                return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:"
             case .relative_humidity_2m:
                 return ":RH:2 m above ground:\(timestep) hour fcst:"
             case .cloud_cover:
                 return ":TCDC:surface:\(timestep) hour fcst:"
-            case .surface_temperature:
-                return ":TMP:surface:\(timestep) hour fcst:"
+            //case .surface_temperature:
+           //     return ":TMP:surface:\(timestep) hour fcst:"
             case .wind_speed_10m:
                 return ":WIND:10 m above ground:\(timestep) hour fcst:"
             case .wind_speed_80m:
@@ -32,7 +32,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             case .wind_direction_80m:
                 return ":WDIR:80 m above ground:\(timestep) hour fcst:"
             case .snow_fall_water_equivalent:
-                return ":ASNOW:surface:\(previousTimestep)-\(timestep) hour acc fcst:"
+                return ":ASNOW:surface:\(timestep-1)-\(timestep) hour acc fcst:"
             case .wind_gusts_10m:
                 return ":GUST:10 m above ground:\(timestep) hour fcst:"
             case .visibility:
@@ -40,22 +40,20 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             case .thunderstorm_probability:
                 return ":TSTM:surface:\(previousTimestep)-\(timestep) hour acc fcst:probability forecast"
             case .precipitation_probability:
-                return ":APCP:surface:\(previousTimestep)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
+                return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
             }
         }
     }
     
     func multiplyAdd(domain: NbmDomain) -> (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m: //, .surface_temperature:
             return (1, -273.15)
         //case .pressure_msl:
         //    return (1/100, 0)
-        case .surface_temperature:
-            fallthrough
-        case .precipitation:
+        //case .precipitation:
             // precipitation rate per second to hourly precipitation
-            return (Float(domain.dtSeconds), 0)
+        //    return (Float(domain.dtSeconds), 0)
         default:
             return nil
         }
