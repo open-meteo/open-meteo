@@ -7,11 +7,14 @@ National Blend of Models domains
  */
 enum NbmDomain: String, GenericDomain, CaseIterable {
     case nbm_conus
+    case nbm_alaska
     
     var domainRegistry: DomainRegistry {
         switch self {
         case .nbm_conus:
             return .ncep_nbm_conus
+        case .nbm_alaska:
+            return .ncep_nbm_alaska
         }
     }
     
@@ -32,35 +35,22 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
     }
     
     var updateIntervalSeconds: Int {
-        switch self {
-        case .nbm_conus:
-            return 3600
-        }
+        return 3600
     }
     
     var dtSeconds: Int {
-        switch self {
-        case .nbm_conus:
-            return 3600
-        }
+        return 3600
     }
     
     var isGlobal: Bool {
-        switch self {
-        case .nbm_conus:
-            return false
-        }
+        return false
     }
     
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        switch self {
-        case .nbm_conus:
-            // NBM has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
-            return t.with(hour: t.hour)
-
-        }
+        // NBM has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
+        return t.with(hour: t.hour)
     }
     
     var ensembleMembers: Int {
@@ -68,28 +58,18 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
     }
     
     func forecastHours(run: Int) -> [Int] {
-        switch self {
-        case .nbm_conus:
-            // Has no hour 0
-            // 1 to 63 hourly, 36 to 192 3-hourly, 192 to 264 in 6-hourly
-            // 270 to 384 is available 10 hours later for run 0z and 12z. This data is not used
-            return Array(1...35) + Array(stride(from: 36, to: 192, by: 3)) + Array(stride(from: 192, through: 264, by: 6))
-        }
+        // Has no hour 0
+        // 1 to 63 hourly, 36 to 192 3-hourly, 192 to 264 in 6-hourly
+        // 270 to 384 is available 10 hours later for run 0z and 12z. This data is not used
+        return Array(1...35) + Array(stride(from: 36, to: 192, by: 3)) + Array(stride(from: 192, through: 264, by: 6))
     }
     
     var levels: [Int] {
-        switch self {
-        case .nbm_conus:
-            return []
-        }
-        
+        return []
     }
     
     var omFileLength: Int {
-        switch self {
-        case .nbm_conus:
-            return 264 + 1 + 2*24 //313
-        }
+        return 264 + 1 + 2*24 //313
     }
     
     var grid: Gridable {
@@ -110,6 +90,26 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
              */
             let proj = LambertConformalConicProjection(λ0: 265-360, ϕ0: 0, ϕ1: 25, ϕ2: 25, radius: 6371200)
             return ProjectionGrid(nx: 2345, ny: 1597, latitude: 19.229, longitude: 233.723-360, dx: 2539.7, dy: 2539.7, projection: proj)
+        case .nbm_alaska:
+            /**
+             Nx = 1649;
+             Ny = 1105;
+             latitudeOfFirstGridPointInDegrees = 40.53;
+             longitudeOfFirstGridPointInDegrees = 181.429;
+             LaDInDegrees = 60;
+             orientationOfTheGridInDegrees = 210;
+             DxInMetres = 2976.56;
+             DyInMetres = 2976.56;
+             iScansNegatively = 0;
+             jScansPositively = 1;
+             jPointsAreConsecutive = 0;
+             alternativeRowScanning = 1;
+             gridType = polar_stereographic;
+             */
+            let proj = StereograpicProjection(latitude: 90, longitude: 210, radius: 6371200)
+            // Note dx/dy would need to be scaled, because they are defined as 60° latitude
+            // ProjectionGrid(nx: 1649, ny: 1105, latitude: 40.53, longitude: 181.429-360, dx: 2976.56, dy: 2976.56, projection: proj)
+            return ProjectionGrid(nx: 1649, ny: 1105, latitude: 40.53...63.97579, longitude: (181.429-360)...(-93.689514), projection: proj)
         }
     }
     
@@ -126,10 +126,14 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         let nbmAws = "https://noaa-nbm-grib2-pds.s3.amazonaws.com/"
         let nbmServer = useArchive ? nbmAws : nbmNomads
         
+        let nameShort: String
         switch self {
         case .nbm_conus:
-            // /blend.20241007/12/core/blend.t12z.core.f001.co.grib2.idx
-            return ["\(nbmServer)blend.\(yyyymmdd)/\(hh)/core/blend.t\(hh)z.core.f\(fHHH).co.grib2"]
+            nameShort = "co"
+        case .nbm_alaska:
+            nameShort = "ak"
         }
+        // /blend.20241007/12/core/blend.t12z.core.f001.co.grib2.idx
+        return ["\(nbmServer)blend.\(yyyymmdd)/\(hh)/core/blend.t\(hh)z.core.f\(fHHH).\(nameShort).grib2"]
     }
 }

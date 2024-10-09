@@ -6,8 +6,8 @@ protocol NbmVariableDownloadable: GenericVariable {
 
 extension NbmSurfaceVariable: NbmVariableDownloadable {
     func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int) -> String? {
-        switch domain {
-        case .nbm_conus:
+        //switch domain {
+        //case .nbm_conus:
             switch self {
             case .temperature_2m:
                 return ":TMP:2 m above ground:\(timestep) hour fcst:"
@@ -44,7 +44,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             case .precipitation_probability:
                 return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
             }
-        }
+        //}
     }
     
     func multiplyAdd(domain: NbmDomain) -> (multiply: Float, add: Float)? {
