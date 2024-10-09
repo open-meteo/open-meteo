@@ -134,12 +134,6 @@ struct NbmDownload: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
         
-
-        //let variables = variablesAll.filter({ !$0.variable.isLeastCommonlyUsedParameter })
-        
-        /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
-        let deaverager = GribDeaverager()
-        
         var previousForecastHour = 0
         
         for forecastHour in forecastHours {
@@ -186,12 +180,6 @@ struct NbmDownload: AsyncCommand {
                     //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
                    // try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
                // }
-                
-                // Deaccumulate precipitation
-                guard await deaverager.deaccumulateIfRequired(variable: variable.variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                    continue
-                }
-                
                 
                 // NBM contains instantanous values for solar flux. Convert it to backwards averaged.
                 if let variable = variable.variable as? NbmSurfaceVariable, variable == .shortwave_radiation {

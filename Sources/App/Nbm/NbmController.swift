@@ -19,6 +19,7 @@ enum NbmVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case vapour_pressure_deficit
     case snowfall
     case rain
+    case showers
     //case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
@@ -211,6 +212,8 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(derived: .surface(.direct_radiation), time: time)
             case .diffuse_radiation:
                 try prefetchData(derived: .surface(.direct_radiation), time: time)
+            case .showers:
+                try prefetchData(raw: .surface(.precipitation), time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -355,6 +358,9 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 let swrad = try get(raw: .surface(.shortwave_radiation), time: time)
                 let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(diffuse, swrad.unit)
+            case .showers:
+                let precipitation = try get(raw: .surface(.precipitation), time: time).data
+                return DataAndUnit(precipitation.map{$0 * 0}, .millimetre)
             }
         case .pressure(let v):
             switch v.variable {
