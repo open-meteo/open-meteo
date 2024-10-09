@@ -716,6 +716,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ukmoGlobalDeterministic10km
         case .ukmo_uk_deterministic_2km:
             return .ukmoUkDeterministic2km
+        case .ncep_nbm_conus:
+            // TODO register NBM
+            return .gfs05
         }
     }
 }

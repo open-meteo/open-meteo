@@ -109,8 +109,8 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
              Latin2 = 25000000;
              Latin2InDegrees = 25;
              */
-            let proj = LambertConformalConicProjection(λ0: 265-360, ϕ0: 0, ϕ1: 25, ϕ2: 25, radius: 6370.997 * 1000)
-            return ProjectionGrid(nx: 2345, ny: 1597, latitudeProjectionOrigion: 19.229, longitudeProjectionOrigion: 233.723-360, dx: 2539.7, dy: 2539.7, projection: proj)
+            let proj = LambertConformalConicProjection(λ0: 265-360, ϕ0: 0, ϕ1: 25, ϕ2: 25, radius: 6371200)
+            return ProjectionGrid(nx: 2345, ny: 1597, latitude: 19.229, longitude: 233.723-360, dx: 2539.7, dy: 2539.7, projection: proj)
         }
     }
     

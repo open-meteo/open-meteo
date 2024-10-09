@@ -283,6 +283,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gfs013
     case gfs_hrrr
     case gfs_graphcast025
+    case ncep_nbm_conus
     
     case meteofrance_seamless
     case meteofrance_mix
@@ -561,6 +562,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .ukmo_uk_deterministic_2km:
             let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [ukmoUk].compactMap({$0})
+        case .ncep_nbm_conus:
+            return try NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         }
     }
     
