@@ -166,9 +166,9 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.wind_speed_10m), time: time)
             case .rain:
                 try prefetchData(raw: .surface(.precipitation), time: time)
-                try prefetchData(raw: .surface(.snow_fall_water_equivalent), time: time)
+                try prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
             case .snowfall:
-                try prefetchData(raw: .surface(.snow_fall_water_equivalent), time: time)
+                try prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
             case .terrestrial_radiation:
                 break
             case .terrestrial_radiation_instant:
@@ -195,7 +195,7 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
             case .weathercode:
                 try prefetchData(raw: .surface(.cloud_cover), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
-                try prefetchData(raw: .surface(.snow_fall_water_equivalent), time: time)
+                try prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
                 try prefetchData(raw: .surface(.cape), time: time)
                 try prefetchData(raw: .surface(.wind_gusts_10m), time: time)
                 try prefetchData(raw: .surface(.visibility), time: time)
@@ -265,11 +265,11 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:
-                let snow_fall_water_equivalent = try get(raw: .surface(.snow_fall_water_equivalent), time: time).data
+                let snow_fall_water_equivalent = try get(raw: .surface(.snowfall_water_equivalent), time: time).data
                 let snowfall = snow_fall_water_equivalent.map({ $0 * 0.7 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .rain:
-                let snow_fall_water_equivalent = try get(raw: .surface(.snow_fall_water_equivalent), time: time).data
+                let snow_fall_water_equivalent = try get(raw: .surface(.snowfall_water_equivalent), time: time).data
                 let precipitation = try get(raw: .surface(.precipitation), time: time).data
                 let rain = zip(precipitation, snow_fall_water_equivalent).map(-)
                 return DataAndUnit(rain, .millimetre)

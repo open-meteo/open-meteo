@@ -161,12 +161,6 @@ struct NbmDownload: AsyncCommand {
                 }
                 //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
                 
-                guard /*let shortName = message.get(attribute: "shortName"),*/
-                      let stepRange = message.get(attribute: "stepRange"),
-                      let stepType = message.get(attribute: "stepType") else {
-                    fatalError("could not get step range or type")
-                }
-                
                 /// Generate land mask from regular data for GFS Wave013
                 //if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                     //let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
