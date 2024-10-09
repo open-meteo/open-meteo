@@ -47,7 +47,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
         case .wind_gusts_10m:
             return ":GUST:10 m above ground:\(timestep) hour fcst:"
         case .visibility:
-            return ":VIS:surface:\(timestep) hour fcst:"
+            return timestep > 78 ? nil : ":VIS:surface:\(timestep) hour fcst:"
         case .thunderstorm_probability:
             if timestep > 36 {
                 return relTime % 6 != 0 || relTime >= 192 ? nil : ":TSTM:surface:\(timestep-6)-\(timestep) hour acc fcst:probability forecast"
