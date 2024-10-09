@@ -1,12 +1,16 @@
 /// Required additions to a GFS variable to make it downloadable
 protocol NbmVariableDownloadable: GenericVariable {
-    func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int, switchTo6H: Int) -> String?
+    func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int, run: Int) -> String?
     func multiplyAdd(domain: NbmDomain) -> (multiply: Float, add: Float)?
 }
 
 extension NbmSurfaceVariable: NbmVariableDownloadable {
-    func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int, switchTo6H: Int) -> String? {
+    func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int, run: Int) -> String? {
         // Note: Aggregations are only available every 6 hours, while instant values are 3 hourly after hour 40
+        
+        /// NBM uses 6 hourly models below. Probabilities are emited to 6 hours alignments
+        let relTime = timestep + run % 6
+        
         switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:\(timestep) hour fcst:"
@@ -19,8 +23,8 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             }
             return ":DSWRF:surface:\(timestep) hour fcst:"
         case .precipitation:
-            if timestep >= switchTo6H {
-                return (timestep - switchTo6H) % 6 == 0 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:"
+            if timestep > 36 {
+                return relTime % 6 != 0 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:"
             }
             return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:"
         case .relative_humidity_2m:
@@ -36,8 +40,8 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
         case .wind_direction_80m:
             return ":WDIR:80 m above ground:\(timestep) hour fcst:"
         case .snowfall_water_equivalent:
-            if timestep >= switchTo6H {
-                return (timestep - switchTo6H) % 6 == 0 ? nil : ":ASNOW:surface:\(timestep-6)-\(timestep) hour acc fcst:"
+            if timestep > 36 {
+                return relTime % 6 != 0 ? nil : ":ASNOW:surface:\(timestep-6)-\(timestep) hour acc fcst:"
             }
             return ":ASNOW:surface:\(timestep-1)-\(timestep) hour acc fcst:"
         case .wind_gusts_10m:
@@ -45,13 +49,13 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
         case .visibility:
             return ":VIS:surface:\(timestep) hour fcst:"
         case .thunderstorm_probability:
-            if timestep >= switchTo6H {
-                return (timestep - switchTo6H) % 6 == 0 || timestep >= 188 ? nil : ":TSTM:surface:\(timestep-6)-\(timestep) hour acc fcst:probability forecast"
+            if timestep > 36 {
+                return relTime % 6 != 0 || relTime >= 192 ? nil : ":TSTM:surface:\(timestep-6)-\(timestep) hour acc fcst:probability forecast"
             }
             return ":TSTM:surface:\(timestep-1)-\(timestep) hour acc fcst:probability forecast"
         case .precipitation_probability:
-            if timestep >= switchTo6H {
-                return (timestep - switchTo6H) % 6 == 0 || timestep >= 188 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
+            if timestep > 36 {
+                return relTime % 6 != 0 || relTime >= 192 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
             }
             return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
         }
@@ -68,7 +72,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
 }
 
 extension NbmPressureVariable: NbmVariableDownloadable {
-    func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int, switchTo6H: Int) -> String? {
+    func gribIndexName(for domain: NbmDomain, timestep: Int, previousTimestep: Int, run: Int) -> String? {
         return nil
     }
     
