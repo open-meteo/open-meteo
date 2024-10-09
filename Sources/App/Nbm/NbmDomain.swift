@@ -61,7 +61,26 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         // Has no hour 0
         // 1 to 63 hourly, 36 to 192 3-hourly, 192 to 264 in 6-hourly
         // 270 to 384 is available 10 hours later for run 0z and 12z. This data is not used
-        return Array(1...35) + Array(stride(from: 36, to: 192, by: 3)) + Array(stride(from: 192, through: 264, by: 6))
+        /**
+         0z 35,36,39 ... 186,189,195 ... 264
+         1z 36, 38, 41 ... 185,188,191,197 ... 263 ... ONLY PRECP 1z full 1h until 264
+         2z 36,37,40 ... 184,187,190,196 ... 262
+         3z 35,36,39 ... 186,189,195 ... 261
+         4z 35,36,38,41 ... 185,188,194 ... 260
+         5z 36,37,40 ... 184,187,193 ... 259
+         6z 35,36,39 ... 189,192,198 ... 264 (like 0z)
+         7z full 1h until 264 (like 1z)
+         8z 36,37,40 ... 184,187,190,196 ... 262 (like 2z)
+         9z 35,36,39 ... 186,189,195 ... 261 (like 3z)
+         */
+        switch run % 6 {
+        case 1:  return Array(1..<37) + Array(stride(from: 38, to: 191, by: 3)) + Array(stride(from: 191, through: 263, by: 6))
+        case 2:  return Array(1..<37) + Array(stride(from: 37, to: 190, by: 3)) + Array(stride(from: 190, through: 262, by: 6))
+        case 3:  return Array(1..<36) + Array(stride(from: 36, to: 189, by: 3)) + Array(stride(from: 189, through: 261, by: 6))
+        case 4:  return Array(1..<37) + Array(stride(from: 38, to: 188, by: 3)) + Array(stride(from: 188, through: 260, by: 6))
+        case 5:  return Array(1..<37) + Array(stride(from: 37, to: 187, by: 3)) + Array(stride(from: 187, through: 259, by: 6))
+        default: return Array(1..<36) + Array(stride(from: 36, to: 192, by: 3)) + Array(stride(from: 192, through: 264, by: 6))
+        }
     }
     
     var levels: [Int] {

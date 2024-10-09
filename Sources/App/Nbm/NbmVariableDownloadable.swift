@@ -14,7 +14,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             case .cape:
                 return ":CAPE:surface:\(timestep) hour fcst:"
             case .shortwave_radiation:
-                if timestep > 36 {
+                if timestep - previousTimestep > 1 {
                     // Instantaneous radiation can be processed with 1-hour intervals. Disregard the 3-hourly and 6-hourly data.
                     return nil
                 }
