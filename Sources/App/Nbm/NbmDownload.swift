@@ -127,6 +127,8 @@ struct NbmDownload: AsyncCommand {
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
         
+        let switchTo6H = domain.switchTo6H(run: run.hour)
+        
         var previousForecastHour = 0
         
         for forecastHour in forecastHours {
@@ -136,7 +138,7 @@ struct NbmDownload: AsyncCommand {
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0)
             
             let variables: [NbmVariableAndDomain] = variables.map {
-                NbmVariableAndDomain(variable: $0, domain: domain, timestep: forecastHour, previousTimestep: previousForecastHour)
+                NbmVariableAndDomain(variable: $0, domain: domain, timestep: forecastHour, previousTimestep: previousForecastHour, switchTo6H: switchTo6H)
             }
                            
             for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: false) {
@@ -205,12 +207,13 @@ struct NbmVariableAndDomain: CurlIndexedVariable {
     let domain: NbmDomain
     let timestep: Int
     let previousTimestep: Int
+    let switchTo6H: Int
     
     var exactMatch: Bool {
         return true
     }
     
     var gribIndexName: String? {
-        return variable.gribIndexName(for: domain, timestep: timestep, previousTimestep: previousTimestep)
+        return variable.gribIndexName(for: domain, timestep: timestep, previousTimestep: previousTimestep, switchTo6H: switchTo6H)
     }
 }

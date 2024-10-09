@@ -57,6 +57,18 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         return 1
     }
     
+    func switchTo6H(run: Int) -> Int {
+        switch run % 6 {
+        case 0:  return 36
+        case 1:  return 38
+        case 2:  return 37
+        case 3:  return 36
+        case 4:  return 38
+        case 5:  return 37
+        default: return 36
+        }
+    }
+    
     func forecastHours(run: Int) -> [Int] {
         // Has no hour 0
         // 1 to 63 hourly, 36 to 192 3-hourly, 192 to 264 in 6-hourly
