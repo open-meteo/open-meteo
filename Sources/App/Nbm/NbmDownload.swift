@@ -150,7 +150,7 @@ struct NbmDownload: AsyncCommand {
                     logger.warning("GRIB dimensions (nx=\(nx), ny=\(ny)) do not match domain grid dimensions (nx=\(domain.grid.nx), ny=\(domain.grid.ny)). Skipping")
                     continue
                 }
-                print(variable.variable)
+
                 try grib2d.load(message: message)
                 if domain.isGlobal {
                     grib2d.array.shift180LongitudeAndFlipLatitude()
