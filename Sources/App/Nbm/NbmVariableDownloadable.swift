@@ -25,8 +25,6 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
                 return ":RH:2 m above ground:\(timestep) hour fcst:"
             case .cloud_cover:
                 return ":TCDC:surface:\(timestep) hour fcst:"
-            //case .surface_temperature:
-           //     return ":TMP:surface:\(timestep) hour fcst:"
             case .wind_speed_10m:
                 return ":WIND:10 m above ground:\(timestep) hour fcst:"
             case .wind_speed_80m:
@@ -51,13 +49,8 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
     
     func multiplyAdd(domain: NbmDomain) -> (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m: //, .surface_temperature:
+        case .temperature_2m:
             return (1, -273.15)
-        //case .pressure_msl:
-        //    return (1/100, 0)
-        //case .precipitation:
-            // precipitation rate per second to hourly precipitation
-        //    return (Float(domain.dtSeconds), 0)
         default:
             return nil
         }

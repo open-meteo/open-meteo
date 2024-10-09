@@ -20,7 +20,6 @@ enum NbmVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case snowfall
     case rain
     case showers
-    //case surface_pressure
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case weathercode
@@ -170,9 +169,6 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.snow_fall_water_equivalent), time: time)
             case .snowfall:
                 try prefetchData(raw: .surface(.snow_fall_water_equivalent), time: time)
-            //case .surface_pressure:
-            //    try prefetchData(raw: .surface(.pressure_msl), time: time)
-            //    try prefetchData(raw: .surface(.temperature_2m), time: time)
             case .terrestrial_radiation:
                 break
             case .terrestrial_radiation_instant:

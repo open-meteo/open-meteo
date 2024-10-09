@@ -6,6 +6,9 @@ import SwiftNetCDF
 /**
 NCEP NBM downloader
  
+ TODO:
+ - surface elevation height and land-sea-mask
+ 
  Note: Depending on the run, different variables are available. See: https://vlab.noaa.gov/web/mdl/nbm-v4.2-weather-elements and  https://vlab.noaa.gov/web/mdl/nbm-data-availability-v4.2
  */
 struct NbmDownload: AsyncCommand {
@@ -18,9 +21,6 @@ struct NbmDownload: AsyncCommand {
         
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
-        
-        @Flag(name: "second-flush", help: "For GFS05 ensemble to download hours 390-840")
-        var secondFlush: Bool
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -61,8 +61,6 @@ struct NbmDownload: AsyncCommand {
             }
             return
         }
-        
-        /// 18z run is available the day after starting 05:26
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         try await downloadRun(using: context, signature: signature, run: run, domain: domain)
     }
@@ -94,7 +92,7 @@ struct NbmDownload: AsyncCommand {
         
         let variables: [any NbmVariableDownloadable] = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
         
-        let handles = try await downloadNbm(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour)
+        let handles = try await downloadNbm(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour)
         
         let nConcurrent = signature.concurrent ?? 1
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
@@ -108,8 +106,7 @@ struct NbmDownload: AsyncCommand {
         }
     }
     
-    /// download NBM
-    func downloadNbm(application: Application, domain: NbmDomain, run: Timestamp, variables: [any NbmVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func downloadNbm(application: Application, domain: NbmDomain, run: Timestamp, variables: [any NbmVariableDownloadable], maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         
         let deadLineHours: Double
@@ -122,7 +119,7 @@ struct NbmDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours+2) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
+        var forecastHours = domain.forecastHours(run: run.hour)
         if let maxForecastHour {
             forecastHours = forecastHours.filter({$0 <= maxForecastHour})
         }

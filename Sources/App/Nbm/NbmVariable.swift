@@ -2,51 +2,33 @@ import Foundation
 
 
 /**
- List of all surface GFS variables to download
+ List of all surface NBM variables to download
  */
 enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
-    
     case cloud_cover
-    //case pressure_msl
-    
     case relative_humidity_2m
-    
-    /// accumulated since forecast start
     case precipitation
-    
     case wind_speed_10m
     case wind_direction_10m
     case wind_speed_80m
     case wind_direction_80m
-    
-    /// Only sea surface temperture
-    //case surface_temperature
-    
     case snow_fall_water_equivalent
-
-    
     case wind_gusts_10m
-    
     case shortwave_radiation
-    
     case cape
-    
     case visibility
-    
     case thunderstorm_probability
-    
     case precipitation_probability
     
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .precipitation, .snow_fall_water_equivalent: return true
-        //case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
-        case .cape: return true
+        case .cape, .thunderstorm_probability: return true
         case .wind_speed_80m, .wind_direction_80m: return true
         default: return false
         }
@@ -92,14 +74,10 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linearDegrees
         case .cloud_cover:
             return .linear
-        //case .pressure_msl:
-            //return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
-        //case .surface_temperature:
-        //    return .hermite(bounds: nil)
         case .snow_fall_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
@@ -125,9 +103,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .precipitation, .snow_fall_water_equivalent: return .millimetre
         case .wind_speed_10m, .wind_speed_80m: return .metrePerSecond
         case .wind_direction_10m, .wind_direction_80m: return .degreeDirection
-        //case .surface_temperature: return .celsius
         case .wind_gusts_10m: return .metrePerSecond
-        //case .pressure_msl: return .hectopascal
         case .shortwave_radiation: return .wattPerSquareMetre
         case .cape: return .joulePerKilogram
         case .visibility: return .metre
@@ -140,8 +116,6 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var isElevationCorrectable: Bool {
         switch self {
-        //case .surface_temperature:
-        //    fallthrough
         case .temperature_2m:
             return true
         default:
