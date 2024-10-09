@@ -20,7 +20,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             return ":DSWRF:surface:\(timestep) hour fcst:"
         case .precipitation:
             if timestep >= switchTo6H {
-                return timestep % 6 > 3 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:"
+                return (timestep - switchTo6H) % 6 == 0 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:"
             }
             return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:"
         case .relative_humidity_2m:
@@ -37,7 +37,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             return ":WDIR:80 m above ground:\(timestep) hour fcst:"
         case .snowfall_water_equivalent:
             if timestep >= switchTo6H {
-                return timestep % 6 > 3 ? nil : ":ASNOW:surface:\(timestep-6)-\(timestep) hour acc fcst:"
+                return (timestep - switchTo6H) % 6 == 0 ? nil : ":ASNOW:surface:\(timestep-6)-\(timestep) hour acc fcst:"
             }
             return ":ASNOW:surface:\(timestep-1)-\(timestep) hour acc fcst:"
         case .wind_gusts_10m:
@@ -46,12 +46,12 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             return ":VIS:surface:\(timestep) hour fcst:"
         case .thunderstorm_probability:
             if timestep >= switchTo6H {
-                return timestep % 6 > 3 || timestep >= 188 ? nil : ":TSTM:surface:\(timestep-6)-\(timestep) hour acc fcst:probability forecast"
+                return (timestep - switchTo6H) % 6 == 0 || timestep >= 188 ? nil : ":TSTM:surface:\(timestep-6)-\(timestep) hour acc fcst:probability forecast"
             }
             return ":TSTM:surface:\(timestep-1)-\(timestep) hour acc fcst:probability forecast"
         case .precipitation_probability:
             if timestep >= switchTo6H {
-                return timestep % 6 > 3 || timestep >= 188 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
+                return (timestep - switchTo6H) % 6 == 0 || timestep >= 188 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
             }
             return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
         }
