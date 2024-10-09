@@ -4,7 +4,9 @@ import SwiftPFor2D
 import SwiftNetCDF
 
 /**
-NCEP GFS downloader
+NCEP NBM downloader
+ 
+ Note: Depending on the run, different variables are available. See: https://vlab.noaa.gov/web/mdl/nbm-v4.2-weather-elements and  https://vlab.noaa.gov/web/mdl/nbm-data-availability-v4.2
  */
 struct NbmDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -191,18 +193,16 @@ struct NbmDownload: AsyncCommand {
                 }
                 
                 
-                // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
-                /*if let variable = variable.variable as? NbmSurfaceVariable {
-                    if  (domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable)) {
-                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
-                        for i in grib2d.array.data.indices {
-                            if factor.data[i] < 0.05 {
-                                continue
-                            }
-                            grib2d.array.data[i] /= factor.data[i]
+                // NBM contains instantanous values for solar flux. Convert it to backwards averaged.
+                if let variable = variable.variable as? NbmSurfaceVariable, variable == .shortwave_radiation {
+                    let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                    for i in grib2d.array.data.indices {
+                        if factor.data[i] < 0.05 {
+                            continue
                         }
+                        grib2d.array.data[i] /= factor.data[i]
                     }
-                }*/
+                }
                 
                 // Scaling before compression with scalefactor
                 if let fma = variable.variable.multiplyAdd(domain: domain) {
