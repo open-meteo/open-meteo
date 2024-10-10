@@ -55,9 +55,18 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             return ":TSTM:surface:\(timestep-1)-\(timestep) hour acc fcst:probability forecast"
         case .precipitation_probability:
             if timestep > 36 {
-                return relTime % 6 != 0 || relTime >= 192 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
+                return relTime % 6 != 0 ? nil : ":APCP:surface:\(timestep-6)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
             }
             return ":APCP:surface:\(timestep-1)-\(timestep) hour acc fcst:prob >0.254:prob fcst 255/255"
+        case .rain_probability:
+            // PTYPE codes: https://www.nco.ncep.noaa.gov/pmb/docs/grib2/grib2_doc/grib2_table4-201.shtml
+            return ":PTYPE:surface:\(timestep) hour fcst:prob >=1 <2:prob fcst 1/1"
+        case .freezing_rain_probability:
+            return ":PTYPE:surface:\(timestep) hour fcst:prob >=3 <4:prob fcst 1/1"
+        case .ice_probability:
+            return ":PTYPE:surface:\(timestep) hour fcst:prob >=8 <9:prob fcst 1/1"
+        case .snowfall_probability:
+            return ":PTYPE:surface:\(timestep) hour fcst:prob >=5 <7:prob fcst 1/1"
         }
     }
     

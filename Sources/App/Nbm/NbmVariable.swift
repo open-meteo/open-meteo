@@ -20,6 +20,10 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case visibility
     case thunderstorm_probability
     case precipitation_probability
+    case rain_probability
+    case freezing_rain_probability
+    case ice_probability
+    case snowfall_probability
     
     var storePreviousForecast: Bool {
         switch self {
@@ -28,7 +32,8 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
-        case .cape, .thunderstorm_probability: return true
+        case .cape: return true
+        case .precipitation_probability, .thunderstorm_probability, .rain_probability, .freezing_rain_probability, .ice_probability, .snowfall_probability: return true
         case .wind_speed_80m, .wind_direction_80m: return true
         default: return false
         }
@@ -57,9 +62,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .shortwave_radiation: return 1
         case .cape: return 0.1
         case .visibility: return 0.05 // 50 meter
-        case .thunderstorm_probability:
-            return 1
-        case .precipitation_probability:
+        case .precipitation_probability, .thunderstorm_probability, .rain_probability, .freezing_rain_probability, .ice_probability, .snowfall_probability:
             return 1
         }
     }
@@ -88,9 +91,9 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...10e9)
         case .visibility:
             return .linear
-        case .thunderstorm_probability:
-            return .linear
-        case .precipitation_probability:
+        case .precipitation_probability, .thunderstorm_probability:
+            return .backwards
+        case .rain_probability, .freezing_rain_probability, .ice_probability, .snowfall_probability:
             return .linear
         }
     }
@@ -107,9 +110,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .shortwave_radiation: return .wattPerSquareMetre
         case .cape: return .joulePerKilogram
         case .visibility: return .metre
-        case .thunderstorm_probability:
-            return .percentage
-        case .precipitation_probability:
+        case .precipitation_probability, .thunderstorm_probability, .rain_probability, .freezing_rain_probability, .ice_probability, .snowfall_probability:
             return .percentage
         }
     }
