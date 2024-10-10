@@ -895,6 +895,11 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     case boundary_layer_height
+    case thunderstorm_probability
+    case rain_probability
+    case freezing_rain_probability
+    case ice_pellets_probability
+    case snowfall_probability
     
     
     case wind_speed_10m_spread
