@@ -369,6 +369,21 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .boundary_layer_height_spread:
             // TODO register PBL height
             return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+        case .thunderstorm_probability:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+        case .rain_probability:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+        case .freezing_rain_probability:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+        case .ice_pellets_probability:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+        case .snowfall_probability:
+            // TODO register PBL height
+            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
         }
     }
 }
@@ -716,6 +731,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ukmoGlobalDeterministic10km
         case .ukmo_uk_deterministic_2km:
             return .ukmoUkDeterministic2km
+        case .ncep_nbm_conus:
+            // TODO register NBM
+            return .gfs05
         }
     }
 }

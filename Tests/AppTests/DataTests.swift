@@ -92,6 +92,40 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(nearest.gridElevation.numeric, 1006.0)
     }
     
+    func testNbmGrid() {
+        // https://vlab.noaa.gov/web/mdl/nbm-grib2-v4.0
+        let proj = LambertConformalConicProjection(λ0: 265-360, ϕ0: 0, ϕ1: 25, ϕ2: 25, radius: 6371200)
+        let grid = ProjectionGrid(nx: 2345, ny: 1597, latitude: 19.229, longitude: 233.723-360, dx: 2539.7, dy: 2539.7, projection: proj)
+        let pos = proj.forward(latitude: 19.229, longitude: 233.723-360)
+        XCTAssertEqual(pos.x, -3271192.0)
+        XCTAssertEqual(pos.y, 2604267.8)
+        
+        let pos2 = grid.findPointXy(lat: 19.229, lon: 233.723-360)
+        XCTAssertEqual(pos2?.x, 0)
+        XCTAssertEqual(pos2?.y, 0)
+        
+        XCTAssertEqual(grid.findPoint(lat: 21.137999999999987, lon: 237.28 - 360), 117411)
+        XCTAssertEqual(grid.findPoint(lat: 24.449714395051082, lon: 265.54789437771944 - 360), 188910)
+        XCTAssertEqual(grid.findPoint(lat: 22.73382904757237 , lon: 242.93190409785294 - 360), 180965)
+        XCTAssertEqual(grid.findPoint(lat: 24.37172305316154, lon: 271.6307003393202 - 360), 196187)
+        XCTAssertEqual(grid.findPoint(lat: 24.007414634071907, lon: 248.77817290935954 - 360), 232796)
+        
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 0).latitude, 19.228992, accuracy: 0.001)
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 0).longitude, -126.27699, accuracy: 0.001)
+        
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 10000).latitude, 21.794254, accuracy: 0.001)
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 10000).longitude, -111.44652, accuracy: 0.001)
+        
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 20000).latitude, 22.806227, accuracy: 0.001)
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 20000).longitude, -96.18898, accuracy: 0.001)
+        
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 30000).latitude, 22.222015, accuracy: 0.001)
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 30000).longitude, -80.87921, accuracy: 0.001)
+        
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 40000).latitude, 20.274399, accuracy: 0.001)
+        XCTAssertEqual(grid.getCoordinates(gridpoint: 40000).longitude, -123.18192, accuracy: 0.001)
+    }
+    
     func testLambertConformal() {
         let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
         let pos = proj.forward(latitude: 47, longitude: -8)

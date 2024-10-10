@@ -98,6 +98,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")
     app.asyncCommands.use(GfsGraphCastDownload(), as: "download-gfs-graphcast")
+    app.asyncCommands.use(NbmDownload(), as: "download-nbm")
     app.asyncCommands.use(JmaDownload(), as: "download-jma")
     app.asyncCommands.use(MetNoDownloader(), as: "download-metno")
     app.asyncCommands.use(GloFasDownloader(), as: "download-glofas")
