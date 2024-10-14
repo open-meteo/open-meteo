@@ -64,6 +64,14 @@ struct ProbabilityReader {
         return reader
     }
     
+    /// Reader for probabilities based on NCEP NBM
+    static func makeNbmReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<NbmDomain, ProbabilityVariable>? {
+        guard let reader = try GenericReader<NbmDomain, ProbabilityVariable>(domain: .nbm_conus, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            return nil
+        }
+        return reader
+    }
+    
     /// Reader for probabilities based on ICON EU EPS
     static func makeIconEuReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<IconDomains, ProbabilityVariable>? {
         return try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
