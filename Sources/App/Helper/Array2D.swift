@@ -39,6 +39,17 @@ struct Array2D {
         data.shift180LongitudeAndFlipLatitude(nt: 1, ny: ny, nx: nx)
     }
     
+    mutating func flipEverySecondScanLine() {
+        // flip every second line
+        for y in stride(from: 1, to: ny, by: 2) {
+            for x in 0 ..< nx / 2 {
+                let temp = data[y * nx + x]
+                data[y * nx + x] = data[y * nx + nx - x - 1]
+                data[y * nx + nx - x - 1] = temp
+            }
+        }
+    }
+    
     mutating func shift180Longitudee() {
         data.shift180Longitude(nt: 1, ny: ny, nx: nx)
     }

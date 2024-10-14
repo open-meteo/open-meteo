@@ -52,7 +52,7 @@ struct GloFasDownloader: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
+        //let logger = context.application.logger
         let domain = try GloFasDomain.load(rawValue: signature.domain)
         
         switch domain {
