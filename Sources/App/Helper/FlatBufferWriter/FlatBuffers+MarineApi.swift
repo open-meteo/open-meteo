@@ -95,8 +95,7 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
         case .ncep_gfswave025:
             return .ncepGfswave025
         case .ncep_gfswave016:
-            // TODO register GFSwave 016
-            return .ncepGfswave025
+            return .ncepGfswave016
         case .ncep_gefswave025:
             return .ncepGefswave025
         }

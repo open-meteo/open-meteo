@@ -364,26 +364,19 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .direct_radiation_spread:
             return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
         case .boundary_layer_height:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, previousDay: previousDay)
+            return .init(variable: .boundaryLayerHeight, previousDay: previousDay)
         case .boundary_layer_height_spread:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+            return .init(variable: .boundaryLayerHeight, aggregation: .spread, previousDay: previousDay)
         case .thunderstorm_probability:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+            return .init(variable: .thunderstormProbability, previousDay: previousDay)
         case .rain_probability:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+            return .init(variable: .rainProbability, previousDay: previousDay)
         case .freezing_rain_probability:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+            return .init(variable: .freezingRainProbability, previousDay: previousDay)
         case .ice_pellets_probability:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+            return .init(variable: .icePelletsProbability, previousDay: previousDay)
         case .snowfall_probability:
-            // TODO register PBL height
-            return .init(variable: .directRadiation, aggregation: .spread, previousDay: previousDay)
+            return .init(variable: .snowfallProbability, previousDay: previousDay)
         }
     }
 }
@@ -732,8 +725,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .ukmo_uk_deterministic_2km:
             return .ukmoUkDeterministic2km
         case .ncep_nbm_conus:
-            // TODO register NBM
-            return .gfs05
+            return .ncepNbmConus
         }
     }
 }
