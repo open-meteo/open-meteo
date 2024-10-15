@@ -220,6 +220,8 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
             default:
                 return false
             }
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            return false
         }
     }
     
