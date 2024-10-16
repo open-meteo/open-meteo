@@ -78,7 +78,7 @@ struct RegularGrid: Gridable {
     }
 }
 
-/// Represend a subsection of a grid. Similar to an array slice, but using two dimensions
+/// Represent a subsection of a grid. Similar to an array slice, but using two dimensions
 /// Important: The iterated coordinates are in global coordinates (-> gridpoint index). Array slices would use local indices.
 struct RegularGridSlice {
     let grid: RegularGrid
