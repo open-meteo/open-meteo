@@ -36,7 +36,7 @@ struct GenericVariableHandle {
         logger.info("Conversion completed in \(timeElapsed)")
         
         /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
-        if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10" ].contains($0.variable.omFileName.file)}) {
+        if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10" ].contains($0.variable.omFileName.file)}) {
             let end = handles.max(by: {$0.time < $1.time})?.time.add(domain.dtSeconds) ?? Timestamp(0)
             
             //let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)

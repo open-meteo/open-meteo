@@ -33,6 +33,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arome_france_15min
     case arome_france_hd_15min
     
+    case arpege_europe_probabilities
+    case arpege_world_probabilities
+    
     var hasYearlyFiles: Bool {
         return false
     }
@@ -55,6 +58,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return .meteofrance_arome_france0025_15min
         case .arome_france_hd_15min:
             return .meteofrance_arome_france_hd_15min
+        case .arpege_europe_probabilities:
+            return .meteofrance_arpege_europe_probabilities
+        case .arpege_world_probabilities:
+            return .meteofrance_arpege_world025_probabilities
         }
     }
     
@@ -64,6 +71,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return .meteofrance_arome_france0025
         case .arome_france_hd_15min:
             return .meteofrance_arome_france_hd
+        case .arpege_europe_probabilities:
+            return .meteofrance_arpege_europe
+        case .arpege_world_probabilities:
+            return .meteofrance_arpege_world025
         default:
             return domainRegistry
         }
@@ -77,6 +88,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .arome_france_15min, .arome_france_hd_15min:
             return 900
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            return 3*3600
         }
     }
     var isGlobal: Bool {
@@ -91,6 +104,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return 3*3600
         case .arome_france_15min, .arome_france_hd_15min:
             return 3600
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            return 12*3600
         }
     }
     
@@ -98,6 +113,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fallthrough
         case .arpege_europe, .arpege_world:
             // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
@@ -111,6 +128,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     
     var timeoutHours: Double {
         switch self {
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fallthrough
         case .arpege_europe, .arpege_world:
             // Arpege has sometimes larger delays
             return 7.5
@@ -136,14 +155,16 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return "MF-NWP-HIGHRES-AROMEPI-0025-FRANCE"
         case .arome_france_hd_15min:
             return "MF-NWP-HIGHRES-AROMEPI-001-FRANCE"
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fatalError()
         }
     }
     
     var mfApiGridName: String {
         switch self {
-        case .arpege_europe:
+        case .arpege_europe, .arpege_europe_probabilities:
             return "0.1"
-        case .arpege_world:
+        case .arpege_world, .arpege_world_probabilities:
             return "0.25"
         case .arome_france:
             return "0.025"
@@ -170,6 +191,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return []
         case .arome_france_hd_15min:
             return []
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fatalError()
         }
     }
     
@@ -185,6 +208,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return []
         case .arome_france_hd_15min:
             return []
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fatalError()
         }
     }
     
@@ -202,6 +227,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return []
         case .arome_france_hd_15min:
             return []
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fatalError()
         }
     }
     
@@ -235,6 +262,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     
     var family: Family {
         switch self {
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fallthrough
         case .arpege_world, .arpege_europe:
             return .arpege
         case .arome_france, .arome_france_hd:
@@ -252,6 +281,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return "&subset=long(-180,180)&subset=lat(-90,90)"
         case .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min:
             return "&subset=lat(37.5,55.4)&subset=long(-12,16)"
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            fatalError()
         }
     }
 
@@ -271,6 +302,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, through: 51*3600, by: 3600))
         case .arome_france_15min, .arome_france_hd_15min:
             return Array(stride(from: 0, through: 6*3600, by: 900))
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            return Array(stride(from: 3*3600, through: (run == 6 ? 90 : 102)*3600, by: 3*3600))
         }
     }
     
@@ -288,6 +321,8 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return []
         case .arome_france_15min, .arome_france_hd_15min:
             return []
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            return []
         }
     }
     
@@ -302,14 +337,16 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arome_france_15min, .arome_france_hd_15min:
             // 6 h forecast a 15min = 24 steps per update
             return 24 * 2
+        case .arpege_europe_probabilities, .arpege_world_probabilities:
+            return (102 + 4*24)/3
         }
     }
     
     var grid: Gridable {
         switch self {
-        case .arpege_europe:
+        case .arpege_europe, .arpege_europe_probabilities:
             return RegularGrid(nx: 741, ny: 521, latMin: 20, lonMin: -32, dx: 0.1, dy: 0.1)
-        case .arpege_world:
+        case .arpege_world, .arpege_world_probabilities:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .arome_france, .arome_france_15min:
             return RegularGrid(nx: 1121, ny: 717, latMin: 37.5, lonMin: -12.0, dx: 0.025, dy: 0.025)
