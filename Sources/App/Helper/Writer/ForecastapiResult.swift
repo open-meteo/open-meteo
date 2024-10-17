@@ -403,7 +403,7 @@ extension Sequence where Element == Timestamp {
         return AnySequence<String> { () -> AnyIterator<String> in
             var itterator = self.makeIterator()
             var t = tm()
-            var dateCalculated = -99999
+            var dateCalculated = Int.min
             
             if onlyDate {
                 return AnyIterator<String> {
@@ -422,8 +422,8 @@ extension Sequence where Element == Timestamp {
                     return nil
                 }
                 var time = element.timeIntervalSince1970
-                if dateCalculated != time / 86400 {
-                    dateCalculated = time / 86400
+                if dateCalculated != time - time.moduloPositive(86400) {
+                    dateCalculated = time - time.moduloPositive(86400)
                     gmtime_r(&time, &t)
                 }
                 let year = Int(t.tm_year+1900)
