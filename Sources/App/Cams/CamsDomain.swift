@@ -73,7 +73,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         case .cams_global:
             return 12*3600
         case .cams_europe:
-            return 12*3600
+            return 24*3600
         case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
             return 0
         }
