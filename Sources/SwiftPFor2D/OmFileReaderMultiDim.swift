@@ -349,36 +349,24 @@ struct OmFileReadRequest {
         /// TODO optimise
         let nChunks = number_of_chunks()
         
-        // index is a flat Int64 array
-        //let data = indexData.assumingMemoryBound(to: Int.self)
-        
         let indexDataPtr = UnsafeMutablePointer(mutating: indexData.baseAddress!.assumingMemoryBound(to: UInt8.self))
-        
-        /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
-        //let startOffset = indexRange.lowerBound == 0 ? 1 : 0
         
         /// Note: This should be stack allocated to a max size of 256 elements
         /// TODO LUT buffer may need to be larger. Maybe no bounding is required anymore at all
-        var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount+16)
+        var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount /*+16*/)
         
         /// Which LUT chunk is currently loaded into `uncompressedLut`
-        var lutChunk = -1
+        var lutChunk = dataStartChunk.lowerBound / lutChunkElementCount
         
         /// Uncompress the first LUT index chunk and check the length
-        if true { // if indexRange.lowerBound > 0 {
-            lutChunk = (dataStartChunk.lowerBound - 0) / lutChunkElementCount
+        if true {
             let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks+1) - lutChunk * lutChunkElementCount
-            let start = lutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 0) / lutChunkElementCount * self.lutChunkLength
+            let start = lutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength
             assert(start >= 0)
             assert(start + self.lutChunkLength <= indexData.count)
-            if lutChunkElementCount == 1 {
-                // Old files do not compress LUTs
-                uncompressedLut[0] = indexDataPtr.advanced(by: start).assumingMemoryBound(to: UInt64.self, capacity: 1)[0]
-            } else {
-                // Decompress LUT chunk
-                uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                    let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
-                }
+            // Decompress LUT chunk
+            uncompressedLut.withUnsafeMutableBufferPointer { dest in
+                let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
             }
             //print("Initial LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
@@ -393,17 +381,12 @@ struct OmFileReadRequest {
         if (indexRange.lowerBound + 1) / lutChunkElementCount != lutChunk {
             lutChunk = (dataStartChunk.lowerBound + 1) / lutChunkElementCount
             let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks+1) - lutChunk * lutChunkElementCount
-            let start = lutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 0) / lutChunkElementCount * self.lutChunkLength
+            let start = lutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength
             assert(start >= 0)
             assert(start + self.lutChunkLength <= indexData.count)
-            if lutChunkElementCount == 1 {
-                // Old files do not compress LUTs
-                uncompressedLut[0] = indexDataPtr.advanced(by: start).assumingMemoryBound(to: UInt64.self, capacity: 1)[0]
-            } else {
-                // Decompress LUT chunk
-                uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                    let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
-                }
+            // Decompress LUT chunk
+            uncompressedLut.withUnsafeMutableBufferPointer { dest in
+                let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
             }
             //print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
@@ -436,17 +419,12 @@ struct OmFileReadRequest {
             /// Maybe the next LUT chunk needs to be uncompressed
             if nextLutChunk != lutChunk {
                 let nextlutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, nChunks+1) - nextLutChunk * lutChunkElementCount
-                let start = nextLutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 0) / lutChunkElementCount * self.lutChunkLength
+                let start = nextLutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength
                 assert(start >= 0)
                 assert(start + self.lutChunkLength <= indexData.count)
-                if lutChunkElementCount == 1 {
-                    // Old files do not compress LUTs
-                    uncompressedLut[0] = indexDataPtr.advanced(by: start).assumingMemoryBound(to: UInt64.self, capacity: 1)[0]
-                } else {
-                    // Decompress LUT chunk
-                    uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                        let _ = p4nddec64(indexDataPtr.advanced(by: start), nextlutChunkElementCount, dest.baseAddress)
-                    }
+                // Decompress LUT chunk
+                uncompressedLut.withUnsafeMutableBufferPointer { dest in
+                    let _ = p4nddec64(indexDataPtr.advanced(by: start), nextlutChunkElementCount, dest.baseAddress)
                 }
                 //print("Next LUT load \(uncompressedLut), \(nextlutChunkElementCount), start=\(start)")
                 //print(uncompressedLut)
