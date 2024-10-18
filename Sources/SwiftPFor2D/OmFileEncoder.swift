@@ -84,7 +84,6 @@ public struct OmFileJSONVariable: Codable {
     let dimensionNames: [String]?
     let scalefactor: Float
     let compression: CompressionType
-    let dataOffset: Int
     let lutOffset: Int
     let lutChunkSize: Int
 }

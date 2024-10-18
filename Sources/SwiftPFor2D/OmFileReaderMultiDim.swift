@@ -34,7 +34,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
     /// Number of elements in index LUT chunk. Might be hardcoded to 256 later
     let lutChunkElementCount: Int
     
-    /// Offset in bytes of data
+    /// Offset in bytes of data. Only used in V1 files. Otherwise 0.
     let dataStart: Int
     
     public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) throws -> Self {
@@ -84,7 +84,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
                 lutStart: variable.lutOffset,
                 lutChunkLength: variable.lutChunkSize,
                 lutChunkElementCount: lutChunkElementCount,
-                dataStart: variable.dataOffset
+                dataStart: 0
             )
         })
     }
@@ -166,7 +166,7 @@ struct OmFileReadRequest {
     /// Number of elements in each LUT chunk
     let lutChunkElementCount: Int
     
-    /// Offset in bytes of data
+    /// Offset in bytes of data. Only used in V1 files. Otherwise 0.
     let dataStart: Int
     
     /// Offset  in bytes of LUT index
@@ -234,10 +234,18 @@ struct OmFileReadRequest {
         var chunkIndex = chunkIndexStart.lowerBound
         var nextChunkOut: Range<Int>? = chunkIndexStart
         
+        let isV3LUT = dataStart == 0
+        
+        /// Old files do not store the chunk start in the first LUT entry
+        /// LUT old: end0, end1, end2
+        /// LUT new: start0, end0, end1, end2
+        let alignOffset = isV3LUT || chunkIndexStart.lowerBound == 0 ? 0 : 1
+        let endAlignOffset = isV3LUT ? 1 : 0
+        
         var rangeEnd = chunkIndexStart.upperBound
         
         /// The current read start position
-        let readStart = chunkIndexStart.lowerBound == 0 ? 0 : (chunkIndexStart.lowerBound-1) / lutChunkElementCount * lutChunkLength
+        let readStart = (chunkIndexStart.lowerBound-alignOffset) / lutChunkElementCount * lutChunkLength
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while true {
@@ -259,7 +267,7 @@ struct OmFileReadRequest {
                 next = nextRange.lowerBound
                 
                 nextChunkOut = next ..< rangeEnd
-                let readStartNext = next / lutChunkElementCount * lutChunkLength - lutChunkLength
+                let readStartNext = (next+endAlignOffset) / lutChunkElementCount * lutChunkLength - lutChunkLength
                 
                 // The new range could be quite far apart.
                 // E.g. A LUT of 10MB and you only need information from the beginning and end
@@ -272,7 +280,7 @@ struct OmFileReadRequest {
             nextChunkOut = next ..< rangeEnd
             
             /// The read end position if the current index would be read
-            let readEndNext = next / lutChunkElementCount * lutChunkLength
+            let readEndNext = (next+endAlignOffset) / lutChunkElementCount * lutChunkLength
             
             guard readEndNext - readStart <= io_size_max else {
                 // the next read would exceed IO limitons
@@ -280,7 +288,7 @@ struct OmFileReadRequest {
             }
             chunkIndex = next
         }
-        let readEnd = (chunkIndex / lutChunkElementCount + 1) * lutChunkLength
+        let readEnd = ((chunkIndex + endAlignOffset) / lutChunkElementCount + 1) * lutChunkLength
         return (lutStart + readStart, readEnd - readStart, chunkIndexStart.lowerBound..<chunkIndex+1, nextChunkOut)
     }
     
@@ -350,17 +358,17 @@ struct OmFileReadRequest {
         //let startOffset = indexRange.lowerBound == 0 ? 1 : 0
         
         /// Note: This should be stack allocated to a max size of 256 elements
-        /// TODO LUT buffer may need to be larger
+        /// TODO LUT buffer may need to be larger. Maybe no bounding is required anymore at all
         var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount+16)
         
         /// Which LUT chunk is currently loaded into `uncompressedLut`
         var lutChunk = -1
         
         /// Uncompress the first LUT index chunk and check the length
-        if indexRange.lowerBound > 0 {
-            lutChunk = (dataStartChunk.lowerBound - 1) / lutChunkElementCount
-            let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks) - lutChunk * lutChunkElementCount
-            let start = lutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 1) / lutChunkElementCount * self.lutChunkLength
+        if true { // if indexRange.lowerBound > 0 {
+            lutChunk = (dataStartChunk.lowerBound - 0) / lutChunkElementCount
+            let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks+1) - lutChunk * lutChunkElementCount
+            let start = lutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 0) / lutChunkElementCount * self.lutChunkLength
             assert(start >= 0)
             assert(start + self.lutChunkLength <= indexData.count)
             if lutChunkElementCount == 1 {
@@ -379,13 +387,13 @@ struct OmFileReadRequest {
         //var uncompressedLutPreviousEnd = UInt64(0)
         
         /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-        let startPos = indexRange.lowerBound == 0 ? UInt64(dataStart) : uncompressedLut[(dataStartChunk.lowerBound - 1) % lutChunkElementCount]
+        let startPos = /*indexRange.lowerBound == 0 ? UInt64(dataStart) : */uncompressedLut[(dataStartChunk.lowerBound - 0) % lutChunkElementCount]
         
         /// For the unlucky case that only th last value of the LUT was required, we now have to decompress the next LUT
-        if indexRange.lowerBound / lutChunkElementCount != lutChunk {
-            lutChunk = dataStartChunk.lowerBound / lutChunkElementCount
-            let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks) - lutChunk * lutChunkElementCount
-            let start = lutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 1) / lutChunkElementCount * self.lutChunkLength
+        if (indexRange.lowerBound + 1) / lutChunkElementCount != lutChunk {
+            lutChunk = (dataStartChunk.lowerBound + 1) / lutChunkElementCount
+            let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks+1) - lutChunk * lutChunkElementCount
+            let start = lutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 0) / lutChunkElementCount * self.lutChunkLength
             assert(start >= 0)
             assert(start + self.lutChunkLength <= indexData.count)
             if lutChunkElementCount == 1 {
@@ -400,13 +408,14 @@ struct OmFileReadRequest {
             //print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
         
-        var endPos = uncompressedLut[(dataStartChunk.lowerBound) % lutChunkElementCount]
+        var endPos = uncompressedLut[(dataStartChunk.lowerBound+1) % lutChunkElementCount]
         
         var rangeEnd = dataStartChunk.upperBound
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while true {
             var next = globalChunkNum + 1
+            //print("next \(next)")
             if next >= rangeEnd {
                 guard let nextRange = get_next_chunk_position(globalChunkNum: globalChunkNum) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
@@ -422,12 +431,12 @@ struct OmFileReadRequest {
             }
             nextChunkOut = next ..< rangeEnd
             
-            let nextLutChunk = next / lutChunkElementCount
+            let nextLutChunk = (next+1) / lutChunkElementCount
             
             /// Maybe the next LUT chunk needs to be uncompressed
             if nextLutChunk != lutChunk {
-                let nextlutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, nChunks) - nextLutChunk * lutChunkElementCount
-                let start = nextLutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 1) / lutChunkElementCount * self.lutChunkLength
+                let nextlutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, nChunks+1) - nextLutChunk * lutChunkElementCount
+                let start = nextLutChunk * self.lutChunkLength - max(0, indexRange.lowerBound - 0) / lutChunkElementCount * self.lutChunkLength
                 assert(start >= 0)
                 assert(start + self.lutChunkLength <= indexData.count)
                 if lutChunkElementCount == 1 {
@@ -447,7 +456,7 @@ struct OmFileReadRequest {
             //let dataStartPos = data.advanced(by: next - indexRange.lowerBound - startOffset).pointee
             //let dataEndPos = data.advanced(by: next - indexRange.lowerBound - startOffset + 1).pointee
             
-            let dataEndPos = uncompressedLut[next % lutChunkElementCount]
+            let dataEndPos = uncompressedLut[(next+1) % lutChunkElementCount]
             
             /// Merge and split IO requests
             if dataEndPos - startPos > io_size_max,
