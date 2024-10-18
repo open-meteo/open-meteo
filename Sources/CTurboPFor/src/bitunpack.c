@@ -25,7 +25,7 @@
 
 #ifdef GUARDED
 
-
+#include <string.h> // for memcp
 #define BITUTIL_IN
 #define VINT_IN
 #include "conf.h"
