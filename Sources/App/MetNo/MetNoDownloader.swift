@@ -148,7 +148,7 @@ struct MetNoDownloader: AsyncCommand {
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
                 for (i,l) in locationRange.enumerated() {
                     /// Make sure to keep hour 0 filled with NaNs for solar radiation. Otherwise they contain "0".
-                    let start = variable.isAccumulatedSinceModelStart ? 1 : 0
+                    let start = variable.skipHour0 ? 1 : 0
                     for h in start..<nTime {
                         data2d[i, h] = spatial[h, l]
                     }

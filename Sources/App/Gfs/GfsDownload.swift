@@ -115,7 +115,7 @@ struct GfsDownload: AsyncCommand {
             
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
-        case .gfswave025, .gfswave025_ens:
+        case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing)
             let nConcurrent = signature.concurrent ?? 1
@@ -155,6 +155,10 @@ struct GfsDownload: AsyncCommand {
                     return ":LAND:surface:"
                 }
             }
+            
+            var exactMatch: Bool {
+                return false
+            }
         }
         
         var height: Array2D? = nil
@@ -193,7 +197,7 @@ struct GfsDownload: AsyncCommand {
         
         // GFS025 ensemble does not have elevation information, use non-ensemble version
         let elevationUrl = (domain == .gfs025_ens ? GfsDomain.gfs025 : domain).getGribUrl(run: run, forecastHour: 0, member: 0)
-        if ![GfsDomain.hrrr_conus_15min, .gfswave025, .gfswave025_ens].contains(domain) {
+        if ![GfsDomain.hrrr_conus_15min, .gfswave025, .gfswave025_ens, .gfswave016].contains(domain) {
             // 15min hrrr data uses hrrr domain elevation files
             try await downloadNcepElevation(application: application, url: elevationUrl, surfaceElevationFileOm: domain.surfaceElevationFileOm, grid: domain.grid, isGlobal: domain.isGlobal)
         }
@@ -202,7 +206,7 @@ struct GfsDownload: AsyncCommand {
         switch domain {
         case .gfs013:
             deadLineHours = 6
-        case .gfs025, .gfswave025:
+        case .gfs025, .gfswave025, .gfswave016:
             deadLineHours = 5
         case .hrrr_conus_15min:
             deadLineHours = 2
@@ -332,6 +336,13 @@ struct GfsDownload: AsyncCommand {
                         fatalError("could not get step range or type")
                     }
                     
+                    /// Generate land mask from regular data for GFS Wave013
+                    if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
+                        let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
+                        //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
+                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
+                    }
+                    
                     // Deaccumulate precipitation
                     guard await deaverager.deaccumulateIfRequired(variable: variable.variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         continue
@@ -442,6 +453,10 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
     let variable: any GfsVariableDownloadable
     let domain: GfsDomain
     let timestep: Int?
+    
+    var exactMatch: Bool {
+        return false
+    }
     
     var gribIndexName: String? {
         return variable.gribIndexName(for: domain, timestep: timestep)

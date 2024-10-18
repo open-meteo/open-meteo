@@ -65,7 +65,7 @@ extension GenericReaderMixerRaw {
         reader.last!.targetElevation
     }
     var modelDtSeconds: Int {
-        reader.first!.modelDtSeconds
+        reader.last!.modelDtSeconds
     }
     
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) throws {

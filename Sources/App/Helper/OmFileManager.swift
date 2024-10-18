@@ -58,6 +58,11 @@ enum OmFileManagerReadable: Hashable {
         return try OmFileReader(file: file)
     }
     
+    func exists() -> Bool {
+        let file = getFilePath()
+        return FileManager.default.fileExists(atPath: file)
+    }
+    
     func openReadCached() throws -> OmFileReader<MmapFileCached>? {
         let fileRel = getRelativeFilePath()
         let file = "\(OpenMeteo.dataDirectory)\(fileRel)"

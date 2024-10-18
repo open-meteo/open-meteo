@@ -42,7 +42,7 @@ Apps:
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
-- [omWeather](https://github.com/woheller69/omweather) Android Weather App
+- [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
 - [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
@@ -68,6 +68,7 @@ Repositories:
 - [Homepage](https://github.com/benphelps/homepage/) A highly customizable homepage (or startpage / application dashboard) with Docker and service API integrations.
 - [Spots Guru](https://www.spots.guru) Weather forecast for lazy, the best wind & wave spots around you.
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
+- [DIY Arduino esp8266 weather station](https://github.com/AlexeyMal/esp8266-weather-station) esp8266 weather station using Open-Meteo API, an embedded C++ implementation example
 
 Other:
 - [Menubar Weather](https://www.raycast.com/koinzhang/menubar-weather) A Raycast extension that displays live weather information in your menu bar

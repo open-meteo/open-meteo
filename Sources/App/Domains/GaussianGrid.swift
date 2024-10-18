@@ -125,6 +125,80 @@ struct GaussianGrid: Gridable {
     }
     
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
-        return nil
+        return Slice(type: type, bb: bb)
+    }
+}
+
+extension GaussianGrid {
+    /// Represent a subsection of a gaussian grid
+    /// Important: The iterated coordinates are in global coordinates (-> gridpoint index). Array slices would use local indices.
+    struct Slice {
+        let type: GridType
+        let bb: BoundingBoxWGS84
+    }
+}
+
+extension GaussianGrid.Slice: Sequence {
+    func makeIterator() -> SliceIterator {
+        let latitudeLines = type.latitudeLines
+        let dy = Float(180)/(2*Float(latitudeLines)+0.5)
+        let y1 = (Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy/2) / dy))) + 2*latitudeLines) % (2*latitudeLines)
+        let y2 = (Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy/2) / dy))) + 2*latitudeLines) % (2*latitudeLines)
+        
+        let nx = type.nxOf(y: y1)
+        let dx = 360 / Float(nx)
+        let x1 = (Int(round(bb.longitude.lowerBound / dx)) + nx) % nx
+        let x2 = (Int(round(bb.longitude.upperBound / dx)) + nx) % nx
+        
+        return SliceIterator(
+            position: type.integral(y: y1) + x1,
+            y: y1,
+            x: x1,
+            nx: nx,
+            xEnd: x2,
+            yEnd: y2,
+            type: type,
+            longitude: bb.longitude
+        )
+    }
+
+    /// Iterate over a subset of a grib following x and y ranges. The element returns the global grid coordinate (grid point index as integer)
+    struct SliceIterator: IteratorProtocol {
+        var position: Int
+        
+        var y: Int
+        
+        var x: Int
+        
+        /// number of longitudes in this latitude line
+        var nx: Int
+        
+        var xEnd: Int
+        
+        let yEnd: Int
+        
+        let type: GaussianGrid.GridType
+        
+        let longitude: Range<Float>
+        
+        mutating func next() -> Int? {
+            // check if x exceeds x-range
+            if x >= xEnd {
+                // move y forward if possible
+                guard y+1 < yEnd else {
+                    return nil
+                }
+                y = y+1
+                position = position - x + nx // move position to new line
+                nx = type.nxOf(y: y)
+                let dx = 360 / Float(nx)
+                x = (Int(round(longitude.lowerBound / dx)) + nx) % nx
+                position += x // move position in line to x
+                xEnd = (Int(round(longitude.upperBound / dx)) + nx) % nx
+            }
+            position += 1
+            x += 1
+            return position-1
+        }
     }
 }

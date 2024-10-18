@@ -5,6 +5,11 @@ import SwiftPFor2D
 
 /**
 Meteofrance Arome, Arpge downloader
+ 
+ TODO:
+ - AROME 0.025 PI added direct radiation
+ - Correct old shortwave radiaiton files
+ - AROME 0.01 PI has low clouds, AROME PRI 0.025 mid and high, should be combined to total clouds
  */
 struct MeteoFranceDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -81,8 +86,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let useGribPackagesDownload = signature.useGribPackages && domain.mfApiPackagesSurface != []
                 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
-        let handles = useGribPackagesDownload ?
-        try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour) :
+        let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, maxForecastHour: signature.maxForecastHour) : useGribPackagesDownload ?
+            try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour) :
             try await download2(application: context.application, domain: domain, run: run, variables: variables)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
@@ -98,7 +103,7 @@ struct MeteoFranceDownload: AsyncCommand {
     func downloadElevation2(application: Application, domain: MeteoFranceDomain, run: Timestamp) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
-        if domain == .arome_france_15min || domain == .arome_france_hd_15min {
+        if domain == .arome_france_15min || domain == .arome_france_hd_15min || domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities {
             return
         }
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -191,6 +196,70 @@ struct MeteoFranceDownload: AsyncCommand {
         var requiresOffsetCorrectionForMixing: Bool {
             return false
         }
+    }
+    
+    /**
+     Download statistical ensemble forecast. See https://github.com/open-meteo/open-meteo/issues/1069
+     */
+    func downloadProbabilities(application: Application, domain: MeteoFranceDomain, run: Timestamp, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+        guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
+            fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
+        }
+        let logger = application.logger
+        let deadLineHours = domain.timeoutHours
+        Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
+        defer { Process.alarm(seconds: 0) }
+        
+        let grid = domain.grid
+        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
+        var handles = [GenericVariableHandle]()
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
+        
+        // https://public-api.meteofrance.fr/public/DPStatsPEARPEGE/v1/models/PEARP-EUROPE/grids/0.1/groups/FFDDP1/productStatsPEARP?referencetime=2024-10-14T18%3A00%3A00Z&time=003H&format=grib2
+        
+        for forecastSecond in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: false) {
+            if let maxForecastHour, forecastSecond / 3600 > maxForecastHour {
+                break
+            }
+            let timestamp = run.add(forecastSecond)
+            let f3 = (forecastSecond/3600).zeroPadded(len: 3)
+            
+            let url = "https://public-api.meteofrance.fr/public/DPStatsPEARPEGE/v1/models/PEARP-EUROPE/grids/\(domain.mfApiGridName)/groups/RRP1/productStatsPEARP?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(f3)H&format=grib2"
+            
+            let h = try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+                
+                // process sequentialy, as precipitation need to be in order for deaveraging
+                return try await stream.compactMap { message -> GenericVariableHandle? in
+                    // Only select 3h precipitation probability from the grib file
+                    guard let probabilityType = message.getLong(attribute: "probabilityType"),
+                          probabilityType == 3,
+                          let stepRange = message.get(attribute: "stepRange")?.splitTo2Integer(),
+                          stepRange.1 - stepRange.0 == 3
+                    else {
+                        return nil
+                    }
+                    
+                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    //message.dumpAttributes()
+                    try grib2d.load(message: message)
+                    if domain.isGlobal {
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                    } else {
+                        grib2d.array.flipLatitude()
+                    }
+                    
+                    let variable = ProbabilityVariable.precipitation_probability
+                    
+                    logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
+                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                }.collect()
+            }
+            handles.append(contentsOf: h)
+        }
+        await curl.printStatistics()
+        return handles
     }
     
     /**
@@ -470,13 +539,13 @@ struct MeteoFranceDownload: AsyncCommand {
                 if seconds == 0 && variable.skipHour0(domain: domain) {
                     continue
                 }
-                let coverage = variable.getCoverageId()
+                let coverage = variable.getCoverageId(domain: domain)
                 let subsetHeight = coverage.height.map { "&subset=height(\($0))" } ?? ""
                 let subsetPressure = coverage.pressure.map { "&subset=pressure(\($0))" } ?? ""
                 let subsetTime = "&subset=time(\(seconds))"
                 let runTime = "\(run.iso8601_YYYY_MM_dd)T\(run.hour.zeroPadded(len: 2)).00.00Z"
-                let is3H = domain == .arpege_world && (seconds/3600) >= 51
-                let period = coverage.isPeriod ? domain.dtSeconds == 900 ? "_PT15M" : is3H ? "_PT3H" : "_PT1H" : ""
+                //let is3H = domain == .arpege_world && (seconds/3600) >= 51
+                let period = coverage.periodMinutes.map { $0 >= 60 ? "_PT\($0/60)H" : "_PT\($0)M" } ?? ""
                 
                 let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=\(coverage.variable)___\(runTime)\(period)\(subsetGrid)\(subsetHeight)\(subsetPressure)\(subsetTime)&format=application%2Fwmo-grib"
                 
