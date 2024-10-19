@@ -59,7 +59,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     static func read(fn: Backend, decoder: OmFileDecoder, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
-        var chunkIndex: Range<Int>? = decoder.get_first_chunk_position()
+        
         
         //print("new read \(self), start \(chunkIndex ?? 0..<0)")
         
@@ -68,11 +68,14 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         
         
         fn.withUnsafeBytes({ ptr in
+            
+            var readIndexInstruction = decoder.get_first_chunk_position()
+            
             /// Loop over index blocks
-            while let chunkIndexStart = chunkIndex {
-                let readIndexInstruction = decoder.get_next_index_read(chunkIndex: chunkIndexStart)
-                chunkIndex = readIndexInstruction.nextChunk
-                var chunkData: Range<Int>? = chunkIndexStart
+            while decoder.get_next_index_read(indexRead: &readIndexInstruction) {
+                //let readIndexInstruction = decoder.get_next_index_read(chunkIndex: chunkIndexStart)
+                //chunkIndex = readIndexInstruction.nextChunk
+                //var chunkData: Range<Int>? = readIndexInstruction.chunkIndex
                 
                 // actually "read" index data from file
                 //print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
@@ -81,10 +84,12 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                 //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
                 //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
                 
+                var readDataInstruction = ChunkDataReadInstruction(indexRead: readIndexInstruction)
+                
                 /// Loop over data blocks
-                while let chunkDataStart = chunkData {
-                    let readDataInstruction = decoder.get_next_data_read(chunkIndex: chunkDataStart, indexRange: readIndexInstruction.indexRange, indexData: indexData)
-                    chunkData = readDataInstruction.nextChunk
+                while decoder.get_next_data_read(dataRead: &readDataInstruction, indexData: indexData) {
+                    //let readDataInstruction = decoder.get_next_data_read(chunkIndex: chunkDataStart, indexRange: readIndexInstruction.indexRange, indexData: indexData)
+                    //chunkData = readDataInstruction.nextChunk
                     
                     // actually "read" compressed chunk data from file
                     //print("read data \(readDataInstruction)")
