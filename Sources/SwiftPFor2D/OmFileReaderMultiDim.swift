@@ -169,16 +169,13 @@ struct OmFileDecoder {
         while true {
             /// How many elements could we read before we reach the maximum IO size
             let maxRead = io_size_max / lutChunkLength * lutChunkElementCount
-            let nextIncrement = max(1, min(maxRead, indexRead.nextChunkUpper - chunkIndex - 1))
+            let nextIncrement = max(1, min(maxRead, indexRead.nextChunkUpper - indexRead.nextChunkLower - 1))
             
-            //var next = chunkIndex
-            if chunkIndex + nextIncrement >= indexRead.nextChunkUpper {
+            if indexRead.nextChunkLower + nextIncrement >= indexRead.nextChunkUpper {
                 guard get_next_chunk_position(chunkIndexLower: &indexRead.nextChunkLower, chunkIndexUpper: &indexRead.nextChunkUpper) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
                     break
                 }
-                //indexRead.nextChunkLower = next
-                //indexRead.nextChunkUpper = rangeEnd
                 let readStartNext = (indexRead.nextChunkLower + endAlignOffset) / lutChunkElementCount * lutChunkLength - lutChunkLength
                 
                 /// The read end potiions of the previous chunk index. Could be consecutive, or has a huge gap.
@@ -194,8 +191,6 @@ struct OmFileDecoder {
             } else {
                 indexRead.nextChunkLower += nextIncrement
             }
-            //indexRead.nextChunkLower = next
-            //indexRead.nextChunkUpper = rangeEnd
             
             /// The read end position if the current index would be read
             let readEndNext = (indexRead.nextChunkLower+endAlignOffset) / lutChunkElementCount * lutChunkLength
@@ -220,34 +215,39 @@ struct OmFileDecoder {
     
     /// Data = index of global chunk num
     public func get_next_data_read(dataRead: inout ChunkDataReadInstruction, indexData: UnsafeRawBufferPointer) -> Bool {
-        let chunkRangeLower = dataRead.nextChunkLower
-        let chunkRangeUpper = dataRead.nextChunkUpper
-        if chunkRangeLower == chunkRangeUpper {
+        if dataRead.nextChunkLower == dataRead.nextChunkUpper {
             return false
         }
-        //dataRead.chunkIndex = chunkIndexStart
-        let indexRangeLower = dataRead.indexRangeLower
-        let indexRangeUpper = dataRead.indexRangeUpper
-        dataRead.chunkIndexLower = chunkRangeLower
-        var chunkIndex = chunkRangeLower
-        //var nextChunkRangeLower: Int? = chunkRangeLower
-        //var nextChunkRangeUpper: Int? = chunkRangeUpper
+        var chunkIndex = dataRead.nextChunkLower
+        dataRead.chunkIndexLower = chunkIndex
         
         /// Version 1 case
         if lutChunkElementCount == 1 {
             // index is a flat Int64 array
             let data = indexData.assumingMemoryBound(to: Int.self).baseAddress!
             
+            let isOffset0 = dataRead.indexRangeLower == 0
+            
             /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
-            let startOffset = indexRangeLower == 0 ? 1 : 0
+            let startOffset = isOffset0 ? 1 : 0
             
             /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-            let startPos = indexRangeLower == 0 ? 0 : data.advanced(by: indexRangeLower - chunkRangeLower - startOffset).pointee
-            var endPos = data.advanced(by: indexRangeLower == 0 ? 0 : 1).pointee
+            let startPos = isOffset0 ? 0 : data.advanced(by: dataRead.indexRangeLower - chunkIndex - startOffset).pointee
+            var endPos = startPos
             
             /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
             while true {
-                if chunkIndex + 1 >= dataRead.nextChunkUpper {
+                let dataStartPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset).pointee
+                let dataEndPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset + 1).pointee
+                
+                /// Merge and split IO requests, but make sure that always one IO request is send
+                if startPos != endPos && (dataEndPos - startPos > io_size_max || dataEndPos - endPos > io_size_merge) {
+                    break
+                }
+                endPos = dataEndPos
+                chunkIndex = dataRead.nextChunkLower
+                
+                if dataRead.nextChunkLower + 1 >= dataRead.nextChunkUpper {
                     guard get_next_chunk_position(chunkIndexLower: &dataRead.nextChunkLower, chunkIndexUpper: &dataRead.nextChunkUpper) else {
                         // there is no next chunk anymore, finish processing the current one and then stop with the next call
                         break
@@ -255,22 +255,11 @@ struct OmFileDecoder {
                 } else {
                     dataRead.nextChunkLower += 1
                 }
-                guard dataRead.nextChunkLower < indexRangeUpper else {
+                guard dataRead.nextChunkLower < dataRead.indexRangeUpper else {
                     dataRead.nextChunkLower = 0
                     dataRead.nextChunkUpper = 0
                     break
                 }
-                
-                let dataStartPos = data.advanced(by: dataRead.nextChunkLower - indexRangeLower - startOffset).pointee
-                let dataEndPos = data.advanced(by: dataRead.nextChunkLower - indexRangeLower - startOffset + 1).pointee
-                
-                /// Merge and split IO requests
-                if dataEndPos - startPos > io_size_max,
-                    dataStartPos - endPos > io_size_merge {
-                    break
-                }
-                endPos = dataEndPos
-                chunkIndex = dataRead.nextChunkLower
             }
             /// Old files do not compress LUT and data is after LUT
             let dataStart = OmHeader.length + numberOfChunks*8
@@ -290,10 +279,10 @@ struct OmFileDecoder {
         var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount)
         
         /// Which LUT chunk is currently loaded into `uncompressedLut`
-        var lutChunk = chunkRangeLower / lutChunkElementCount
+        var lutChunk = chunkIndex / lutChunkElementCount
         
         /// Offset byte in LUT relative to the index range
-        let lutOffset = indexRangeLower / lutChunkElementCount * self.lutChunkLength
+        let lutOffset = dataRead.indexRangeLower / lutChunkElementCount * self.lutChunkLength
         
         /// Uncompress the first LUT index chunk and check the length
         if true {
@@ -309,43 +298,11 @@ struct OmFileDecoder {
         }
         
         /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-        let startPos = uncompressedLut[(chunkRangeLower - 0) % lutChunkElementCount]
-        
-        /// For the unlucky case that only th last value of the LUT was required, we now have to decompress the next LUT
-        if (indexRangeLower + 1) / lutChunkElementCount != lutChunk {
-            lutChunk = (chunkRangeLower + 1) / lutChunkElementCount
-            let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, numberOfChunks+1) - lutChunk * lutChunkElementCount
-            let start = lutChunk * self.lutChunkLength - lutOffset
-            assert(start >= 0)
-            assert(start + self.lutChunkLength <= indexData.count)
-            // Decompress LUT chunk
-            uncompressedLut.withUnsafeMutableBufferPointer { dest in
-                let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
-            }
-            //print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
-        }
-        
-        var endPos = uncompressedLut[(chunkRangeLower+1) % lutChunkElementCount]
+        let startPos = uncompressedLut[chunkIndex % lutChunkElementCount]
+        var endPos = startPos
                 
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while true {
-            //print("next \(next)")
-            if chunkIndex + 1 >= dataRead.nextChunkUpper {
-                guard get_next_chunk_position(chunkIndexLower: &dataRead.nextChunkLower, chunkIndexUpper: &dataRead.nextChunkUpper) else {
-                    // there is no next chunk anymore, finish processing the current one and then stop with the next call
-                    dataRead.nextChunkLower = 0
-                    dataRead.nextChunkUpper = 0
-                    break
-                }
-            } else {
-                dataRead.nextChunkLower += 1
-            }
-            guard dataRead.nextChunkLower < indexRangeUpper else {
-                dataRead.nextChunkLower = 0
-                dataRead.nextChunkUpper = 0
-                break
-            }
-            
             let nextLutChunk = (dataRead.nextChunkLower+1) / lutChunkElementCount
             
             /// Maybe the next LUT chunk needs to be uncompressed
@@ -364,13 +321,27 @@ struct OmFileDecoder {
             }
             let dataEndPos = uncompressedLut[(dataRead.nextChunkLower+1) % lutChunkElementCount]
             
-            /// Merge and split IO requests
-            if dataEndPos - startPos > io_size_max,
-               dataEndPos - endPos > io_size_merge {
+            /// Merge and split IO requests, but make sure that always one IO request is send
+            if startPos != endPos && (dataEndPos - startPos > io_size_max || dataEndPos - endPos > io_size_merge) {
                 break
             }
             endPos = dataEndPos
             chunkIndex = dataRead.nextChunkLower
+            
+            //print("next \(next)")
+            if chunkIndex + 1 >= dataRead.nextChunkUpper {
+                guard get_next_chunk_position(chunkIndexLower: &dataRead.nextChunkLower, chunkIndexUpper: &dataRead.nextChunkUpper) else {
+                    // there is no next chunk anymore, finish processing the current one and then stop with the next call
+                    break
+                }
+            } else {
+                dataRead.nextChunkLower += 1
+            }
+            guard dataRead.nextChunkLower < dataRead.indexRangeUpper else {
+                dataRead.nextChunkLower = 0
+                dataRead.nextChunkUpper = 0
+                break
+            }
         }
         //print("Read \(startPos)-\(endPos) (\(endPos - startPos) bytes)")
         
