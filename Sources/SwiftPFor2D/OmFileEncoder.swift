@@ -121,7 +121,7 @@ public final class OmFileEncoder {
             nChunks *= dims[i].divideRoundedUp(divisor: chunks[i])
         }
         /// Assume the lut buffer is not compressible
-        let lutBufferSize = nChunks * lutChunkElementCount * 8
+        let lutBufferSize = nChunks * 8
         
         return max(4096, max(lutBufferSize, bufferSize))
     }

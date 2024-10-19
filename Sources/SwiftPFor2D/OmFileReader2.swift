@@ -46,10 +46,10 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         })
     }
     
-    public func read(into: UnsafeMutablePointer<Float>, dimRead: [Range<Int>], intoCoordLower: [Int], intoCubeDimension: [Int]) {
+    public func read(into: UnsafeMutablePointer<Float>, dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int]) {
         let decoder = json.variables[0].makeReader(
             dimRead: dimRead,
-            intoCoordLower: intoCoordLower,
+            intoCubeOffset: intoCubeOffset,
             intoCubeDimension: intoCubeDimension,
             lutChunkElementCount: lutChunkElementCount
         )
@@ -64,9 +64,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         //print("new read \(self), start \(chunkIndex ?? 0..<0)")
         
         /// only debug
-        let nChunks = decoder.number_of_chunks()
-        /// only debug
-        let lutTotalSize = nChunks.divideRoundedUp(divisor: decoder.lutChunkElementCount) * decoder.lutChunkLength
+        let lutTotalSize = decoder.numberOfChunks.divideRoundedUp(divisor: decoder.lutChunkElementCount) * decoder.lutChunkLength
         
         
         fn.withUnsafeBytes({ ptr in
@@ -106,7 +104,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         let n = outDims.reduce(1, *)
         var out = [Float](repeating: .nan, count: n)
         out.withUnsafeMutableBufferPointer({
-            read(into: $0.baseAddress!, dimRead: dimRead, intoCoordLower: .init(repeating: 0, count: dimRead.count), intoCubeDimension: outDims)
+            read(into: $0.baseAddress!, dimRead: dimRead, intoCubeOffset: .init(repeating: 0, count: dimRead.count), intoCubeDimension: outDims)
         })
         return out
     }

@@ -266,7 +266,7 @@ final class SwiftPFor2DTests: XCTestCase {
             for y in 0..<dims[1] {
                 var r = [Float](repeating: .nan, count: 9)
                 r.withUnsafeMutableBufferPointer({
-                    read.read(into: $0.baseAddress!, dimRead: [x..<x+1, y..<y+1], intoCoordLower: [1,1], intoCubeDimension: [3,3])
+                    read.read(into: $0.baseAddress!, dimRead: [x..<x+1, y..<y+1], intoCubeOffset: [1,1], intoCubeDimension: [3,3])
                 })
                 XCTAssertEqualArray(r, [.nan, .nan, .nan, .nan, Float(x*5 + y), .nan, .nan, .nan, .nan], accuracy: 0.001)
             }
