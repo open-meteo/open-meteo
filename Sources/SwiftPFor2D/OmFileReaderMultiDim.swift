@@ -13,23 +13,7 @@ import Foundation
 struct OmFileDecoder<Backend: OmFileReaderBackend> {
     let fn: Backend
     
-    /// The scalefactor that is applied to all write data
-    public let scalefactor: Float
-    
-    /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
-    public let compression: CompressionType
-    
-    /// The dimensions of the file
-    let dims: [Int]
-    
-    /// How the dimensions are chunked
-    let chunks: [Int]
-    
-    /// The offset position of the beignning of the LUT
-    let lutStart: Int
-    
-    /// How long a chunk inside the LUT is after compression
-    let lutChunkLength: Int
+    let json: OmFileJSON
     
     /// Number of elements in index LUT chunk. Might be hardcoded to 256 later
     let lutChunkElementCount: Int
@@ -48,41 +32,18 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
         //let dataStart = version == 3 ? 3 : OmHeader.length + nChunks*8
         
         return try fn.withUnsafeBytes({ptr in
-            
-            /*let lutStart = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
-            let lutChunkLength = ptr.baseAddress!.advanced(by: fn.count - 16).assumingMemoryBound(to: Int.self).pointee
-            let nDims = ptr.baseAddress!.advanced(by: fn.count - 24).assumingMemoryBound(to: Int.self).pointee
-            
-            let dimensions = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
-                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 24 - 2*nDims*8), nDims*8)
-                $1 = nDims
-            })
-            
-            let chunks = [Int](unsafeUninitializedCapacity: nDims, initializingWith: {
-                memcpy($0.baseAddress!, ptr.baseAddress!.advanced(by: fn.count - 24 - nDims*8), nDims*8)
-                $1 = nDims
-            })*/
-            
-            let jsonLength = ptr.baseAddress!.advanced(by: fn.count - 8).assumingMemoryBound(to: Int.self).pointee
+            let fileSize = fn.count
+            /// The last 8 bytes of the file are the size of the JSON payload
+            let jsonLength = ptr.baseAddress!.advanced(by: fileSize - 8).assumingMemoryBound(to: Int.self).pointee
             let jsonData = Data(
-                bytesNoCopy: UnsafeMutableRawPointer(mutating: (ptr.baseAddress!.advanced(by: fn.count - 8 - jsonLength))),
+                bytesNoCopy: UnsafeMutableRawPointer(mutating: (ptr.baseAddress!.advanced(by: fileSize - 8 - jsonLength))),
                 count: jsonLength,
                 deallocator: .none
             )
             let json = try JSONDecoder().decode(OmFileJSON.self, from: jsonData)
-            // Just read the first variable. Ignoring the rest.
-            let variable = json.variables[0]
-            
-            //print(lutStart, nDims, dimensions, chunks)
-            
             return OmFileDecoder(
                 fn: fn,
-                scalefactor: 1,
-                compression: .p4nzdec256,
-                dims: variable.dimensions,
-                chunks: variable.chunks,
-                lutStart: variable.lutOffset,
-                lutChunkLength: variable.lutChunkSize,
+                json: json,
                 lutChunkElementCount: lutChunkElementCount,
                 dataStart: 0
             )
@@ -90,24 +51,14 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
     }
     
     public func read(into: UnsafeMutablePointer<Float>, dimRead: [Range<Int>], intoCoordLower: [Int], intoCubeDimension: [Int]) {
-        let chunkLength = chunks.reduce(1, *)
-        let bufferSize = P4NDEC256_BOUND(n: chunkLength, bytesPerElement: compression.bytesPerElement)
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
-
-        let read = OmFileReadRequest(
-            scalefactor: scalefactor,
-            compression: compression,
-            dims: dims,
-            chunks: chunks,
-            dimReadOffset: dimRead.map{$0.lowerBound},
-            dimReadCount: dimRead.map{$0.count},
+        let read = json.variables[0].makeReader(
+            dimRead: dimRead,
             intoCoordLower: intoCoordLower,
             intoCubeDimension: intoCubeDimension,
-            lutChunkLength: lutChunkLength,
-            lutChunkElementCount: lutChunkElementCount, // `1` if version <2
-            dataStart: dataStart,
-            lutStart: lutStart
+            lutChunkElementCount: lutChunkElementCount,
+            dataStart: dataStart
         )
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: read.get_read_buffer_size(), alignment: 4)
         read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3)
         chunkBuffer.deallocate()
     }
@@ -173,9 +124,7 @@ struct OmFileReadRequest {
     let lutStart: Int
     
     /// Actually read data from a file. Merges IO for optimal sizes
-    /// TODO: The read offset calculation is not ideal
     func read_from_file<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer, version: Int = 2) {
-        
         var chunkIndex: Range<Int>? = get_first_chunk_position()
         
         //print("new read \(self), start \(chunkIndex ?? 0..<0)")
@@ -215,6 +164,12 @@ struct OmFileReadRequest {
                 }
             }
         })
+    }
+
+    /// Get the size of the buffer that needs to be suplied to decode a single chunk. It is the product of chunk dimensions times the size of the output.
+    public func get_read_buffer_size() -> Int {
+        let chunkLength = chunks.reduce(1, *)
+        return chunkLength * compression.bytesPerElement
     }
     
     /// Return the total number of chunks in this file
@@ -258,7 +213,7 @@ struct OmFileReadRequest {
             
             var next = chunkIndex + nextIncrement
             if next >= rangeEnd {
-                guard let nextRange = get_next_chunk_position(globalChunkNum: chunkIndex) else {
+                guard let nextRange = get_next_chunk_position(chunkIndex: chunkIndex) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
                     nextChunkOut = nil
                     break
@@ -294,9 +249,9 @@ struct OmFileReadRequest {
     
     
     /// Data = index of global chunk num
-    public func get_next_data_read(chunkIndex dataStartChunk: Range<Int>, indexRange: Range<Int>, indexData: UnsafeRawBufferPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
-        var globalChunkNum = dataStartChunk.lowerBound
-        var nextChunkOut: Range<Int>? = dataStartChunk
+    public func get_next_data_read(chunkIndex chunkRange: Range<Int>, indexRange: Range<Int>, indexData: UnsafeRawBufferPointer) -> (offset: Int, count: Int, dataStartChunk: Int, dataLastChunk: Int, nextChunk: Range<Int>?) {
+        var chunkIndex = chunkRange.lowerBound
+        var nextChunkRange: Range<Int>? = chunkRange
         
         /// Version 1 case
         if lutChunkElementCount == 1 {
@@ -307,28 +262,28 @@ struct OmFileReadRequest {
             let startOffset = indexRange.lowerBound == 0 ? 1 : 0
             
             /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-            let startPos = indexRange.lowerBound == 0 ? 0 : data.advanced(by: indexRange.lowerBound - dataStartChunk.lowerBound - startOffset).pointee
+            let startPos = indexRange.lowerBound == 0 ? 0 : data.advanced(by: indexRange.lowerBound - chunkRange.lowerBound - startOffset).pointee
             var endPos = data.advanced(by: indexRange.lowerBound == 0 ? 0 : 1).pointee
             
-            var rangeEnd = dataStartChunk.upperBound
+            var rangeEnd = chunkRange.upperBound
             
             /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
             while true {
-                var next = globalChunkNum + 1
+                var next = chunkIndex + 1
                 if next >= rangeEnd {
-                    guard let nextRange = get_next_chunk_position(globalChunkNum: globalChunkNum) else {
+                    guard let nextRange = get_next_chunk_position(chunkIndex: chunkIndex) else {
                         // there is no next chunk anymore, finish processing the current one and then stop with the next call
-                        nextChunkOut = nil
+                        nextChunkRange = nil
                         break
                     }
                     rangeEnd = nextRange.upperBound
                     next = nextRange.lowerBound
                 }
                 guard next < indexRange.upperBound else {
-                    nextChunkOut = nil
+                    nextChunkRange = nil
                     break
                 }
-                nextChunkOut = next ..< rangeEnd
+                nextChunkRange = next ..< rangeEnd
                 
                 let dataStartPos = data.advanced(by: next - indexRange.lowerBound - startOffset).pointee
                 let dataEndPos = data.advanced(by: next - indexRange.lowerBound - startOffset + 1).pointee
@@ -339,11 +294,11 @@ struct OmFileReadRequest {
                     break
                 }
                 endPos = dataEndPos
-                globalChunkNum = next
+                chunkIndex = next
             }
             //print("Read \(startPos)-\(endPos) (\(endPos - startPos) bytes)")
             // IMPORTANT: V1 files have a add dataStart
-            return (startPos + dataStart, endPos - startPos, dataStartChunk.lowerBound, globalChunkNum, nextChunkOut)
+            return (startPos + dataStart, endPos - startPos, chunkRange.lowerBound, chunkIndex, nextChunkRange)
         }
         
         /// TODO optimise
@@ -356,7 +311,7 @@ struct OmFileReadRequest {
         var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount /*+16*/)
         
         /// Which LUT chunk is currently loaded into `uncompressedLut`
-        var lutChunk = dataStartChunk.lowerBound / lutChunkElementCount
+        var lutChunk = chunkRange.lowerBound / lutChunkElementCount
         
         /// Uncompress the first LUT index chunk and check the length
         if true {
@@ -375,11 +330,11 @@ struct OmFileReadRequest {
         //var uncompressedLutPreviousEnd = UInt64(0)
         
         /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-        let startPos = /*indexRange.lowerBound == 0 ? UInt64(dataStart) : */uncompressedLut[(dataStartChunk.lowerBound - 0) % lutChunkElementCount]
+        let startPos = /*indexRange.lowerBound == 0 ? UInt64(dataStart) : */uncompressedLut[(chunkRange.lowerBound - 0) % lutChunkElementCount]
         
         /// For the unlucky case that only th last value of the LUT was required, we now have to decompress the next LUT
         if (indexRange.lowerBound + 1) / lutChunkElementCount != lutChunk {
-            lutChunk = (dataStartChunk.lowerBound + 1) / lutChunkElementCount
+            lutChunk = (chunkRange.lowerBound + 1) / lutChunkElementCount
             let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, nChunks+1) - lutChunk * lutChunkElementCount
             let start = lutChunk * self.lutChunkLength - indexRange.lowerBound / lutChunkElementCount * self.lutChunkLength
             assert(start >= 0)
@@ -391,28 +346,28 @@ struct OmFileReadRequest {
             //print("Secondary LUT load \(uncompressedLut), \(thisLutChunkElementCount), start=\(start)")
         }
         
-        var endPos = uncompressedLut[(dataStartChunk.lowerBound+1) % lutChunkElementCount]
+        var endPos = uncompressedLut[(chunkRange.lowerBound+1) % lutChunkElementCount]
         
-        var rangeEnd = dataStartChunk.upperBound
+        var chunkIndexEnd = chunkRange.upperBound
         
         /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
         while true {
-            var next = globalChunkNum + 1
+            var next = chunkIndex + 1
             //print("next \(next)")
-            if next >= rangeEnd {
-                guard let nextRange = get_next_chunk_position(globalChunkNum: globalChunkNum) else {
+            if next >= chunkIndexEnd {
+                guard let nextRange = get_next_chunk_position(chunkIndex: chunkIndex) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
-                    nextChunkOut = nil
+                    nextChunkRange = nil
                     break
                 }
-                rangeEnd = nextRange.upperBound
+                chunkIndexEnd = nextRange.upperBound
                 next = nextRange.lowerBound
             }
             guard next < indexRange.upperBound else {
-                nextChunkOut = nil
+                nextChunkRange = nil
                 break
             }
-            nextChunkOut = next ..< rangeEnd
+            nextChunkRange = next ..< chunkIndexEnd
             
             let nextLutChunk = (next+1) / lutChunkElementCount
             
@@ -442,10 +397,10 @@ struct OmFileReadRequest {
                 break
             }
             endPos = dataEndPos
-            globalChunkNum = next
+            chunkIndex = next
         }
         //print("Read \(startPos)-\(endPos) (\(endPos - startPos) bytes)")
-        return (Int(startPos), Int(endPos) - Int(startPos), dataStartChunk.lowerBound, globalChunkNum, nextChunkOut)
+        return (Int(startPos), Int(endPos) - Int(startPos), chunkRange.lowerBound, chunkIndex, nextChunkRange)
     }
     
     /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
@@ -457,7 +412,7 @@ struct OmFileReadRequest {
         var pos = 0
         for chunkNum in globalChunkNum ... lastChunk {
             //print("decompress chunk \(chunkNum), pos \(pos)")
-            let uncompressedBytes = decode_chunk_into_array(globalChunkNum: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
+            let uncompressedBytes = decode_chunk_into_array(chunkIndex: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
         }
         return pos
@@ -466,7 +421,7 @@ struct OmFileReadRequest {
     /// Writes a chunk index into the
     /// Return number of uncompressed bytes from the data
     @discardableResult
-    public func decode_chunk_into_array(globalChunkNum: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
+    public func decode_chunk_into_array(chunkIndex: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
         //print("globalChunkNum=\(globalChunkNum)")
         
         var rollingMultiplty = 1
@@ -494,7 +449,7 @@ struct OmFileReadRequest {
         /// Count length in chunk and find first buffer offset position
         for i in (0..<dims.count).reversed() {
             let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-            let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+            let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
             /// Number of elements in this dim in this chunk
             let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
             
@@ -627,7 +582,7 @@ struct OmFileReadRequest {
             linearRead = true
             for i in (0..<dims.count).reversed() {
                 let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                let c0 = (globalChunkNum / rollingMultiplty) % nChunksInThisDimension
+                let c0 = (chunkIndex / rollingMultiplty) % nChunksInThisDimension
                 /// Number of elements in this dim in this chunk
                 let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
                 let chunkGlobal0Start = c0 * chunks[i]
@@ -703,8 +658,8 @@ struct OmFileReadRequest {
     }
     
     /// Find the next chunk index that should be processed to satisfy the read request. Nil if not further chunks need to be read
-    func get_next_chunk_position(globalChunkNum: Int) -> Range<Int>? {
-        var nextChunk = globalChunkNum
+    func get_next_chunk_position(chunkIndex: Int) -> Range<Int>? {
+        var nextChunk = chunkIndex
         
         // Move `globalChunkNum` to next position
         var rollingMultiplty = 1

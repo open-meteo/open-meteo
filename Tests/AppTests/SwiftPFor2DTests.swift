@@ -68,8 +68,7 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let writer = OmFileEncoder(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
-        // TODO fix buffer size
-        let buffer = OmFileBufferedWriter(capacity: 1014*1024)//writer.maximum_buffer_capacity())
+        let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -106,7 +105,7 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
-        let buffer = OmFileBufferedWriter(capacity: writer.maximum_buffer_capacity())
+        let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -148,8 +147,7 @@ final class SwiftPFor2DTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
-        // TODO fix buffer size
-        let buffer = OmFileBufferedWriter(capacity: 1014*1024)//writer.maximum_buffer_capacity())
+        let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
         /// Deliberately add NaN on all positions that should not be written to the file. Only the inner 5x5 array is written
@@ -182,9 +180,9 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileEncoder(dimensions: [3,3,3], chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
-        // TODO fix buffer size
-        let buffer = OmFileBufferedWriter(capacity: 1014*1024)//writer.maximum_buffer_capacity())
+        let dims = [3,3,3]
+        let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
+        let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0]
@@ -213,9 +211,9 @@ final class SwiftPFor2DTests: XCTestCase {
         XCTAssertEqual(a, data)
         
         // single index
-        for x in 0..<read.dims[0] {
-            for y in 0..<read.dims[1] {
-                for z in 0..<read.dims[2] {
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1] {
+                for z in 0..<dims[2] {
                     XCTAssertEqual(read.read([x..<x+1, y..<y+1, z..<z+1]), [Float(x*3*3 + y*3 + z)])
                 }
             }
@@ -226,9 +224,9 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
-        // TODO fix buffer size
-        let buffer = OmFileBufferedWriter(capacity: 1014*1024)//writer.maximum_buffer_capacity())
+        let dims = [5,5]
+        let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
+        let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
@@ -257,15 +255,15 @@ final class SwiftPFor2DTests: XCTestCase {
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
         
         // single index
-        for x in 0..<read.dims[0] {
-            for y in 0..<read.dims[1] {
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1] {
                 XCTAssertEqual(read.read([x..<x+1, y..<y+1]), [Float(x*5 + y)])
             }
         }
         
         // Read into an existing array with an offset
-        for x in 0..<read.dims[0] {
-            for y in 0..<read.dims[1] {
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1] {
                 var r = [Float](repeating: .nan, count: 9)
                 r.withUnsafeMutableBufferPointer({
                     read.read(into: $0.baseAddress!, dimRead: [x..<x+1, y..<y+1], intoCoordLower: [1,1], intoCubeDimension: [3,3])
@@ -275,39 +273,39 @@ final class SwiftPFor2DTests: XCTestCase {
         }
         
         // 2x in fast dim
-        for x in 0..<read.dims[0] {
-            for y in 0..<read.dims[1]-1 {
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1]-1 {
                 XCTAssertEqual(read.read([x..<x+1, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1)])
             }
         }
         
         // 2x in slow dim
-        for x in 0..<read.dims[0]-1 {
-            for y in 0..<read.dims[1] {
+        for x in 0..<dims[0]-1 {
+            for y in 0..<dims[1] {
                 XCTAssertEqual(read.read([x..<x+2, y..<y+1]), [Float(x*5 + y), Float((x+1)*5 + y)])
             }
         }
         
         // 2x2
-        for x in 0..<read.dims[0]-1 {
-            for y in 0..<read.dims[1]-1 {
+        for x in 0..<dims[0]-1 {
+            for y in 0..<dims[1]-1 {
                 XCTAssertEqual(read.read([x..<x+2, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
             }
         }
         // 3x3
-        for x in 0..<read.dims[0]-2 {
-            for y in 0..<read.dims[1]-2 {
+        for x in 0..<dims[0]-2 {
+            for y in 0..<dims[1]-2 {
                 XCTAssertEqual(read.read([x..<x+3, y..<y+3]), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
             }
         }
         
         // 1x5
-        for x in 0..<read.dims[1] {
+        for x in 0..<dims[1] {
             XCTAssertEqual(read.read([x..<x+1, 0..<5]), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
         }
         
         // 5x1
-        for x in 0..<read.dims[0] {
+        for x in 0..<dims[0] {
             XCTAssertEqual(read.read([0..<5, x..<x+1]), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
         }
         
