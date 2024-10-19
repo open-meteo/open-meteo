@@ -38,7 +38,7 @@ public final class OmFileBufferedWriter {
         buffer.deallocate()
     }
     
-    /// Write header. Onnly magic number and version 3
+    /// Write header. Only magic number and version 3
     public func writeHeader() {
         assert(capacity - writePosition >= 3)
         buffer[writePosition + 0] = OmHeader.magicNumber1
@@ -50,7 +50,7 @@ public final class OmFileBufferedWriter {
     
     /// Serialise JSON, write to buffer and write size of JSON
     public func writeTrailer(meta: OmFileJSON) throws {
-        print(meta)
+        //print(meta)
         
         // Serialise and write JSON
         let json = try JSONEncoder().encode(meta)
@@ -61,6 +61,9 @@ public final class OmFileBufferedWriter {
         })
         writePosition += jsonLength
         totalBytesWritten += jsonLength
+        
+        // TODO Pad to 64 bit?
+        // TODO Additional version field and maybe some reserved stuff. E.g. if the JSON payload should be compressed later.
         
         // write length of JSON
         assert(capacity - writePosition >= 8)

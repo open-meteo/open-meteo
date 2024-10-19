@@ -6,13 +6,24 @@
 //
 
 
-/// The meta data block should have a "variables" array
+/// The entry level JSON structure to descode all meta data inside an OpenMeteo file
+/// Should contain an attribute `variable` with a list of variables in this file
 public struct OmFileJSON: Codable {
+    /// A list of variables inside this file
     let variables: [OmFileJSONVariable]
+    
     let someAttributes: String?
 }
 
-/// Technically can have any attributes
+/// Represent a variable inside an OpenMeteo file.
+/// A variable can have arbitrary attributes, but the following are required for decding:
+/// `dimensions` and `chunks` to describe the shape of data
+/// `compression` and `scalefactor` define how data is compressed
+/// `lutOffset` and `lutChunkSize` are required to locate data inside the file
+///
+/// TODO:
+/// - datatype
+/// - finalise naming
 public struct OmFileJSONVariable: Codable {
     let name: String?
     
