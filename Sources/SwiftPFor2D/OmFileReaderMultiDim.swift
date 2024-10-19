@@ -45,15 +45,15 @@ struct OmFileDecoder {
     let intoCubeOffset: [Int]
     
     /// The target cube dimensions. E.g. Reading 2 years of data may read data from mutliple files
-    let intoCubeDimension: [Int] // = dimRead.map { $0.count }
+    let intoCubeDimension: [Int]
     
     /// Automatically merge and break up IO to ideal sizes
     /// Merging is important to reduce the number of IO operations for the lookup table
     /// A maximum size will break up chunk reads. Otherwise a full file read could result in a single 20GB read.
-    let io_size_merge: Int = 512
+    let io_size_merge: Int
     
-    /// Maximum length of a return IO read
-    let io_size_max: Int = 65536
+    /// Maximum length of a returned IO read
+    let io_size_max: Int
     
     /// How long a chunk inside the LUT is after compression
     let lutChunkLength: Int
@@ -68,7 +68,7 @@ struct OmFileDecoder {
     let numberOfChunks: Int
     
     
-    public init(scalefactor: Float, compression: CompressionType, dims: [Int], chunks: [Int], readOffset: [Int], readCount: [Int], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkLength: Int, lutChunkElementCount: Int, lutStart: Int) {
+    public init(scalefactor: Float, compression: CompressionType, dims: [Int], chunks: [Int], readOffset: [Int], readCount: [Int], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkLength: Int, lutChunkElementCount: Int, lutStart: Int, io_size_merge: Int = 512, io_size_max: Int = 65536) {
         self.scalefactor = scalefactor
         self.compression = compression
         self.dims = dims
@@ -80,6 +80,8 @@ struct OmFileDecoder {
         self.lutChunkLength = lutChunkLength
         self.lutChunkElementCount = lutChunkElementCount
         self.lutStart = lutStart
+        self.io_size_max = io_size_max
+        self.io_size_merge = io_size_merge
         
         var n = 1
         for i in 0..<dims.count {
