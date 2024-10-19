@@ -50,9 +50,8 @@ public struct OmFileJSONVariable: Codable {
 
 extension OmFileJSONVariable {
     /// Get a decoder for this variable given the desired read offsets and lengths
-    /// `lutChunkElementCount` is only for testing right now. Probably hard coded in next version
-    /// `dataStart` is a workaround for version1 files that do not store the start position in the file. Maybe replaced with a version number
-    func makeReader(dimRead: [Range<Int>], intoCoordLower: [Int], intoCubeDimension: [Int], lutChunkElementCount: Int = 256, dataStart: Int = 0) -> OmFileReadRequest {
+    /// `lutChunkElementCount` controls the size of each block to compress the LUT
+    func makeReader(dimRead: [Range<Int>], intoCoordLower: [Int], intoCubeDimension: [Int], lutChunkElementCount: Int = 256) -> OmFileReadRequest {
         return OmFileReadRequest(
             scalefactor: scalefactor,
             compression: compression,
@@ -64,7 +63,6 @@ extension OmFileJSONVariable {
             intoCubeDimension: intoCubeDimension,
             lutChunkLength: lutChunkSize,
             lutChunkElementCount: lutChunkElementCount,
-            dataStart: dataStart,
             lutStart: lutOffset
         )
     }

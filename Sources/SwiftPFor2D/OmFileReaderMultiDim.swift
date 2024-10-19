@@ -15,23 +15,20 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
     
     let json: OmFileJSON
     
-    /// Number of elements in index LUT chunk. Might be hardcoded to 256 later
+    /// Number of elements in index LUT chunk. Might be hardcoded to 256 later. `1` signals old version 1/2 file without a compressed LUT.
     let lutChunkElementCount: Int
     
-    /// Offset in bytes of data. Only used in V1 files. Otherwise 0.
-    let dataStart: Int
     
     public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) throws -> Self {
-        // read header
-        
         // switch version 2 and 3
         
         // if version 3, read trailer
         
-        //let lutStart = lutStart ?? OmHeader.length
-        //let dataStart = version == 3 ? 3 : OmHeader.length + nChunks*8
-        
         return try fn.withUnsafeBytes({ptr in
+            // TODO read header and check for old file
+            // if old file
+            // read header
+            
             let fileSize = fn.count
             /// The last 8 bytes of the file are the size of the JSON payload
             let jsonLength = ptr.baseAddress!.advanced(by: fileSize - 8).assumingMemoryBound(to: Int.self).pointee
@@ -44,8 +41,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             return OmFileDecoder(
                 fn: fn,
                 json: json,
-                lutChunkElementCount: lutChunkElementCount,
-                dataStart: 0
+                lutChunkElementCount: lutChunkElementCount
             )
         })
     }
@@ -55,8 +51,7 @@ struct OmFileDecoder<Backend: OmFileReaderBackend> {
             dimRead: dimRead,
             intoCoordLower: intoCoordLower,
             intoCubeDimension: intoCubeDimension,
-            lutChunkElementCount: lutChunkElementCount,
-            dataStart: dataStart
+            lutChunkElementCount: lutChunkElementCount
         )
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: read.get_read_buffer_size(), alignment: 4)
         read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3)
@@ -114,11 +109,8 @@ struct OmFileReadRequest {
     /// How long a chunk inside the LUT is after compression
     let lutChunkLength: Int
     
-    /// Number of elements in each LUT chunk
+    /// Number of elements in each LUT chunk. If `1` this is an version 1/2 file with non-compressed LUT before data
     let lutChunkElementCount: Int
-    
-    /// Offset in bytes of data. Only used in V1 files. Otherwise 0.
-    let dataStart: Int
     
     /// Offset  in bytes of LUT index
     let lutStart: Int
@@ -189,7 +181,7 @@ struct OmFileReadRequest {
         var chunkIndex = chunkIndexStart.lowerBound
         var nextChunkOut: Range<Int>? = chunkIndexStart
         
-        let isV3LUT = dataStart == 0
+        let isV3LUT = lutChunkElementCount > 1
         
         /// Old files do not store the chunk start in the first LUT entry
         /// LUT old: end0, end1, end2
@@ -253,6 +245,10 @@ struct OmFileReadRequest {
         var chunkIndex = chunkRange.lowerBound
         var nextChunkRange: Range<Int>? = chunkRange
         
+        
+        /// TODO optimise
+        let nChunks = number_of_chunks()
+        
         /// Version 1 case
         if lutChunkElementCount == 1 {
             // index is a flat Int64 array
@@ -296,13 +292,13 @@ struct OmFileReadRequest {
                 endPos = dataEndPos
                 chunkIndex = next
             }
+            /// Old files do not compress LUT and data is after LUT
+            let dataStart = OmHeader.length + nChunks*8
+            
             //print("Read \(startPos)-\(endPos) (\(endPos - startPos) bytes)")
-            // IMPORTANT: V1 files have a add dataStart
             return (startPos + dataStart, endPos - startPos, chunkRange.lowerBound, chunkIndex, nextChunkRange)
         }
-        
-        /// TODO optimise
-        let nChunks = number_of_chunks()
+
         
         let indexDataPtr = UnsafeMutablePointer(mutating: indexData.baseAddress!.assumingMemoryBound(to: UInt8.self))
         
