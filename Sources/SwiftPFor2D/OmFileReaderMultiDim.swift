@@ -13,14 +13,12 @@ import Foundation
 struct ChunkIndexReadInstruction {
     var offset: Int
     var count: Int
-    //var indexRange: Range<Int>
     var indexRangeLower: Int
     var indexRangeUpper: Int
     var chunkIndexLower: Int
     var chunkIndexUpper: Int
-    //var chunkIndex: Range<Int>
-    var nextChunkLower: Int?
-    var nextChunkUpper: Int?
+    var nextChunkLower: Int
+    var nextChunkUpper: Int
     
     public init(nextChunk: Range<Int>) {
         self.offset = 0
@@ -39,19 +37,18 @@ struct ChunkDataReadInstruction {
     var count: Int
     let indexRangeLower: Int
     let indexRangeUpper: Int
-    var dataStartChunk: Int
-    var dataLastChunk: Int
-    
-    var nextChunkLower: Int?
-    var nextChunkUpper: Int?
+    var chunkIndexLower: Int
+    var chunkIndexUpper: Int
+    var nextChunkLower: Int
+    var nextChunkUpper: Int
     
     public init(indexRead: ChunkIndexReadInstruction) {
         self.offset = 0
         self.count = 0
         self.indexRangeLower = indexRead.indexRangeLower
         self.indexRangeUpper = indexRead.indexRangeUpper
-        dataStartChunk = 0
-        dataLastChunk = 0
+        chunkIndexLower = 0
+        chunkIndexUpper = 0
         self.nextChunkLower = indexRead.chunkIndexLower
         self.nextChunkUpper = indexRead.chunkIndexUpper
         
@@ -148,11 +145,14 @@ struct OmFileDecoder {
     /// Modifies `chunkIndex` to keep as a internal reference counter
     /// Should be called in a loop. Return `nil` once all blocks have been processed and the hyperchunk read is complete
     public func get_next_index_read(indexRead: inout ChunkIndexReadInstruction) -> Bool {
-        guard let chunkIndexStartLower = indexRead.nextChunkLower, let chunkIndexStartUpper = indexRead.nextChunkUpper else {
+        let chunkIndexStartLower = indexRead.nextChunkLower
+        let chunkIndexStartUpper = indexRead.nextChunkUpper
+        if chunkIndexStartLower == chunkIndexStartUpper {
             return false
         }
         indexRead.chunkIndexLower = chunkIndexStartLower
         indexRead.chunkIndexUpper = chunkIndexStartUpper
+        indexRead.indexRangeLower = chunkIndexStartLower
         
         var chunkIndex = chunkIndexStartLower
         
@@ -182,8 +182,8 @@ struct OmFileDecoder {
             if next >= rangeEnd {
                 guard let nextRange = get_next_chunk_position(chunkIndex: chunkIndex) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
-                    indexRead.nextChunkLower = nil
-                    indexRead.nextChunkUpper = nil
+                    indexRead.nextChunkLower = 0
+                    indexRead.nextChunkUpper = 0
                     break
                 }
                 rangeEnd = nextRange.upperBound
@@ -214,9 +214,12 @@ struct OmFileDecoder {
             chunkIndex = next
         }
         let readEnd = ((chunkIndex + endAlignOffset) / lutChunkElementCount + 1) * lutChunkLength
+        
+        let lutTotalSize = numberOfChunks.divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength
+        assert(readEnd <= lutTotalSize)
+        
         indexRead.offset = lutStart + readStart
         indexRead.count = readEnd - readStart
-        indexRead.indexRangeLower = chunkIndexStartLower
         indexRead.indexRangeUpper = chunkIndex+1
         return true
     }
@@ -224,12 +227,15 @@ struct OmFileDecoder {
     
     /// Data = index of global chunk num
     public func get_next_data_read(dataRead: inout ChunkDataReadInstruction, indexData: UnsafeRawBufferPointer) -> Bool {
-        guard let chunkRangeLower = dataRead.nextChunkLower, let chunkRangeUpper = dataRead.nextChunkUpper else {
+        let chunkRangeLower = dataRead.nextChunkLower
+        let chunkRangeUpper = dataRead.nextChunkUpper
+        if chunkRangeLower == chunkRangeUpper {
             return false
         }
         //dataRead.chunkIndex = chunkIndexStart
         let indexRangeLower = dataRead.indexRangeLower
         let indexRangeUpper = dataRead.indexRangeUpper
+        dataRead.chunkIndexLower = chunkRangeLower
         var chunkIndex = chunkRangeLower
         //var nextChunkRangeLower: Int? = chunkRangeLower
         //var nextChunkRangeUpper: Int? = chunkRangeUpper
@@ -254,16 +260,16 @@ struct OmFileDecoder {
                 if next >= rangeEnd {
                     guard let nextRange = get_next_chunk_position(chunkIndex: chunkIndex) else {
                         // there is no next chunk anymore, finish processing the current one and then stop with the next call
-                        dataRead.nextChunkLower = nil
-                        dataRead.nextChunkUpper = nil
+                        dataRead.nextChunkLower = 0
+                        dataRead.nextChunkUpper = 0
                         break
                     }
                     rangeEnd = nextRange.upperBound
                     next = nextRange.lowerBound
                 }
                 guard next < indexRangeUpper else {
-                    dataRead.nextChunkLower = nil
-                    dataRead.nextChunkUpper = nil
+                    dataRead.nextChunkLower = 0
+                    dataRead.nextChunkUpper = 0
                     break
                 }
                 dataRead.nextChunkLower = next
@@ -287,8 +293,7 @@ struct OmFileDecoder {
             
             dataRead.offset = startPos + dataStart
             dataRead.count = endPos - startPos
-            dataRead.dataStartChunk = chunkRangeLower
-            dataRead.dataLastChunk = chunkIndex
+            dataRead.chunkIndexUpper = chunkIndex+1
             return true
         }
 
@@ -342,16 +347,16 @@ struct OmFileDecoder {
             if next >= chunkIndexEnd {
                 guard let nextRange = get_next_chunk_position(chunkIndex: chunkIndex) else {
                     // there is no next chunk anymore, finish processing the current one and then stop with the next call
-                    dataRead.nextChunkLower = nil
-                    dataRead.nextChunkUpper = nil
+                    dataRead.nextChunkLower = 0
+                    dataRead.nextChunkUpper = 0
                     break
                 }
                 chunkIndexEnd = nextRange.upperBound
                 next = nextRange.lowerBound
             }
             guard next < indexRangeUpper else {
-                dataRead.nextChunkLower = nil
-                dataRead.nextChunkUpper = nil
+                dataRead.nextChunkLower = 0
+                dataRead.nextChunkUpper = 0
                 break
             }
             dataRead.nextChunkLower = next
@@ -391,19 +396,18 @@ struct OmFileDecoder {
         
         dataRead.offset = Int(startPos)
         dataRead.count = Int(endPos) - Int(startPos)
-        dataRead.dataStartChunk = chunkRangeLower
-        dataRead.dataLastChunk = chunkIndex
+        dataRead.chunkIndexUpper = chunkIndex+1
         return true
     }
     
     /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
     /// Returns number of processed bytes from input
-    public func decode_chunks(globalChunkNum: Int, lastChunk: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
+    public func decode_chunks(chunkIndexLower: Int, chunkIndexUpper: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
 
         // Note: Relays on the correct number of uncompressed bytes from the compression library...
         // Maybe we need a differnet way that is independenet of this information
         var pos = 0
-        for chunkNum in globalChunkNum ... lastChunk {
+        for chunkNum in chunkIndexLower ..< chunkIndexUpper {
             //print("decompress chunk \(chunkNum), pos \(pos)")
             let uncompressedBytes = decode_chunk_into_array(chunkIndex: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
@@ -627,7 +631,7 @@ struct OmFileDecoder {
     }
     
     /// Find the first chunk indices that needs to be processed. If chunks are consecutive, a range is returned.
-    func get_first_chunk_position() -> ChunkIndexReadInstruction {
+    func initilalise_index_read() -> ChunkIndexReadInstruction {
         var chunkStart = 0
         var chunkEnd = 1
         for i in 0..<dims.count {

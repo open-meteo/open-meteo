@@ -59,27 +59,15 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     static func read(fn: Backend, decoder: OmFileDecoder, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
-        
-        
         //print("new read \(self), start \(chunkIndex ?? 0..<0)")
         
-        /// only debug
-        let lutTotalSize = decoder.numberOfChunks.divideRoundedUp(divisor: decoder.lutChunkElementCount) * decoder.lutChunkLength
-        
-        
         fn.withUnsafeBytes({ ptr in
-            
-            var readIndexInstruction = decoder.get_first_chunk_position()
+            var readIndexInstruction = decoder.initilalise_index_read()
             
             /// Loop over index blocks
             while decoder.get_next_index_read(indexRead: &readIndexInstruction) {
-                //let readIndexInstruction = decoder.get_next_index_read(chunkIndex: chunkIndexStart)
-                //chunkIndex = readIndexInstruction.nextChunk
-                //var chunkData: Range<Int>? = readIndexInstruction.chunkIndex
-                
                 // actually "read" index data from file
                 //print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
-                assert(readIndexInstruction.offset + readIndexInstruction.count - decoder.lutStart <= lutTotalSize)
                 let indexData = UnsafeRawBufferPointer(rebasing: ptr[readIndexInstruction.offset ..< readIndexInstruction.offset + readIndexInstruction.count])
                 //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
                 //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
@@ -88,14 +76,11 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                 
                 /// Loop over data blocks
                 while decoder.get_next_data_read(dataRead: &readDataInstruction, indexData: indexData) {
-                    //let readDataInstruction = decoder.get_next_data_read(chunkIndex: chunkDataStart, indexRange: readIndexInstruction.indexRange, indexData: indexData)
-                    //chunkData = readDataInstruction.nextChunk
-                    
                     // actually "read" compressed chunk data from file
                     //print("read data \(readDataInstruction)")
                     let dataData = ptr.baseAddress!.advanced(by: readDataInstruction.offset)
                     
-                    let uncompressedSize = decoder.decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
+                    let uncompressedSize = decoder.decode_chunks(chunkIndexLower: readDataInstruction.chunkIndexLower, chunkIndexUpper: readDataInstruction.chunkIndexUpper, data: dataData, into: into, chunkBuffer: chunkBuffer)
                     if uncompressedSize != readDataInstruction.count {
                         fatalError("Uncompressed size missmatch")
                     }
