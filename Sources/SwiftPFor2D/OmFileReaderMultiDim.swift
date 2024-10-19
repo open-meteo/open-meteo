@@ -10,70 +10,16 @@ import Foundation
 @_implementationOnly import CHelper
 
 
-struct OmFileDecoder<Backend: OmFileReaderBackend> {
-    let fn: Backend
-    
-    let json: OmFileJSON
-    
-    /// Number of elements in index LUT chunk. Might be hardcoded to 256 later. `1` signals old version 1/2 file without a compressed LUT.
-    let lutChunkElementCount: Int
-    
-    
-    public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) throws -> Self {
-        // switch version 2 and 3
-        
-        // if version 3, read trailer
-        
-        return try fn.withUnsafeBytes({ptr in
-            // TODO read header and check for old file
-            // if old file
-            // read header
-            
-            let fileSize = fn.count
-            /// The last 8 bytes of the file are the size of the JSON payload
-            let jsonLength = ptr.baseAddress!.advanced(by: fileSize - 8).assumingMemoryBound(to: Int.self).pointee
-            let jsonData = Data(
-                bytesNoCopy: UnsafeMutableRawPointer(mutating: (ptr.baseAddress!.advanced(by: fileSize - 8 - jsonLength))),
-                count: jsonLength,
-                deallocator: .none
-            )
-            let json = try JSONDecoder().decode(OmFileJSON.self, from: jsonData)
-            return OmFileDecoder(
-                fn: fn,
-                json: json,
-                lutChunkElementCount: lutChunkElementCount
-            )
-        })
-    }
-    
-    public func read(into: UnsafeMutablePointer<Float>, dimRead: [Range<Int>], intoCoordLower: [Int], intoCubeDimension: [Int]) {
-        let read = json.variables[0].makeReader(
-            dimRead: dimRead,
-            intoCoordLower: intoCoordLower,
-            intoCubeDimension: intoCubeDimension,
-            lutChunkElementCount: lutChunkElementCount
-        )
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: read.get_read_buffer_size(), alignment: 4)
-        read.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer.baseAddress!, version: 3)
-        chunkBuffer.deallocate()
-    }
-    
-    public func read(_ dimRead: [Range<Int>]) -> [Float] {
-        let outDims = dimRead.map({$0.count})
-        let n = outDims.reduce(1, *)
-        var out = [Float](repeating: .nan, count: n)
-        out.withUnsafeMutableBufferPointer({
-            read(into: $0.baseAddress!, dimRead: dimRead, intoCoordLower: .init(repeating: 0, count: dimRead.count), intoCubeDimension: outDims)
-        })
-        return out
-    }
-}
-
 /**
+ C-style implementation to read chunks from a OpenMeteo file variable. No allocations should occur below.
+ This code below might be move to C or other programming languages
+ 
  TODO:
- - consider if we need to access the index LUT inside decompress call instead of relying on returned data size
+ - consider if we need to access the index LUT inside decompress call instead of relying on returned data size. Certainly required for other compressors
+ - number of chunks calculation may be move outside
+ - All read requests should be guarded against out-of-bounds reads. May require `fileSize` as an input paramter
  */
-struct OmFileReadRequest {
+struct OmFileDecoder {
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
     
@@ -114,49 +60,6 @@ struct OmFileReadRequest {
     
     /// Offset  in bytes of LUT index
     let lutStart: Int
-    
-    /// Actually read data from a file. Merges IO for optimal sizes
-    func read_from_file<Backend: OmFileReaderBackend>(fn: Backend, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer, version: Int = 2) {
-        var chunkIndex: Range<Int>? = get_first_chunk_position()
-        
-        //print("new read \(self), start \(chunkIndex ?? 0..<0)")
-        
-        let nChunks = number_of_chunks()
-        
-        let lutTotalSize = nChunks.divideRoundedUp(divisor: lutChunkElementCount) * lutChunkLength
-        
-        fn.withUnsafeBytes({ ptr in
-            /// Loop over index blocks
-            while let chunkIndexStart = chunkIndex {
-                let readIndexInstruction = get_next_index_read(chunkIndex: chunkIndexStart)
-                chunkIndex = readIndexInstruction.nextChunk
-                var chunkData: Range<Int>? = chunkIndexStart
-                
-                // actually "read" index data from file
-                //print("read index \(readIndexInstruction), chunkIndexRead=\(chunkData ?? 0..<0)")
-                assert(readIndexInstruction.offset + readIndexInstruction.count - lutStart <= lutTotalSize)
-                let indexData = UnsafeRawBufferPointer(rebasing: ptr[readIndexInstruction.offset ..< readIndexInstruction.offset + readIndexInstruction.count])
-                //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
-                //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
-                      
-                
-                /// Loop over data blocks
-                while let chunkDataStart = chunkData {
-                    let readDataInstruction = get_next_data_read(chunkIndex: chunkDataStart, indexRange: readIndexInstruction.indexRange, indexData: indexData)
-                    chunkData = readDataInstruction.nextChunk
-                    
-                    // actually "read" compressed chunk data from file
-                    //print("read data \(readDataInstruction)")
-                    let dataData = ptr.baseAddress!.advanced(by: readDataInstruction.offset)
-                    
-                    let uncompressedSize = decode_chunks(globalChunkNum: readDataInstruction.dataStartChunk, lastChunk: readDataInstruction.dataLastChunk, data: dataData, into: into, chunkBuffer: chunkBuffer)
-                    if uncompressedSize != readDataInstruction.count {
-                        fatalError("Uncompressed size missmatch")
-                    }
-                }
-            }
-        })
-    }
 
     /// Get the size of the buffer that needs to be suplied to decode a single chunk. It is the product of chunk dimensions times the size of the output.
     public func get_read_buffer_size() -> Int {
@@ -302,9 +205,8 @@ struct OmFileReadRequest {
         
         let indexDataPtr = UnsafeMutablePointer(mutating: indexData.baseAddress!.assumingMemoryBound(to: UInt8.self))
         
-        /// Note: This should be stack allocated to a max size of 256 elements
-        /// TODO LUT buffer may need to be larger. Maybe no bounding is required anymore at all
-        var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount /*+16*/)
+        /// TODO This should be stack allocated to a max size of 256 elements
+        var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount)
         
         /// Which LUT chunk is currently loaded into `uncompressedLut`
         var lutChunk = chunkRange.lowerBound / lutChunkElementCount

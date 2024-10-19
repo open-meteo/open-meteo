@@ -74,7 +74,10 @@ public final class OmFileBufferedWriter {
 }
 
 
-/// Write an om file and write multiple chunks of data
+/// Encodes a single variable to an OpenMeteo file
+/// Mutliple variables may be encoded in the single file
+///
+/// This file currenly allocates a chunk buffer and LUT table. This might change if this is moved to C
 public final class OmFileEncoder {
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float

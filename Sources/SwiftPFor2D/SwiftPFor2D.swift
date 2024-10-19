@@ -589,7 +589,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             case .p4nzdec256:
                 //let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                 
-                let r = OmFileReadRequest(
+                let r = OmFileDecoder(
                     scalefactor: scalefactor,
                     compression: compression,
                     dims: [dim0, dim1],
@@ -602,7 +602,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     lutChunkElementCount: 1,
                     lutStart: OmHeader.length
                 )
-                r.read_from_file(fn: fn, into: into, chunkBuffer: chunkBuffer)
+                OmFileReader2.read(fn: fn, decoder: r, into: into, chunkBuffer: chunkBuffer)
                 
                 /*for c0 in dim0Read.divide(by: chunk0) {
                     let c1Range = dim1Read.divide(by: chunk1)
