@@ -114,8 +114,12 @@ struct OmFileDecoder {
     /// Number of chunkls. Precomputed, because it is required often
     let numberOfChunks: Int
     
+    static var io_size_merge_default: Int { 512 }
     
-    public init(scalefactor: Float, compression: CompressionType, dataType: DataType, dims: [Int], chunks: [Int], readOffset: [Int], readCount: [Int], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkLength: Int, lutChunkElementCount: Int, lutStart: Int, io_size_merge: Int = 512, io_size_max: Int = 65536) {
+    static var io_size_max_default: Int { 65536 }
+    
+    
+    public init(scalefactor: Float, compression: CompressionType, dataType: DataType, dims: [Int], chunks: [Int], readOffset: [Int], readCount: [Int], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkLength: Int, lutChunkElementCount: Int, lutStart: Int, io_size_merge: Int = Self.io_size_merge_default, io_size_max: Int = Self.io_size_max_default) {
         self.scalefactor = scalefactor
         self.compression = compression
         self.dataType = dataType

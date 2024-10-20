@@ -54,7 +54,7 @@ public struct OmFileJSONVariable: Codable {
 extension OmFileJSONVariable {
     /// Get a decoder for this variable given the desired read offsets and lengths
     /// `lutChunkElementCount` controls the size of each block to compress the LUT
-    func makeReader(dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkElementCount: Int = 256) -> OmFileDecoder {
+    func makeReader(dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkElementCount: Int = 256, io_size_max: Int = OmFileDecoder.io_size_max_default, io_size_merge: Int = OmFileDecoder.io_size_merge_default) -> OmFileDecoder {
         return OmFileDecoder(
             scalefactor: scalefactor,
             compression: compression,
@@ -67,7 +67,9 @@ extension OmFileJSONVariable {
             intoCubeDimension: intoCubeDimension,
             lutChunkLength: lutChunkSize,
             lutChunkElementCount: lutChunkElementCount,
-            lutStart: lutOffset
+            lutStart: lutOffset,
+            io_size_merge: io_size_merge,
+            io_size_max: io_size_max
         )
     }
 }
