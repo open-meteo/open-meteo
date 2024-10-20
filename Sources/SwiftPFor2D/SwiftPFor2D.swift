@@ -19,6 +19,36 @@ public enum SwiftPFor2DError: Error {
 }
 
 
+public enum DataType: UInt8, Codable {
+    case int8 = 0
+    case uint8 = 1
+    case int16 = 2
+    case uint16 = 3
+    case int32 = 4
+    case uint32 = 5
+    case int64 = 6
+    case uint64 = 7
+    case float = 8
+    case double = 9
+
+    public var bytesPerElement: Int {
+        switch self {
+        case .int8, .uint8:
+            return 1
+        case .int16, .uint16:
+            return 2
+        case .int32, .uint32:
+            return 4
+        case .int64, .uint64:
+            return 8
+        case .float:
+            return 4
+        case .double:
+            return 8
+        }
+    }
+}
+
 public enum CompressionType: UInt8, Codable {
     /// Lossy compression using 2D delta coding and scalefactor
     case p4nzdec256 = 0
@@ -592,6 +622,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 let r = OmFileDecoder(
                     scalefactor: scalefactor,
                     compression: compression,
+                    dataType: .float,
                     dims: [dim0, dim1],
                     chunks: [chunk0, chunk1],
                     readOffset: [dim0Read.lowerBound, dim1Read.lowerBound],

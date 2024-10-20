@@ -46,7 +46,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         })
     }
     
-    public func read(into: UnsafeMutablePointer<Float>, dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int]) {
+    public func read(into: UnsafeMutableRawPointer, dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int]) {
         let decoder = json.variables[0].makeReader(
             dimRead: dimRead,
             intoCubeOffset: intoCubeOffset,
@@ -58,8 +58,10 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         chunkBuffer.deallocate()
     }
     
-    static func read(fn: Backend, decoder: OmFileDecoder, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) {
+    static func read(fn: Backend, decoder: OmFileDecoder, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         //print("new read \(self), start \(chunkIndex ?? 0..<0)")
+        
+        // TODO validate input buffer size?
         
         fn.withUnsafeBytes({ ptr in
             var readIndexInstruction = decoder.initilalise_index_read()

@@ -74,6 +74,8 @@ struct OmFileDecoder {
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
     public let compression: CompressionType
     
+    public let dataType: DataType
+    
     /// The dimensions of the file
     let dims: [Int]
     
@@ -113,9 +115,10 @@ struct OmFileDecoder {
     let numberOfChunks: Int
     
     
-    public init(scalefactor: Float, compression: CompressionType, dims: [Int], chunks: [Int], readOffset: [Int], readCount: [Int], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkLength: Int, lutChunkElementCount: Int, lutStart: Int, io_size_merge: Int = 512, io_size_max: Int = 65536) {
+    public init(scalefactor: Float, compression: CompressionType, dataType: DataType, dims: [Int], chunks: [Int], readOffset: [Int], readCount: [Int], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkLength: Int, lutChunkElementCount: Int, lutStart: Int, io_size_merge: Int = 512, io_size_max: Int = 65536) {
         self.scalefactor = scalefactor
         self.compression = compression
+        self.dataType = dataType
         self.dims = dims
         self.chunks = chunks
         self.readOffset = readOffset
@@ -237,7 +240,7 @@ struct OmFileDecoder {
             
             /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
             while true {
-                let dataStartPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset).pointee
+                //let dataStartPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset).pointee
                 let dataEndPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset + 1).pointee
                 
                 /// Merge and split IO requests, but make sure that always one IO request is send
@@ -353,7 +356,7 @@ struct OmFileDecoder {
     
     /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
     /// Returns number of processed bytes from input
-    public func decode_chunks(chunkIndexLower: Int, chunkIndexUpper: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
+    public func decode_chunks(chunkIndexLower: Int, chunkIndexUpper: Int, data: UnsafeRawPointer, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) -> Int {
 
         // Note: Relays on the correct number of uncompressed bytes from the compression library...
         // Maybe we need a differnet way that is independenet of this information
@@ -368,7 +371,7 @@ struct OmFileDecoder {
     
     /// Writes a chunk index into the
     /// Return number of uncompressed bytes from the data
-    private func decode_chunk(chunkIndex: Int, data: UnsafeRawPointer, into: UnsafeMutablePointer<Float>, chunkBuffer: UnsafeMutableRawPointer) -> Int {
+    private func decode_chunk(chunkIndex: Int, data: UnsafeRawPointer, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) -> Int {
         //print("globalChunkNum=\(globalChunkNum)")
         
         var rollingMultiplty = 1
@@ -455,16 +458,31 @@ struct OmFileDecoder {
         
         
         let uncompressedBytes: Int
+        let dataMutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
         
         switch compression {
         case .p4nzdec256, .p4nzdec256logarithmic:
-            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
-            let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
-            uncompressedBytes = p4nzdec128v16(mutablePtr, lengthInChunk, chunkBuffer)
+            switch dataType {
+            case .float:
+                /// TODO currently using only 16 bit. Certainly needs to be improved
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+                uncompressedBytes = p4nzdec128v16(dataMutablePtr, lengthInChunk, chunkBuffer)
+            default:
+                fatalError()
+            }
+
         case .fpxdec32:
-            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt32.self)
-            let mutablePtr = UnsafeMutablePointer(mutating: data.assumingMemoryBound(to: UInt8.self))
-            uncompressedBytes = fpxdec32(mutablePtr, lengthInChunk, chunkBuffer, 0)
+            switch dataType {
+            case .float:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt32.self)
+                uncompressedBytes = fpxdec32(dataMutablePtr, lengthInChunk, chunkBuffer, 0)
+            case .double:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt64.self)
+                uncompressedBytes = fpxdec64(dataMutablePtr, lengthInChunk, chunkBuffer, 0)
+            default:
+                fatalError()
+            }
+
         }
         
         //print("uncompressed bytes", uncompressedBytes, "lengthInChunk", lengthInChunk)
@@ -475,11 +493,37 @@ struct OmFileDecoder {
 
         switch compression {
         case .p4nzdec256, .p4nzdec256logarithmic:
-            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
-            delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+            switch dataType {
+            case .int8:
+                fatalError()
+            case .uint8:
+                fatalError()
+            case .int16:
+                fatalError()
+            case .uint16:
+                fatalError()
+            case .int32:
+                fatalError()
+            case .uint32:
+                fatalError()
+            case .int64:
+                fatalError()
+            case .uint64:
+                fatalError()
+            case .float:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+                delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+            case .double:
+                fatalError()
+            }
         case .fpxdec32:
-            let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
-            delta2d_decode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+            switch dataType {
+            case .float:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+                delta2d_decode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+            default:
+                fatalError()
+            }
         }
         
         
@@ -491,6 +535,7 @@ struct OmFileDecoder {
             switch compression {
             case .p4nzdec256:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+                let into = into.assumingMemoryBound(to: Float.self)
                 for i in 0..<linearReadCount {
                     let val = chunkBuffer[d+i]
                     if val == Int16.max {
@@ -502,11 +547,13 @@ struct OmFileDecoder {
                 }
             case .fpxdec32:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+                let into = into.assumingMemoryBound(to: Float.self)
                 for i in 0..<linearReadCount {
                     into.advanced(by: q+i).pointee = chunkBuffer[d+i]
                 }
             case .p4nzdec256logarithmic:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
+                let into = into.assumingMemoryBound(to: Float.self)
                 for i in 0..<linearReadCount {
                     let val = chunkBuffer[d+i]
                     if val == Int16.max {

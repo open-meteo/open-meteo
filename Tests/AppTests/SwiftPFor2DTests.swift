@@ -42,6 +42,8 @@ final class SwiftPFor2DTests: XCTestCase {
         // 143 MB index!
     }*/
     
+    // TODO test for no IO merging
+    
     /// Make sure the last chunk has the correct number of chunks
     func testWriteMoreDataThenExpected() throws {
         let file = "writetest.om"
@@ -84,6 +86,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression,
+            dataType: .float,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -129,6 +132,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression,
+            dataType: .float,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -164,6 +168,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression,
+            dataType: .float,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -197,6 +202,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression,
+            dataType: .float,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -241,6 +247,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression,
+            dataType: .float,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
