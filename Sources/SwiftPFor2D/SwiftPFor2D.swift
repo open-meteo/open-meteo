@@ -19,8 +19,38 @@ public enum SwiftPFor2DError: Error {
 }
 
 
-public enum CompressionType: UInt8 {
-    /// Lossy compression using 2D delta coding and scalefactor
+public enum DataType: UInt8, Codable {
+    case int8 = 0
+    case uint8 = 1
+    case int16 = 2
+    case uint16 = 3
+    case int32 = 4
+    case uint32 = 5
+    case int64 = 6
+    case uint64 = 7
+    case float = 8
+    case double = 9
+
+    public var bytesPerElement: Int {
+        switch self {
+        case .int8, .uint8:
+            return 1
+        case .int16, .uint16:
+            return 2
+        case .int32, .uint32:
+            return 4
+        case .int64, .uint64:
+            return 8
+        case .float:
+            return 4
+        case .double:
+            return 8
+        }
+    }
+}
+
+public enum CompressionType: UInt8, Codable {
+    /// Lossy compression using 2D delta coding and scalefactor. Only support float ad scaled to 16 bit integer
     case p4nzdec256 = 0
     
     /// Lossless compression using 2D xor coding
@@ -28,6 +58,9 @@ public enum CompressionType: UInt8 {
     
     ///  Similar to `p4nzdec256` but apply `log10(1+x)` before
     case p4nzdec256logarithmic = 3
+    
+    // TODO: Use a new compression type to properly implement data type switching. Deprecate the old one
+    //case pforNEW
     
     public var bytesPerElement: Int {
         switch self {
@@ -587,8 +620,25 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             case.p4nzdec256logarithmic:
                 fallthrough
             case .p4nzdec256:
-                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
-                for c0 in dim0Read.divide(by: chunk0) {
+                //let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                
+                let r = OmFileDecoder(
+                    scalefactor: scalefactor,
+                    compression: compression,
+                    dataType: .float,
+                    dims: [dim0, dim1],
+                    chunks: [chunk0, chunk1],
+                    readOffset: [dim0Read.lowerBound, dim1Read.lowerBound],
+                    readCount: [dim0Read.count, dim1Read.count],
+                    intoCubeOffset: [0, arrayDim1Range.lowerBound],
+                    intoCubeDimension: [dim0Read.count, arrayDim1Length],
+                    lutChunkLength: 8,
+                    lutChunkElementCount: 1,
+                    lutStart: OmHeader.length
+                )
+                OmFileReader2.read(fn: fn, decoder: r, into: into, chunkBuffer: chunkBuffer)
+                
+                /*for c0 in dim0Read.divide(by: chunk0) {
                     let c1Range = dim1Read.divide(by: chunk1)
                     let c1Chunks = c1Range.add(c0 * nDim1Chunks)
                     // pre-read chunk table at specific offset
@@ -622,15 +672,15 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                         
                         /// Moved to local coordinates... e.g. 50..<350
                         let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
+                        let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
                         
                         for d0 in clampedLocal0 {
-                            let readStart = clampedLocal1 + d0 * length1
+                            //let readStart = clampedLocal1.lowerBound + d0 * length1
                             let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
                             let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
                             let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                            for i in 0..<clampedGlobal1.count {
-                                let posBuffer = readStart + i
+                            for (i,d1) in clampedLocal1.enumerated() {
+                                let posBuffer = d0 * length1 + d1
                                 let posOut = localRange + i
                                 let val = chunkBuffer[posBuffer]
                                 if val == Int16.max {
@@ -642,7 +692,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                             }
                         }
                     }
-                }
+                }*/
             case .fpxdec32:
                 let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
