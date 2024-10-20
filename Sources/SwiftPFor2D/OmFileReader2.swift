@@ -63,7 +63,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     static func read(fn: Backend, decoder: OmFileDecoder, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         //print("new read \(self)")
         
-        // TODO validate input buffer size?
+        // TODO validate input buffer size based on data type?
         
         fn.withUnsafeBytes({ ptr in
             var readIndexInstruction = decoder.initilalise_index_read()
@@ -72,22 +72,17 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             while decoder.get_next_index_read(indexRead: &readIndexInstruction) {
                 // actually "read" index data from file
                 //print("read index \(readIndexInstruction)")
-                let indexData = UnsafeRawBufferPointer(rebasing: ptr[readIndexInstruction.offset ..< readIndexInstruction.offset + readIndexInstruction.count])
-                //ptr.baseAddress!.advanced(by: lutStart + readIndexInstruction.offset).assumingMemoryBound(to: UInt8.self)
-                //print(ptr.baseAddress!.advanced(by: lutStart).assumingMemoryBound(to: Int.self).assumingMemoryBound(to: Int.self, capacity: readIndexInstruction.count / 8).map{$0})
+                let indexData = ptr.baseAddress!.advanced(by: readIndexInstruction.offset)
                 
                 var readDataInstruction = ChunkDataReadInstruction(indexRead: readIndexInstruction)
                 
                 /// Loop over data blocks
-                while decoder.get_next_data_read(dataRead: &readDataInstruction, indexData: indexData) {
+                while decoder.get_next_data_read(dataRead: &readDataInstruction, indexData: indexData, indexDataCount: readIndexInstruction.count) {
                     // actually "read" compressed chunk data from file
                     //print("read data \(readDataInstruction)")
                     let dataData = ptr.baseAddress!.advanced(by: readDataInstruction.offset)
                     
-                    let uncompressedSize = decoder.decode_chunks(chunkIndexLower: readDataInstruction.chunkIndexLower, chunkIndexUpper: readDataInstruction.chunkIndexUpper, data: dataData, into: into, chunkBuffer: chunkBuffer)
-                    if uncompressedSize != readDataInstruction.count {
-                        fatalError("Uncompressed size missmatch")
-                    }
+                    let _ = decoder.decode_chunks(chunkIndexLower: readDataInstruction.chunkIndexLower, chunkIndexUpper: readDataInstruction.chunkIndexUpper, data: dataData, dataCount: readDataInstruction.count, into: into, chunkBuffer: chunkBuffer)
                 }
             }
         })

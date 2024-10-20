@@ -62,10 +62,10 @@ struct ChunkDataReadInstruction {
  TODO:
  - 64 bit padding to trailer
  - reserved fields for trailer
- - data type support / filter pipeline?
- - consider if we need to access the index LUT inside decompress call instead of relying on returned data size. Certainly required for other compressors
- - number of chunks calculation may be move outside
- - All read requests should be guarded against out-of-bounds reads. May require `fileSize` as an input paramter
+ - data type support / filter pipeline? -> datatype first implemented
+ - DONE consider if we need to access the index LUT inside decompress call instead of relying on returned data size. Certainly required for other compressors -> can also only return a single chunk in dataRead
+ - DONE All read requests should be guarded against out-of-bounds reads. May require `fileSize` as an input paramter
+ - Use C style errno returns for error handling. E.g. out-of-bounds read or datatype/compression not available
  */
 struct OmFileDecoder {
     /// The scalefactor that is applied to all write data
@@ -221,7 +221,7 @@ struct OmFileDecoder {
     
     
     /// Data = index of global chunk num
-    public func get_next_data_read(dataRead: inout ChunkDataReadInstruction, indexData: UnsafeRawBufferPointer) -> Bool {
+    public func get_next_data_read(dataRead: inout ChunkDataReadInstruction, indexData: UnsafeRawPointer, indexDataCount: Int) -> Bool {
         if dataRead.nextChunkLower == dataRead.nextChunkUpper {
             return false
         }
@@ -231,21 +231,25 @@ struct OmFileDecoder {
         /// Version 1 case
         if lutChunkElementCount == 1 {
             // index is a flat Int64 array
-            let data = indexData.assumingMemoryBound(to: Int.self).baseAddress!
+            let data = indexData.assumingMemoryBound(to: Int.self)
             
             let isOffset0 = dataRead.indexRangeLower == 0
             
             /// If the start index starts at 0, the entire array is shifted by one, because the start position of 0 is not stored
             let startOffset = isOffset0 ? 1 : 0
             
+            let readPos = dataRead.indexRangeLower - chunkIndex - startOffset
+            assert((readPos+1)*8 <= indexDataCount)
             /// Index data relative to startindex, needs special care because startpos==0 reads one value less
-            let startPos = isOffset0 ? 0 : data.advanced(by: dataRead.indexRangeLower - chunkIndex - startOffset).pointee
+            let startPos = isOffset0 ? 0 : data.advanced(by: readPos).pointee
             var endPos = startPos
             
             /// loop to next chunk until the end is reached, consecutive reads are further appart than `io_size_merge` or the maximum read length is reached `io_size_max`
             while true {
                 //let dataStartPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset).pointee
-                let dataEndPos = data.advanced(by: dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset + 1).pointee
+                let readPos = dataRead.nextChunkLower - dataRead.indexRangeLower - startOffset + 1
+                assert((readPos+1)*8 <= indexDataCount)
+                let dataEndPos = data.advanced(by: readPos).pointee
                 
                 /// Merge and split IO requests, but make sure that always one IO request is send
                 if startPos != endPos && (dataEndPos - startPos > io_size_max || dataEndPos - endPos > io_size_merge) {
@@ -280,7 +284,7 @@ struct OmFileDecoder {
         }
 
         
-        let indexDataPtr = UnsafeMutablePointer(mutating: indexData.baseAddress!.assumingMemoryBound(to: UInt8.self))
+        let indexDataPtr = UnsafeMutablePointer(mutating: indexData.assumingMemoryBound(to: UInt8.self))
         
         /// TODO This should be stack allocated to a max size of 256 elements
         var uncompressedLut = [UInt64](repeating: 0, count: lutChunkElementCount)
@@ -296,7 +300,7 @@ struct OmFileDecoder {
             let thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, numberOfChunks+1) - lutChunk * lutChunkElementCount
             let start = lutChunk * self.lutChunkLength - lutOffset
             assert(start >= 0)
-            assert(start + self.lutChunkLength <= indexData.count)
+            assert(start + self.lutChunkLength <= indexDataCount)
             // Decompress LUT chunk
             uncompressedLut.withUnsafeMutableBufferPointer { dest in
                 let _ = p4nddec64(indexDataPtr.advanced(by: start), thisLutChunkElementCount, dest.baseAddress)
@@ -317,7 +321,7 @@ struct OmFileDecoder {
                 let nextlutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, numberOfChunks+1) - nextLutChunk * lutChunkElementCount
                 let start = nextLutChunk * self.lutChunkLength - lutOffset
                 assert(start >= 0)
-                assert(start + self.lutChunkLength <= indexData.count)
+                assert(start + self.lutChunkLength <= indexDataCount)
                 // Decompress LUT chunk
                 uncompressedLut.withUnsafeMutableBufferPointer { dest in
                     let _ = p4nddec64(indexDataPtr.advanced(by: start), nextlutChunkElementCount, dest.baseAddress)
@@ -360,15 +364,15 @@ struct OmFileDecoder {
     
     /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
     /// Returns number of processed bytes from input
-    public func decode_chunks(chunkIndexLower: Int, chunkIndexUpper: Int, data: UnsafeRawPointer, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) -> Int {
+    public func decode_chunks(chunkIndexLower: Int, chunkIndexUpper: Int, data: UnsafeRawPointer, dataCount: Int, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) -> Int {
         var pos = 0
         for chunkNum in chunkIndexLower ..< chunkIndexUpper {
-            // TODO guard against out of bound reads
-            
             //print("decompress chunk \(chunkNum), pos \(pos)")
+            assert(pos < dataCount)
             let uncompressedBytes = decode_chunk(chunkIndex: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
         }
+        assert(pos == dataCount)
         return pos
     }
     
