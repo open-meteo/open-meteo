@@ -95,7 +95,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         let outDims = dimRead.map({$0.count})
         let n = outDims.reduce(1, *)
         var out = [Float](repeating: .nan, count: n)
-        out.withUnsafeMutableBufferPointer({
+        out.withUnsafeMutableBytes({
             read(into: $0.baseAddress!, dimRead: dimRead, intoCubeOffset: .init(repeating: 0, count: dimRead.count), intoCubeDimension: outDims)
         })
         return out

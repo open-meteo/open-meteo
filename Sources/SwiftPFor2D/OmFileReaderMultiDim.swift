@@ -357,11 +357,10 @@ struct OmFileDecoder {
     /// Decode multiple chunks inside `data`. Chunks are ordered strictly increasing by 1. Due to IO merging, a chunk might be read, that does not contain relevant data for the output.
     /// Returns number of processed bytes from input
     public func decode_chunks(chunkIndexLower: Int, chunkIndexUpper: Int, data: UnsafeRawPointer, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) -> Int {
-
-        // Note: Relays on the correct number of uncompressed bytes from the compression library...
-        // Maybe we need a differnet way that is independenet of this information
         var pos = 0
         for chunkNum in chunkIndexLower ..< chunkIndexUpper {
+            // TODO guard against out of bound reads
+            
             //print("decompress chunk \(chunkNum), pos \(pos)")
             let uncompressedBytes = decode_chunk(chunkIndex: chunkNum, data: data.advanced(by: pos), into: into, chunkBuffer: chunkBuffer)
             pos += uncompressedBytes
@@ -494,26 +493,10 @@ struct OmFileDecoder {
         switch compression {
         case .p4nzdec256, .p4nzdec256logarithmic:
             switch dataType {
-            case .int8:
-                fatalError()
-            case .uint8:
-                fatalError()
-            case .int16:
-                fatalError()
-            case .uint16:
-                fatalError()
-            case .int32:
-                fatalError()
-            case .uint32:
-                fatalError()
-            case .int64:
-                fatalError()
-            case .uint64:
-                fatalError()
             case .float:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
                 delta2d_decode(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
-            case .double:
+            default:
                 fatalError()
             }
         case .fpxdec32:
@@ -521,6 +504,9 @@ struct OmFileDecoder {
             case .float:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
                 delta2d_decode_xor(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
+            case .double:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Double.self)
+                delta2d_decode_xor_double(lengthInChunk / lengthLast, lengthLast, chunkBuffer)
             default:
                 fatalError()
             }
@@ -546,11 +532,23 @@ struct OmFileDecoder {
                     }
                 }
             case .fpxdec32:
-                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
-                let into = into.assumingMemoryBound(to: Float.self)
-                for i in 0..<linearReadCount {
-                    into.advanced(by: q+i).pointee = chunkBuffer[d+i]
+                switch dataType {
+                case .float:
+                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+                    let into = into.assumingMemoryBound(to: Float.self)
+                    for i in 0..<linearReadCount {
+                        into.advanced(by: q+i).pointee = chunkBuffer[d+i]
+                    }
+                case .double:
+                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Double.self)
+                    let into = into.assumingMemoryBound(to: Double.self)
+                    for i in 0..<linearReadCount {
+                        into.advanced(by: q+i).pointee = chunkBuffer[d+i]
+                    }
+                default:
+                    fatalError()
                 }
+
             case .p4nzdec256logarithmic:
                 let chunkBuffer = chunkBuffer.assumingMemoryBound(to: UInt16.self)
                 let into = into.assumingMemoryBound(to: Float.self)

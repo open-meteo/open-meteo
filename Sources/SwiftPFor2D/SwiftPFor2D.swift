@@ -50,7 +50,7 @@ public enum DataType: UInt8, Codable {
 }
 
 public enum CompressionType: UInt8, Codable {
-    /// Lossy compression using 2D delta coding and scalefactor
+    /// Lossy compression using 2D delta coding and scalefactor. Only support float ad scaled to 16 bit integer
     case p4nzdec256 = 0
     
     /// Lossless compression using 2D xor coding
@@ -58,6 +58,9 @@ public enum CompressionType: UInt8, Codable {
     
     ///  Similar to `p4nzdec256` but apply `log10(1+x)` before
     case p4nzdec256logarithmic = 3
+    
+    // TODO: Use a new compression type to properly implement data type switching. Deprecate the old one
+    //case pforNEW
     
     public var bytesPerElement: Int {
         switch self {
