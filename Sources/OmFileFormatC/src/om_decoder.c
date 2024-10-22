@@ -74,6 +74,34 @@ uint64_t max(const uint64_t a, const uint64_t b) {
     return a > b ? a : b;
 }
 
+/// Assume chunk buffer is a 16 bit integer array and convert to float
+void om_decoder_copy_int16_to_float(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
+    for (uint64_t i = 0; i < count; ++i) {
+        int16_t val = ((int16_t *)chunk_buffer)[read_offset + i];
+        ((float *)into)[write_offset + i] = (val == INT16_MAX) ? NAN : (float)val / scalefactor;
+    }
+}
+
+/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
+void om_decoder_copy_int16_to_float_log10(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
+    for (uint64_t i = 0; i < count; ++i) {
+        int16_t val = ((int16_t *)chunk_buffer)[read_offset + i];
+        ((float *)into)[write_offset + i] = (val == INT16_MAX) ? NAN : powf(10, (float)val / scalefactor) - 1;
+    }
+}
+
+void om_decoder_copy_float(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
+    for (uint64_t i = 0; i < count; ++i) {
+        ((float *)into)[write_offset + i] = ((float *)chunk_buffer)[read_offset + i];
+    }
+}
+
+void om_decoder_copy_double(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
+    for (uint64_t i = 0; i < count; ++i) {
+        ((double *)into)[write_offset + i] = ((double *)chunk_buffer)[read_offset + i];
+    }
+}
+
 
 // Initialization function for OmFileDecoder
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, const uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, const uint64_t lut_chunk_length, const uint64_t lut_chunk_element_count, const uint64_t lust_start, const uint64_t io_size_merge, const uint64_t io_size_max) {
@@ -92,6 +120,28 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     decoder->lut_start = lust_start;
     decoder->io_size_merge = io_size_merge;
     decoder->io_size_max = io_size_max;
+    
+    
+    switch (decoder->compression) {
+        case P4NZDEC256:
+            decoder->copy_callback = &om_decoder_copy_int16_to_float;
+            break;
+            
+        case FPXDEC32:
+            if (decoder->data_type == DATA_TYPE_FLOAT) {
+                decoder->copy_callback = om_decoder_copy_float;
+            } else if (decoder->data_type == DATA_TYPE_DOUBLE) {
+                decoder->copy_callback = om_decoder_copy_double;
+            }
+            break;
+            
+        case P4NZDEC256_LOGARITHMIC:
+            decoder->copy_callback = om_decoder_copy_int16_to_float_log10;
+            break;
+            
+        default:
+            assert(0 && "Unsupported compression type for copying data.");
+    }
     
     // Calculate the number of chunks based on dims and chunks
     uint64_t n = 1;
@@ -523,36 +573,8 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
     
     // Copy data from the chunk buffer to the output buffer.
     while (true) {
-        switch (decoder->compression) {
-            case P4NZDEC256:
-                for (uint64_t i = 0; i < linearReadCount; ++i) {
-                    int16_t val = ((int16_t *)chunk_buffer)[d + i];
-                    ((float *)into)[q + i] = (val == INT16_MAX) ? NAN : (float)val / decoder->scalefactor;
-                }
-                break;
-                
-            case FPXDEC32:
-                if (decoder->data_type == DATA_TYPE_FLOAT) {
-                    for (uint64_t i = 0; i < linearReadCount; ++i) {
-                        ((float *)into)[q + i] = ((float *)chunk_buffer)[d + i];
-                    }
-                } else if (decoder->data_type == DATA_TYPE_DOUBLE) {
-                    for (uint64_t i = 0; i < linearReadCount; ++i) {
-                        ((double *)into)[q + i] = ((double *)chunk_buffer)[d + i];
-                    }
-                }
-                break;
-                
-            case P4NZDEC256_LOGARITHMIC:
-                for (uint64_t i = 0; i < linearReadCount; ++i) {
-                    int16_t val = ((int16_t *)chunk_buffer)[d + i];
-                    ((float *)into)[q + i] = (val == INT16_MAX) ? NAN : powf(10, (float)val / decoder->scalefactor) - 1;
-                }
-                break;
-                
-            default:
-                assert(0 && "Unsupported compression type for copying data.");
-        }
+        /// Copy values from chunk buffer into output buffer
+        (*decoder->copy_callback)(linearReadCount, d, q, decoder->scalefactor, chunk_buffer, into);
         
         q += linearReadCount - 1;
         d += linearReadCount - 1;

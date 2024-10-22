@@ -47,6 +47,8 @@ typedef enum {
     P4NZDEC256_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
 } om_compression_t;
 
+typedef void(*om_decompress_copy_callback)(uint64_t count, uint64_t, uint64_t, float, void*, void*);
+
 typedef struct {
     uint64_t dims_count;
     uint64_t io_size_merge;
@@ -62,6 +64,8 @@ typedef struct {
     uint64_t* read_count;
     uint64_t* cube_offset;
     uint64_t* cube_dimensions;
+    
+    om_decompress_copy_callback* copy_callback;
     
     float scalefactor;
     om_compression_t compression;
