@@ -49,6 +49,12 @@ typedef enum {
 
 typedef void(*om_decompress_copy_callback)(uint64_t, uint64_t, uint64_t, float, const void*, void*);
 
+/// decompress input, of n-elements to output and return number of compressed byte
+typedef uint64_t(*om_decompress_callback)(const void*, uint64_t lengthInChunk, void*);
+
+/// Perform a 2d filter operation
+typedef void(*om_decompress_filter_callback)(const size_t length0, const size_t length1, void* chunkBuffer);
+
 typedef struct {
     uint64_t dims_count;
     uint64_t io_size_merge;
@@ -65,18 +71,18 @@ typedef struct {
     uint64_t* cube_offset;
     uint64_t* cube_dimensions;
     
-    om_decompress_copy_callback copy_callback;
+    om_decompress_callback decompress_callback;
+    om_decompress_filter_callback decompress_filter_callback;
+    om_decompress_copy_callback decompress_copy_callback;
     
     float scalefactor;
-    om_compression_t compression;
-    om_datatype_t data_type;
+    //om_compression_t compression;
+    //om_datatype_t data_type;
+    int8_t bytes_per_element;
 } om_decoder_t;
 
 void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_read_t *indexRead);
 void om_decoder_data_read_init(om_decoder_data_read_t *dataInstruction, const om_decoder_index_read_t *indexRead);
-
-uint64_t compression_bytes_per_element(const om_compression_t type);
-//uint64_t bytesPerElement(const om_datatype_t dataType);
 
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t dataType, const uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* readOffset, const uint64_t* readCount, const uint64_t* intoCubeOffset, const uint64_t* intoCubeDimension, const uint64_t lutChunkLength, const uint64_t lutChunkElementCount, const uint64_t lutStart, const uint64_t io_size_merge, const uint64_t io_size_max);
 uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder);

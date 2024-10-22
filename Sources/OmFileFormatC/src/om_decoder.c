@@ -25,42 +25,6 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
     data_read->nextChunk = index_read->chunkIndex;
 }
 
-
-// Function to get bytes per element for each compression type.
-uint64_t compression_bytes_per_element(const om_compression_t type) {
-    switch (type) {
-        case P4NZDEC256:
-        case P4NZDEC256_LOGARITHMIC:
-            return 2;
-        case FPXDEC32:
-            return 4;
-        default:
-            return 0; // Handle unknown types gracefully.
-    }
-}
-
-// Function to get the number of bytes per element for each data type
-uint64_t bytesPerElement(const om_datatype_t data_type) {
-    switch (data_type) {
-        case DATA_TYPE_INT8:
-        case DATA_TYPE_UINT8:
-            return 1;
-        case DATA_TYPE_INT16:
-        case DATA_TYPE_UINT16:
-            return 2;
-        case DATA_TYPE_INT32:
-        case DATA_TYPE_UINT32:
-        case DATA_TYPE_FLOAT:
-            return 4;
-        case DATA_TYPE_INT64:
-        case DATA_TYPE_UINT64:
-        case DATA_TYPE_DOUBLE:
-            return 8;
-        default:
-            return 0; // Error case if the data type is not recognized
-    }
-}
-
 // Function to divide and round up
 uint64_t divide_rounded_up(const uint64_t dividend, const uint64_t divisor) {
     uint64_t rem = dividend % divisor;
@@ -102,12 +66,20 @@ void om_decoder_copy_double(uint64_t count, uint64_t read_offset, uint64_t write
     }
 }
 
+uint64_t om_decoder_compress_fpxdec32(const void* data, uint64_t count, void* out) {
+    return fpxdec32(data, count, (uint32_t *)out, 0);
+}
+
+uint64_t om_decoder_compress_fpxdec64(const void* data, uint64_t count, void* out) {
+    return fpxdec64(data, count, (uint32_t *)out, 0);
+}
+
 
 // Initialization function for OmFileDecoder
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, const uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, const uint64_t lut_chunk_length, const uint64_t lut_chunk_element_count, const uint64_t lust_start, const uint64_t io_size_merge, const uint64_t io_size_max) {
     decoder->scalefactor = scalefactor;
-    decoder->compression = compression;
-    decoder->data_type = data_type;
+    //decoder->compression = compression;
+    //decoder->data_type = data_type;
     decoder->dims = dims;
     decoder->dims_count = dims_count;
     decoder->chunks = chunks;
@@ -121,22 +93,34 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     decoder->io_size_merge = io_size_merge;
     decoder->io_size_max = io_size_max;
     
-    
-    switch (decoder->compression) {
+    // TODO more compression and datatypes
+    switch (compression) {
         case P4NZDEC256:
-            decoder->copy_callback = om_decoder_copy_int16_to_float;
+            decoder->bytes_per_element = 2;
+            decoder->decompress_copy_callback = om_decoder_copy_int16_to_float;
+            decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode;
+            decoder->decompress_callback = (om_decompress_callback*)p4nzdec128v16;
             break;
             
         case FPXDEC32:
-            if (decoder->data_type == DATA_TYPE_FLOAT) {
-                decoder->copy_callback = om_decoder_copy_float;
-            } else if (decoder->data_type == DATA_TYPE_DOUBLE) {
-                decoder->copy_callback = om_decoder_copy_double;
+            if (data_type == DATA_TYPE_FLOAT) {
+                decoder->bytes_per_element = 4;
+                decoder->decompress_callback = om_decoder_compress_fpxdec32;
+                decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode_xor;
+                decoder->decompress_copy_callback = om_decoder_copy_float;
+            } else if (data_type == DATA_TYPE_DOUBLE) {
+                decoder->bytes_per_element = 8;
+                decoder->decompress_callback = om_decoder_compress_fpxdec64;
+                decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode_xor_double;
+                decoder->decompress_copy_callback = om_decoder_copy_double;
             }
             break;
             
         case P4NZDEC256_LOGARITHMIC:
-            decoder->copy_callback = om_decoder_copy_int16_to_float_log10;
+            decoder->bytes_per_element = 2;
+            decoder->decompress_callback = (om_decompress_callback*)p4nzdec128v16;
+            decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode;
+            decoder->decompress_copy_callback = om_decoder_copy_int16_to_float_log10;
             break;
             
         default:
@@ -193,8 +177,7 @@ uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder) {
     for (uint64_t i = 0; i < decoder->dims_count; i++) {
         chunkLength *= decoder->chunks[i];
     }
-    // Assuming a bytesPerElement function exists for compression type, adjust as needed.
-    return chunkLength * compression_bytes_per_element(decoder->compression);
+    return chunkLength * decoder->bytes_per_element;
 }
 
 bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, om_range_t *chunk_index) {
@@ -514,67 +497,19 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
     }
     
     uint64_t lengthInChunk = rollingMultiplyChunkLength;
-    uint64_t uncompressedBytes;
-    uint8_t *dataMutablePtr = (uint8_t *)data;
-    
-    // Handle decompression based on compression type and data type.
-    switch (decoder->compression) {
-        case P4NZDEC256:
-        case P4NZDEC256_LOGARITHMIC:
-            if (decoder->data_type == DATA_TYPE_FLOAT) {
-                uncompressedBytes = p4nzdec128v16(dataMutablePtr, lengthInChunk, (uint16_t *)chunk_buffer);
-            } else {
-                // Handle other data types as needed.
-                assert(0 && "Unsupported data type for compression.");
-            }
-            break;
-            
-        case FPXDEC32:
-            if (decoder->data_type == DATA_TYPE_FLOAT) {
-                uncompressedBytes = fpxdec32(dataMutablePtr, lengthInChunk, (uint32_t *)chunk_buffer, 0);
-            } else if (decoder->data_type == DATA_TYPE_DOUBLE) {
-                uncompressedBytes = fpxdec64(dataMutablePtr, lengthInChunk, (uint64_t *)chunk_buffer, 0);
-            } else {
-                assert(0 && "Unsupported data type for compression.");
-            }
-            break;
-            
-        default:
-            assert(0 && "Unsupported compression type.");
-    }
+    uint64_t uncompressedBytes = (*decoder->decompress_callback)(data, lengthInChunk, chunk_buffer);
     
     if (no_data) {
         return uncompressedBytes;
     }
     
-    // Decode delta if necessary.
-    switch (decoder->compression) {
-        case P4NZDEC256:
-            if (decoder->data_type == DATA_TYPE_FLOAT) {
-                delta2d_decode(lengthInChunk / lengthLast, lengthLast, (uint16_t *)chunk_buffer);
-            } else {
-                assert(0 && "Unsupported data type for delta decoding.");
-            }
-            break;
-            
-        case FPXDEC32:
-            if (decoder->data_type == DATA_TYPE_FLOAT) {
-                delta2d_decode_xor(lengthInChunk / lengthLast, lengthLast, (float *)chunk_buffer);
-            } else if (decoder->data_type == DATA_TYPE_DOUBLE) {
-                delta2d_decode_xor_double(lengthInChunk / lengthLast, lengthLast, (double *)chunk_buffer);
-            } else {
-                assert(0 && "Unsupported data type for delta decoding.");
-            }
-            break;
-            
-        default:
-            assert(0 && "Unsupported compression type for delta decoding.");
-    }
+    /// Perform 2D decoding
+    (*decoder->decompress_filter_callback)(lengthInChunk / lengthLast, lengthLast, chunk_buffer);
     
     // Copy data from the chunk buffer to the output buffer.
     while (true) {
         /// Copy values from chunk buffer into output buffer
-        (*decoder->copy_callback)(linearReadCount, d, q, decoder->scalefactor, chunk_buffer, into);
+        (*decoder->decompress_copy_callback)(linearReadCount, d, q, decoder->scalefactor, chunk_buffer, into);
         
         q += linearReadCount - 1;
         d += linearReadCount - 1;
