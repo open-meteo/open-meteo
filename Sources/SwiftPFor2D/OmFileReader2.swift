@@ -6,6 +6,7 @@
 //
 
 import Foundation
+@_implementationOnly import CTurboPFor
 
 /// High level implementation to read an OpenMeteo file
 /// Decodes meta data which may include JSON
@@ -17,9 +18,9 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     let json: OmFileJSON
     
     /// Number of elements in index LUT chunk. Might be hardcoded to 256 later. `1` signals old version 1/2 file without a compressed LUT.
-    let lutChunkElementCount: Int
+    let lutChunkElementCount: UInt64
         
-    public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) throws -> Self {
+    public static func open_file(fn: Backend, lutChunkElementCount: UInt64 = 256) throws -> Self {
         // switch version 2 and 3
         
         // if version 3, read trailer
@@ -46,52 +47,81 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         })
     }
     
-    public func read(into: UnsafeMutableRawPointer, dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int], io_size_max: Int = OmFileDecoder.io_size_max_default, io_size_merge: Int = OmFileDecoder.io_size_merge_default) {
-        let decoder = json.variables[0].makeReader(
+    public func read(into: UnsafeMutableRawPointer, dimRead: [Range<UInt64>], intoCubeOffset: [UInt64], intoCubeDimension: [UInt64], io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) {
+        let v = self.json.variables[0]
+        let readOffset = dimRead.map({UInt64($0.lowerBound)})
+        let readCount = dimRead.map({UInt64($0.count)})
+        
+        var decoder = OmFileDecoder()
+        initOmFileDecoder(
+            &decoder,
+            v.scalefactor,
+            v.compression,
+            v.dataType,
+            v.dimensions,
+            UInt64(v.dimensions.count),
+            v.chunks,
+            readOffset,
+            readCount,
+            intoCubeOffset,
+            intoCubeDimension,
+            v.lutChunkSize,
+            lutChunkElementCount,
+            v.lutOffset,
+            io_size_merge,
+            io_size_max
+        )
+        /*let decoder = json.variables[0].makeReader(
             dimRead: dimRead,
             intoCubeOffset: intoCubeOffset,
             intoCubeDimension: intoCubeDimension,
             lutChunkElementCount: lutChunkElementCount,
             io_size_max: io_size_max,
             io_size_merge: io_size_merge
-        )
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: decoder.get_read_buffer_size(), alignment: 4)
-        Self.read(fn: fn, decoder: decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
+        )*/
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(get_read_buffer_size(&decoder)), alignment: 4)
+        Self.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
         chunkBuffer.deallocate()
     }
     
-    static func read(fn: Backend, decoder: OmFileDecoder, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+    static func read(fn: Backend, decoder: UnsafePointer<OmFileDecoder>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         //print("new read \(self)")
         
         // TODO validate input buffer size based on data type?
         
         fn.withUnsafeBytes({ ptr in
-            var readIndexInstruction = decoder.initilalise_index_read()
+            
+            var readIndexInstruction = ChunkIndexReadInstruction()
+            initialise_index_read(decoder, &readIndexInstruction)
+            //print("start \(readIndexInstruction)")
+            //decoder.initilalise_index_read()
             
             /// Loop over index blocks
-            while decoder.get_next_index_read(indexRead: &readIndexInstruction) {
+            while get_next_index_read(decoder, &readIndexInstruction) {
                 // actually "read" index data from file
                 //print("read index \(readIndexInstruction)")
-                let indexData = ptr.baseAddress!.advanced(by: readIndexInstruction.offset)
+                let indexData = ptr.baseAddress!.advanced(by: Int(readIndexInstruction.offset))
                 
-                var readDataInstruction = ChunkDataReadInstruction(indexRead: readIndexInstruction)
+                
+                var readDataInstruction = ChunkDataReadInstruction()
+                initChunkDataReadInstruction(&readDataInstruction, &readIndexInstruction)
                 
                 /// Loop over data blocks
-                while decoder.get_next_data_read(dataRead: &readDataInstruction, indexData: indexData, indexDataCount: readIndexInstruction.count) {
+                while get_next_data_read(decoder, &readDataInstruction, indexData, readIndexInstruction.count) {
                     // actually "read" compressed chunk data from file
                     //print("read data \(readDataInstruction)")
-                    let dataData = ptr.baseAddress!.advanced(by: readDataInstruction.offset)
+                    let dataData = ptr.baseAddress!.advanced(by: Int(readDataInstruction.offset))
                     
-                    let _ = decoder.decode_chunks(chunkIndexLower: readDataInstruction.chunkIndexLower, chunkIndexUpper: readDataInstruction.chunkIndexUpper, data: dataData, dataCount: readDataInstruction.count, into: into, chunkBuffer: chunkBuffer)
+                    let _ = decode_chunks(decoder, readDataInstruction.chunkIndexLower, readDataInstruction.chunkIndexUpper, dataData, readDataInstruction.count, into, chunkBuffer)
                 }
             }
         })
     }
     
-    public func read(_ dimRead: [Range<Int>], io_size_max: Int = OmFileDecoder.io_size_max_default, io_size_merge: Int = OmFileDecoder.io_size_merge_default) -> [Float] {
-        let outDims = dimRead.map({$0.count})
+    public func read(_ dimRead: [Range<UInt64>], io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) -> [Float] {
+        let outDims = dimRead.map({UInt64($0.count)})
         let n = outDims.reduce(1, *)
-        var out = [Float](repeating: .nan, count: n)
+        var out = [Float](repeating: .nan, count: Int(n))
         out.withUnsafeMutableBytes({
             read(
                 into: $0.baseAddress!,

@@ -5,6 +5,7 @@
 //  Created by Patrick Zippenfenig on 19.10.2024.
 //
 
+@_implementationOnly import CTurboPFor
 
 /// The entry level JSON structure to descode all meta data inside an OpenMeteo file
 /// Should contain an attribute `variable` with a list of variables in this file
@@ -28,10 +29,10 @@ public struct OmFileJSONVariable: Codable {
     let name: String?
     
     /// The dimensions of the file
-    let dimensions: [Int]
+    let dimensions: [UInt64]
     
     /// How the dimensions are chunked
-    let chunks: [Int]
+    let chunks: [UInt64]
     
     let dimensionNames: [String]?
     
@@ -39,19 +40,25 @@ public struct OmFileJSONVariable: Codable {
     let scalefactor: Float
     
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
-    let compression: CompressionType
+    let compression: CTurboPFor.CompressionType
     
     /// Data type like float, int32, uint64
-    let dataType: DataType
+    let dataType: CTurboPFor.DataType
     
     /// The offset position of the beginning of the look up table LUT. The LUT comtains then data positions for each chunk
-    let lutOffset: Int
+    let lutOffset: UInt64
     
     /// How long a chunk inside the LUT is after compression
-    let lutChunkSize: Int
+    let lutChunkSize: UInt64
 }
 
-extension OmFileJSONVariable {
+extension CTurboPFor.CompressionType: Codable {
+    
+}
+extension CTurboPFor.DataType: Codable {
+    
+}
+/*extension OmFileJSONVariable {
     /// Get a decoder for this variable given the desired read offsets and lengths
     /// `lutChunkElementCount` controls the size of each block to compress the LUT
     func makeReader(dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkElementCount: Int = 256, io_size_max: Int = OmFileDecoder.io_size_max_default, io_size_merge: Int = OmFileDecoder.io_size_merge_default) -> OmFileDecoder {
@@ -72,4 +79,4 @@ extension OmFileJSONVariable {
             io_size_max: io_size_max
         )
     }
-}
+}*/

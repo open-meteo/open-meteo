@@ -10,7 +10,7 @@ import Foundation
 @_implementationOnly import CHelper
 
 
-struct ChunkIndexReadInstruction {
+struct ChunkIndexReadInstruction2 {
     var offset: Int
     var count: Int
     var indexRangeLower: Int
@@ -32,7 +32,7 @@ struct ChunkIndexReadInstruction {
     }
 }
 
-struct ChunkDataReadInstruction {
+struct ChunkDataReadInstruction2 {
     var offset: Int
     var count: Int
     let indexRangeLower: Int
@@ -42,7 +42,7 @@ struct ChunkDataReadInstruction {
     var nextChunkLower: Int
     var nextChunkUpper: Int
     
-    public init(indexRead: ChunkIndexReadInstruction) {
+    public init(indexRead: ChunkIndexReadInstruction2) {
         self.offset = 0
         self.count = 0
         self.indexRangeLower = indexRead.indexRangeLower
@@ -67,7 +67,7 @@ struct ChunkDataReadInstruction {
  - DONE All read requests should be guarded against out-of-bounds reads. May require `fileSize` as an input paramter
  - Use C style errno returns for error handling. E.g. out-of-bounds read or datatype/compression not available
  */
-struct OmFileDecoder {
+struct OmFileDecoder2 {
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
     
@@ -151,7 +151,7 @@ struct OmFileDecoder {
     /// Return the next data-block to read from the lookup table. Merges reads from mutliple chunks adress lookups.
     /// Modifies `chunkIndex` to keep as a internal reference counter
     /// Should be called in a loop. Return `nil` once all blocks have been processed and the hyperchunk read is complete
-    public func get_next_index_read(indexRead: inout ChunkIndexReadInstruction) -> Bool {
+    public func get_next_index_read(indexRead: inout ChunkIndexReadInstruction2) -> Bool {
         if indexRead.nextChunkLower == indexRead.nextChunkUpper {
             return false
         }
@@ -221,7 +221,7 @@ struct OmFileDecoder {
     
     
     /// Data = index of global chunk num
-    public func get_next_data_read(dataRead: inout ChunkDataReadInstruction, indexData: UnsafeRawPointer, indexDataCount: Int) -> Bool {
+    public func get_next_data_read(dataRead: inout ChunkDataReadInstruction2, indexData: UnsafeRawPointer, indexDataCount: Int) -> Bool {
         if dataRead.nextChunkLower == dataRead.nextChunkUpper {
             return false
         }
@@ -634,7 +634,7 @@ struct OmFileDecoder {
     }
     
     /// Find the first chunk indices that needs to be processed. If chunks are consecutive, a range is returned.
-    func initilalise_index_read() -> ChunkIndexReadInstruction {
+    func initilalise_index_read() -> ChunkIndexReadInstruction2 {
         var chunkStart = 0
         var chunkEnd = 1
         for i in 0..<dims.count {
@@ -654,7 +654,7 @@ struct OmFileDecoder {
                 chunkEnd = chunkStart + chunkInThisDimensionCount
             }
         }
-        return ChunkIndexReadInstruction(nextChunkLower: chunkStart, nextChunkUpper: chunkEnd)
+        return ChunkIndexReadInstruction2(nextChunkLower: chunkStart, nextChunkUpper: chunkEnd)
     }
     
     /// Find the next chunk index that should be processed to satisfy the read request. Nil if not further chunks need to be read

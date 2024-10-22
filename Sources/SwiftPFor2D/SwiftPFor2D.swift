@@ -72,6 +72,10 @@ public enum CompressionType: UInt8, Codable {
             return 4
         }
     }
+    
+    func toC() -> CTurboPFor.CompressionType {
+        return CTurboPFor.CompressionType(rawValue: UInt32(self.rawValue))
+    }
 }
 
 /// Write an om file and write multiple chunks of data
@@ -622,7 +626,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             case .p4nzdec256:
                 //let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
                 
-                let r = OmFileDecoder(
+                /*let r = OmFileDecoder(
                     scalefactor: scalefactor,
                     compression: compression,
                     dataType: .float,
@@ -635,8 +639,35 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     lutChunkLength: 8,
                     lutChunkElementCount: 1,
                     lutStart: OmHeader.length
-                )
-                OmFileReader2.read(fn: fn, decoder: r, into: into, chunkBuffer: chunkBuffer)
+                )*/
+                var decoder = OmFileDecoder()
+                let dims = [UInt64(dim0), UInt64(dim1)]
+                let chunks = [UInt64(chunk0), UInt64(chunk1)]
+                let readOffset = [UInt64(dim0Read.lowerBound), UInt64(dim1Read.lowerBound)]
+                let readCount = [UInt64(dim0Read.count), UInt64(dim1Read.count)]
+                let cubeOffset = [0, UInt64(arrayDim1Range.lowerBound)]
+                let cubeDimensions = [UInt64(dim0Read.count), UInt64(arrayDim1Length)]
+                
+                let c = CTurboPFor.CompressionType(rawValue: UInt32(compression.rawValue))
+                initOmFileDecoder(
+                    &decoder,
+                    scalefactor,
+                    c,
+                    CTurboPFor.DATA_TYPE_FLOAT,
+                    dims,
+                    2,
+                    chunks,
+                    readOffset,
+                    readCount,
+                    cubeOffset,
+                    cubeDimensions,
+                    8,
+                    1,
+                    UInt64(OmHeader.length),
+                    512,
+                    65536)
+                
+                OmFileReader2.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
                 
                 /*for c0 in dim0Read.divide(by: chunk0) {
                     let c1Range = dim1Read.divide(by: chunk1)

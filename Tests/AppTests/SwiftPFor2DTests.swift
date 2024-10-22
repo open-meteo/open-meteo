@@ -85,8 +85,8 @@ final class SwiftPFor2DTests: XCTestCase {
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
-            compression: writer.compression,
-            dataType: .float,
+            compression: writer.compression.toC(),
+            dataType: CTurboPFor.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -131,8 +131,8 @@ final class SwiftPFor2DTests: XCTestCase {
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
-            compression: writer.compression,
-            dataType: .float,
+            compression: writer.compression.toC(),
+            dataType: CTurboPFor.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -167,8 +167,8 @@ final class SwiftPFor2DTests: XCTestCase {
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
-            compression: writer.compression,
-            dataType: .float,
+            compression: writer.compression.toC(),
+            dataType: CTurboPFor.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -185,7 +185,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let dims = [3,3,3]
+        let dims = [UInt64(3),3,3]
         let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
@@ -201,8 +201,8 @@ final class SwiftPFor2DTests: XCTestCase {
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
-            compression: writer.compression,
-            dataType: .float,
+            compression: writer.compression.toC(),
+            dataType: CTurboPFor.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -230,7 +230,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let dims = [5,5]
+        let dims = [UInt64(5),5]
         let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
@@ -246,8 +246,8 @@ final class SwiftPFor2DTests: XCTestCase {
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
-            compression: writer.compression,
-            dataType: .float,
+            compression: writer.compression.toC(),
+            dataType: CTurboPFor.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -329,7 +329,7 @@ final class SwiftPFor2DTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let dims = [5,5]
+        let dims = [UInt64(5),5]
         let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
@@ -345,8 +345,8 @@ final class SwiftPFor2DTests: XCTestCase {
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
-            compression: writer.compression,
-            dataType: .float,
+            compression: writer.compression.toC(),
+            dataType: CTurboPFor.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )

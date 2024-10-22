@@ -20,6 +20,13 @@ extension UnsafeMutablePointer {
     }
 }
 
+extension UInt64 {
+    @inlinable func divideRoundedUp(divisor: UInt64) -> UInt64 {
+        let rem = self % divisor
+        return rem == 0 ? self / divisor : self / divisor + 1
+    }
+}
+
 public extension Int {
     func ceil(to: Int) -> Int {
         guard to != 0 else {
