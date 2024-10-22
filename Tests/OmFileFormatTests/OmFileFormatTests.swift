@@ -424,6 +424,86 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItem(atPath: file)
     }
     
+    func testOldWriterNewReader() throws {
+        let file = "writetest.om"
+        try FileManager.default.removeItemIfExists(at: file)
+        
+        let fn = try OmFileWriter(dim0: 5, dim1: 5, chunk0: 2, chunk1: 2).write(file: file, compressionType: .p4nzdec256, scalefactor: 1, overwrite: false, supplyChunk: { dim0pos in
+            
+            if dim0pos == 0 {
+                return ArraySlice((0..<10).map({ Float($0) }))
+            }
+            if dim0pos == 2 {
+                return ArraySlice((10..<20).map({ Float($0) }))
+            }
+            if dim0pos == 4 {
+                return ArraySlice((20..<25).map({ Float($0) }))
+            }
+            fatalError("Not expected")
+        })
+        
+        let read = try OmFileReader2.open_file(fn: try MmapFile(fn: fn))
+        let dims = read.json.variables[0].dimensions
+        let a = read.read([0..<5, 0..<5], io_size_max: 0, io_size_merge: 0)
+        XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
+        
+        // single index
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1] {
+                XCTAssertEqual(read.read([x..<x+1, y..<y+1], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y)])
+            }
+        }
+        
+        // Read into an existing array with an offset
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1] {
+                var r = [Float](repeating: .nan, count: 9)
+                r.withUnsafeMutableBufferPointer({
+                    read.read(into: $0.baseAddress!, dimRead: [x..<x+1, y..<y+1], intoCubeOffset: [1,1], intoCubeDimension: [3,3], io_size_max: 0, io_size_merge: 0)
+                })
+                XCTAssertEqualArray(r, [.nan, .nan, .nan, .nan, Float(x*5 + y), .nan, .nan, .nan, .nan], accuracy: 0.001)
+            }
+        }
+        
+        // 2x in fast dim
+        for x in 0..<dims[0] {
+            for y in 0..<dims[1]-1 {
+                XCTAssertEqual(read.read([x..<x+1, y..<y+2], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float(x*5 + y + 1)])
+            }
+        }
+        
+        // 2x in slow dim
+        for x in 0..<dims[0]-1 {
+            for y in 0..<dims[1] {
+                XCTAssertEqual(read.read([x..<x+2, y..<y+1], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float((x+1)*5 + y)])
+            }
+        }
+        
+        // 2x2
+        for x in 0..<dims[0]-1 {
+            for y in 0..<dims[1]-1 {
+                XCTAssertEqual(read.read([x..<x+2, y..<y+2], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
+            }
+        }
+        // 3x3
+        for x in 0..<dims[0]-2 {
+            for y in 0..<dims[1]-2 {
+                XCTAssertEqual(read.read([x..<x+3, y..<y+3], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
+            }
+        }
+        
+        // 1x5
+        for x in 0..<dims[1] {
+            XCTAssertEqual(read.read([x..<x+1, 0..<5], io_size_max: 0, io_size_merge: 0), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
+        }
+        
+        // 5x1
+        for x in 0..<dims[0] {
+            XCTAssertEqual(read.read([0..<5, x..<x+1], io_size_max: 0, io_size_merge: 0), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
+        }
+        try FileManager.default.removeItem(atPath: file)
+    }
+    
     
     func testWrite() throws {
         let file = "writetest.om"

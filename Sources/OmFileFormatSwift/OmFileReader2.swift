@@ -51,6 +51,30 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     public static func open_file(fn: Backend, lutChunkElementCount: UInt64 = 256) throws -> Self {
         return try fn.withUnsafeBytes({ptr in
             // TODO Support for old files. Read header and check for old file
+            guard ptr[0] == OmHeader.magicNumber1, ptr[1] == OmHeader.magicNumber2 else {
+                fatalError("Not an OM file")
+            }
+            let version = ptr.baseAddress!.advanced(by: 2).assumingMemoryBound(to: UInt8.self).pointee
+            if version == 1 || version == 2 {
+                let metaV1 = ptr.baseAddress!.assumingMemoryBound(to: OmHeader.self)
+                let variable = OmFileJSONVariable(
+                    name: "data",
+                    dimensions: [UInt64(metaV1.pointee.dim0), UInt64(metaV1.pointee.dim1)],
+                    chunks: [UInt64(metaV1.pointee.chunk0), UInt64(metaV1.pointee.chunk1)],
+                    dimensionNames: nil,
+                    scalefactor: metaV1.pointee.scalefactor,
+                    compression: .init(UInt32(metaV1.pointee.compression)),
+                    dataType: DATA_TYPE_FLOAT,
+                    lutOffset: UInt64(OmHeader.length),
+                    lutChunkSize: 8
+                )
+                let json = OmFileJSON(variables: [variable], someAttributes: nil)
+                return OmFileReader2(fn: fn, json: json, lutChunkElementCount: 1)
+            }
+            
+            if version != 3 {
+                fatalError("Unknown version \(version)")
+            }
             
             // Version 2 files below use JSON meta data
             let fileSize = fn.count
