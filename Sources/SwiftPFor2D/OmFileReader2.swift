@@ -98,7 +98,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                     //print("read data \(dataRead)")
                     let dataData = ptr.baseAddress!.advanced(by: Int(dataRead.offset))
                     
-                    let _ = om_decoder_decode_chunks(decoder, dataRead.chunkIndexLower, dataRead.chunkIndexUpper, dataData, dataRead.count, into, chunkBuffer)
+                    let _ = om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer)
                 }
             }
         })

@@ -12,14 +12,16 @@
 #include <stdbool.h>
 
 typedef struct {
+    uint64_t lowerBound;
+    uint64_t upperBound;
+} om_range_t;
+
+typedef struct {
     uint64_t offset;
     uint64_t count;
-    uint64_t indexRangeLower;
-    uint64_t indexRangeUpper;
-    uint64_t chunkIndexLower;
-    uint64_t chunkIndexUpper;
-    uint64_t nextChunkLower;
-    uint64_t nextChunkUpper;
+    om_range_t indexRange;
+    om_range_t chunkIndex;
+    om_range_t nextChunk;
 } om_decoder_index_read_t;
 
 typedef om_decoder_index_read_t om_decoder_data_read_t;
@@ -78,10 +80,10 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
                        const uint64_t* intoCubeDimension, const uint64_t lutChunkLength, const uint64_t lutChunkElementCount,
                        const uint64_t lutStart, const uint64_t io_size_merge, const uint64_t io_size_max);
 uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder);
-bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, uint64_t *chunkIndexLower, uint64_t *chunkIndexUpper);
+//bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, uint64_t *chunkIndexLower, uint64_t *chunkIndexUpper);
 bool om_decocder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* indexRead);
 bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, uint64_t indexDataCount);
-uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunkBuffer);
-uint64_t om_decoder_decode_chunks(const om_decoder_t *decoder, uint64_t chunkIndexLower, uint64_t chunkIndexUpper, const void *data, uint64_t dataCount, void *into, void *chunkBuffer);
+//uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunkBuffer);
+uint64_t om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer);
 
 #endif // DECODE_H
