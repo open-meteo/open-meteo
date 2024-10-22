@@ -649,7 +649,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 512,
                 65536
             )
-            OmFileReader2.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
+            fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
     }
 }

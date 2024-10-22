@@ -8,6 +8,35 @@
 import Foundation
 @_implementationOnly import OmFileFormatC
 
+extension OmFileReaderBackend {
+    /// Read and decode
+    func decode(decoder: UnsafePointer<om_decoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+        // TODO validate input buffer size based on data type?
+        
+        self.withUnsafeBytes({ ptr in
+            var indexRead = om_decoder_index_read_t()
+            om_decoder_index_read_init(decoder, &indexRead)
+            
+            /// Loop over index blocks and read index data
+            while om_decocder_next_index_read(decoder, &indexRead) {
+                //print("read index \(indexRead)")
+                let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
+                
+                var dataRead = om_decoder_data_read_t()
+                om_decoder_data_read_init(&dataRead, &indexRead)
+                
+                /// Loop over data blocks and read compressed data chunks
+                while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count) {
+                    //print("read data \(dataRead)")
+                    let dataData = ptr.baseAddress!.advanced(by: Int(dataRead.offset))
+                    
+                    let _ = om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer)
+                }
+            }
+        })
+    }
+}
+
 /// High level implementation to read an OpenMeteo file
 /// Decodes meta data which may include JSON
 /// Handles actual file reads. The current implementation just uses MMAP or plain memory.
@@ -72,36 +101,8 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             io_size_max
         )
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(om_decoder_read_buffer_size(&decoder)), alignment: 4)
-        Self.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
+        fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
         chunkBuffer.deallocate()
-    }
-    
-    static func read(fn: Backend, decoder: UnsafePointer<om_decoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
-        //print("new read \(self)")
-        
-        // TODO validate input buffer size based on data type?
-        
-        fn.withUnsafeBytes({ ptr in
-            var indexRead = om_decoder_index_read_t()
-            om_decoder_index_read_init(decoder, &indexRead)
-            
-            /// Loop over index blocks and read index data
-            while om_decocder_next_index_read(decoder, &indexRead) {
-                //print("read index \(indexRead)")
-                let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
-                
-                var dataRead = om_decoder_data_read_t()
-                om_decoder_data_read_init(&dataRead, &indexRead)
-                
-                /// Loop over data blocks and read compressed data chunks
-                while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count) {
-                    //print("read data \(dataRead)")
-                    let dataData = ptr.baseAddress!.advanced(by: Int(dataRead.offset))
-                    
-                    let _ = om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer)
-                }
-            }
-        })
     }
     
     public func read(_ dimRead: [Range<UInt64>], io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) -> [Float] {
