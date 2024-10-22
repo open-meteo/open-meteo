@@ -77,6 +77,8 @@ uint64_t om_decoder_compress_fpxdec64(const void* data, uint64_t count, void* ou
 
 // Initialization function for OmFileDecoder
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, const uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, const uint64_t lut_chunk_length, const uint64_t lut_chunk_element_count, const uint64_t lust_start, const uint64_t io_size_merge, const uint64_t io_size_max) {
+    // TODO limit lut_chunk_element_count to 256
+    
     decoder->scalefactor = scalefactor;
     //decoder->compression = compression;
     //decoder->data_type = data_type;
