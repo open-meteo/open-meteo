@@ -124,7 +124,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     
     switch (decoder->compression) {
         case P4NZDEC256:
-            decoder->copy_callback = &om_decoder_copy_int16_to_float;
+            decoder->copy_callback = om_decoder_copy_int16_to_float;
             break;
             
         case FPXDEC32:
