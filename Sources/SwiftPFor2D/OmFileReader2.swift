@@ -52,8 +52,8 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         let readOffset = dimRead.map({UInt64($0.lowerBound)})
         let readCount = dimRead.map({UInt64($0.count)})
         
-        var decoder = OmFileDecoder()
-        initOmFileDecoder(
+        var decoder = om_decoder_t()
+        om_decoder_init(
             &decoder,
             v.scalefactor,
             v.compression,
@@ -71,48 +71,34 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             io_size_merge,
             io_size_max
         )
-        /*let decoder = json.variables[0].makeReader(
-            dimRead: dimRead,
-            intoCubeOffset: intoCubeOffset,
-            intoCubeDimension: intoCubeDimension,
-            lutChunkElementCount: lutChunkElementCount,
-            io_size_max: io_size_max,
-            io_size_merge: io_size_merge
-        )*/
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(get_read_buffer_size(&decoder)), alignment: 4)
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(om_decoder_read_buffer_size(&decoder)), alignment: 4)
         Self.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
         chunkBuffer.deallocate()
     }
     
-    static func read(fn: Backend, decoder: UnsafePointer<OmFileDecoder>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+    static func read(fn: Backend, decoder: UnsafePointer<om_decoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         //print("new read \(self)")
         
         // TODO validate input buffer size based on data type?
         
         fn.withUnsafeBytes({ ptr in
+            var indexRead = om_decoder_index_read_t()
+            om_decoder_index_read_init(decoder, &indexRead)
             
-            var readIndexInstruction = ChunkIndexReadInstruction()
-            initialise_index_read(decoder, &readIndexInstruction)
-            //print("start \(readIndexInstruction)")
-            //decoder.initilalise_index_read()
-            
-            /// Loop over index blocks
-            while get_next_index_read(decoder, &readIndexInstruction) {
-                // actually "read" index data from file
-                //print("read index \(readIndexInstruction)")
-                let indexData = ptr.baseAddress!.advanced(by: Int(readIndexInstruction.offset))
+            /// Loop over index blocks and read index data
+            while om_decocder_next_index_read(decoder, &indexRead) {
+                //print("read index \(indexRead)")
+                let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
                 
+                var dataRead = om_decoder_data_read_t()
+                om_decoder_data_read_init(&dataRead, &indexRead)
                 
-                var readDataInstruction = ChunkDataReadInstruction()
-                initChunkDataReadInstruction(&readDataInstruction, &readIndexInstruction)
-                
-                /// Loop over data blocks
-                while get_next_data_read(decoder, &readDataInstruction, indexData, readIndexInstruction.count) {
-                    // actually "read" compressed chunk data from file
-                    //print("read data \(readDataInstruction)")
-                    let dataData = ptr.baseAddress!.advanced(by: Int(readDataInstruction.offset))
+                /// Loop over data blocks and read compressed data chunks
+                while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count) {
+                    //print("read data \(dataRead)")
+                    let dataData = ptr.baseAddress!.advanced(by: Int(dataRead.offset))
                     
-                    let _ = decode_chunks(decoder, readDataInstruction.chunkIndexLower, readDataInstruction.chunkIndexUpper, dataData, readDataInstruction.count, into, chunkBuffer)
+                    let _ = om_decoder_decode_chunks(decoder, dataRead.chunkIndexLower, dataRead.chunkIndexUpper, dataData, dataRead.count, into, chunkBuffer)
                 }
             }
         })

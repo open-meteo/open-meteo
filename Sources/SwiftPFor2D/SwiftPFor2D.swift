@@ -73,8 +73,8 @@ public enum CompressionType: UInt8, Codable {
         }
     }
     
-    func toC() -> CTurboPFor.CompressionType {
-        return CTurboPFor.CompressionType(rawValue: UInt32(self.rawValue))
+    func toC() -> CTurboPFor.om_compression_t {
+        return CTurboPFor.om_compression_t(rawValue: UInt32(self.rawValue))
     }
 }
 
@@ -640,7 +640,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                     lutChunkElementCount: 1,
                     lutStart: OmHeader.length
                 )*/
-                var decoder = OmFileDecoder()
+                var decoder = om_decoder_t()
                 let dims = [UInt64(dim0), UInt64(dim1)]
                 let chunks = [UInt64(chunk0), UInt64(chunk1)]
                 let readOffset = [UInt64(dim0Read.lowerBound), UInt64(dim1Read.lowerBound)]
@@ -648,8 +648,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 let cubeOffset = [0, UInt64(arrayDim1Range.lowerBound)]
                 let cubeDimensions = [UInt64(dim0Read.count), UInt64(arrayDim1Length)]
                 
-                let c = CTurboPFor.CompressionType(rawValue: UInt32(compression.rawValue))
-                initOmFileDecoder(
+                let c = CTurboPFor.om_compression_t(rawValue: UInt32(compression.rawValue))
+                om_decoder_init(
                     &decoder,
                     scalefactor,
                     c,

@@ -18,7 +18,7 @@
 
 
 // Initialization function for ChunkDataReadInstruction
-void initChunkDataReadInstruction(ChunkDataReadInstruction *dataInstruction, const ChunkIndexReadInstruction *indexRead) {
+void om_decoder_data_read_init(om_decoder_data_read_t *dataInstruction, const om_decoder_index_read_t *indexRead) {
     dataInstruction->offset = 0;
     dataInstruction->count = 0;
     dataInstruction->indexRangeLower = indexRead->indexRangeLower;
@@ -33,7 +33,7 @@ void initChunkDataReadInstruction(ChunkDataReadInstruction *dataInstruction, con
 
 
 // Function to get bytes per element for each compression type.
-uint64_t compression_bytes_per_element(const CompressionType type) {
+uint64_t compression_bytes_per_element(const om_compression_t type) {
     switch (type) {
         case P4NZDEC256:
         case P4NZDEC256_LOGARITHMIC:
@@ -46,7 +46,7 @@ uint64_t compression_bytes_per_element(const CompressionType type) {
 }
 
 // Function to get the number of bytes per element for each data type
-uint64_t bytesPerElement(const DataType dataType) {
+uint64_t bytesPerElement(const om_datatype_t dataType) {
     switch (dataType) {
         case DATA_TYPE_INT8:
         case DATA_TYPE_UINT8:
@@ -82,7 +82,7 @@ uint64_t max(const uint64_t a, const uint64_t b) {
 
 
 // Initialization function for OmFileDecoder
-void initOmFileDecoder(OmFileDecoder* decoder, const float scalefactor, const CompressionType compression, const DataType dataType,
+void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t dataType,
                        const uint64_t* dims, const uint64_t dims_count, const uint64_t* chunks, const uint64_t* readOffset,
                        const uint64_t* readCount, const uint64_t* intoCubeOffset,
                        const uint64_t* intoCubeDimension, const uint64_t lutChunkLength, const uint64_t lutChunkElementCount,
@@ -112,7 +112,7 @@ void initOmFileDecoder(OmFileDecoder* decoder, const float scalefactor, const Co
 }
 
 
-void initialise_index_read(const OmFileDecoder* decoder, ChunkIndexReadInstruction *indexRead) {
+void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_read_t *indexRead) {
     uint64_t chunkStart = 0;
     uint64_t chunkEnd = 1;
 
@@ -148,7 +148,7 @@ void initialise_index_read(const OmFileDecoder* decoder, ChunkIndexReadInstructi
 
 
 // Function to get the read buffer size for a single chunk
-uint64_t get_read_buffer_size(const OmFileDecoder* decoder) {
+uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder) {
     uint64_t chunkLength = 1;
     for (uint64_t i = 0; i < decoder->dims_count; i++) {
         chunkLength *= decoder->chunks[i];
@@ -157,7 +157,7 @@ uint64_t get_read_buffer_size(const OmFileDecoder* decoder) {
     return chunkLength * compression_bytes_per_element(decoder->compression);
 }
 
-bool get_next_chunk_position(const OmFileDecoder *decoder, uint64_t *chunkIndexLower, uint64_t *chunkIndexUpper) {
+bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, uint64_t *chunkIndexLower, uint64_t *chunkIndexUpper) {
     uint64_t rollingMultiply = 1;
 
     // Number of consecutive chunks that can be read linearly.
@@ -218,7 +218,7 @@ bool get_next_chunk_position(const OmFileDecoder *decoder, uint64_t *chunkIndexL
 }
 
 
-bool get_next_index_read(const OmFileDecoder* decoder, ChunkIndexReadInstruction* indexRead) {
+bool om_decocder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* indexRead) {
     if (indexRead->nextChunkLower == indexRead->nextChunkUpper) {
         return false;
     }
@@ -240,7 +240,7 @@ bool get_next_index_read(const OmFileDecoder* decoder, ChunkIndexReadInstruction
         uint64_t nextIncrement = max(1, min(maxRead, indexRead->nextChunkUpper - indexRead->nextChunkLower - 1));
 
         if (indexRead->nextChunkLower + nextIncrement >= indexRead->nextChunkUpper) {
-            if (!get_next_chunk_position(decoder, &indexRead->nextChunkLower, &indexRead->nextChunkUpper)) {
+            if (!_om_decoder_next_chunk_position(decoder, &indexRead->nextChunkLower, &indexRead->nextChunkUpper)) {
                 break;
             }
             uint64_t readStartNext = (indexRead->nextChunkLower + endAlignOffset) / decoder->lutChunkElementCount * decoder->lutChunkLength - decoder->lutChunkLength;
@@ -273,7 +273,7 @@ bool get_next_index_read(const OmFileDecoder* decoder, ChunkIndexReadInstruction
 }
 
 
-bool get_next_data_read(const OmFileDecoder *decoder, ChunkDataReadInstruction* dataRead, const void* indexData, uint64_t indexDataCount) {
+bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, uint64_t indexDataCount) {
     if (dataRead->nextChunkLower == dataRead->nextChunkUpper) {
         return false;
     }
@@ -313,7 +313,7 @@ bool get_next_data_read(const OmFileDecoder *decoder, ChunkDataReadInstruction* 
             chunkIndex = dataRead->nextChunkLower;
 
             if (dataRead->nextChunkLower + 1 >= dataRead->nextChunkUpper) {
-                if (!get_next_chunk_position(decoder, &dataRead->nextChunkLower, &dataRead->nextChunkUpper)) {
+                if (!_om_decoder_next_chunk_position(decoder, &dataRead->nextChunkLower, &dataRead->nextChunkUpper)) {
                     // No next chunk, finish processing the current one and stop
                     break;
                 }
@@ -391,7 +391,7 @@ bool get_next_data_read(const OmFileDecoder *decoder, ChunkDataReadInstruction* 
         chunkIndex = dataRead->nextChunkLower;
 
         if (chunkIndex + 1 >= dataRead->nextChunkUpper) {
-            if (!get_next_chunk_position(decoder, &dataRead->nextChunkLower, &dataRead->nextChunkUpper)) {
+            if (!_om_decoder_next_chunk_position(decoder, &dataRead->nextChunkLower, &dataRead->nextChunkUpper)) {
                 // No next chunk, finish processing the current one and stop
                 break;
             }
@@ -413,7 +413,7 @@ bool get_next_data_read(const OmFileDecoder *decoder, ChunkDataReadInstruction* 
 }
 
 // Function to decode a single chunk.
-uint64_t decode_chunk(const OmFileDecoder *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunkBuffer) {
+uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunkBuffer) {
     uint64_t rollingMultiply = 1;
     uint64_t rollingMultiplyChunkLength = 1;
     uint64_t rollingMultiplyTargetCube = 1;
@@ -629,13 +629,13 @@ uint64_t decode_chunk(const OmFileDecoder *decoder, uint64_t chunkIndex, const v
 
 
 // Function to decode multiple chunks inside data.
-uint64_t decode_chunks(const OmFileDecoder *decoder, uint64_t chunkIndexLower, uint64_t chunkIndexUpper, const void *data, uint64_t dataCount, void *into, void *chunkBuffer) {
+uint64_t om_decoder_decode_chunks(const om_decoder_t *decoder, uint64_t chunkIndexLower, uint64_t chunkIndexUpper, const void *data, uint64_t dataCount, void *into, void *chunkBuffer) {
     uint64_t pos = 0;
     //printf("chunkIndexLower %d %d\n",chunkIndexLower,chunkIndexUpper);
     for (uint64_t chunkNum = chunkIndexLower; chunkNum < chunkIndexUpper; ++chunkNum) {
         //printf("chunkIndex %d pos=%d dataCount=%d \n",chunkNum, pos, dataCount);
         assert(pos < dataCount);
-        uint64_t uncompressedBytes = decode_chunk(decoder, chunkNum, (const uint8_t *)data + pos, into, chunkBuffer);
+        uint64_t uncompressedBytes = _om_decoder_decode_chunk(decoder, chunkNum, (const uint8_t *)data + pos, into, chunkBuffer);
         pos += uncompressedBytes;
     }
     //printf("%d %d \n", pos, dataCount);
