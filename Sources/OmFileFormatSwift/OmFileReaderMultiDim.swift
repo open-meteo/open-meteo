@@ -4,7 +4,7 @@
 //
 //  Created by Patrick Zippenfenig on 09.09.2024.
 //
-
+/*
 import Foundation
 @_implementationOnly import OmFileFormatC
 @_implementationOnly import CHelper
@@ -711,3 +711,4 @@ struct OmFileDecoder2 {
         return true
     }
 }
+*/

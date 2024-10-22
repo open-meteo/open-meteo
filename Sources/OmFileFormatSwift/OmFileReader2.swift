@@ -11,8 +11,6 @@ import Foundation
 extension OmFileReaderBackend {
     /// Read and decode
     func decode(decoder: UnsafePointer<om_decoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
-        // TODO validate input buffer size based on data type?
-        
         self.withUnsafeBytes({ ptr in
             var indexRead = om_decoder_index_read_t()
             om_decoder_index_read_init(decoder, &indexRead)
@@ -49,16 +47,12 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     /// Number of elements in index LUT chunk. Might be hardcoded to 256 later. `1` signals old version 1/2 file without a compressed LUT.
     let lutChunkElementCount: UInt64
         
+    /// Open a file and decode om file meta data. In this casem fn is typically mmap or just plain memory
     public static func open_file(fn: Backend, lutChunkElementCount: UInt64 = 256) throws -> Self {
-        // switch version 2 and 3
-        
-        // if version 3, read trailer
-        
         return try fn.withUnsafeBytes({ptr in
-            // TODO read header and check for old file
-            // if old file
-            // read header
+            // TODO Support for old files. Read header and check for old file
             
+            // Version 2 files below use JSON meta data
             let fileSize = fn.count
             /// The last 8 bytes of the file are the size of the JSON payload
             let jsonLength = ptr.baseAddress!.advanced(by: fileSize - 8).assumingMemoryBound(to: Int.self).pointee
@@ -76,8 +70,14 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         })
     }
     
+    /// Read the first variable from a OM file
     public func read(into: UnsafeMutableRawPointer, dimRead: [Range<UInt64>], intoCubeOffset: [UInt64], intoCubeDimension: [UInt64], io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) {
         let v = self.json.variables[0]
+        let nDimensions = v.dimensions.count
+        assert(dimRead.count == nDimensions)
+        assert(intoCubeOffset.count == nDimensions)
+        assert(intoCubeDimension.count == nDimensions)
+        
         let readOffset = dimRead.map({UInt64($0.lowerBound)})
         let readCount = dimRead.map({UInt64($0.count)})
         
