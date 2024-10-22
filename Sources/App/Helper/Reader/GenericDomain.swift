@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormatSwift
 
 /**
  Generic domain that is required for the reader

@@ -1,8 +1,8 @@
-@_implementationOnly import CTurboPFor
+@_implementationOnly import OmFileFormatC
 @_implementationOnly import CHelper
 import Foundation
 
-public enum SwiftPFor2DError: Error {
+public enum OmFileFormatSwiftError: Error {
     case cannotOpenFile(filename: String, errno: Int32, error: String)
     case cannotCreateFile(filename: String, errno: Int32, error: String)
     case cannotTruncateFile(filename: String, errno: Int32, error: String)
@@ -73,8 +73,8 @@ public enum CompressionType: UInt8, Codable {
         }
     }
     
-    func toC() -> CTurboPFor.om_compression_t {
-        return CTurboPFor.om_compression_t(rawValue: UInt32(self.rawValue))
+    func toC() -> OmFileFormatC.om_compression_t {
+        return OmFileFormatC.om_compression_t(rawValue: UInt32(self.rawValue))
     }
 }
 
@@ -141,10 +141,10 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         self.fsyncFlushSize = fsync ? 32 * 1024 * 1024 : nil
         
         guard chunk0 > 0 && chunk1 > 0 && dim0 > 0 && dim1 > 0 else {
-            throw SwiftPFor2DError.dimensionMustBeLargerThan0
+            throw OmFileFormatSwiftError.dimensionMustBeLargerThan0
         }
         guard chunk0 <= dim0 && chunk1 <= dim1 else {
-            throw SwiftPFor2DError.chunkDimensionIsSmallerThenOverallDim
+            throw OmFileFormatSwiftError.chunkDimensionIsSmallerThenOverallDim
         }
         
         let chunkSizeByte = chunk0 * chunk1 * 4
@@ -219,12 +219,12 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
             if missingElements < elementsPerChunkRow {
                 // For the last chunk, the number must match exactly
                 guard uncompressedInput.count == missingElements else {
-                    throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                    throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
                 }
             }
             let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
             guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
-                throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
             }
             
             let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
@@ -288,12 +288,12 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
             if missingElements < elementsPerChunkRow {
                 // For the last chunk, the number must match exactly
                 guard uncompressedInput.count == missingElements else {
-                    throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                    throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
                 }
             }
             let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
             guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
-                throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
             }
             
             let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
@@ -400,7 +400,7 @@ public final class OmFileWriter {
     @discardableResult
     public func write(file: String, compressionType: CompressionType, scalefactor: Float, overwrite: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> FileHandle {
         if !overwrite && FileManager.default.fileExists(atPath: file) {
-            throw SwiftPFor2DError.fileExistsAlready(filename: file)
+            throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
         }
         let fileTemp = "\(file)~"
         try FileManager.default.removeItemIfExists(at: fileTemp)
@@ -515,7 +515,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         }
         
         guard header.magicNumber1 == OmHeader.magicNumber1 && header.magicNumber2 == OmHeader.magicNumber2 else {
-            throw SwiftPFor2DError.notAOmFile
+            throw OmFileFormatSwiftError.notAOmFile
         }
         
         self.fn = fn
@@ -537,10 +537,10 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         let dim1Read = dim1Read ?? 0..<dim1
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
         }
         guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
         let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
@@ -603,10 +603,10 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         //assert(arrayDim1Range.count == dim1Read.count)
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
         }
         guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
         let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
@@ -648,12 +648,12 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 let cubeOffset = [0, UInt64(arrayDim1Range.lowerBound)]
                 let cubeDimensions = [UInt64(dim0Read.count), UInt64(arrayDim1Length)]
                 
-                let c = CTurboPFor.om_compression_t(rawValue: UInt32(compression.rawValue))
+                let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
                 om_decoder_init(
                     &decoder,
                     scalefactor,
                     c,
-                    CTurboPFor.DATA_TYPE_FLOAT,
+                    OmFileFormatC.DATA_TYPE_FLOAT,
                     dims,
                     2,
                     chunks,

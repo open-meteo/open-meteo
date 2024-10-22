@@ -11,14 +11,14 @@ extension FileHandle {
         let fn = open(file, flags, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
         guard fn > 0 else {
             let error = String(cString: strerror(errno))
-            throw SwiftPFor2DError.cannotCreateFile(filename: file, errno: errno, error: error)
+            throw OmFileFormatSwiftError.cannotCreateFile(filename: file, errno: errno, error: error)
         }
         
         let handle = FileHandle(fileDescriptor: fn, closeOnDealloc: true)
         if let sparseSize {
             guard ftruncate(fn, off_t(sparseSize)) == 0 else {
                 let error = String(cString: strerror(errno))
-                throw SwiftPFor2DError.cannotTruncateFile(filename: file, errno: errno, error: error)
+                throw OmFileFormatSwiftError.cannotTruncateFile(filename: file, errno: errno, error: error)
             }
         }
         if let size {
@@ -33,7 +33,7 @@ extension FileHandle {
         #if os(Linux)
         let error = posix_fallocate(fileDescriptor, 0, size)
         guard error == 0 else {
-            throw SwiftPFor2DError.posixFallocateFailed(error: error)
+            throw OmFileFormatSwiftError.posixFallocateFailed(error: error)
         }
         #else
         /// Try to allocate continous space first
@@ -45,11 +45,11 @@ extension FileHandle {
             error = fcntl(fileDescriptor, F_PREALLOCATE, &store)
         }
         guard error >= 0 else {
-            throw SwiftPFor2DError.posixFallocateFailed(error: error)
+            throw OmFileFormatSwiftError.posixFallocateFailed(error: error)
         }
         let error2 = ftruncate(fileDescriptor, off_t(size))
         guard error2 >= 0 else {
-            throw SwiftPFor2DError.ftruncateFailed(error: error2)
+            throw OmFileFormatSwiftError.ftruncateFailed(error: error2)
         }
         #endif
     }
@@ -61,7 +61,7 @@ extension FileHandle {
         let fn = open(file, O_RDONLY, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
         guard fn > 0 else {
             let error = String(cString: strerror(errno))
-            throw SwiftPFor2DError.cannotOpenFile(filename: file, errno: errno, error: error)
+            throw OmFileFormatSwiftError.cannotOpenFile(filename: file, errno: errno, error: error)
         }
         let handle = FileHandle(fileDescriptor: fn, closeOnDealloc: true)
         return handle
@@ -74,7 +74,7 @@ extension FileHandle {
         let fn = open(file, O_RDWR, S_IRUSR|S_IWUSR|S_IRGRP|S_IROTH)
         guard fn > 0 else {
             let error = String(cString: strerror(errno))
-            throw SwiftPFor2DError.cannotOpenFile(filename: file, errno: errno, error: error)
+            throw OmFileFormatSwiftError.cannotOpenFile(filename: file, errno: errno, error: error)
         }
         let handle = FileHandle(fileDescriptor: fn, closeOnDealloc: true)
         return handle
@@ -111,7 +111,7 @@ extension FileManager {
     public func moveFileOverwrite(from: String, to: String) throws {
         guard rename(from, to) != -1 else {
             let error = String(cString: strerror(errno))
-            throw SwiftPFor2DError.cannotMoveFile(from: from, to: to, errno: errno, error: error)
+            throw OmFileFormatSwiftError.cannotMoveFile(from: from, to: to, errno: errno, error: error)
         }
     }
     

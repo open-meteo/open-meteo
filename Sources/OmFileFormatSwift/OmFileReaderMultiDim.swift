@@ -6,7 +6,7 @@
 //
 
 import Foundation
-@_implementationOnly import CTurboPFor
+@_implementationOnly import OmFileFormatC
 @_implementationOnly import CHelper
 
 

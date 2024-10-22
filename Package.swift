@@ -54,7 +54,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 "CHelper",
-                "SwiftPFor2D",
+                "OmFileFormatSwift",
                 "CZlib",
                 "CBz2lib"
             ] + (enableParquet ? [
@@ -86,14 +86,18 @@ let package = Package(
             name: "AppTests",
             dependencies: [.target(name: "App")]
         ),
+        .testTarget(
+            name: "OmFileFormatTests",
+            dependencies: [.target(name: "App")]
+        ),
         .target(
-            name: "SwiftPFor2D",
-            dependencies: ["CTurboPFor", "CHelper"],
+            name: "OmFileFormatSwift",
+            dependencies: ["OmFileFormatC", "CHelper"],
             cSettings: cFlagsPFor2D,
             swiftSettings: swiftFlags
         ),
         .target(
-            name: "CTurboPFor",
+            name: "OmFileFormatC",
             cSettings: cFlagsPFor,
             swiftSettings: swiftFlags
         ),

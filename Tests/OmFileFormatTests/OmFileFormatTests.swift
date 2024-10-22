@@ -1,9 +1,9 @@
 import XCTest
-@testable import SwiftPFor2D
+@testable import OmFileFormatSwift
 @testable import App
-@_implementationOnly import CTurboPFor
+@_implementationOnly import OmFileFormatC
 
-final class SwiftPFor2DTests: XCTestCase {
+final class OmFileFormatTests: XCTestCase {
     func testInMemory() throws {
         let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
@@ -86,7 +86,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: CTurboPFor.DATA_TYPE_FLOAT,
+            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -132,7 +132,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: CTurboPFor.DATA_TYPE_FLOAT,
+            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -168,7 +168,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: CTurboPFor.DATA_TYPE_FLOAT,
+            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -202,7 +202,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: CTurboPFor.DATA_TYPE_FLOAT,
+            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -247,7 +247,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: CTurboPFor.DATA_TYPE_FLOAT,
+            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -346,7 +346,7 @@ final class SwiftPFor2DTests: XCTestCase {
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: CTurboPFor.DATA_TYPE_FLOAT,
+            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
             lutOffset: lutStart,
             lutChunkSize: lutChunkLength
         )
@@ -594,5 +594,33 @@ final class SwiftPFor2DTests: XCTestCase {
         print(data2)
         XCTAssertTrue(try read.read(dim0Slow: 1..<2, dim1: 1..<2)[0].isNaN)
         try FileManager.default.removeItem(atPath: file)
+    }
+}
+
+func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T.Element == Float, T: Equatable {
+    guard a.count == b.count else {
+        XCTFail("Array length different")
+        return
+    }
+    var failed = false
+    for (a1,b1) in zip(a,b) {
+        if a1.isNaN && b1.isNaN {
+            continue
+        }
+        if a1.isNaN || b1.isNaN || abs(a1 - b1) > accuracy {
+            failed = true
+            break
+        }
+    }
+    if failed {
+        for (a1,b1) in zip(a,b) {
+            if a1.isNaN && b1.isNaN {
+                continue
+            }
+            if a1.isNaN || b1.isNaN || abs(a1 - b1) > accuracy {
+                print("\(a1)\t\(b1)\t\(a1-b1)")
+            }
+        }
+        XCTAssertEqual(a, b)
     }
 }

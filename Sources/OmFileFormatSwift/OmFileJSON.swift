@@ -5,7 +5,7 @@
 //  Created by Patrick Zippenfenig on 19.10.2024.
 //
 
-@_implementationOnly import CTurboPFor
+@_implementationOnly import OmFileFormatC
 
 /// The entry level JSON structure to descode all meta data inside an OpenMeteo file
 /// Should contain an attribute `variable` with a list of variables in this file
@@ -40,10 +40,10 @@ public struct OmFileJSONVariable: Codable {
     let scalefactor: Float
     
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
-    let compression: CTurboPFor.om_compression_t
+    let compression: OmFileFormatC.om_compression_t
     
     /// Data type like float, int32, uint64
-    let dataType: CTurboPFor.om_datatype_t
+    let dataType: OmFileFormatC.om_datatype_t
     
     /// The offset position of the beginning of the look up table LUT. The LUT comtains then data positions for each chunk
     let lutOffset: UInt64
@@ -52,10 +52,10 @@ public struct OmFileJSONVariable: Codable {
     let lutChunkSize: UInt64
 }
 
-extension CTurboPFor.om_compression_t: Codable {
+extension OmFileFormatC.om_compression_t: Codable {
     
 }
-extension CTurboPFor.om_datatype_t: Codable {
+extension OmFileFormatC.om_datatype_t: Codable {
     
 }
 /*extension OmFileJSONVariable {

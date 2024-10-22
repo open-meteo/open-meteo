@@ -39,7 +39,7 @@ public final class MmapFile {
         let len = try Int(fn.seekToEnd())
         guard let mem = mmap(nil, len, mode.prot, MAP_SHARED, fn.fileDescriptor, 0), mem != UnsafeMutableRawPointer(bitPattern: -1) else {
             let error = String(cString: strerror(errno))
-            throw SwiftPFor2DError.cannotOpenFile(errno: errno, error: error)
+            throw OmFileFormatSwiftError.cannotOpenFile(errno: errno, error: error)
         }
         //madvise(mem, len, MADV_SEQUENTIAL)
         let start = mem.assumingMemoryBound(to: UInt8.self)
