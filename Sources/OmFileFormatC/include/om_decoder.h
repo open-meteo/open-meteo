@@ -74,8 +74,8 @@ void om_decoder_data_read_init(om_decoder_data_read_t *dataInstruction, const om
 uint64_t compression_bytes_per_element(const om_compression_t type);
 //uint64_t bytesPerElement(const om_datatype_t dataType);
 
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t dataType,
-                       const uint64_t* dims, const uint64_t dims_count, const uint64_t* chunks, const uint64_t* readOffset,
+void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t dataType, const uint64_t dims_count,
+                       const uint64_t* dims, const uint64_t* chunks, const uint64_t* readOffset,
                        const uint64_t* readCount, const uint64_t* intoCubeOffset,
                        const uint64_t* intoCubeDimension, const uint64_t lutChunkLength, const uint64_t lutChunkElementCount,
                        const uint64_t lutStart, const uint64_t io_size_merge, const uint64_t io_size_max);

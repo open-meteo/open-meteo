@@ -609,175 +609,47 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
-        let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
-        let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
-        
-        let nChunks = nDim0Chunks * nDim1Chunks
-        fn.withUnsafeBytes { ptr in
-            //fn.preRead(offset: OmHeader.length, count: nChunks * MemoryLayout<Int>.stride)
-            let chunkOffsets = ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self, capacity: nChunks)
+        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*6) { ptr in
+            // dimensions
+            ptr[0] = UInt64(dim0)
+            ptr[1] = UInt64(dim1)
+            // chunks
+            ptr[2] = UInt64(chunk0)
+            ptr[3] = UInt64(chunk1)
+            // read offset
+            ptr[4] = UInt64(dim0Read.lowerBound)
+            ptr[5] = UInt64(dim1Read.lowerBound)
+            // read count
+            ptr[6] = UInt64(dim0Read.count)
+            ptr[7] = UInt64(dim1Read.count)
+            // cube offset
+            ptr[8] = 0
+            ptr[9] = UInt64(arrayDim1Range.lowerBound)
+            // cube dimensions
+            ptr[10] = UInt64(dim0Read.count)
+            ptr[11] = UInt64(arrayDim1Length)
             
-            let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
-            let compressedDataStartPtr = UnsafeMutablePointer(mutating: ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: compressedDataStartOffset))
-            
-            switch compression {
-            case.p4nzdec256logarithmic:
-                fallthrough
-            case .p4nzdec256:
-                //let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
-                
-                /*let r = OmFileDecoder(
-                    scalefactor: scalefactor,
-                    compression: compression,
-                    dataType: .float,
-                    dims: [dim0, dim1],
-                    chunks: [chunk0, chunk1],
-                    readOffset: [dim0Read.lowerBound, dim1Read.lowerBound],
-                    readCount: [dim0Read.count, dim1Read.count],
-                    intoCubeOffset: [0, arrayDim1Range.lowerBound],
-                    intoCubeDimension: [dim0Read.count, arrayDim1Length],
-                    lutChunkLength: 8,
-                    lutChunkElementCount: 1,
-                    lutStart: OmHeader.length
-                )*/
-                var decoder = om_decoder_t()
-                let dims = [UInt64(dim0), UInt64(dim1)]
-                let chunks = [UInt64(chunk0), UInt64(chunk1)]
-                let readOffset = [UInt64(dim0Read.lowerBound), UInt64(dim1Read.lowerBound)]
-                let readCount = [UInt64(dim0Read.count), UInt64(dim1Read.count)]
-                let cubeOffset = [0, UInt64(arrayDim1Range.lowerBound)]
-                let cubeDimensions = [UInt64(dim0Read.count), UInt64(arrayDim1Length)]
-                
-                let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
-                om_decoder_init(
-                    &decoder,
-                    scalefactor,
-                    c,
-                    OmFileFormatC.DATA_TYPE_FLOAT,
-                    dims,
-                    2,
-                    chunks,
-                    readOffset,
-                    readCount,
-                    cubeOffset,
-                    cubeDimensions,
-                    8,
-                    1,
-                    UInt64(OmHeader.length),
-                    512,
-                    65536)
-                
-                OmFileReader2.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
-                
-                /*for c0 in dim0Read.divide(by: chunk0) {
-                    let c1Range = dim1Read.divide(by: chunk1)
-                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
-                    // pre-read chunk table at specific offset
-                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                    for c1 in c1Range {
-                        // load chunk into buffer
-                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                        let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
-                        
-                        /// The chunk coordinates in global space... e.g. 600..<1000
-                        let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
-                        let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
-                        
-                        /// This chunk clamped to read coodinates... e.g. 650..<950
-                        let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
-                        let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
-                        
-                        // load chunk from mmap
-                        let chunkNum = c0 * nDim1Chunks + c1
-                        precondition(chunkNum < nChunks, "invalid chunkNum")
-                        let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                        precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
-                        let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                        fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                        let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
-                        precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
-                        
-                        // 2D delta decoding
-                        delta2d_decode(length0, length1, chunkBuffer)
-                        
-                        /// Moved to local coordinates... e.g. 50..<350
-                        let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.substract(c1 * chunk1)
-                        
-                        for d0 in clampedLocal0 {
-                            //let readStart = clampedLocal1.lowerBound + d0 * length1
-                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                            for (i,d1) in clampedLocal1.enumerated() {
-                                let posBuffer = d0 * length1 + d1
-                                let posOut = localRange + i
-                                let val = chunkBuffer[posBuffer]
-                                if val == Int16.max {
-                                    into.advanced(by: posOut).pointee = .nan
-                                } else {
-                                    let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                                    into.advanced(by: posOut).pointee = unscaled
-                                }
-                            }
-                        }
-                    }
-                }*/
-            case .fpxdec32:
-                let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
-                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
-                
-                for c0 in dim0Read.divide(by: chunk0) {
-                    let c1Range = dim1Read.divide(by: chunk1)
-                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
-                    // pre-read chunk table at specific offset
-                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                    
-                    for c1 in c1Range {
-                        // load chunk into buffer
-                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                        let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
-                        
-                        /// The chunk coordinates in global space... e.g. 600..<1000
-                        let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
-                        let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
-                        
-                        /// This chunk clamped to read coodinates... e.g. 650..<950
-                        let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
-                        let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
-                        
-                        // load chunk from mmap
-                        let chunkNum = c0 * nDim1Chunks + c1
-                        let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                        let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                        fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                        let uncompressedBytes = fpxdec32(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBufferUInt, 0)
-                        precondition(uncompressedBytes == lengthCompressedBytes)
-                        
-                        // 2D xor decoding
-                        delta2d_decode_xor(length0, length1, chunkBuffer)
-                        
-                        /// Moved to local coordinates... e.g. 50..<350
-                        let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
-                        
-                        for d0 in clampedLocal0 {
-                            let readStart = clampedLocal1 + d0 * length1
-                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                            for i in 0..<clampedGlobal1.count {
-                                let posBuffer = readStart + i
-                                let posOut = localRange + i
-                                let val = chunkBuffer[posBuffer]
-                                into.advanced(by: posOut).pointee = val
-                            }
-                        }
-                    }
-                }
-            }
+            let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
+            var decoder = om_decoder_t()
+            om_decoder_init(
+                &decoder,
+                scalefactor,
+                c,
+                OmFileFormatC.DATA_TYPE_FLOAT,
+                2,
+                ptr.baseAddress,
+                ptr.baseAddress?.advanced(by: 2),
+                ptr.baseAddress?.advanced(by: 4),
+                ptr.baseAddress?.advanced(by: 6),
+                ptr.baseAddress?.advanced(by: 8),
+                ptr.baseAddress?.advanced(by: 10),
+                8,
+                1,
+                UInt64(OmHeader.length),
+                512,
+                65536
+            )
+            OmFileReader2.read(fn: fn, decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
     }
 }
