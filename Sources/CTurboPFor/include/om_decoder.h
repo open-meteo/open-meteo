@@ -49,19 +49,19 @@ typedef enum {
 
 typedef struct {
     uint64_t dims_count;
-    uint64_t* dims;
-    uint64_t* chunks;
-    uint64_t* readOffset;
-    uint64_t* readCount;
-    uint64_t* intoCubeOffset;
-    uint64_t* intoCubeDimension;
-
     uint64_t io_size_merge;
     uint64_t io_size_max;
     uint64_t lutChunkLength;
     uint64_t lutChunkElementCount;
     uint64_t lutStart;
     uint64_t numberOfChunks;
+    
+    uint64_t* dims;
+    uint64_t* chunks;
+    uint64_t* readOffset;
+    uint64_t* readCount;
+    uint64_t* intoCubeOffset;
+    uint64_t* intoCubeDimension;
     
     float scalefactor;
     om_compression_t compression;
@@ -72,7 +72,7 @@ void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_re
 void om_decoder_data_read_init(om_decoder_data_read_t *dataInstruction, const om_decoder_index_read_t *indexRead);
 
 uint64_t compression_bytes_per_element(const om_compression_t type);
-uint64_t bytesPerElement(const om_datatype_t dataType);
+//uint64_t bytesPerElement(const om_datatype_t dataType);
 
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t dataType,
                        const uint64_t* dims, const uint64_t dims_count, const uint64_t* chunks, const uint64_t* readOffset,
@@ -80,10 +80,8 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
                        const uint64_t* intoCubeDimension, const uint64_t lutChunkLength, const uint64_t lutChunkElementCount,
                        const uint64_t lutStart, const uint64_t io_size_merge, const uint64_t io_size_max);
 uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder);
-//bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, uint64_t *chunkIndexLower, uint64_t *chunkIndexUpper);
 bool om_decocder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* indexRead);
 bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, uint64_t indexDataCount);
-//uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunkBuffer);
 uint64_t om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer);
 
 #endif // DECODE_H

@@ -15,21 +15,15 @@
 
 #define MAX_LUT_ELEMENTS 256
 
-
-
 // Initialization function for ChunkDataReadInstruction
 void om_decoder_data_read_init(om_decoder_data_read_t *dataInstruction, const om_decoder_index_read_t *indexRead) {
     dataInstruction->offset = 0;
     dataInstruction->count = 0;
-    dataInstruction->indexRange.lowerBound = indexRead->indexRange.lowerBound;
-    dataInstruction->indexRange.upperBound = indexRead->indexRange.upperBound;
+    dataInstruction->indexRange = indexRead->indexRange;
     dataInstruction->chunkIndex.lowerBound = 0;
     dataInstruction->chunkIndex.upperBound = 0;
-    dataInstruction->nextChunk.lowerBound = indexRead->chunkIndex.lowerBound;
-    dataInstruction->nextChunk.upperBound = indexRead->chunkIndex.upperBound;
+    dataInstruction->nextChunk = indexRead->chunkIndex;
 }
-
-
 
 
 // Function to get bytes per element for each compression type.
@@ -219,12 +213,11 @@ bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, om_range_t *ch
 
 
 bool om_decocder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* indexRead) {
-    if (indexRead->nextChunk.lowerBound == indexRead->nextChunk.upperBound) {
+    if (indexRead->nextChunk.lowerBound >= indexRead->nextChunk.upperBound) {
         return false;
     }
     
-    indexRead->chunkIndex.lowerBound = indexRead->nextChunk.lowerBound;
-    indexRead->chunkIndex.upperBound = indexRead->nextChunk.upperBound;
+    indexRead->chunkIndex = indexRead->nextChunk;
     indexRead->indexRange.lowerBound = indexRead->nextChunk.lowerBound;
 
     uint64_t chunkIndex = indexRead->nextChunk.lowerBound;
@@ -274,7 +267,7 @@ bool om_decocder_next_index_read(const om_decoder_t* decoder, om_decoder_index_r
 
 
 bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, uint64_t indexDataCount) {
-    if (dataRead->nextChunk.lowerBound == dataRead->nextChunk.upperBound) {
+    if (dataRead->nextChunk.lowerBound >= dataRead->nextChunk.upperBound) {
         return false;
     }
 
@@ -330,8 +323,8 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
 
         // Old files do not compress LUT and data is after LUT
         // V1 header size
-        uint64_t OmHeader_length = 40;
-        size_t dataStart = OmHeader_length + decoder->numberOfChunks * sizeof(int64_t);
+        uint64_t om_header_v1_length = 40;
+        size_t dataStart = om_header_v1_length + decoder->numberOfChunks * sizeof(int64_t);
         
         dataRead->offset = startPos + dataStart;
         dataRead->count = endPos - startPos;
@@ -341,7 +334,6 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
 
     uint8_t* indexDataPtr = (uint8_t*)indexData;
 
-    // TODO: This should be stack allocated to a max size of 256 elements
     uint64_t uncompressedLut[MAX_LUT_ELEMENTS] = {0};
 
     // Which LUT chunk is currently loaded into `uncompressedLut`
