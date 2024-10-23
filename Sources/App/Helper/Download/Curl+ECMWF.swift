@@ -8,6 +8,7 @@ enum EcmwfApiError: Error {
     case jobStartFailed(error: String)
     case restrictedAccessToValidData
     case waiting(status: String)
+    case errorResponse(code: UInt, message: String?)
 }
 
 extension Curl {
@@ -116,10 +117,8 @@ extension Curl {
 extension HTTPClientResponse {
     public func checkCode200AndReadJSONDecodable<T: Decodable>(_ type: T.Type, upTo: Int = 1024*1024) async throws -> T? {
         guard (200..<300).contains(status.code) else {
-            if let error = try await readStringImmutable() {
-                print(error)
-            }
-            fatalError("ERROR: Response code \(status.code)")
+            let error = try await readStringImmutable()
+            fatalError("ERROR: Response code \(status.code) \(error ?? "")")
         }
         return try await readJSONDecodable(type, upTo: upTo)
     }

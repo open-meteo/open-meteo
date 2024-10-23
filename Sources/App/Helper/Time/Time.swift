@@ -398,12 +398,12 @@ public extension Sequence where Element == Timestamp {
     var iso8601_YYYYMMddHHmm: [String] {
         var time = 0
         var t = tm()
-        var dateCalculated = -99999
+        var dateCalculated = Int.min
         return map {
             // only do date calculation if the actual date changes
-            if dateCalculated != $0.timeIntervalSince1970 / 86400 {
+            if dateCalculated != $0.timeIntervalSince1970 - $0.timeIntervalSince1970.moduloPositive(86400)  {
                 time = $0.timeIntervalSince1970
-                dateCalculated = $0.timeIntervalSince1970 / 86400
+                dateCalculated = $0.timeIntervalSince1970 - $0.timeIntervalSince1970.moduloPositive(86400)
                 gmtime_r(&time, &t)
             }
             let year = Int(t.tm_year+1900)

@@ -946,9 +946,9 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
         case .temperature:
             return .temperature_2m
         case .windspeed:
-            return .windspeed_10m
+            return .wind_speed_10m
         case .winddirection:
-            return .winddirection_10m
+            return .wind_direction_10m
         case .surface_air_pressure:
             return .surface_pressure
         default:
@@ -1174,19 +1174,19 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
         case .shortwave_radiation_sum:
             return .radiationSum(.surface(.init(.shortwave_radiation, 0)))
         case .windspeed_10m_max, .wind_speed_10m_max:
-            return .max(.surface(.init(.windspeed_10m, 0)))
+            return .max(.surface(.init(.wind_speed_10m, 0)))
         case .windspeed_10m_min, .wind_speed_10m_min:
-            return .min(.surface(.init(.windspeed_10m, 0)))
+            return .min(.surface(.init(.wind_speed_10m, 0)))
         case .windspeed_10m_mean, .wind_speed_10m_mean:
-            return .mean(.surface(.init(.windspeed_10m, 0)))
+            return .mean(.surface(.init(.wind_speed_10m, 0)))
         case .windgusts_10m_max, .wind_gusts_10m_max:
-            return .max(.surface(.init(.windgusts_10m, 0)))
+            return .max(.surface(.init(.wind_gusts_10m, 0)))
         case .windgusts_10m_min, .wind_gusts_10m_min:
-            return .min(.surface(.init(.windgusts_10m, 0)))
+            return .min(.surface(.init(.wind_gusts_10m, 0)))
         case .windgusts_10m_mean, .wind_gusts_10m_mean:
-            return .mean(.surface(.init(.windgusts_10m, 0)))
+            return .mean(.surface(.init(.wind_gusts_10m, 0)))
         case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            return .dominantDirection(velocity: .surface(.init(.windspeed_10m, 0)), direction: .surface(.init(.winddirection_10m, 0)))
+            return .dominantDirection(velocity: .surface(.init(.wind_speed_10m, 0)), direction: .surface(.init(.wind_direction_10m, 0)))
         case .precipitation_hours:
             return .precipitationHours(.surface(.init(.precipitation, 0)))
         case .sunrise:
