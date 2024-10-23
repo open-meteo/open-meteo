@@ -39,6 +39,8 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        disableIdleSleep()
+        
         let domain = try CamsDomain.load(rawValue: signature.domain)
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
@@ -50,7 +52,7 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let variables = onlyVariables ?? CamsVariable.allCases
         switch domain {
-        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
@@ -219,7 +221,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let type: String
         let type2: String
         switch domain {
-        case .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             type = "validated_reanalysis"
             type2 = "vra"
         case .cams_europe_reanalysis_interim:
@@ -277,7 +279,7 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let type2: String
         switch domain {
-        case .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             type2 = "vra"
         case .cams_europe_reanalysis_interim:
             type2 = "ira"

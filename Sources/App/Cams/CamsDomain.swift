@@ -8,6 +8,13 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     case cams_europe
     case cams_europe_reanalysis_interim
     case cams_europe_reanalysis_validated
+    /// Used a diferent grid before 2020. Off by 1.
+    /// Data from 2018 until 2019 included
+    case cams_europe_reanalysis_validated_pre2020
+    
+    /// Used a diferent grid before 2017.         lon = 701 ; lat = 401 ;
+    /// Data from 2013 until 2017 included
+    case cams_europe_reanalysis_validated_pre2018
     
     /// count of forecast hours
     var forecastHours: Int {
@@ -16,7 +23,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return 121
         case .cams_europe:
             return 97
-        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             // Downloaded in 1 month files
             return 14*24
         }
@@ -30,7 +37,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return t.with(hour: t.hour > 14 ? 12 : 0)
         case .cams_europe:
             return t.with(hour: 0)
-        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             return t
         }
     }
@@ -45,6 +52,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return .cams_europe_reanalysis_interim
         case .cams_europe_reanalysis_validated:
             return .cams_europe_reanalysis_validated
+        case .cams_europe_reanalysis_validated_pre2020:
+            return .cams_europe_reanalysis_validated_pre2020
+        case .cams_europe_reanalysis_validated_pre2018:
+            return .cams_europe_reanalysis_validated_pre2018
         }
     }
     
@@ -74,7 +85,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return 12*3600
         case .cams_europe:
             return 24*3600
-        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             return 0
         }
     }
@@ -85,6 +96,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
         case .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
             return RegularGrid(nx: 700, ny: 420, latMin: /*30.05*/ 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
+        case .cams_europe_reanalysis_validated_pre2020:
+            return RegularGrid(nx: 701, ny: 421, latMin: /*30.05*/ 72, lonMin: -25, dx: 0.1, dy: -0.1)
+        case .cams_europe_reanalysis_validated_pre2018:
+            return RegularGrid(nx: 701, ny: 401, latMin: /*30.05*/ 70, lonMin: -25, dx: 0.1, dy: -0.1)
         }
     }
 }

@@ -19,6 +19,8 @@ enum DomainRegistry: String, CaseIterable {
     case cams_global
     case cams_europe_reanalysis_interim
     case cams_europe_reanalysis_validated
+    case cams_europe_reanalysis_validated_pre2020
+    case cams_europe_reanalysis_validated_pre2018
     
     case copernicus_dem90
     case copernicus_cerra
@@ -288,6 +290,10 @@ enum DomainRegistry: String, CaseIterable {
             return CamsDomain.cams_europe_reanalysis_interim
         case .cams_europe_reanalysis_validated:
             return CamsDomain.cams_europe_reanalysis_validated
+        case .cams_europe_reanalysis_validated_pre2020:
+            return CamsDomain.cams_europe_reanalysis_validated_pre2020
+        case .cams_europe_reanalysis_validated_pre2018:
+            return CamsDomain.cams_europe_reanalysis_validated_pre2018
         case .ncep_gfswave016:
             return GfsDomain.gfswave016
         case .ncep_nbm_conus:
