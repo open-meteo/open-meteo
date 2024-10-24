@@ -1,0 +1,4 @@
+module OmFileFormatC [system] {
+    header "om_file_format.h"
+    export *
+}
