@@ -34,6 +34,7 @@ struct GribAttributes {
         case entireAtmosphere
         case heightAboveGround
         case depthBelowLandLayer
+        case hybrid
     }
     
     enum StepType: String {
