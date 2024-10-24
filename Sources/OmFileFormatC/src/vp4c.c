@@ -30,6 +30,7 @@
 #pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma clang diagnostic ignored "-Wmacro-redefined"
 #pragma clang diagnostic ignored "-Wconstant-conversion"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
 
 #ifndef USIZE //--------------------------------- Functions ----------------------------------------------------------------------
 #pragma warning( disable : 4005)

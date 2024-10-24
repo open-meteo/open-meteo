@@ -31,6 +31,7 @@
 #pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma clang diagnostic ignored "-Wshift-op-parentheses"
 #pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
 
 #pragma warning( disable : 4005)
 #pragma warning( disable : 4090)

@@ -27,6 +27,7 @@
 #pragma clang diagnostic ignored "-Wincompatible-pointer-types"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
 
 #include <math.h> //nan
 #include "conf.h"
@@ -238,7 +239,7 @@ void bitddec32(uint32_t *p, unsigned n, unsigned start) {
 
 uint8_t  bitzz8( uint8_t  *in, unsigned n, uint8_t  *px, uint8_t  start) { uint8_t  o=0, x=0,d,startd=0,u; BITZDE(uint8_t,  in, n, 1,  8, o |= u; x |= u ^ in[0]); if(px) *px = x; return o; }
 uint16_t bitzz16(uint16_t *in, unsigned n, uint16_t *px, uint16_t start) { uint16_t o=0, x=0,d,startd=0,u; BITZDE(uint16_t, in, n, 1, 16, o |= u; x |= u ^ in[0]); if(px) *px = x; return o; }
-uint32_t bitzz32(uint32_t *in, unsigned n, uint32_t *px, uint32_t start) { uint64_t o=0, x=0,d,startd=0,u; BITZDE(uint32_t, in, n, 1, 32, o |= u; x |= u ^ in[0]); if(px) *px = x; return o; }
+uint32_t bitzz32(uint32_t *in, unsigned n, uint32_t *px, uint32_t start) { uint32_t o=0, x=0,d,startd=0,u; BITZDE(uint32_t, in, n, 1, 32, o |= u; x |= u ^ in[0]); if(px) *px = x; return o; }
 uint64_t bitzz64(uint64_t *in, unsigned n, uint64_t *px, uint64_t start) { uint64_t o=0, x=0,d,startd=0,u; BITZDE(uint64_t, in, n, 1, 64, o |= u; x |= u ^ in[0]); if(px) *px = x; return o; }
 uint8_t  bitzzenc8( uint8_t  *in, unsigned n, uint8_t  *out, uint8_t  start, uint8_t  mindelta) { uint8_t  o=0,*op = out,u,d,startd=0; BITZDE(uint8_t,  in, n, mindelta,  8,o |= u;*op++ = u); return o;}
 uint16_t bitzzenc16(uint16_t *in, unsigned n, uint16_t *out, uint16_t start, uint16_t mindelta) { uint16_t o=0,*op = out,u,d,startd=0; BITZDE(uint16_t, in, n, mindelta, 16,o |= u;*op++ = u); return o;}
