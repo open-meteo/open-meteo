@@ -69,8 +69,8 @@
  *       and `om_decoder_decode_chunks` are essential to this process.
  */
 
-#ifndef DECODE_H
-#define DECODE_H
+#ifndef OM_DECODER_H
+#define OM_DECODER_H
 
 #include <stdint.h>
 #include <stdbool.h>
@@ -121,7 +121,7 @@ typedef void(*om_decompress_filter_callback)(const size_t length0, const size_t 
 
 typedef struct {
     /// Number of dimensions
-    uint64_t dims_count;
+    uint64_t dimensions_count;
 
     /// Combine smaller IO reads to a single larger read. If consecutive reads are smaller than `io_size_merge` they might be merged. Default should be 512 bytes.
     uint64_t io_size_merge;
@@ -142,7 +142,7 @@ typedef struct {
     uint64_t number_of_chunks;
     
     /// The dimensions of the data array. The last dimension is the "fast" dimension meaning the elements are sequential in memory
-    const uint64_t* dims;
+    const uint64_t* dimensions;
 
     /// The chunk lengths for each dimension
     const uint64_t* chunks;
@@ -390,4 +390,4 @@ uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder);
  */
 uint64_t om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer);
 
-#endif // DECODE_H
+#endif // OM_DECODER_H

@@ -78,10 +78,8 @@ uint64_t om_decoder_compress_fpxdec64(const void* in, uint64_t count, void* out)
 // Initialization function for OmFileDecoder
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_length, uint64_t lut_chunk_element_count, uint64_t lust_start, uint64_t io_size_merge, uint64_t io_size_max) {    
     decoder->scalefactor = scalefactor;
-    //decoder->compression = compression;
-    //decoder->data_type = data_type;
-    decoder->dims = dims;
-    decoder->dims_count = dims_count;
+    decoder->dimensions = dims;
+    decoder->dimensions_count = dims_count;
     decoder->chunks = chunks;
     decoder->read_offset = read_offset;
     decoder->read_count = read_count;
@@ -93,7 +91,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     decoder->io_size_merge = io_size_merge;
     decoder->io_size_max = io_size_max;
 
-    assert(lut_chunk_element_count <= 256);
+    assert(lut_chunk_element_count > 0 && lut_chunk_element_count <= MAX_LUT_ELEMENTS);
     
     // TODO more compression and datatypes
     switch (compression) {
@@ -142,19 +140,19 @@ void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_re
     uint64_t chunkStart = 0;
     uint64_t chunkEnd = 1;
     
-    for (uint64_t i = 0; i < decoder->dims_count; i++) {
+    for (uint64_t i = 0; i < decoder->dimensions_count; i++) {
         // Calculate lower and upper chunk indices for the current dimension
         uint64_t chunkInThisDimensionLower = decoder->read_offset[i] / decoder->chunks[i];
         uint64_t chunkInThisDimensionUpper = divide_rounded_up(decoder->read_offset[i] + decoder->read_count[i], decoder->chunks[i]);
         uint64_t chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower;
         
         uint64_t firstChunkInThisDimension = chunkInThisDimensionLower;
-        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dims[i], decoder->chunks[i]);
+        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
         
         // Update chunkStart and chunkEnd
         chunkStart = chunkStart * nChunksInThisDimension + firstChunkInThisDimension;
         
-        if (decoder->read_count[i] == decoder->dims[i]) {
+        if (decoder->read_count[i] == decoder->dimensions[i]) {
             // The entire dimension is read
             chunkEnd = chunkEnd * nChunksInThisDimension;
         } else {
@@ -176,7 +174,7 @@ void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_re
 // Function to get the read buffer size for a single chunk
 uint64_t om_decoder_read_buffer_size(const om_decoder_t* decoder) {
     uint64_t chunkLength = 1;
-    for (uint64_t i = 0; i < decoder->dims_count; i++) {
+    for (uint64_t i = 0; i < decoder->dimensions_count; i++) {
         chunkLength *= decoder->chunks[i];
     }
     return chunkLength * decoder->bytes_per_element;
@@ -189,9 +187,9 @@ bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, om_range_t *ch
     uint64_t linearReadCount = 1;
     bool linearRead = true;
     
-    for (int64_t i = decoder->dims_count - 1; i >= 0; --i) {
+    for (int64_t i = decoder->dimensions_count - 1; i >= 0; --i) {
         // Number of chunks in this dimension.
-        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dims[i], decoder->chunks[i]);
+        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
         
         // Calculate chunk range in this dimension.
         uint64_t chunkInThisDimensionLower = decoder->read_offset[i] / decoder->chunks[i];
@@ -202,13 +200,13 @@ bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, om_range_t *ch
         chunk_index->lowerBound += rollingMultiply;
         
         // Check for linear read conditions.
-        if (i == decoder->dims_count - 1 && decoder->dims[i] != decoder->read_count[i]) {
+        if (i == decoder->dimensions_count - 1 && decoder->dimensions[i] != decoder->read_count[i]) {
             // If the fast dimension is only partially read.
             linearReadCount = chunkInThisDimensionCount;
             linearRead = false;
         }
         
-        if (linearRead && decoder->dims[i] == decoder->read_count[i]) {
+        if (linearRead && decoder->dimensions[i] == decoder->read_count[i]) {
             // The dimension is read entirely.
             linearReadCount *= nChunksInThisDimension;
         } else {
@@ -451,10 +449,10 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
     //printf("decode dimcount=%d \n", decoder->dims_count );
     
     // Count length in chunk and find first buffer offset position.
-    for (int64_t i = decoder->dims_count - 1; i >= 0; --i) {
-        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dims[i], decoder->chunks[i]);
+    for (int64_t i = decoder->dimensions_count - 1; i >= 0; --i) {
+        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
         uint64_t c0 = (chunk / rollingMultiply) % nChunksInThisDimension;
-        uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dims[i]) - c0 * decoder->chunks[i];
+        uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dimensions[i]) - c0 * decoder->chunks[i];
         
         uint64_t chunkGlobal0Start = c0 * decoder->chunks[i];
         uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
@@ -467,7 +465,7 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
             no_data = true;
         }
         
-        if (i == decoder->dims_count - 1) {
+        if (i == decoder->dimensions_count - 1) {
             lengthLast = length0;
         }
         
@@ -478,7 +476,7 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
         d += rollingMultiplyChunkLength * d0;
         q += rollingMultiplyTargetCube * q0;
         
-        if (i == decoder->dims_count - 1 && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
+        if (i == decoder->dimensions_count - 1 && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
             // if fast dimension and only partially read
             linearReadCount = lengthRead;
             linearRead = false;
@@ -521,11 +519,11 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
         rollingMultiplyChunkLength = 1;
         linearReadCount = 1;
         linearRead = true;
-        for (int64_t i = decoder->dims_count-1; i >= 0; i--) {
+        for (int64_t i = decoder->dimensions_count-1; i >= 0; i--) {
             //printf("i=%d q=%d d=%d\n", i,q,d);
-            uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dims[i], decoder->chunks[i]);
+            uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
             uint64_t c0 = (chunk / rollingMultiply) % nChunksInThisDimension;
-            uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dims[i]) - c0 * decoder->chunks[i];
+            uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dimensions[i]) - c0 * decoder->chunks[i];
             
             uint64_t chunkGlobal0Start = c0 * decoder->chunks[i];
             uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
@@ -537,7 +535,7 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
             d += rollingMultiplyChunkLength;
             q += rollingMultiplyTargetCube;
             
-            if ((i == decoder->dims_count - 1) && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
+            if ((i == decoder->dimensions_count - 1) && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
                 // if fast dimension and only partially read
                 linearReadCount = lengthRead;
                 linearRead = false;
