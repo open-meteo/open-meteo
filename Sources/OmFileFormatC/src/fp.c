@@ -561,8 +561,8 @@ size_t TEMPLATE2(bvzzdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint_t
           #if (defined(__SSE2__) /*|| defined(__ARM_NEON)*/) && USIZE == 32
         __m128i sv = _mm_set1_epi32(start), cv = _mm_set_epi32(4*pd,3*pd,2*pd,1*pd);
         for(r += NL, _op = op; op != _op+(r&~7);) {
-          sv = _mm_add_epi32(sv,cv); _mm_storeu_si128(op, sv); sv = mm_shuffle_nnnn_epi32(sv, 3); op += 4; //_mm_shuffle_epi32(sv, _MM_SHUFFLE(3, 3, 3, 3))->mm_shuffle_nnnn_epi32(sv, 3)
-          sv = _mm_add_epi32(sv,cv); _mm_storeu_si128(op, sv); sv = mm_shuffle_nnnn_epi32(sv, 3); op += 4;
+          sv = _mm_add_epi32(sv,cv); _mm_storeu_si128((__m128i *)op, sv); sv = mm_shuffle_nnnn_epi32(sv, 3); op += 4; //_mm_shuffle_epi32(sv, _MM_SHUFFLE(3, 3, 3, 3))->mm_shuffle_nnnn_epi32(sv, 3)
+          sv = _mm_add_epi32(sv,cv); _mm_storeu_si128((__m128i *)op, sv); sv = mm_shuffle_nnnn_epi32(sv, 3); op += 4;
         }
         start = (unsigned)mm_cvtsi128_si32(_mm_srli_si128(sv,12));
           #else
@@ -663,8 +663,8 @@ size_t TEMPLATE2(bvzdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint_t 
           #if (defined(__SSE2__) || defined(__ARM_NEON)) && USIZE == 32
         __m128i sv = _mm_set1_epi32(start);
         for(r += NL, _op = op; op != _op+(r&~7);) {
-          _mm_storeu_si128(op, sv); op += 4;
-          _mm_storeu_si128(op, sv); op += 4;
+          _mm_storeu_si128((__m128i *)op, sv); op += 4;
+          _mm_storeu_si128((__m128i *)op, sv); op += 4;
         }
           #else
         for(r+=NL, _op = op; op != _op+(r&~7); op += 8)

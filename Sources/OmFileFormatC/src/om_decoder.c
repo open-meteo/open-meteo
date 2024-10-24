@@ -71,7 +71,7 @@ uint64_t om_decoder_compress_fpxdec32(const void* data, uint64_t count, void* ou
 }
 
 uint64_t om_decoder_compress_fpxdec64(const void* data, uint64_t count, void* out) {
-    return fpxdec64(data, count, (uint32_t *)out, 0);
+    return fpxdec64(data, count, (uint64_t *)out, 0);
 }
 
 
@@ -100,28 +100,28 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
         case P4NZDEC256:
             decoder->bytes_per_element = 2;
             decoder->decompress_copy_callback = om_decoder_copy_int16_to_float;
-            decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode;
-            decoder->decompress_callback = (om_decompress_callback*)p4nzdec128v16;
+            decoder->decompress_filter_callback = (om_decompress_filter_callback)delta2d_decode;
+            decoder->decompress_callback = (om_decompress_callback)p4nzdec128v16;
             break;
             
         case FPXDEC32:
             if (data_type == DATA_TYPE_FLOAT) {
                 decoder->bytes_per_element = 4;
                 decoder->decompress_callback = om_decoder_compress_fpxdec32;
-                decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode_xor;
+                decoder->decompress_filter_callback = (om_decompress_filter_callback)delta2d_decode_xor;
                 decoder->decompress_copy_callback = om_decoder_copy_float;
             } else if (data_type == DATA_TYPE_DOUBLE) {
                 decoder->bytes_per_element = 8;
                 decoder->decompress_callback = om_decoder_compress_fpxdec64;
-                decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode_xor_double;
+                decoder->decompress_filter_callback = (om_decompress_filter_callback)delta2d_decode_xor_double;
                 decoder->decompress_copy_callback = om_decoder_copy_double;
             }
             break;
             
         case P4NZDEC256_LOGARITHMIC:
             decoder->bytes_per_element = 2;
-            decoder->decompress_callback = (om_decompress_callback*)p4nzdec128v16;
-            decoder->decompress_filter_callback = (om_decompress_filter_callback*)delta2d_decode;
+            decoder->decompress_callback = (om_decompress_callback)p4nzdec128v16;
+            decoder->decompress_filter_callback = (om_decompress_filter_callback)delta2d_decode;
             decoder->decompress_copy_callback = om_decoder_copy_int16_to_float_log10;
             break;
             

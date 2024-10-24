@@ -300,7 +300,7 @@ uint32_t bitd132(uint32_t *in, unsigned n, uint32_t *px, uint32_t start) {
 
 uint16_t bits128v16(uint16_t *in, unsigned n, uint16_t *px, uint16_t start) {
     #if defined(__SSE2__) || defined(__ARM_NEON)
-  unsigned *ip,b; __m128i bv = _mm_setzero_si128(), vs = _mm_set1_epi16(start), cv = _mm_set1_epi16(8);
+  uint16_t *ip,b; __m128i bv = _mm_setzero_si128(), vs = _mm_set1_epi16(start), cv = _mm_set1_epi16(8);
   for(ip = in; ip != in+(n&~(4-1)); ip += 4) {
     __m128i iv = _mm_loadu_si128((__m128i *)ip);
     bv = _mm_or_si128(bv,_mm_sub_epi16(SUBI16x8(iv,vs),cv));
