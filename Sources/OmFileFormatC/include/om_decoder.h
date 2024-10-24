@@ -64,12 +64,12 @@ typedef struct {
     uint64_t lut_start;
     uint64_t number_of_chunks;
     
-    uint64_t* dims;
-    uint64_t* chunks;
-    uint64_t* read_offset;
-    uint64_t* read_count;
-    uint64_t* cube_offset;
-    uint64_t* cube_dimensions;
+    const uint64_t* dims;
+    const uint64_t* chunks;
+    const uint64_t* read_offset;
+    const uint64_t* read_count;
+    const uint64_t* cube_offset;
+    const uint64_t* cube_dimensions;
     
     om_decompress_callback decompress_callback;
     om_decompress_filter_callback decompress_filter_callback;

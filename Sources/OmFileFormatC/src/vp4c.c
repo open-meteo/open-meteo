@@ -25,6 +25,11 @@
 
 #ifdef GUARDED
 
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wconstant-conversion"
 
 #ifndef USIZE //--------------------------------- Functions ----------------------------------------------------------------------
 #pragma warning( disable : 4005)
@@ -103,7 +108,7 @@
 #undef P4DELTA
 #define  BITDELTA bitdienc
 
-#define HYBRID 0             // Direct access
+/*#define HYBRID 0             // Direct access
 #define  P4BITS _p4bitsx
 #define _P4BITS _p4bitsx
 #define _P4ENC  _p4encx
@@ -116,7 +121,7 @@
 #define USIZE 32
 #include "vp4c.c"
 #define USIZE 64
-#include "vp4c.c"
+#include "vp4c.c"*/
 
 
 #undef _P4ENC

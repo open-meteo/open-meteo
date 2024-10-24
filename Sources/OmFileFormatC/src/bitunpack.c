@@ -25,6 +25,8 @@
 
 #ifdef GUARDED
 
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+
 #include <string.h> // for memcp
 #define BITUTIL_IN
 #define VINT_IN
@@ -36,6 +38,7 @@
 
 #define PAD8(_x_) (((_x_)+7)/8)
 
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
 #pragma warning( disable : 4005)
 #pragma warning( disable : 4090)
 #pragma warning( disable : 4068)
@@ -44,6 +47,10 @@
 #pragma GCC optimize ("align-functions=16")
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunsequenced"
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wshift-op-parentheses"
 
 #if !defined(SSE2_ON) && !defined(AVX2_ON) //----------------------------------- Plain -------------------------------------------------------------------------------------------
 typedef unsigned char *(*BITUNPACK_F8)( const unsigned char *__restrict in, unsigned n, uint8_t  *__restrict out);

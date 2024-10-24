@@ -23,6 +23,15 @@
 **/
 //    "Floating Point + Integer Compression (All integer compression functions can be used for float/double and vice versa)"
   #ifndef USIZE
+
+
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wshift-op-parentheses"
+#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+
 #pragma warning( disable : 4005)
 #pragma warning( disable : 4090)
 #pragma warning( disable : 4068)
@@ -81,8 +90,6 @@
 
   #else //-------------------------------------- Template functions ------------------------------------------------------------
 
-#pragma message("AAAAAAAAAAAAAAAAAAAA!")
-
 #define XORENC( _u_, _pu_, _usize_) ((_u_)^(_pu_))  // xor predictor
 #define XORDEC( _u_, _pu_, _usize_) ((_u_)^(_pu_))
 #define ZZAGENC(_u_, _pu_, _usize_)  TEMPLATE2(zigzagenc,_usize_)((_u_)-(_pu_)) //zigzag predictor
@@ -101,7 +108,7 @@ size_t TEMPLATE2(p4nzzenc128v,USIZE)(uint_t *in, size_t n, unsigned char *out, u
     for(p = _p; p != &_p[VSIZE]; p+=4,ip+=4) { FE(0,USIZE); FE(1,USIZE); FE(2,USIZE); FE(3,USIZE); }
     op = TEMPLATE2(P4ENCV,USIZE)(_p, VSIZE, op);                                                    PREFETCH(ip+512,0);
   }
-  if(n = (in+n)-ip) {
+  if((n = (in+n)-ip)) {
     for(p = _p; p != &_p[n]; p++,ip++) FE(0,USIZE);
     op = TEMPLATE2(P4ENC,USIZE)(_p, n, op);
   }
@@ -116,7 +123,7 @@ size_t TEMPLATE2(p4nzzdec128v,USIZE)(unsigned char *in, size_t n, uint_t *out, u
   for(op = out; op != out+(n&~(VSIZE-1)); ) {                           PREFETCH(ip+512,0);
     for(ip = TEMPLATE2(P4DECV,USIZE)(ip, VSIZE, _p), p = _p; p != &_p[VSIZE]; p+=4,op+=4) { FD(0,USIZE); FD(1,USIZE); FD(2,USIZE); FD(3,USIZE); }
   }
-  if(n = (out+n) - op)
+  if((n = (out+n) - op))
     for(ip = TEMPLATE2(P4DEC,USIZE)(ip, n, _p), p = _p; p != &_p[n]; p++,op++) FD(0,USIZE);
   return ip - in;
 }
@@ -193,7 +200,7 @@ size_t TEMPLATE2(fpxenc,USIZE)(uint_t *in, size_t n, unsigned char *out, uint_t 
       #endif
     op = TEMPLATE2(P4ENCV,USIZE)(_p, VSIZE, op);                                                    PREFETCH(ip+512,0);
   }
-  if(n = (in+n)-ip) { uint_t b = 0;
+  if((n = (in+n)-ip)) { uint_t b = 0;
     for(p = _p; p != &_p[n]; p++,ip++) FE(0,USIZE);
     b = TEMPLATE2(clz,USIZE)(b);
     *op++ = b;
@@ -249,7 +256,7 @@ size_t TEMPLATE2(fpxdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint_t 
     for(p = _p; p != &_p[VSIZE]; p+=4,op+=4) { FD(0,USIZE); FD(1,USIZE); FD(2,USIZE); FD(3,USIZE); }
       #endif
   }
-  if(n = (out+n) - op) {
+  if((n = (out+n) - op)) {
     uint_t b = *ip++;
     for(ip = TEMPLATE2(P4DEC,USIZE)(ip, n, _p), p = _p; p < &_p[n]; p++,op++) FD(0,USIZE);
   }
@@ -307,7 +314,7 @@ size_t TEMPLATE2(fpfcmenc,USIZE)(uint_t *in, size_t n, unsigned char *out, uint_
       #endif
     op = TEMPLATE2(P4ENCV,USIZE)(_p, VSIZE, op);                                                    PREFETCH(ip+512,0);
   }
-  if(n = (in+n)-ip) { uint_t b = 0;
+  if((n = (in+n)-ip)) { uint_t b = 0;
     for(p = _p; p != &_p[n]; p++,ip++) FE(0,USIZE);
     b = TEMPLATE2(clz,USIZE)(b);
     *op++ = b;
@@ -328,7 +335,7 @@ size_t TEMPLATE2(fpfcmdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint_
      unsigned b = *ip++; ip = TEMPLATE2(P4DECV,USIZE)(ip, VSIZE, _p);
     for(p = _p; p != &_p[VSIZE]; p+=4,op+=4) { FD(0,USIZE); FD(1,USIZE); FD(2,USIZE); FD(3,USIZE); }
   }
-  if(n = ((uint_t *)out+n) - op) {
+  if((n = ((uint_t *)out+n) - op)) {
     unsigned b = *ip++; ip = TEMPLATE2(P4DEC,USIZE)(ip, n, _p);
     for(p = _p; p != &_p[n]; p++,op++) FD(0,USIZE);
   }
@@ -343,14 +350,14 @@ size_t TEMPLATE2(fpdfcmenc,USIZE)(uint_t *in, size_t n, unsigned char *out, uint
   #define FE(i,_usize_) { TEMPLATE3(uint, _usize_, _t) u = ip[i]; p[i] = XORENC(u, (htab[h]+start),_usize_); b |= p[i]; \
     htab[h] = start = u - start; h = TEMPLATE2(HASH,_usize_)(h,start); start = u;\
   }
-  for(ip = in; ip != in + (n&~(VSIZE-1)); ) { uint_t b;
+  for(ip = in; ip != in + (n&~(VSIZE-1)); ) { uint_t b = 0;
     for(p = _p; p != &_p[VSIZE]; p+=4,ip+=4) { FE(0,USIZE); FE(1,USIZE); FE(2,USIZE); FE(3,USIZE); }
     #define TR(i,_usize_) p[i] = TEMPLATE2(rbit,_usize_)(p[i]<<b)
     b = TEMPLATE2(clz,USIZE)(b);
     for(p = _p; p != &_p[VSIZE]; p+=4) { TR(0,USIZE); TR(1,USIZE); TR(2,USIZE); TR(3,USIZE); }
     *op++ = b; op = TEMPLATE2(P4ENCV,USIZE)(_p, VSIZE, op);                                                     PREFETCH(ip+512,0);
   }
-  if(n = (in+n)-ip) { uint_t b;
+  if((n = (in+n)-ip)) { uint_t b = 0;
     for(p = _p; p != &_p[n]; p++,ip++) FE(0,USIZE);
     b = TEMPLATE2(clz,USIZE)(b);
     for(p = _p; p != &_p[n]; p++) TR(0,USIZE);
@@ -371,7 +378,7 @@ size_t TEMPLATE2(fpdfcmdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uint
     ip = TEMPLATE2(P4DECV,USIZE)(ip, VSIZE, _p);
     for(p = _p; p != &_p[VSIZE]; p+=4,op+=4) { FD(0,USIZE); FD(1,USIZE); FD(2,USIZE); FD(3,USIZE); }
   }
-  if(n = ((uint_t *)out+n) - op) {
+  if((n = ((uint_t *)out+n) - op)) {
     uint_t b = *ip++;
     ip = TEMPLATE2(P4DEC,USIZE)(ip, n, _p);
     for(p = _p; p != &_p[n]; p++,op++) FD(0,USIZE);
@@ -390,15 +397,15 @@ size_t TEMPLATE2(fp2dfcmenc,USIZE)(uint_t *in, size_t n, unsigned char *out, uin
   #define TR(i,_usize_) p[i] = TEMPLATE2(rbit,_usize_)(p[i]<<b)
 
   for(ip = in; ip != in + (n&~(VSIZE-1)); ) {
-    uint_t b;
+    uint_t b = 0;
     for(p = _p; p != &_p[VSIZE]; p+=4,ip+=4) { FE(0,USIZE); FE(1,USIZE); FE(2,USIZE); FE(3,USIZE); }
     b = TEMPLATE2(clz,USIZE)(b);
 
     for(p = _p; p != &_p[VSIZE]; p+=4) { TR(0,USIZE); TR(1,USIZE); TR(2,USIZE); TR(3,USIZE); }
     *op++ = b; op = TEMPLATE2(P4ENCV,USIZE)(_p, VSIZE, op);                                                     PREFETCH(ip+512,0);
   }
-  if(n = (in+n)-ip) {
-    uint_t b;
+  if((n = (in+n)-ip)) {
+    uint_t b = 0;
     for(p = _p; p != &_p[n]; p++,ip++) FE(0,USIZE);
     b = TEMPLATE2(clz,USIZE)(b);
 
@@ -421,7 +428,7 @@ size_t TEMPLATE2(fp2dfcmdec,USIZE)(unsigned char *in, size_t n, uint_t *out, uin
     ip = TEMPLATE2(P4DECV,USIZE)(ip, VSIZE, _p);
     for(p = _p; p != &_p[VSIZE]; p+=4,op+=4) { FD(0,USIZE); FD(1,USIZE); FD(2,USIZE); FD(3,USIZE); }
   }
-  if(n = ((uint_t *)out+n) - op) {
+  if((n = ((uint_t *)out+n) - op)) {
     uint_t b = *ip++;
     ip = TEMPLATE2(P4DEC,USIZE)(ip, n, _p);
     for(p = _p; p != &_p[n]; p++,op++) FD(0,USIZE);

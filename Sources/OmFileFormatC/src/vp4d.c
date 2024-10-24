@@ -26,6 +26,12 @@
 
 #ifdef GUARDED
 
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wconstant-conversion"
+
 #ifndef USIZE
 #pragma warning( disable : 4005)
 #pragma warning( disable : 4090)

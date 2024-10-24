@@ -22,6 +22,12 @@
     - email    : powturbo [_AT_] gmail [_DOT_] com
 **/
 //    "Integer Compression" utility - delta, for, zigzag / Floating point compression
+
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wunused-but-set-variable"
+
 #include <math.h> //nan
 #include "conf.h"
 #define BITUTIL_IN

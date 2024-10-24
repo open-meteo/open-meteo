@@ -67,16 +67,16 @@ void om_decoder_copy_double(uint64_t count, uint64_t read_offset, uint64_t write
 }
 
 uint64_t om_decoder_compress_fpxdec32(const void* data, uint64_t count, void* out) {
-    return fpxdec32(data, count, (uint32_t *)out, 0);
+    return fpxdec32((unsigned char *)data, count, (uint32_t *)out, 0);
 }
 
 uint64_t om_decoder_compress_fpxdec64(const void* data, uint64_t count, void* out) {
-    return fpxdec64(data, count, (uint64_t *)out, 0);
+    return fpxdec64((unsigned char *)data, count, (uint64_t *)out, 0);
 }
 
 
 // Initialization function for OmFileDecoder
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, const uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, const uint64_t lut_chunk_length, const uint64_t lut_chunk_element_count, const uint64_t lust_start, const uint64_t io_size_merge, const uint64_t io_size_max) {
+void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_length, uint64_t lut_chunk_element_count, uint64_t lust_start, uint64_t io_size_merge, uint64_t io_size_max) {
     // TODO limit lut_chunk_element_count to 256
     
     decoder->scalefactor = scalefactor;
