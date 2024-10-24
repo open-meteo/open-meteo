@@ -101,8 +101,9 @@ struct DownloadCamsCommand: AsyncCommand {
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true)
+            let concurrent = signature.concurrent ?? 1
+            let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true)
         }
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -215,7 +216,7 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     struct CamsEuropeQuery: Encodable {
-        let model = ["ensemble"]
+        let model: [String]?
         let date: String?
         let type: [String]?
         let data_format: String?
@@ -260,6 +261,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 continue
             }
             let query = CamsEuropeQuery(
+                model: ["ensemble"],
                 date: nil,
                 type: [type],
                 data_format: nil,
@@ -350,6 +352,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let forecastHours = forecastHours ?? domain.forecastHours
         let date = run.iso8601_YYYY_MM_dd
         let query = CamsEuropeQuery(
+            model: ["ensemble"],
             date: "\(date)/\(date)",
             type: ["forecast"],
             data_format: "netcdf",

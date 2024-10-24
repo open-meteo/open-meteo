@@ -35,7 +35,8 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         let t = Timestamp.now()
         switch self {
         case .cams_global_greenhouse_gases:
-            return t.subtract(days: 1).with(hour: 0)
+            // Should be available after 10 UTC
+            return t.with(hour: 0)
         case .cams_global:
             return t.with(hour: t.hour > 14 ? 12 : 0)
         case .cams_europe:
@@ -107,7 +108,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         case .cams_global_greenhouse_gases:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cams_europe:
-            // IMPORANT: GRID is flipped! Therefore dy negative!
+            // IMPORTANT: GRID is flipped! Therefore dy negative!
             return RegularGrid(nx: 700, ny: 420, latMin: /*30.05*/ 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
         case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
             return RegularGrid(nx: 700, ny: 420, latMin: 30.05 /*71.95*/, lonMin: -24.95, dx: 0.1, dy: 0.1)
@@ -437,6 +438,21 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .carbon_dioxide:
             return nil
         case .methane:
+            return nil
+        }
+    }
+    
+    func getCamsGlobalGreenhouseGasesMeta() -> (apiname: String, scalefactor: Float, gribShortName: String)? {
+        let airDensitySurface: Float = 1.223803
+        let massMixingToUgm3 = airDensitySurface * 1e9
+        switch self {
+        case .carbon_dioxide:
+            return ("carbon_dioxide", massMixingToUgm3, "co2")
+        case .carbon_monoxide:
+            return ("carbon_monoxide", massMixingToUgm3, "co")
+        case .methane:
+            return ("methane", massMixingToUgm3, "ch4")
+        default:
             return nil
         }
     }
