@@ -67,7 +67,7 @@ extension DownloadCamsCommand {
                     if let scaling = variable.getCamsGlobalGreenhouseGasesMeta()?.scalefactor {
                         grib2d.array.data.multiplyAdd(multiply: scaling, add: 0)
                     }
-                    //grib2d.array.shift180LongitudeAndFlipLatitude()
+                    grib2d.array.shift180LongitudeAndFlipLatitude()
                     let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})

@@ -189,8 +189,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return .microgramsPerCubicMetre
         case .aerosol_optical_depth:
             return .dimensionless
-        case .carbon_monoxide, .carbon_dioxide:
+        case .carbon_monoxide:
             return .microgramsPerCubicMetre
+        case .carbon_dioxide:
+            return .partsPerMillion
         case .methane:
             return .microgramsPerCubicMetre
         case .nitrogen_dioxide:
@@ -253,8 +255,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return 1
         case .aerosol_optical_depth:
             return 100
-        case .carbon_monoxide, .carbon_dioxide:
+        case .carbon_monoxide:
             return 1
+        case .carbon_dioxide:
+            return 1 // stored in PPM
         case .methane:
             return 1
         case .nitrogen_dioxide:
@@ -445,9 +449,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     func getCamsGlobalGreenhouseGasesMeta() -> (apiname: String, scalefactor: Float, gribShortName: String)? {
         let airDensitySurface: Float = 1.223803
         let massMixingToUgm3 = airDensitySurface * 1e9
+        let massMixingToMgm3 = airDensitySurface * 1e6
         switch self {
         case .carbon_dioxide:
-            return ("carbon_dioxide", massMixingToUgm3, "co2")
+            return ("carbon_dioxide", 24.45 * massMixingToMgm3 / 44.0095, "co2")
         case .carbon_monoxide:
             return ("carbon_monoxide", massMixingToUgm3, "co")
         case .methane:
