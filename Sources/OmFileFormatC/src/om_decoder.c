@@ -66,19 +66,17 @@ void om_decoder_copy_double(uint64_t count, uint64_t read_offset, uint64_t write
     }
 }
 
-uint64_t om_decoder_compress_fpxdec32(const void* data, uint64_t count, void* out) {
-    return fpxdec32((unsigned char *)data, count, (uint32_t *)out, 0);
+uint64_t om_decoder_compress_fpxdec32(const void* in, uint64_t count, void* out) {
+    return fpxdec32((unsigned char *)in, count, (uint32_t *)out, 0);
 }
 
-uint64_t om_decoder_compress_fpxdec64(const void* data, uint64_t count, void* out) {
-    return fpxdec64((unsigned char *)data, count, (uint64_t *)out, 0);
+uint64_t om_decoder_compress_fpxdec64(const void* in, uint64_t count, void* out) {
+    return fpxdec64((unsigned char *)in, count, (uint64_t *)out, 0);
 }
 
 
 // Initialization function for OmFileDecoder
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_length, uint64_t lut_chunk_element_count, uint64_t lust_start, uint64_t io_size_merge, uint64_t io_size_max) {
-    // TODO limit lut_chunk_element_count to 256
-    
+void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_length, uint64_t lut_chunk_element_count, uint64_t lust_start, uint64_t io_size_merge, uint64_t io_size_max) {    
     decoder->scalefactor = scalefactor;
     //decoder->compression = compression;
     //decoder->data_type = data_type;
@@ -94,17 +92,19 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     decoder->lut_start = lust_start;
     decoder->io_size_merge = io_size_merge;
     decoder->io_size_max = io_size_max;
+
+    assert(lut_chunk_element_count <= 256);
     
     // TODO more compression and datatypes
     switch (compression) {
-        case P4NZDEC256:
+        case COMPRESSION_P4NZDEC256:
             decoder->bytes_per_element = 2;
             decoder->decompress_copy_callback = om_decoder_copy_int16_to_float;
             decoder->decompress_filter_callback = (om_decompress_filter_callback)delta2d_decode;
             decoder->decompress_callback = (om_decompress_callback)p4nzdec128v16;
             break;
             
-        case FPXDEC32:
+        case COMPRESSION_FPXDEC32:
             if (data_type == DATA_TYPE_FLOAT) {
                 decoder->bytes_per_element = 4;
                 decoder->decompress_callback = om_decoder_compress_fpxdec32;
@@ -118,7 +118,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
             }
             break;
             
-        case P4NZDEC256_LOGARITHMIC:
+        case COMPRESSION_P4NZDEC256_LOGARITHMIC:
             decoder->bytes_per_element = 2;
             decoder->decompress_callback = (om_decompress_callback)p4nzdec128v16;
             decoder->decompress_filter_callback = (om_decompress_filter_callback)delta2d_decode;
@@ -243,7 +243,7 @@ bool _om_decoder_next_chunk_position(const om_decoder_t *decoder, om_range_t *ch
 }
 
 
-bool om_decocder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* index_read) {
+bool om_decoder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* index_read) {
     if (index_read->nextChunk.lowerBound >= index_read->nextChunk.upperBound) {
         return false;
     }

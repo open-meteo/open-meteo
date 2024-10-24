@@ -16,7 +16,7 @@ extension OmFileReaderBackend {
             om_decoder_index_read_init(decoder, &indexRead)
             
             /// Loop over index blocks and read index data
-            while om_decocder_next_index_read(decoder, &indexRead) {
+            while om_decoder_next_index_read(decoder, &indexRead) {
                 //print("read index \(indexRead)")
                 let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
                 
