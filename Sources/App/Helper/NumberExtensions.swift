@@ -18,6 +18,13 @@ public extension Float {
     }
 }
 
+extension UInt64 {
+    public func divideRoundedUp(divisor: UInt64) -> UInt64 {
+        let rem = self % divisor
+        return rem == 0 ? self / divisor : self / divisor + 1
+    }
+}
+
 
 extension Int {
     /// Integer division, but round up instead of floor

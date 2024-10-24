@@ -25,8 +25,10 @@
 
 #ifdef GUARDED
 
+#pragma clang diagnostic ignored "-Wmacro-redefined"
 
 #include <stdio.h>
+#include <string.h> // for memcp
 #define BITUTIL_IN
 #define VINT_IN
 #include "conf.h"
@@ -41,11 +43,18 @@
 #define PREFETCH(_ip_,_rw_) __builtin_prefetch(_ip_,_rw_)
   #endif
 
+#pragma clang diagnostic ignored "-Wunknown-pragmas"
+
 #pragma warning( disable : 4005)
 #pragma warning( disable : 4090)
 #pragma warning( disable : 4068)
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wunsequenced"
+#pragma clang diagnostic ignored "-Wincompatible-pointer-types"
+#pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wshift-op-parentheses"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
 
 #if !defined(SSE2_ON) && !defined(AVX2_ON) //----------------------------------- Plain -----------------------------------------------------------------------
 typedef unsigned char *(*BITPACK_F8)( uint8_t  *__restrict out, unsigned n, const unsigned char *__restrict in);

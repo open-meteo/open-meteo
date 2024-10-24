@@ -25,6 +25,8 @@
 #ifndef _VINT_H_
 #define _VINT_H_
 
+#pragma clang diagnostic ignored "-Wtautological-constant-out-of-range-compare"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

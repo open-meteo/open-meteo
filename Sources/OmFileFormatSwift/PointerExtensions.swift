@@ -20,6 +20,13 @@ extension UnsafeMutablePointer {
     }
 }
 
+extension UInt64 {
+    @inlinable func divideRoundedUp(divisor: UInt64) -> UInt64 {
+        let rem = self % divisor
+        return rem == 0 ? self / divisor : self / divisor + 1
+    }
+}
+
 public extension Int {
     func ceil(to: Int) -> Int {
         guard to != 0 else {
@@ -48,11 +55,13 @@ public extension Int {
 }
 
 /// For encoding: compression lib read and write more data to buffers https://github.com/powturbo/TurboPFor-Integer-Compression/issues/59
+/// Only the output buffer for encoding needs padding
 public func P4NENC256_BOUND(n: Int, bytesPerElement: Int) -> Int {
     return ((n + 255) / 256 + (n + 32)) * bytesPerElement
 }
 /// For Decoding: compression lib read and write more data to buffers https://github.com/powturbo/TurboPFor-Integer-Compression/issues/59
 public func P4NDEC256_BOUND(n: Int, bytesPerElement: Int) -> Int {
+    // Note: padding for output buffer should noe be required anymore
     return n * bytesPerElement + 32*4
 }
 

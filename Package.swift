@@ -15,10 +15,10 @@ let swiftFlags: [PackageDescription.SwiftSetting] = [
     .when(configuration: .release))
 ]
 
-let cFlags = [PackageDescription.CSetting.unsafeFlags(["-O3", "-fno-math-errno", "-fno-trapping-math", "-freciprocal-math", "-ffp-contract=fast"] + mArch)]
+let cFlags = [PackageDescription.CSetting.unsafeFlags(["-O3", "-Wall", "-Werror", "-fno-math-errno", "-fno-trapping-math", "-freciprocal-math", "-ffp-contract=fast"] + mArch)]
 // Note: Fast math flags reduce performance for compression
 let cFlagsPFor2D = [PackageDescription.CSetting.unsafeFlags(["-O3"] + mArch)]
-let cFlagsPFor = [PackageDescription.CSetting.unsafeFlags(["-O3", "-w"] + mArch)]
+let cFlagsPFor = [PackageDescription.CSetting.unsafeFlags(["-O3", "-Wall", "-Werror"] + mArch)]
 
 /// Conditional support for Apache Arrow Parquet files
 let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TRUE"
@@ -54,7 +54,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 "CHelper",
-                "SwiftPFor2D",
+                "OmFileFormatSwift",
                 "CZlib",
                 "CBz2lib"
             ] + (enableParquet ? [
@@ -86,14 +86,18 @@ let package = Package(
             name: "AppTests",
             dependencies: [.target(name: "App")]
         ),
+        .testTarget(
+            name: "OmFileFormatTests",
+            dependencies: [.target(name: "App")]
+        ),
         .target(
-            name: "SwiftPFor2D",
-            dependencies: ["CTurboPFor", "CHelper"],
+            name: "OmFileFormatSwift",
+            dependencies: ["OmFileFormatC", "CHelper"],
             cSettings: cFlagsPFor2D,
             swiftSettings: swiftFlags
         ),
         .target(
-            name: "CTurboPFor",
+            name: "OmFileFormatC",
             cSettings: cFlagsPFor,
             swiftSettings: swiftFlags
         ),

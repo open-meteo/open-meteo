@@ -1,8 +1,8 @@
-@_implementationOnly import CTurboPFor
+@_implementationOnly import OmFileFormatC
 @_implementationOnly import CHelper
 import Foundation
 
-public enum SwiftPFor2DError: Error {
+public enum OmFileFormatSwiftError: Error {
     case cannotOpenFile(filename: String, errno: Int32, error: String)
     case cannotCreateFile(filename: String, errno: Int32, error: String)
     case cannotTruncateFile(filename: String, errno: Int32, error: String)
@@ -19,8 +19,38 @@ public enum SwiftPFor2DError: Error {
 }
 
 
-public enum CompressionType: UInt8 {
-    /// Lossy compression using 2D delta coding and scalefactor
+public enum DataType: UInt8, Codable {
+    case int8 = 0
+    case uint8 = 1
+    case int16 = 2
+    case uint16 = 3
+    case int32 = 4
+    case uint32 = 5
+    case int64 = 6
+    case uint64 = 7
+    case float = 8
+    case double = 9
+
+    public var bytesPerElement: Int {
+        switch self {
+        case .int8, .uint8:
+            return 1
+        case .int16, .uint16:
+            return 2
+        case .int32, .uint32:
+            return 4
+        case .int64, .uint64:
+            return 8
+        case .float:
+            return 4
+        case .double:
+            return 8
+        }
+    }
+}
+
+public enum CompressionType: UInt8, Codable {
+    /// Lossy compression using 2D delta coding and scalefactor. Only support float ad scaled to 16 bit integer
     case p4nzdec256 = 0
     
     /// Lossless compression using 2D xor coding
@@ -28,6 +58,9 @@ public enum CompressionType: UInt8 {
     
     ///  Similar to `p4nzdec256` but apply `log10(1+x)` before
     case p4nzdec256logarithmic = 3
+    
+    // TODO: Use a new compression type to properly implement data type switching. Deprecate the old one
+    //case pforNEW
     
     public var bytesPerElement: Int {
         switch self {
@@ -38,6 +71,10 @@ public enum CompressionType: UInt8 {
         case .fpxdec32:
             return 4
         }
+    }
+    
+    func toC() -> OmFileFormatC.om_compression_t {
+        return OmFileFormatC.om_compression_t(rawValue: UInt32(self.rawValue))
     }
 }
 
@@ -104,10 +141,10 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
         self.fsyncFlushSize = fsync ? 32 * 1024 * 1024 : nil
         
         guard chunk0 > 0 && chunk1 > 0 && dim0 > 0 && dim1 > 0 else {
-            throw SwiftPFor2DError.dimensionMustBeLargerThan0
+            throw OmFileFormatSwiftError.dimensionMustBeLargerThan0
         }
         guard chunk0 <= dim0 && chunk1 <= dim1 else {
-            throw SwiftPFor2DError.chunkDimensionIsSmallerThenOverallDim
+            throw OmFileFormatSwiftError.chunkDimensionIsSmallerThenOverallDim
         }
         
         let chunkSizeByte = chunk0 * chunk1 * 4
@@ -182,12 +219,12 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
             if missingElements < elementsPerChunkRow {
                 // For the last chunk, the number must match exactly
                 guard uncompressedInput.count == missingElements else {
-                    throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                    throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
                 }
             }
             let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
             guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
-                throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
             }
             
             let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
@@ -251,12 +288,12 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
             if missingElements < elementsPerChunkRow {
                 // For the last chunk, the number must match exactly
                 guard uncompressedInput.count == missingElements else {
-                    throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                    throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
                 }
             }
             let isEvenMultipleOfChunkSize = uncompressedInput.count % elementsPerChunkRow == 0
             guard isEvenMultipleOfChunkSize || uncompressedInput.count == missingElements else {
-                throw SwiftPFor2DError.chunkHasWrongNumberOfElements
+                throw OmFileFormatSwiftError.chunkHasWrongNumberOfElements
             }
             
             let nReadChunks = uncompressedInput.count.divideRoundedUp(divisor: elementsPerChunkRow)
@@ -363,7 +400,7 @@ public final class OmFileWriter {
     @discardableResult
     public func write(file: String, compressionType: CompressionType, scalefactor: Float, overwrite: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws -> FileHandle {
         if !overwrite && FileManager.default.fileExists(atPath: file) {
-            throw SwiftPFor2DError.fileExistsAlready(filename: file)
+            throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
         }
         let fileTemp = "\(file)~"
         try FileManager.default.removeItemIfExists(at: fileTemp)
@@ -478,7 +515,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         }
         
         guard header.magicNumber1 == OmHeader.magicNumber1 && header.magicNumber2 == OmHeader.magicNumber2 else {
-            throw SwiftPFor2DError.notAOmFile
+            throw OmFileFormatSwiftError.notAOmFile
         }
         
         self.fn = fn
@@ -500,10 +537,10 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         let dim1Read = dim1Read ?? 0..<dim1
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
         }
         guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
         let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
@@ -566,137 +603,53 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         //assert(arrayDim1Range.count == dim1Read.count)
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
         }
         guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
-            throw SwiftPFor2DError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
+            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
-        let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
-        let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
-        
-        let nChunks = nDim0Chunks * nDim1Chunks
-        fn.withUnsafeBytes { ptr in
-            //fn.preRead(offset: OmHeader.length, count: nChunks * MemoryLayout<Int>.stride)
-            let chunkOffsets = ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self, capacity: nChunks)
+        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*6) { ptr in
+            // dimensions
+            ptr[0] = UInt64(dim0)
+            ptr[1] = UInt64(dim1)
+            // chunks
+            ptr[2] = UInt64(chunk0)
+            ptr[3] = UInt64(chunk1)
+            // read offset
+            ptr[4] = UInt64(dim0Read.lowerBound)
+            ptr[5] = UInt64(dim1Read.lowerBound)
+            // read count
+            ptr[6] = UInt64(dim0Read.count)
+            ptr[7] = UInt64(dim1Read.count)
+            // cube offset
+            ptr[8] = 0
+            ptr[9] = UInt64(arrayDim1Range.lowerBound)
+            // cube dimensions
+            ptr[10] = UInt64(dim0Read.count)
+            ptr[11] = UInt64(arrayDim1Length)
             
-            let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
-            let compressedDataStartPtr = UnsafeMutablePointer(mutating: ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: compressedDataStartOffset))
-            
-            switch compression {
-            case.p4nzdec256logarithmic:
-                fallthrough
-            case .p4nzdec256:
-                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
-                for c0 in dim0Read.divide(by: chunk0) {
-                    let c1Range = dim1Read.divide(by: chunk1)
-                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
-                    // pre-read chunk table at specific offset
-                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                    for c1 in c1Range {
-                        // load chunk into buffer
-                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                        let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
-                        
-                        /// The chunk coordinates in global space... e.g. 600..<1000
-                        let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
-                        let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
-                        
-                        /// This chunk clamped to read coodinates... e.g. 650..<950
-                        let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
-                        let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
-                        
-                        // load chunk from mmap
-                        let chunkNum = c0 * nDim1Chunks + c1
-                        precondition(chunkNum < nChunks, "invalid chunkNum")
-                        let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                        precondition(compressedDataStartOffset + startPos < ptr.count, "chunk out of range read")
-                        let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                        fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                        let uncompressedBytes = p4nzdec128v16(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBuffer)
-                        precondition(uncompressedBytes == lengthCompressedBytes, "chunk read bytes mismatch")
-                        
-                        // 2D delta decoding
-                        delta2d_decode(length0, length1, chunkBuffer)
-                        
-                        /// Moved to local coordinates... e.g. 50..<350
-                        let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
-                        
-                        for d0 in clampedLocal0 {
-                            let readStart = clampedLocal1 + d0 * length1
-                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                            for i in 0..<clampedGlobal1.count {
-                                let posBuffer = readStart + i
-                                let posOut = localRange + i
-                                let val = chunkBuffer[posBuffer]
-                                if val == Int16.max {
-                                    into.advanced(by: posOut).pointee = .nan
-                                } else {
-                                    let unscaled = compression == .p4nzdec256logarithmic ? (powf(10, Float(val) / scalefactor) - 1) : (Float(val) / scalefactor)
-                                    into.advanced(by: posOut).pointee = unscaled
-                                }
-                            }
-                        }
-                    }
-                }
-            case .fpxdec32:
-                let chunkBufferUInt = chunkBuffer.assumingMemoryBound(to: UInt32.self)
-                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
-                
-                for c0 in dim0Read.divide(by: chunk0) {
-                    let c1Range = dim1Read.divide(by: chunk1)
-                    let c1Chunks = c1Range.add(c0 * nDim1Chunks)
-                    // pre-read chunk table at specific offset
-                    fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                    
-                    for c1 in c1Range {
-                        // load chunk into buffer
-                        // consider the length, even if the last is only partial... E.g. at 1000 elements with 600 chunk length, the last one is only 400
-                        let length1 = min((c1+1) * chunk1, dim1) - c1 * chunk1
-                        let length0 = min((c0+1) * chunk0, dim0) - c0 * chunk0
-                        
-                        /// The chunk coordinates in global space... e.g. 600..<1000
-                        let chunkGlobal0 = c0 * chunk0 ..< c0 * chunk0 + length0
-                        let chunkGlobal1 = c1 * chunk1 ..< c1 * chunk1 + length1
-                        
-                        /// This chunk clamped to read coodinates... e.g. 650..<950
-                        let clampedGlobal0 = chunkGlobal0.clamped(to: dim0Read)
-                        let clampedGlobal1 = chunkGlobal1.clamped(to: dim1Read)
-                        
-                        // load chunk from mmap
-                        let chunkNum = c0 * nDim1Chunks + c1
-                        let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                        let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                        fn.preRead(offset: compressedDataStartOffset + startPos, count: lengthCompressedBytes)
-                        let uncompressedBytes = fpxdec32(compressedDataStartPtr.advanced(by: startPos), length0 * length1, chunkBufferUInt, 0)
-                        precondition(uncompressedBytes == lengthCompressedBytes)
-                        
-                        // 2D xor decoding
-                        delta2d_decode_xor(length0, length1, chunkBuffer)
-                        
-                        /// Moved to local coordinates... e.g. 50..<350
-                        let clampedLocal0 = clampedGlobal0.substract(c0 * chunk0)
-                        let clampedLocal1 = clampedGlobal1.lowerBound - c1 * chunk1
-                        
-                        for d0 in clampedLocal0 {
-                            let readStart = clampedLocal1 + d0 * length1
-                            let localOut0 = chunkGlobal0.lowerBound + d0 - dim0Read.lowerBound
-                            let localOut1 = clampedGlobal1.lowerBound - dim1Read.lowerBound
-                            let localRange = localOut1 + localOut0 * arrayDim1Length + arrayDim1Range.lowerBound
-                            for i in 0..<clampedGlobal1.count {
-                                let posBuffer = readStart + i
-                                let posOut = localRange + i
-                                let val = chunkBuffer[posBuffer]
-                                into.advanced(by: posOut).pointee = val
-                            }
-                        }
-                    }
-                }
-            }
+            let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
+            var decoder = om_decoder_t()
+            om_decoder_init(
+                &decoder,
+                scalefactor,
+                c,
+                OmFileFormatC.DATA_TYPE_FLOAT,
+                2,
+                ptr.baseAddress,
+                ptr.baseAddress?.advanced(by: 2),
+                ptr.baseAddress?.advanced(by: 4),
+                ptr.baseAddress?.advanced(by: 6),
+                ptr.baseAddress?.advanced(by: 8),
+                ptr.baseAddress?.advanced(by: 10),
+                8,
+                1,
+                UInt64(OmHeader.length),
+                512,
+                65536
+            )
+            fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
     }
 }
