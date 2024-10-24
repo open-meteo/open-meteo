@@ -62,6 +62,12 @@ extension CamsVariable: FlatBuffersVariable {
             return .init(variable: .seaSaltAerosol)
         case .nitrogen_monoxide:
             return .init(variable: .nitrogenMonoxide)
+        case .carbon_dioxide:
+            // TODO register variables
+            return .init(variable: .nitrogenMonoxide)
+        case .methane:
+            // TODO register variables
+            return .init(variable: .nitrogenMonoxide)
         }
     }
 }
