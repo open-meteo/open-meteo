@@ -5,6 +5,7 @@ import SwiftPFor2D
 /// CAMS Air quality domain definitions for Europe and global domains
 enum CamsDomain: String, GenericDomain, CaseIterable {
     case cams_global
+    case cams_global_greenhouse_gases
     case cams_europe
     case cams_europe_reanalysis_interim
     case cams_europe_reanalysis_validated
@@ -19,7 +20,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     /// count of forecast hours
     var forecastHours: Int {
         switch self {
-        case .cams_global:
+        case .cams_global, .cams_global_greenhouse_gases:
             return 121
         case .cams_europe:
             return 97
@@ -33,6 +34,9 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
+        case .cams_global_greenhouse_gases:
+            // Should be available after 10 UTC
+            return t.with(hour: 0)
         case .cams_global:
             return t.with(hour: t.hour > 14 ? 12 : 0)
         case .cams_europe:
@@ -46,6 +50,8 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .cams_global:
             return .cams_global
+        case .cams_global_greenhouse_gases:
+            return .cams_global_greenhouse_gases
         case .cams_europe:
             return .cams_europe
         case .cams_europe_reanalysis_interim:
@@ -72,18 +78,23 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        return 3600
+        switch self {
+        case .cams_global_greenhouse_gases:
+            return 3*3600
+        default:
+            return 3600
+        }
     }
     
     var omFileLength: Int {
-        return forecastHours + 4*24
+        return (forecastHours + 4*24) / dtHours
     }
     
     var updateIntervalSeconds: Int {
         switch self {
         case .cams_global:
             return 12*3600
-        case .cams_europe:
+        case .cams_europe, .cams_global_greenhouse_gases:
             return 24*3600
         case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             return 0
@@ -94,12 +105,17 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .cams_global:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 0.4, dy: 0.4)
-        case .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+        case .cams_global_greenhouse_gases:
+            return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
+        case .cams_europe:
+            // IMPORTANT: GRID is flipped! Therefore dy negative!
             return RegularGrid(nx: 700, ny: 420, latMin: /*30.05*/ 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+            return RegularGrid(nx: 700, ny: 420, latMin: 30.05 /*71.95*/, lonMin: -24.95, dx: 0.1, dy: 0.1)
         case .cams_europe_reanalysis_validated_pre2020:
-            return RegularGrid(nx: 701, ny: 421, latMin: /*30.05*/ 72, lonMin: -25, dx: 0.1, dy: -0.1)
+            return RegularGrid(nx: 701, ny: 421, latMin: 30, lonMin: -25, dx: 0.1, dy: 0.1)
         case .cams_europe_reanalysis_validated_pre2018:
-            return RegularGrid(nx: 701, ny: 401, latMin: /*30.05*/ 70, lonMin: -25, dx: 0.1, dy: -0.1)
+            return RegularGrid(nx: 701, ny: 401, latMin: 30, lonMin: -25, dx: 0.1, dy: 0.1)
         }
     }
 }
@@ -111,10 +127,12 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case dust
     case aerosol_optical_depth
     case carbon_monoxide
+    case carbon_dioxide
     case nitrogen_dioxide
     case ammonia
     case ozone
     case sulphur_dioxide
+    case methane
     case uv_index
     case uv_index_clear_sky
     case alder_pollen
@@ -172,6 +190,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         case .aerosol_optical_depth:
             return .dimensionless
         case .carbon_monoxide:
+            return .microgramsPerCubicMetre
+        case .carbon_dioxide:
+            return .partsPerMillion
+        case .methane:
             return .microgramsPerCubicMetre
         case .nitrogen_dioxide:
             return .microgramsPerCubicMetre
@@ -235,6 +257,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return 100
         case .carbon_monoxide:
             return 1
+        case .carbon_dioxide:
+            return 1 // stored in PPM
+        case .methane:
+            return 1
         case .nitrogen_dioxide:
             return 10
         case .ammonia:
@@ -295,6 +321,10 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return ("dust", "dust", "dust")
         case .carbon_monoxide:
             return ("carbon_monoxide", "co_conc", "co")
+        case .carbon_dioxide:
+            return nil
+        case .methane:
+            return nil
         case .nitrogen_dioxide:
             return ("nitrogen_dioxide", "no2_conc", "no2")
         case .ammonia:
@@ -409,6 +439,26 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return ("no", true, massMixingToUgm3)
         case .sea_salt_aerosol:
             return ("aermr03", true, massMixingToUgm3)
+        case .carbon_dioxide:
+            return nil
+        case .methane:
+            return nil
+        }
+    }
+    
+    func getCamsGlobalGreenhouseGasesMeta() -> (apiname: String, scalefactor: Float, gribShortName: String)? {
+        let airDensitySurface: Float = 1.223803
+        let massMixingToUgm3 = airDensitySurface * 1e9
+        let massMixingToMgm3 = airDensitySurface * 1e6
+        switch self {
+        case .carbon_dioxide:
+            return ("carbon_dioxide", 24.45 * massMixingToMgm3 / 44.0095, "co2")
+        case .carbon_monoxide:
+            return ("carbon_monoxide", massMixingToUgm3, "co")
+        case .methane:
+            return ("methane", massMixingToUgm3, "ch4")
+        default:
+            return nil
         }
     }
 }

@@ -347,9 +347,9 @@ extension CamsQuery {
         var camsDomains: [CamsDomain] {
             switch self {
             case .auto:
-                return [.cams_global, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020]
+                return [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
             case .cams_global:
-                return [.cams_global]
+                return [.cams_global, .cams_global_greenhouse_gases]
             case .cams_europe:
                 return [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
             }
