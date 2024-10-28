@@ -31,7 +31,7 @@ uint64_t divide_rounded_up(const uint64_t dividend, const uint64_t divisor) {
     return (rem == 0) ? dividend / divisor : dividend / divisor + 1;
 }
 
-#ifndef _WIN32
+#ifndef _MSC_VER
 uint64_t min(const uint64_t a, const uint64_t b) {
     return a < b ? a : b;
 }
