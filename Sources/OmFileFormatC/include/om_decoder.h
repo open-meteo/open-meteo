@@ -23,7 +23,7 @@
  *     readCount,                   // Number of elements to read from each dimension
  *     intoCubeOffset,              // Offset within the output cube to store decompressed data
  *     intoCubeDimension,           // Dimensions of the output cube (may be larger than readCount)
- *     v.lutChunkSize,              // Maximum size of a LUT chunk in bytes
+ *     v.lutSize,              // Maximum size of the compressed LUT in bytes
  *     lutChunkElementCount,        // Number of elements in each LUT chunk (typically 256)
  *     v.lutOffset,                 // Starting offset of the LUT in the file
  *     io_size_merge,               // Maximum size for merging smaller I/O reads. Default: 512
@@ -205,11 +205,10 @@ typedef struct {
  * @param cube_dimensions A pointer to an array specifying the dimensions of the target cube being read.
  *                        It can be the same as `read_count` but allows reading into larger arrays.
  *                        This is stored in `decoder->cube_dimensions`.
- * @param lut_chunk_length The length (in bytes) of a Look-Up Table (LUT) chunk. It defines the
- *                         maximum size of compressed LUT chunks and is stored in `decoder->lut_chunk_length`.
+ * @param lut_size  The length (in bytes) of the compressed Look-Up Table (LUT). Ignored for Verion 1/2 files if lut_chunk_element_count == 1.
  * @param lut_chunk_element_count The number of elements in each LUT chunk. Default is 256. A value
  *                                of 1 indicates that the LUT is not compressed. This is stored in `decoder->lut_chunk_element_count`.
- * @param lust_start The starting byte position of the LUT in the file. This is stored in `decoder->lut_start`.
+ * @param lut_start  The starting byte position of the LUT in the file. This is stored in `decoder->lut_start`.
  * @param io_size_merge The maximum size (in bytes) for merging consecutive IO operations.
  *                      It helps to optimize read performance by merging small reads and is stored in `decoder->io_size_merge`.
  * @param io_size_max The maximum size (in bytes) for a single IO operation before it is split.
@@ -240,7 +239,7 @@ typedef struct {
  *          \endcode
  *          This value is stored in `decoder->number_of_chunks` and is used for managing the read operations.
  */
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_length, uint64_t lut_chunk_element_count, uint64_t lust_start, uint64_t io_size_merge, uint64_t io_size_max);
+void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max);
 
 /**
  * @brief Initializes an `om_decoder_index_read_t` structure for reading chunk indices.

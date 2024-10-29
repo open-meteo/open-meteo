@@ -78,7 +78,20 @@ uint64_t om_decoder_compress_fpxdec64(const void* in, uint64_t count, void* out)
 
 
 // Initialization function for OmFileDecoder
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_length, uint64_t lut_chunk_element_count, uint64_t lust_start, uint64_t io_size_merge, uint64_t io_size_max) {    
+void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max) {
+    // Calculate the number of chunks based on dims and chunks
+    uint64_t nChunks = 1;
+    for (uint64_t i = 0; i < dims_count; i++) {
+        nChunks *= divide_rounded_up(dims[i], chunks[i]);
+    }
+    uint64_t nLutChunks = divide_rounded_up(nChunks, lut_chunk_element_count);
+    uint64_t lut_chunk_length = lut_size / nLutChunks;
+    if (lut_chunk_element_count == 1) {
+        // OLD v1 files do not use compressed LUT
+        lut_chunk_length = 8;
+    }
+    
+    decoder->number_of_chunks = nChunks;
     decoder->scalefactor = scalefactor;
     decoder->dimensions = dims;
     decoder->dimensions_count = dims_count;
@@ -89,7 +102,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     decoder->cube_dimensions = cube_dimensions;
     decoder->lut_chunk_length = lut_chunk_length;
     decoder->lut_chunk_element_count = lut_chunk_element_count;
-    decoder->lut_start = lust_start;
+    decoder->lut_start = lut_start;
     decoder->io_size_merge = io_size_merge;
     decoder->io_size_max = io_size_max;
 
@@ -128,13 +141,6 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
         default:
             assert(0 && "Unsupported compression type for copying data.");
     }
-    
-    // Calculate the number of chunks based on dims and chunks
-    uint64_t n = 1;
-    for (uint64_t i = 0; i < dims_count; i++) {
-        n *= divide_rounded_up(dims[i], chunks[i]);
-    }
-    decoder->number_of_chunks = n;
 }
 
 

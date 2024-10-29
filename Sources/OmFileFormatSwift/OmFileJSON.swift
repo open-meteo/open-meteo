@@ -48,8 +48,8 @@ public struct OmFileJSONVariable: Codable {
     /// The offset position of the beginning of the look up table LUT. The LUT comtains then data positions for each chunk
     let lutOffset: UInt64
     
-    /// How long a chunk inside the LUT is after compression
-    let lutChunkSize: UInt64
+    /// The total size of the compressed LUT.
+    let lutSize: UInt64
 }
 
 extension OmFileFormatC.om_compression_t: Codable {
@@ -58,25 +58,3 @@ extension OmFileFormatC.om_compression_t: Codable {
 extension OmFileFormatC.om_datatype_t: Codable {
     
 }
-/*extension OmFileJSONVariable {
-    /// Get a decoder for this variable given the desired read offsets and lengths
-    /// `lutChunkElementCount` controls the size of each block to compress the LUT
-    func makeReader(dimRead: [Range<Int>], intoCubeOffset: [Int], intoCubeDimension: [Int], lutChunkElementCount: Int = 256, io_size_max: Int = OmFileDecoder.io_size_max_default, io_size_merge: Int = OmFileDecoder.io_size_merge_default) -> OmFileDecoder {
-        return OmFileDecoder(
-            scalefactor: scalefactor,
-            compression: compression,
-            dataType: dataType,
-            dims: dimensions,
-            chunks: chunks,
-            readOffset: dimRead.map{$0.lowerBound},
-            readCount: dimRead.map{$0.count},
-            intoCubeOffset: intoCubeOffset,
-            intoCubeDimension: intoCubeDimension,
-            lutChunkLength: lutChunkSize,
-            lutChunkElementCount: lutChunkElementCount,
-            lutStart: lutOffset,
-            io_size_merge: io_size_merge,
-            io_size_max: io_size_max
-        )
-    }
-}*/

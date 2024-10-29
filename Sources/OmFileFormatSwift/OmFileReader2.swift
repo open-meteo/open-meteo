@@ -66,7 +66,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                     compression: .init(UInt32(metaV1.pointee.compression)),
                     dataType: DATA_TYPE_FLOAT,
                     lutOffset: UInt64(OmHeader.length),
-                    lutChunkSize: 8
+                    lutSize: 0 // ignored if lutChunkElementCount == 1
                 )
                 let json = OmFileJSON(variables: [variable], someAttributes: nil)
                 return OmFileReader2(fn: fn, json: json, lutChunkElementCount: 1)
@@ -118,7 +118,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             readCount,
             intoCubeOffset,
             intoCubeDimension,
-            v.lutChunkSize,
+            v.lutSize,
             lutChunkElementCount,
             v.lutOffset,
             io_size_merge,

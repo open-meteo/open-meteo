@@ -130,6 +130,8 @@ public final class OmFileWriter2 {
         let arrayCount = arrayRead.map({UInt64($0.count)})
         
         let numberOfChunksInArray = encoder.number_of_chunks_in_array(arrayCount: arrayCount)
+        
+        /// This is the minimum output buffer size for each compressed size. In practice the buffer should be a couple of MB.
         let minimumBuffer = Int(encoder.minimum_chunk_write_buffer())
         
         // Each thread needs its own chunk buffer to compress data
@@ -149,6 +151,7 @@ public final class OmFileWriter2 {
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
             let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
             let outSize = out.buffer.count - Int(out.writePosition)
+            assert(outSize >= minimumBuffer)
             let writeLength = encoder.writeSingleChunk(array: array, arrayDimensions: arrayDimensions, arrayOffset: arrayOffset, arrayCount: arrayCount, chunkIndex: UInt64(chunkIndex), chunkIndexOffsetInThisArray: chunkIndexOffsetInThisArray, out: outPtr, outSize: outSize, chunkBuffer: chunkBuffer)
 
             //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
@@ -167,24 +170,21 @@ public final class OmFileWriter2 {
         }
     }
     
+    /// Returns LUT size
     public func writeLut(out: OmFileBufferedWriter, fn: FileHandle) throws -> UInt64 {
-        let lutChunkLength = writeLut(out: out)
-        try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
-        out.writePosition = 0
-        return lutChunkLength
-    }
-    
-    
-    /// Returns LUT chunk length
-    public func writeLut(out: OmFileBufferedWriter) -> UInt64 {
         let size_of_compressed_lut = encoder.size_of_compressed_lut(lookUpTable: lookUpTable)
         assert(out.buffer.count - Int(out.writePosition) >= Int(size_of_compressed_lut))
-        let lutChunkLength = encoder.compress_lut(lookUpTable: lookUpTable, out: out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), size_of_compressed_lut: size_of_compressed_lut)
+        encoder.compress_lut(lookUpTable: lookUpTable, out: out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), size_of_compressed_lut: size_of_compressed_lut)
+        
         out.writePosition += UInt64(size_of_compressed_lut)
         out.totalBytesWritten += UInt64(size_of_compressed_lut)
-        return lutChunkLength
+        
+        try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
+        out.writePosition = 0
+        return UInt64(size_of_compressed_lut)
     }
     
+
     func output_buffer_capacity() -> UInt64 {
         encoder.output_buffer_capacity()
     }
@@ -274,7 +274,7 @@ struct OmFileEncoder {
     
     /// Out size needs to cover at least `size_of_compressed_lut()`
     /// Returns length of each lut chunk
-    func compress_lut(lookUpTable: [UInt64], out: UnsafeMutablePointer<UInt8>, size_of_compressed_lut: Int) -> UInt64 {
+    func compress_lut(lookUpTable: [UInt64], out: UnsafeMutablePointer<UInt8>, size_of_compressed_lut: Int) {
         let nLutChunks = lookUpTable.count.divideRoundedUp(divisor: lutChunkElementCount)
         let lutChunkLength = size_of_compressed_lut / nLutChunks
         
@@ -286,7 +286,6 @@ struct OmFileEncoder {
                 _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.advanced(by: i * lutChunkLength))
             }
         })
-        return UInt64(lutChunkLength)
     }
     
     

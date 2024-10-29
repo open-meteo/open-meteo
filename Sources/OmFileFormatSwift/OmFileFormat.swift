@@ -643,7 +643,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 6),
                 ptr.baseAddress?.advanced(by: 8),
                 ptr.baseAddress?.advanced(by: 10),
-                8,
+                8, // ignored if lutChunkElementCount == 1
                 1,
                 UInt64(OmHeader.length),
                 512,
