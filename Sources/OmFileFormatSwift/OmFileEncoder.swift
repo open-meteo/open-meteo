@@ -121,22 +121,20 @@ public final class OmFileWriter2 {
         self.scalefactor = scalefactor
     }
     
-    /// Can be all, a single or multiple chunks
+    /// Compress data
+    /// Can be all, a single or multiple chunks. If mutliple chunks are given at once, they must align with chunks.
     public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>], fn: FileHandle, out: OmFileBufferedWriter) throws {
         // TODO check dimensions of arrayDimensions and arrayRead
         
         let arrayOffset = arrayRead.map({UInt64($0.lowerBound)})
         let arrayCount = arrayRead.map({UInt64($0.count)})
         
-        var numberOfChunksInArray = UInt64(1)
-        for i in 0..<encoder.dims.count {
-            numberOfChunksInArray *= UInt64(arrayRead[i].count).divideRoundedUp(divisor: encoder.chunks[i])
-        }
-        
-        let lengthInChunk = encoder.chunks.reduce(1, *)
+        let numberOfChunksInArray = encoder.number_of_chunks_in_array(arrayCount: arrayCount)
         let minimumBuffer = Int(encoder.minimum_chunk_write_buffer())
         
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(encoder.chunk_buffer_size()), alignment: 1)
+        // Each thread needs its own chunk buffer to compress data
+        let chunkBufferSize = Int(encoder.chunk_buffer_size())
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: chunkBufferSize, alignment: 1)
         defer {
             chunkBuffer.deallocate()
         }
@@ -146,6 +144,8 @@ public final class OmFileWriter2 {
             lookUpTable[chunkIndex] = out.totalBytesWritten
         }
         
+        // This loop could be done in parallel. However, the order of chunks must remain the same in the LUT and final output buffer.
+        // For multithreading, multiple buffers are required that need to be copied into the final buffer afterwards
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
             let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
             let outSize = out.buffer.count - Int(out.writePosition)
@@ -160,7 +160,7 @@ public final class OmFileWriter2 {
             chunkIndex += 1
             
             // Write buffer to disk if the next chunk may not fit anymore in the output buffer
-            if out.buffer.count - Int(out.writePosition) <= minimumBuffer {
+            if out.buffer.count - Int(out.writePosition) < minimumBuffer {
                 try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
                 out.writePosition = 0
             }
@@ -240,6 +240,14 @@ struct OmFileEncoder {
         let lutBufferSize = nChunks * 8
         
         return max(4096, max(lutBufferSize, bufferSize))
+    }
+    
+    func number_of_chunks_in_array(arrayCount: [UInt64]) -> UInt64 {
+        var numberOfChunksInArray = UInt64(1)
+        for i in 0..<dims.count {
+            numberOfChunksInArray *= arrayCount[i].divideRoundedUp(divisor: chunks[i])
+        }
+        return numberOfChunksInArray
     }
     
     /// Return the size of the compressed LUT
