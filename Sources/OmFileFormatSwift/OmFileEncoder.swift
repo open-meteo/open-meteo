@@ -75,12 +75,26 @@ public final class OmFileBufferedWriter {
 
 public final class OmFileWriter2 {
     /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
-    private var chunkOffsetBytes: [UInt64]
+    private var lookUpTable: [UInt64]
     
     let encoder: OmFileEncoder
     
     /// Position of last chunk that has been written
     public var chunkIndex: Int = 0
+    
+    /// The scalefactor that is applied to all write data
+    public let scalefactor: Float
+    
+    /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
+    public let compression: CompressionType
+    
+    // TODO datatype
+    
+    /// The dimensions of the file
+    let dims: [UInt64]
+    
+    /// How the dimensions are chunked
+    let chunks: [UInt64]
     
     /**
      Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
@@ -100,7 +114,11 @@ public final class OmFileWriter2 {
         let nChunks = self.encoder.number_of_chunks()
         
         // +1 to store also the start address
-        self.chunkOffsetBytes = .init(repeating: 0, count: Int(nChunks + 1))
+        self.lookUpTable = .init(repeating: 0, count: Int(nChunks + 1))
+        self.chunks = chunkDimensions
+        self.dims = dimensions
+        self.compression = compression
+        self.scalefactor = scalefactor
     }
     
     /// Can be all, a single or multiple chunks
@@ -126,7 +144,7 @@ public final class OmFileWriter2 {
         
         if chunkIndex == 0 {
             // Store data start address
-            chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
+            lookUpTable[chunkIndex] = out.totalBytesWritten
         }
         
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
@@ -139,7 +157,7 @@ public final class OmFileWriter2 {
             out.totalBytesWritten += UInt64(writeLength)
             
             // Store chunk offset in LUT
-            chunkOffsetBytes[chunkIndex+1] = out.totalBytesWritten
+            lookUpTable[chunkIndex+1] = out.totalBytesWritten
             chunkIndex += 1
             
             // Write buffer to disk if the next chunk may not fit anymore in the output buffer
@@ -160,34 +178,17 @@ public final class OmFileWriter2 {
     
     /// Returns LUT chunk length
     public func writeLut(out: OmFileBufferedWriter) -> UInt64 {
-        //let lutStart = out.totalBytesWritten
-        //print("LUT start \(lutStart), \(chunkOffsetBytes)")
-        let lutChunkLength = chunkOffsetBytes.withUnsafeBytes({
-            var maxLength = 0
-            
-            // TODO move LUT compressor to encoder
-            
-            /// Calculate maximum chunk size
-            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: encoder.lutChunkElementCount) {
-                let rangeStart = i*encoder.lutChunkElementCount
-                let rangeEnd = min((i+1)*encoder.lutChunkElementCount, chunkOffsetBytes.count)
-                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
-                if len > maxLength { maxLength = len }
-            }
-            /// Write chunks to buffer and pad all chunks to have `maxLength` bytes
-            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: encoder.lutChunkElementCount) {
-                let rangeStart = i*encoder.lutChunkElementCount
-                let rangeEnd = min((i+1)*encoder.lutChunkElementCount, chunkOffsetBytes.count)
-                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
-                out.writePosition += UInt64(maxLength)
-                out.totalBytesWritten += UInt64(maxLength)
-            }
-            //print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount))
-            return UInt64(maxLength)
-        })
+        let size_of_compressed_lut = encoder.size_of_compressed_lut(lookUpTable: lookUpTable)
+        assert(out.buffer.count - Int(out.writePosition) >= Int(size_of_compressed_lut))
+        let lutChunkLength = encoder.compress_lut(lookUpTable: lookUpTable, out: out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), size_of_compressed_lut: size_of_compressed_lut)
+        out.writePosition += UInt64(size_of_compressed_lut)
+        out.totalBytesWritten += UInt64(size_of_compressed_lut)
         return lutChunkLength
     }
     
+    func output_buffer_capacity() -> UInt64 {
+        encoder.output_buffer_capacity()
+    }
 }
 
 
@@ -207,9 +208,6 @@ struct OmFileEncoder {
     
     /// How the dimensions are chunked
     let chunks: [UInt64]
-    
-    /// Buffer where chunks are moved to, before compression them. => input for compression call
-    //private var chunkBuffer: UnsafeMutableRawBufferPointer
 
     /// This might be hard coded to 256 in later versions
     let lutChunkElementCount: Int
@@ -235,6 +233,45 @@ struct OmFileEncoder {
         let lutBufferSize = nChunks * 8
         
         return max(4096, max(lutBufferSize, bufferSize))
+    }
+    
+    /// Return the size of the compressed LUT
+    func size_of_compressed_lut(lookUpTable: [UInt64]) -> Int {
+        /// TODO stack allocate in C
+        let bufferSize = P4NENC256_BOUND(n: 256, bytesPerElement: 8)
+        let buffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 1)
+        defer { buffer.deallocate() }
+        
+        let nLutChunks = lookUpTable.count.divideRoundedUp(divisor: lutChunkElementCount)
+        
+        return lookUpTable.withUnsafeBytes({
+            var maxLength = 0
+            /// Calculate maximum chunk size
+            for i in 0..<nLutChunks {
+                let rangeStart = i*lutChunkElementCount
+                let rangeEnd = min((i+1)*lutChunkElementCount, lookUpTable.count)
+                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, buffer.baseAddress!)
+                if len > maxLength { maxLength = len }
+            }
+            return maxLength * nLutChunks
+        })
+    }
+    
+    /// Out size needs to cover at least `size_of_compressed_lut()`
+    /// Returns length of each lut chunk
+    func compress_lut(lookUpTable: [UInt64], out: UnsafeMutablePointer<UInt8>, size_of_compressed_lut: Int) -> UInt64 {
+        let nLutChunks = lookUpTable.count.divideRoundedUp(divisor: lutChunkElementCount)
+        let lutChunkLength = size_of_compressed_lut / nLutChunks
+        
+        lookUpTable.withUnsafeBytes({
+            /// Write chunks to buffer and pad all chunks to have `maxLength` bytes
+            for i in 0..<nLutChunks {
+                let rangeStart = i*lutChunkElementCount
+                let rangeEnd = min((i+1)*lutChunkElementCount, lookUpTable.count)
+                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.advanced(by: i * lutChunkLength))
+            }
+        })
+        return UInt64(lutChunkLength)
     }
     
     

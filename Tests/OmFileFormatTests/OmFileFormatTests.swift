@@ -69,7 +69,7 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileEncoder(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
+        let writer = OmFileWriter2(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         
         let fn = try FileHandle.createNewFile(file: file)
@@ -107,7 +107,7 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
+        let writer = OmFileWriter2(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         
         let fn = try FileHandle.createNewFile(file: file)
@@ -150,7 +150,7 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileEncoder(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
+        let writer = OmFileWriter2(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -186,7 +186,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let dims = [UInt64(3),3,3]
-        let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
+        let writer = OmFileWriter2(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, scalefactor: 1)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -231,7 +231,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let dims = [UInt64(5),5]
-        let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
+        let writer = OmFileWriter2(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -330,7 +330,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let dims = [UInt64(5),5]
-        let writer = OmFileEncoder(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
+        let writer = OmFileWriter2(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scalefactor: 1, lutChunkElementCount: 2)
         let buffer = OmFileBufferedWriter(capacity: writer.output_buffer_capacity())
         let fn = try FileHandle.createNewFile(file: file)
         
