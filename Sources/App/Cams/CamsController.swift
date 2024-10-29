@@ -47,7 +47,7 @@ struct CamsController {
         try await req.ensureApiKey("air-quality-api", apikey: params.apikey)
         
         let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(2020, 1, 1) ..< currentTime.add(86400 * 6)
+        let allowedRange = Timestamp(2013, 1, 1) ..< currentTime.add(86400 * 6)
         
         let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
@@ -347,11 +347,11 @@ extension CamsQuery {
         var camsDomains: [CamsDomain] {
             switch self {
             case .auto:
-                return [.cams_global, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated]
+                return [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
             case .cams_global:
-                return [.cams_global]
+                return [.cams_global, .cams_global_greenhouse_gases]
             case .cams_europe:
-                return [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated]
+                return [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
             }
         }
     }

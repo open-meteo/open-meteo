@@ -171,6 +171,8 @@ Note:
 ```bash
 30 8,20 * * * /usr/local/bin/openmeteo-api download-cams cams_global --ftpuser xxxxx --ftppassword xxxxx > ~/log/cams_global.log 2>&1 || cat ~/log/cams_global.log
 30 9 * * * /usr/local/bin/openmeteo-api download-cams cams_europe --cdskey xxxxxx-xxxx-xxx... > ~/log/cams_europe.log 2>&1 || cat ~/log/cams_europe.log
+30 9 * * * /usr/local/bin/openmeteo-api download-cams cams_global_greenhouse_gases --cdskey xxxxxx-xxxx-xxx... > ~/log/cams_global_greenhouse_gases.log 2>&1 || cat ~/log/cams_global_greenhouse_gases.log
+
 ```
 
 ## Floods

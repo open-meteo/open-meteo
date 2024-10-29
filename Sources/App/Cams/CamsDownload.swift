@@ -32,6 +32,12 @@ struct DownloadCamsCommand: AsyncCommand {
         
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
+        
+        @Flag(name: "create-netcdf")
+        var createNetcdf: Bool
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
     }
 
     var help: String {
@@ -39,6 +45,8 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        disableIdleSleep()
+        
         let domain = try CamsDomain.load(rawValue: signature.domain)
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
@@ -50,7 +58,7 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let variables = onlyVariables ?? CamsVariable.allCases
         switch domain {
-        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
@@ -89,6 +97,13 @@ struct DownloadCamsCommand: AsyncCommand {
             try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, forecastHours: nil)
             try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
             try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
+        case .cams_global_greenhouse_gases:
+            guard let cdskey = signature.cdskey else {
+                fatalError("cds key is required")
+            }
+            let concurrent = signature.concurrent ?? 1
+            let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true)
         }
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -201,16 +216,17 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     struct CamsEuropeQuery: Encodable {
-        let model = ["ensemble"]
+        let model: [String]?
         let date: String?
-        let type: [String]
+        let type: [String]?
         let data_format: String?
         let variable: [String]
-        let level = ["0"]
+        let level: [String]?
         let time: String?
         let leadtime_hour: [String]?
         let year: [String]?
         let month: [String]?
+        let model_level: [Int]?
     }
     
     /// Download one month of reanalysis data as a zipped NetCDF file
@@ -219,7 +235,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let type: String
         let type2: String
         switch domain {
-        case .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             type = "validated_reanalysis"
             type2 = "vra"
         case .cams_europe_reanalysis_interim:
@@ -245,14 +261,17 @@ struct DownloadCamsCommand: AsyncCommand {
                 continue
             }
             let query = CamsEuropeQuery(
+                model: ["ensemble"],
                 date: nil,
                 type: [type],
                 data_format: nil,
                 variable: [meta.apiName],
+                level: ["0"],
                 time: nil,
                 leadtime_hour: nil,
                 year: [String(date.year)],
-                month: [date.month.zeroPadded(len: 2)]
+                month: [date.month.zeroPadded(len: 2)],
+                model_level: nil
             )
             
             do {
@@ -277,7 +296,7 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let type2: String
         switch domain {
-        case .cams_europe_reanalysis_validated:
+        case .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             type2 = "vra"
         case .cams_europe_reanalysis_interim:
             type2 = "ira"
@@ -333,14 +352,17 @@ struct DownloadCamsCommand: AsyncCommand {
         let forecastHours = forecastHours ?? domain.forecastHours
         let date = run.iso8601_YYYY_MM_dd
         let query = CamsEuropeQuery(
+            model: ["ensemble"],
             date: "\(date)/\(date)",
             type: ["forecast"],
             data_format: "netcdf",
             variable: variables.compactMap { $0.getCamsEuMeta()?.apiName },
+            level: ["0"],
             time: "\(run.hour.zeroPadded(len: 2)):00",
             leadtime_hour: (0..<forecastHours).map(String.init),
             year: nil,
-            month: nil
+            month: nil,
+            model_level: nil
         )
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)

@@ -113,6 +113,7 @@ enum CdsApiError: Error {
     case error(message: String, reason: String)
     case waiting(status: CdsState)
     case restrictedAccessToValidData
+    case invalidCombinationOfValues
 }
 
 enum CdsState: String, Decodable {
@@ -127,6 +128,17 @@ fileprivate struct CdsApiResponse: Decodable {
     let processID: String
     let status: CdsState
     let jobID: String
+}
+
+fileprivate struct CdsApiErrorResponse: Decodable {
+    /// E.g. `invalid request`
+    let type: String
+    
+    /// E.g. `invalid request`
+    let title: String
+    
+    /// E.g. `Request has not produced a valid combination of values, please check your selection.\n{'variable': ['formaldehyde'], 'type': ['validated_reanalysis'], 'level': ['0'], 'month': ['01'], 'year': ['2018'], 'model': ['ensemble']}`
+    let detail: String
 }
 
 fileprivate struct CdsApiResults: Decodable {
@@ -196,6 +208,9 @@ extension Curl {
         request.body = .bytes(ByteBuffer(data: try JSONEncoder().encode(["inputs": query])))
         
         let response = try await client.executeRetry(request, logger: logger, deadline: .hours(6))
+        if response.status.code == 400, let errorJson = try await response.readJSONDecodable(CdsApiErrorResponse.self), errorJson.detail.contains("Request has not produced a valid combination of values") {
+            throw CdsApiError.invalidCombinationOfValues
+        }
         guard let job = try await response.checkCode200AndReadJSONDecodable(CdsApiResponse.self) else {
             let error = try await response.readStringImmutable() ?? ""
             fatalError("Could not decode \(error)")
