@@ -31,10 +31,12 @@ uint64_t divide_rounded_up(const uint64_t dividend, const uint64_t divisor) {
     return (rem == 0) ? dividend / divisor : dividend / divisor + 1;
 }
 
-uint64_t min(const uint64_t a, const uint64_t b) {
+// parentheses are used to avoid macro conflicts on Windows
+// https://stackoverflow.com/questions/13416418/define-nominmax-using-stdmin-max
+uint64_t (min)(const uint64_t a, const uint64_t b) {
     return a < b ? a : b;
 }
-uint64_t max(const uint64_t a, const uint64_t b) {
+uint64_t (max)(const uint64_t a, const uint64_t b) {
     return a > b ? a : b;
 }
 
