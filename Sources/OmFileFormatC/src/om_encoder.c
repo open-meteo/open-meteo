@@ -64,8 +64,6 @@ uint64_t om_encoder_compress_fpxenc64(const void* in, uint64_t count, void* out)
 // Initialize om_file_encoder
 void om_encoder_init(om_encoder_t* encoder, float scalefactor, om_compression_t compression, om_datatype_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) {
     encoder->scalefactor = scalefactor;
-    encoder->datatype = data_type;
-    encoder->compression = compression;
     encoder->dimensions = dimensions;
     encoder->chunks = chunks;
     encoder->dimension_count = dimension_count;

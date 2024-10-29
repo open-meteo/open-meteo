@@ -22,8 +22,6 @@ typedef void(*om_compress_filter_callback)(const size_t length0, const size_t le
 // Encoder struct
 typedef struct {
     float scalefactor;
-    om_compression_t compression;
-    om_datatype_t datatype;
     const uint64_t *dimensions;
     const uint64_t *chunks;
     uint64_t dimension_count;
