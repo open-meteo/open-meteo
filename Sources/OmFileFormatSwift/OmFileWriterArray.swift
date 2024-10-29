@@ -115,15 +115,19 @@ public final class OmFileWriterArray {
             print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
         }*/
         
-        // TODO scope could be an issue for arrays!!
+        
         
         var encoder = om_encoder_t()
         
-        dimensions.withUnsafeBufferPointer({ dimensions in
-            chunkDimensions.withUnsafeBufferPointer({ chunkDimensions in
-                om_encoder_init(&encoder, scalefactor, compression.toC(), datatype.toC(), dimensions.baseAddress, chunkDimensions.baseAddress, UInt64(dimensions.count), UInt64(lutChunkElementCount))
-            })
-        })
+        // TODO Remove alloc. Scope could be an issue for arrays!!!!
+        let ptrDims = UnsafeMutablePointer<UInt64>.allocate(capacity: dimensions.count * 2)
+        let ptrChunks = UnsafeMutablePointer<UInt64>.allocate(capacity: dimensions.count * 2)
+        
+        for i in 0..<dimensions.count {
+            ptrDims[i] = dimensions[i]
+            ptrChunks[i] = chunkDimensions[i]
+        }
+        om_encoder_init(&encoder, scalefactor, compression.toC(), datatype.toC(), ptrDims, ptrChunks, UInt64(dimensions.count), UInt64(lutChunkElementCount))
         self.encoder = encoder
 
         
