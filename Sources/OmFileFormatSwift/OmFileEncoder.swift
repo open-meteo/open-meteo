@@ -73,12 +73,129 @@ public final class OmFileBufferedWriter {
     }
 }
 
+public final class OmFileWriter2 {
+    /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
+    private var chunkOffsetBytes: [UInt64]
+    
+    let encoder: OmFileEncoder
+    
+    /// Position of last chunk that has been written
+    public var chunkIndex: Int = 0
+    
+    /**
+     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
+     
+     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not usefull!
+     
+     Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
+     */
+    public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, scalefactor: Float, lutChunkElementCount: Int = 256) {
+        
+        /*let chunkSizeByte = chunkDimensions.reduce(1, *) * 4
+        if chunkSizeByte > 1024 * 1024 * 4 {
+            print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
+        }*/
+        
+        self.encoder = OmFileEncoder(scalefactor: scalefactor, compression: compression, dims: dimensions, chunks: chunkDimensions, lutChunkElementCount: lutChunkElementCount)
+        let nChunks = self.encoder.number_of_chunks()
+        
+        // +1 to store also the start address
+        self.chunkOffsetBytes = .init(repeating: 0, count: Int(nChunks + 1))
+    }
+    
+    /// Can be all, a single or multiple chunks
+    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>], fn: FileHandle, out: OmFileBufferedWriter) throws {
+        // TODO check dimensions of arrayDimensions and arrayRead
+        
+        let arrayOffset = arrayRead.map({UInt64($0.lowerBound)})
+        let arrayCount = arrayRead.map({UInt64($0.count)})
+        
+        var numberOfChunksInArray = UInt64(1)
+        for i in 0..<encoder.dims.count {
+            numberOfChunksInArray *= UInt64(arrayRead[i].count).divideRoundedUp(divisor: encoder.chunks[i])
+        }
+        
+        let lengthInChunk = encoder.chunks.reduce(1, *)
+        let minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+        
+        /// TODO encoder func to get buffer size
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: minimumBuffer, alignment: 4)
+        defer {
+            chunkBuffer.deallocate()
+        }
+        
+        if chunkIndex == 0 {
+            // Store data start address
+            chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
+        }
+        
+        for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
+            let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
+            let outSize = out.buffer.count - Int(out.writePosition)
+            let writeLength = encoder.writeSingleChunk(array: array, arrayDimensions: arrayDimensions, arrayOffset: arrayOffset, arrayCount: arrayCount, chunkIndex: UInt64(chunkIndex), chunkIndexOffsetInThisArray: chunkIndexOffsetInThisArray, out: outPtr, outSize: outSize, chunkBuffer: chunkBuffer)
+
+            //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
+            out.writePosition += UInt64(writeLength)
+            out.totalBytesWritten += UInt64(writeLength)
+            
+            // Store chunk offset in LUT
+            chunkOffsetBytes[chunkIndex+1] = out.totalBytesWritten
+            chunkIndex += 1
+            
+            // Write buffer to disk if the next chunk may not fit anymore in the output buffer
+            if out.buffer.count - Int(out.writePosition) <= minimumBuffer {
+                try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
+                out.writePosition = 0
+            }
+        }
+    }
+    
+    public func writeLut(out: OmFileBufferedWriter, fn: FileHandle) throws -> UInt64 {
+        let lutChunkLength = writeLut(out: out)
+        try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
+        out.writePosition = 0
+        return lutChunkLength
+    }
+    
+    
+    /// Returns LUT chunk length
+    public func writeLut(out: OmFileBufferedWriter) -> UInt64 {
+        //let lutStart = out.totalBytesWritten
+        //print("LUT start \(lutStart), \(chunkOffsetBytes)")
+        let lutChunkLength = chunkOffsetBytes.withUnsafeBytes({
+            var maxLength = 0
+            
+            // TODO move LUT compressor to encoder
+            
+            /// Calculate maximum chunk size
+            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: encoder.lutChunkElementCount) {
+                let rangeStart = i*encoder.lutChunkElementCount
+                let rangeEnd = min((i+1)*encoder.lutChunkElementCount, chunkOffsetBytes.count)
+                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
+                if len > maxLength { maxLength = len }
+            }
+            /// Write chunks to buffer and pad all chunks to have `maxLength` bytes
+            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: encoder.lutChunkElementCount) {
+                let rangeStart = i*encoder.lutChunkElementCount
+                let rangeEnd = min((i+1)*encoder.lutChunkElementCount, chunkOffsetBytes.count)
+                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
+                out.writePosition += UInt64(maxLength)
+                out.totalBytesWritten += UInt64(maxLength)
+            }
+            //print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount))
+            return UInt64(maxLength)
+        })
+        return lutChunkLength
+    }
+    
+}
+
 
 /// Encodes a single variable to an OpenMeteo file
 /// Mutliple variables may be encoded in the single file
 ///
 /// This file currenly allocates a chunk buffer and LUT table. This might change if this is moved to C
-final class OmFileEncoder {
+struct OmFileEncoder {
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
     
@@ -91,14 +208,8 @@ final class OmFileEncoder {
     /// How the dimensions are chunked
     let chunks: [UInt64]
     
-    /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
-    private var chunkOffsetBytes: [UInt64]
-    
     /// Buffer where chunks are moved to, before compression them. => input for compression call
-    private var chunkBuffer: UnsafeMutableRawBufferPointer
-    
-    /// Position of last chunk that has been written
-    public var chunkIndex: Int = 0
+    //private var chunkBuffer: UnsafeMutableRawBufferPointer
 
     /// This might be hard coded to 256 in later versions
     let lutChunkElementCount: Int
@@ -126,120 +237,12 @@ final class OmFileEncoder {
         return max(4096, max(lutBufferSize, bufferSize))
     }
     
-    /**
-     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
-     
-     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not usefull!
-     
-     Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
-     */
-    public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, scalefactor: Float, lutChunkElementCount: Int = 256) {
-        var nChunks = UInt64(1)
-        for i in 0..<dimensions.count {
-            nChunks *= dimensions[i].divideRoundedUp(divisor: chunkDimensions[i])
-        }
-        
-        let chunkSizeByte = chunkDimensions.reduce(1, *) * 4
-        if chunkSizeByte > 1024 * 1024 * 4 {
-            print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
-        }
-        // +1 to store also the start address
-        self.chunkOffsetBytes = .init(repeating: 0, count: Int(nChunks + 1))
-        self.dims = dimensions
-        self.chunks = chunkDimensions
-        self.scalefactor = scalefactor
-        self.compression = compression
-        
-        let bufferSize = P4NENC256_BOUND(n: Int(chunkDimensions.reduce(1, *)), bytesPerElement: 4)
-        
-        // Read buffer needs to be a bit larger for AVX 256 bit alignment
-        self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: bufferSize, alignment: 4)
-        self.lutChunkElementCount = lutChunkElementCount
-    }
-    
-
-    /// Can be all, a single or multiple chunks
-    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>], fn: FileHandle, out: OmFileBufferedWriter) throws {
-        // TODO check dimensions of arrayDimensions and arrayRead
-        
-        let arrayOffset = arrayRead.map({UInt64($0.lowerBound)})
-        let arrayCount = arrayRead.map({UInt64($0.count)})
-        
-        var numberOfChunksInArray = UInt64(1)
-        for i in 0..<dims.count {
-            numberOfChunksInArray *= UInt64(arrayRead[i].count).divideRoundedUp(divisor: chunks[i])
-        }
-        
-        let lengthInChunk = chunks.reduce(1, *)
-        let minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
-        
-        if chunkIndex == 0 {
-            // Store data start address
-            chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
-        }
-        
-        for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
-            let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
-            let outSize = out.buffer.count - Int(out.writePosition)
-            let writeLength = writeSingleChunk(array: array, arrayDimensions: arrayDimensions, arrayOffset: arrayOffset, arrayCount: arrayCount, chunkIndex: UInt64(chunkIndex), chunkIndexOffsetInThisArray: chunkIndexOffsetInThisArray, out: outPtr, outSize: outSize)
-
-            //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
-            out.writePosition += UInt64(writeLength)
-            out.totalBytesWritten += UInt64(writeLength)
-            
-            // Store chunk offset in LUT
-            chunkOffsetBytes[chunkIndex+1] = out.totalBytesWritten
-            chunkIndex += 1
-            
-            // Write buffer to disk if the next chunk may not fit anymore in the output buffer
-            if out.buffer.count - Int(out.writePosition) <= minimumBuffer {
-                try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
-                out.writePosition = 0
-            }
-        }
-    }
-    
-    public func writeLut(out: OmFileBufferedWriter, fn: FileHandle) throws -> UInt64 {
-        let lutChunkLength = writeLut(out: out)
-        try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
-        out.writePosition = 0
-        return lutChunkLength
-    }
-    
-    /// Returns LUT chunk length
-    public func writeLut(out: OmFileBufferedWriter) -> UInt64 {
-        //let lutStart = out.totalBytesWritten
-        //print("LUT start \(lutStart), \(chunkOffsetBytes)")
-        let lutChunkLength = chunkOffsetBytes.withUnsafeBytes({
-            var maxLength = 0
-            
-            /// Calculate maximum chunk size
-            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount) {
-                let rangeStart = i*lutChunkElementCount
-                let rangeEnd = min((i+1)*lutChunkElementCount, chunkOffsetBytes.count)
-                let len = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
-                if len > maxLength { maxLength = len }
-            }
-            /// Write chunks to buffer and pad all chunks to have `maxLength` bytes
-            for i in 0..<chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount) {
-                let rangeStart = i*lutChunkElementCount
-                let rangeEnd = min((i+1)*lutChunkElementCount, chunkOffsetBytes.count)
-                _ = p4ndenc64(UnsafeMutablePointer(mutating: $0.baseAddress?.advanced(by: rangeStart*8).assumingMemoryBound(to: UInt64.self)), rangeEnd-rangeStart, out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
-                out.writePosition += UInt64(maxLength)
-                out.totalBytesWritten += UInt64(maxLength)
-            }
-            //print("Index size", $0.count, " bytes compressed to ", maxLength*chunkOffsetBytes.count.divideRoundedUp(divisor: lutChunkElementCount))
-            return UInt64(maxLength)
-        })
-        return lutChunkLength
-    }
-    
     
     /// Write a single chunk
     /// `chunkIndex` is the chunk numer of the global array
     /// `chunkIndexInThisArray` is the chunk index offset, if the current array contains more than one chunk
     /// Return the number of compressed bytes into out
-    @inlinable public func writeSingleChunk(array: [Float], arrayDimensions: [UInt64], arrayOffset: [UInt64], arrayCount: [UInt64], chunkIndex: UInt64, chunkIndexOffsetInThisArray: UInt64, out: UnsafeMutablePointer<UInt8>, outSize: Int) -> Int {
+    @inlinable public func writeSingleChunk(array: [Float], arrayDimensions: [UInt64], arrayOffset: [UInt64], arrayCount: [UInt64], chunkIndex: UInt64, chunkIndexOffsetInThisArray: UInt64, out: UnsafeMutablePointer<UInt8>, outSize: Int, chunkBuffer: UnsafeMutableRawBufferPointer) -> Int {
         
         // Calculate number of elements in this chunk
         var rollingMultiplty = UInt64(1)
@@ -304,7 +307,7 @@ final class OmFileEncoder {
         //print("compress chunk \(chunkIndex) lengthInChunk \(lengthInChunk)")
         
         // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
-        loopBuffer: while true {
+        while true {
             //print("q=\(q) d=\(d), count=\(linearReadCount)")
             //linearReadCount = 1
             
@@ -382,33 +385,26 @@ final class OmFileEncoder {
                 rollingMultiplyTargetCube *= arrayDimensions[i]
                 if i == 0 {
                     // All values have been loaded into chunk buffer. Proceed to compression
-                    break loopBuffer
+                    // 2D coding and compression
+                    let writeLength: Int
+                    let minimumBuffer: Int
+                    switch compression {
+                    case .p4nzdec256, .p4nzdec256logarithmic:
+                        minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+                        assert(outSize >= minimumBuffer)
+                        /// TODO check delta encoding if done correctly
+                        delta2d_encode(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
+                        writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, Int(lengthInChunk), out)
+                    case .fpxdec32:
+                        minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+                        assert(outSize >= minimumBuffer)
+                        delta2d_encode_xor(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
+                        writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, Int(lengthInChunk), out, 0)
+                    }
+                    return writeLength
                 }
             }
         }
-        
-        // 2D coding and compression
-        let writeLength: Int
-        let minimumBuffer: Int
-        switch compression {
-        case .p4nzdec256, .p4nzdec256logarithmic:
-            minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
-            assert(outSize >= minimumBuffer)
-            /// TODO check delta encoding if done correctly
-            delta2d_encode(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
-            writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, Int(lengthInChunk), out)
-        case .fpxdec32:
-            minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
-            assert(outSize >= minimumBuffer)
-            delta2d_encode_xor(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
-            writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, Int(lengthInChunk), out, 0)
-        }
-        
-        return writeLength
-    }
-    
-    deinit {
-        chunkBuffer.deallocate()
     }
 }
 
