@@ -162,16 +162,40 @@ final class OmFileEncoder {
     public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>], fn: FileHandle, out: OmFileBufferedWriter) throws {
         // TODO check dimensions of arrayDimensions and arrayRead
         
+        let arrayOffset = arrayRead.map({UInt64($0.lowerBound)})
+        let arrayCount = arrayRead.map({UInt64($0.count)})
+        
         var numberOfChunksInArray = UInt64(1)
         for i in 0..<dims.count {
             numberOfChunksInArray *= UInt64(arrayRead[i].count).divideRoundedUp(divisor: chunks[i])
         }
         
-        var q: UInt64? = 0
-        while let qIn = q {
-            q = writeNextChunks(array: array, arrayDimensions: arrayDimensions, arrayOffset: arrayRead.map({UInt64($0.lowerBound)}), arrayCount: arrayRead.map({UInt64($0.count)}), cOffset: qIn, numberOfChunksInArray: numberOfChunksInArray, out: out)
-            try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
-            out.writePosition = 0
+        let lengthInChunk = chunks.reduce(1, *)
+        let minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+        
+        if chunkIndex == 0 {
+            // Store data start address
+            chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
+        }
+        
+        for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
+            let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
+            let outSize = out.buffer.count - Int(out.writePosition)
+            let writeLength = writeSingleChunk(array: array, arrayDimensions: arrayDimensions, arrayOffset: arrayOffset, arrayCount: arrayCount, chunkIndex: UInt64(chunkIndex), chunkIndexOffsetInThisArray: chunkIndexOffsetInThisArray, out: outPtr, outSize: outSize)
+
+            //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
+            out.writePosition += UInt64(writeLength)
+            out.totalBytesWritten += UInt64(writeLength)
+            
+            // Store chunk offset in LUT
+            chunkOffsetBytes[chunkIndex+1] = out.totalBytesWritten
+            chunkIndex += 1
+            
+            // Write buffer to disk if the next chunk may not fit anymore in the output buffer
+            if out.buffer.count - Int(out.writePosition) <= minimumBuffer {
+                try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
+                out.writePosition = 0
+            }
         }
     }
     
@@ -210,55 +234,132 @@ final class OmFileEncoder {
         return lutChunkLength
     }
     
-    /// Data must be exactly of the size of the next chunk or chunks!
-    /// Return true if all inpupt data base been processed
-    ///
-    /// `cOffset=0` if chunks are feed one by one
-    /// Otherwise `cOffset` is incremented while looping over a large array
-    public func writeNextChunks(array: [Float], arrayDimensions: [UInt64], arrayOffset: [UInt64], arrayCount: [UInt64], cOffset: UInt64, numberOfChunksInArray: UInt64, out: OmFileBufferedWriter) -> UInt64? {
-        assert(array.count == arrayDimensions.reduce(1, *))
+    
+    /// Write a single chunk
+    /// `chunkIndex` is the chunk numer of the global array
+    /// `chunkIndexInThisArray` is the chunk index offset, if the current array contains more than one chunk
+    /// Return the number of compressed bytes into out
+    @inlinable public func writeSingleChunk(array: [Float], arrayDimensions: [UInt64], arrayOffset: [UInt64], arrayCount: [UInt64], chunkIndex: UInt64, chunkIndexOffsetInThisArray: UInt64, out: UnsafeMutablePointer<UInt8>, outSize: Int) -> Int {
         
-        var cOffset = cOffset
+        // Calculate number of elements in this chunk
+        var rollingMultiplty = UInt64(1)
+        var rollingMultiplyChunkLength = UInt64(1)
+        var rollingMultiplyTargetCube = UInt64(1)
         
-        while true {
-            // Calculate number of elements in this chunk
-            var rollingMultiplty = UInt64(1)
-            var rollingMultiplyChunkLength = UInt64(1)
-            var rollingMultiplyTargetCube = UInt64(1)
+        /// Read coordinate from input array
+        var readCoordinate = Int(0)
+        
+        /// Position to write to in the chunk buffer
+        var writeCoordinate = Int(0)
+        
+        /// Copy multiple elements from the decoded chunk into the output buffer. For long time-series this drastically improves copy performance.
+        var linearReadCount = UInt64(1)
+        
+        /// Internal state to keep track if everything is kept linear
+        var linearRead = true
+        
+        /// Used for 2d delta coding
+        var lengthLast = UInt64(0)
+        
+        /// Count length in chunk and find first buffer offset position
+        for i in (0..<dims.count).reversed() {
+            let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+            let c0 = (UInt64(chunkIndex) / rollingMultiplty) % nChunksInThisDimension
+            let c0Offset = (chunkIndexOffsetInThisArray / rollingMultiplty) % nChunksInThisDimension
+            let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
+            //let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
+            //let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
+            //let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
             
-            /// Read coordinate from input array
-            var readCoordinate = Int(0)
-            
-            /// Position to write to in the chunk buffer
-            var writeCoordinate = Int(0)
-            
-            /// Copy multiple elements from the decoded chunk into the output buffer. For long time-series this drastically improves copy performance.
-            var linearReadCount = UInt64(1)
-            
-            /// Internal state to keep track if everything is kept linear
-            var linearRead = true
-            
-            /// Used for 2d delta coding
-            var lengthLast = UInt64(0)
-            
-            /// Count length in chunk and find first buffer offset position
-            for i in (0..<dims.count).reversed() {
-                let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
-                let c0 = (UInt64(chunkIndex) / rollingMultiplty) % nChunksInThisDimension
-                let c0Offset = (cOffset / rollingMultiplty) % nChunksInThisDimension
-                let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
-                //let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
-                //let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
-                //let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
-                
-                if i == dims.count-1 {
-                    lengthLast = length0
-                }
+            if i == dims.count-1 {
+                lengthLast = length0
+            }
 
-                readCoordinate = readCoordinate + Int(rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayOffset[i]))
-                //print("i", i, "arrayRead[i].count", arrayRead[i].count, "length0", length0, "arrayDimensions[i]", arrayDimensions[i])
-                assert(length0 <= arrayCount[i])
-                assert(length0 <= arrayDimensions[i])
+            readCoordinate = readCoordinate + Int(rollingMultiplyTargetCube * (c0Offset * chunks[i] + arrayOffset[i]))
+            //print("i", i, "arrayRead[i].count", arrayRead[i].count, "length0", length0, "arrayDimensions[i]", arrayDimensions[i])
+            assert(length0 <= arrayCount[i])
+            assert(length0 <= arrayDimensions[i])
+            if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
+                // if fast dimension and only partially read
+                linearReadCount = length0
+                linearRead = false
+            }
+            if linearRead && arrayCount[i] == length0 && arrayDimensions[i] == length0 {
+                // dimension is read entirely
+                // and can be copied linearly into the output buffer
+                linearReadCount *= length0
+            } else {
+                // dimension is read partly, cannot merge further reads
+                linearRead = false
+            }
+       
+            rollingMultiplty *= nChunksInThisDimension
+            rollingMultiplyTargetCube *= arrayDimensions[i]
+            rollingMultiplyChunkLength *= length0
+        }
+        
+        /// How many elements are in this chunk
+        let lengthInChunk = rollingMultiplyChunkLength
+        
+        //print("compress chunk \(chunkIndex) lengthInChunk \(lengthInChunk)")
+        
+        // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
+        loopBuffer: while true {
+            //print("q=\(q) d=\(d), count=\(linearReadCount)")
+            //linearReadCount = 1
+            
+            switch compression {
+            case .p4nzdec256:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                for i in 0..<Int(linearReadCount) {
+                    assert(readCoordinate+i < array.count)
+                    assert(writeCoordinate+i < lengthInChunk)
+                    let val = array[readCoordinate+i]
+                    if val.isNaN {
+                        // Int16.min is not representable because of zigzag coding
+                        chunkBuffer[writeCoordinate+i] = Int16.max
+                    }
+                    let scaled = val * scalefactor
+                    chunkBuffer[writeCoordinate+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                }
+            case .fpxdec32:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
+                for i in 0..<Int(linearReadCount) {
+                    assert(readCoordinate+i < array.count)
+                    assert(writeCoordinate+i < lengthInChunk)
+                    chunkBuffer[writeCoordinate+i] = array[readCoordinate+i]
+                }
+            case .p4nzdec256logarithmic:
+                let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
+                for i in 0..<Int(linearReadCount) {
+                    assert(readCoordinate+i < array.count)
+                    assert(writeCoordinate+i < lengthInChunk)
+                    let val = array[readCoordinate+i]
+                    if val.isNaN {
+                        // Int16.min is not representable because of zigzag coding
+                        chunkBuffer[writeCoordinate+i] = Int16.max
+                    }
+                    let scaled = log10(1+val) * scalefactor
+                    chunkBuffer[writeCoordinate+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
+                }
+            }
+            
+
+            readCoordinate += Int(linearReadCount)-1
+            writeCoordinate += Int(linearReadCount)-1
+            writeCoordinate += 1
+            
+            // Move `q` to next position
+            rollingMultiplyTargetCube = 1
+            linearRead = true
+            linearReadCount = 1
+            for i in (0..<dims.count).reversed() {
+                let qPos = ((UInt64(readCoordinate) / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunks[i]
+                let length0 = min((qPos+1) * chunks[i], arrayCount[i]) - qPos * chunks[i]
+                
+                /// More forward
+                readCoordinate += Int(rollingMultiplyTargetCube)
+                
                 if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
                     // if fast dimension and only partially read
                     linearReadCount = length0
@@ -272,143 +373,38 @@ final class OmFileEncoder {
                     // dimension is read partly, cannot merge further reads
                     linearRead = false
                 }
-           
-                rollingMultiplty *= nChunksInThisDimension
+                let q0 = ((UInt64(readCoordinate) / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % chunks[i]
+                if q0 != 0 && q0 != length0 {
+                    break // no overflow in this dimension, break
+                }
+                readCoordinate -= Int(length0 * rollingMultiplyTargetCube)
+                
                 rollingMultiplyTargetCube *= arrayDimensions[i]
-                rollingMultiplyChunkLength *= length0
-            }
-            
-            /// How many elements are in this chunk
-            let lengthInChunk = rollingMultiplyChunkLength
-            
-            //print("compress chunk \(chunkIndex) lengthInChunk \(lengthInChunk)")
-            
-            // loop over elements to read and move to target buffer. Apply scalefactor and convert UInt16
-            loopBuffer: while true {
-                //print("q=\(q) d=\(d), count=\(linearReadCount)")
-                //linearReadCount = 1
-                
-                switch compression {
-                case .p4nzdec256:
-                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
-                    for i in 0..<Int(linearReadCount) {
-                        assert(readCoordinate+i < array.count)
-                        assert(writeCoordinate+i < lengthInChunk)
-                        let val = array[readCoordinate+i]
-                        if val.isNaN {
-                            // Int16.min is not representable because of zigzag coding
-                            chunkBuffer[writeCoordinate+i] = Int16.max
-                        }
-                        let scaled = val * scalefactor
-                        chunkBuffer[writeCoordinate+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
-                    }
-                case .fpxdec32:
-                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Float.self)
-                    for i in 0..<Int(linearReadCount) {
-                        assert(readCoordinate+i < array.count)
-                        assert(writeCoordinate+i < lengthInChunk)
-                        chunkBuffer[writeCoordinate+i] = array[readCoordinate+i]
-                    }
-                case .p4nzdec256logarithmic:
-                    let chunkBuffer = chunkBuffer.assumingMemoryBound(to: Int16.self)
-                    for i in 0..<Int(linearReadCount) {
-                        assert(readCoordinate+i < array.count)
-                        assert(writeCoordinate+i < lengthInChunk)
-                        let val = array[readCoordinate+i]
-                        if val.isNaN {
-                            // Int16.min is not representable because of zigzag coding
-                            chunkBuffer[writeCoordinate+i] = Int16.max
-                        }
-                        let scaled = log10(1+val) * scalefactor
-                        chunkBuffer[writeCoordinate+i] = Int16(max(Float(Int16.min), min(Float(Int16.max), round(scaled))))
-                    }
+                if i == 0 {
+                    // All values have been loaded into chunk buffer. Proceed to compression
+                    break loopBuffer
                 }
-                
-
-                readCoordinate += Int(linearReadCount)-1
-                writeCoordinate += Int(linearReadCount)-1
-                writeCoordinate += 1
-                
-                // Move `q` to next position
-                rollingMultiplyTargetCube = 1
-                linearRead = true
-                linearReadCount = 1
-                for i in (0..<dims.count).reversed() {
-                    let qPos = ((UInt64(readCoordinate) / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunks[i]
-                    let length0 = min((qPos+1) * chunks[i], arrayCount[i]) - qPos * chunks[i]
-                    
-                    /// More forward
-                    readCoordinate += Int(rollingMultiplyTargetCube)
-                    
-                    if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
-                        // if fast dimension and only partially read
-                        linearReadCount = length0
-                        linearRead = false
-                    }
-                    if linearRead && arrayCount[i] == length0 && arrayDimensions[i] == length0 {
-                        // dimension is read entirely
-                        // and can be copied linearly into the output buffer
-                        linearReadCount *= length0
-                    } else {
-                        // dimension is read partly, cannot merge further reads
-                        linearRead = false
-                    }
-                    let q0 = ((UInt64(readCoordinate) / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % chunks[i]
-                    if q0 != 0 && q0 != length0 {
-                        break // no overflow in this dimension, break
-                    }
-                    readCoordinate -= Int(length0 * rollingMultiplyTargetCube)
-                    
-                    rollingMultiplyTargetCube *= arrayDimensions[i]
-                    if i == 0 {
-                        // All chunks have been read. End of iteration
-                        break loopBuffer
-                    }
-                }
-            }
-            
-            // 2D coding and compression
-            let writeLength: Int
-            let minimumBuffer: Int
-            switch compression {
-            case .p4nzdec256, .p4nzdec256logarithmic:
-                minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
-                assert(out.buffer.count - Int(out.writePosition) >= minimumBuffer)
-                /// TODO check delta encoding if done correctly
-                delta2d_encode(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
-                writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, Int(lengthInChunk), out.buffer.baseAddress!.advanced(by: Int(out.writePosition)))
-            case .fpxdec32:
-                minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
-                assert(out.buffer.count - Int(out.writePosition) >= minimumBuffer)
-                delta2d_encode_xor(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
-                writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, Int(lengthInChunk), out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), 0)
-            }
-            
-            if chunkIndex == 0 {
-                // Store data start address
-                chunkOffsetBytes[chunkIndex] = out.totalBytesWritten
-            }
-
-            //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
-            out.writePosition += UInt64(writeLength)
-            out.totalBytesWritten += UInt64(writeLength)
-            
-            
-            // Store chunk offset in LUT
-            chunkOffsetBytes[chunkIndex+1] = out.totalBytesWritten
-            chunkIndex += 1
-            cOffset += 1
-            
-            //print("cOffset", cOffset, "number_of_chunks_in_array", number_of_chunks_in_array)
-            if cOffset == numberOfChunksInArray {
-                return nil
-            }
-            
-            // Return to caller if the next chunk would not fit into the buffer
-            if out.buffer.count - Int(out.writePosition) <= minimumBuffer {
-                return cOffset
             }
         }
+        
+        // 2D coding and compression
+        let writeLength: Int
+        let minimumBuffer: Int
+        switch compression {
+        case .p4nzdec256, .p4nzdec256logarithmic:
+            minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+            assert(outSize >= minimumBuffer)
+            /// TODO check delta encoding if done correctly
+            delta2d_encode(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Int16.self).baseAddress)
+            writeLength = p4nzenc128v16(chunkBuffer.assumingMemoryBound(to: UInt16.self).baseAddress!, Int(lengthInChunk), out)
+        case .fpxdec32:
+            minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+            assert(outSize >= minimumBuffer)
+            delta2d_encode_xor(Int(lengthInChunk / lengthLast), Int(lengthLast), chunkBuffer.assumingMemoryBound(to: Float.self).baseAddress)
+            writeLength = fpxenc32(chunkBuffer.assumingMemoryBound(to: UInt32.self).baseAddress!, Int(lengthInChunk), out, 0)
+        }
+        
+        return writeLength
     }
     
     deinit {

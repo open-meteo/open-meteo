@@ -26,6 +26,7 @@
 #ifdef GUARDED
 
 #pragma clang diagnostic ignored "-Wmacro-redefined"
+#pragma clang diagnostic ignored "-Wshorten-64-to-32"
 
 #include <string.h> // for memcp
 #define BITUTIL_IN
