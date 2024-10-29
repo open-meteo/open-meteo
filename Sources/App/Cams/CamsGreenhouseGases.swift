@@ -18,7 +18,7 @@
      "data_format": "grib"
  */
 import Vapor
-import SwiftPFor2D
+import OmFileFormatSwift
 
 extension DownloadCamsCommand {
     /**
