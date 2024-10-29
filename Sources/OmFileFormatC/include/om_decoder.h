@@ -72,8 +72,7 @@
 #ifndef OM_DECODER_H
 #define OM_DECODER_H
 
-#include <stdint.h>
-#include <stdbool.h>
+#include "om_common.h"
 
 typedef struct {
     uint64_t lowerBound;
@@ -90,25 +89,7 @@ typedef struct {
 
 typedef om_decoder_index_read_t om_decoder_data_read_t;
 
-typedef enum {
-    DATA_TYPE_INT8 = 0,
-    DATA_TYPE_UINT8 = 1,
-    DATA_TYPE_INT16 = 2,
-    DATA_TYPE_UINT16 = 3,
-    DATA_TYPE_INT32 = 4,
-    DATA_TYPE_UINT32 = 5,
-    DATA_TYPE_INT64 = 6,
-    DATA_TYPE_UINT64 = 7,
-    DATA_TYPE_FLOAT = 8,
-    DATA_TYPE_DOUBLE = 9
-} om_datatype_t;
 
-// Define an enum for the compression types.
-typedef enum {
-    COMPRESSION_P4NZDEC256 = 0,          // Lossy compression using 2D delta coding and scalefactor. Only supports float and scales to 16-bit integer.
-    COMPRESSION_FPXDEC32 = 1,            // Lossless compression using 2D xor coding.
-    COMPRESSION_P4NZDEC256_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
-} om_compression_t;
 
 /// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
 typedef void(*om_decompress_copy_callback)(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into);

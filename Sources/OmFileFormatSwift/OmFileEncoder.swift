@@ -7,7 +7,7 @@ import Foundation
 /// Mutliple variables may be encoded in the single file
 ///
 /// This file currenly allocates a chunk buffer and LUT table. This might change if this is moved to C
-struct OmFileEncoder {
+/*struct OmFileEncoder {
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
     
@@ -270,4 +270,4 @@ struct OmFileEncoder {
         }
     }
 }
-
+*/

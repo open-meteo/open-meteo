@@ -13,8 +13,6 @@
 #include "delta2d.h"
 #include "om_decoder.h"
 
-#define MAX_LUT_ELEMENTS 256
-
 // Initialization function for ChunkDataReadInstruction
 void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decoder_index_read_t *index_read) {
     data_read->offset = 0;
@@ -23,21 +21,6 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
     data_read->chunkIndex.lowerBound = 0;
     data_read->chunkIndex.upperBound = 0;
     data_read->nextChunk = index_read->chunkIndex;
-}
-
-// Function to divide and round up
-uint64_t divide_rounded_up(const uint64_t dividend, const uint64_t divisor) {
-    uint64_t rem = dividend % divisor;
-    return (rem == 0) ? dividend / divisor : dividend / divisor + 1;
-}
-
-// parentheses are used to avoid macro conflicts on Windows
-// https://stackoverflow.com/questions/13416418/define-nominmax-using-stdmin-max
-uint64_t (min)(const uint64_t a, const uint64_t b) {
-    return a < b ? a : b;
-}
-uint64_t (max)(const uint64_t a, const uint64_t b) {
-    return a > b ? a : b;
 }
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float

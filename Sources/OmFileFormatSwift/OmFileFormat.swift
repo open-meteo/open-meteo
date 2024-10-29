@@ -47,6 +47,11 @@ public enum DataType: UInt8, Codable {
             return 8
         }
     }
+    
+    
+    func toC() -> OmFileFormatC.om_datatype_t {
+        return OmFileFormatC.om_datatype_t(rawValue: UInt32(self.rawValue))
+    }
 }
 
 public enum CompressionType: UInt8, Codable {
