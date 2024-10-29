@@ -134,10 +134,9 @@ public final class OmFileWriter2 {
         }
         
         let lengthInChunk = encoder.chunks.reduce(1, *)
-        let minimumBuffer = P4NENC256_BOUND(n: Int(lengthInChunk), bytesPerElement: 4)
+        let minimumBuffer = Int(encoder.minimum_chunk_write_buffer())
         
-        /// TODO encoder func to get buffer size
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: minimumBuffer, alignment: 4)
+        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(encoder.chunk_buffer_size()), alignment: 1)
         defer {
             chunkBuffer.deallocate()
         }
@@ -219,6 +218,14 @@ struct OmFileEncoder {
             n *= dims[i].divideRoundedUp(divisor: chunks[i])
         }
         return n
+    }
+    
+    func chunk_buffer_size() -> UInt64 {
+        return UInt64(P4NENC256_BOUND(n: Int(chunks.reduce(1, *)), bytesPerElement: compression.bytesPerElement))
+    }
+    
+    func minimum_chunk_write_buffer() -> UInt64 {
+        return UInt64(P4NENC256_BOUND(n: Int(number_of_chunks()), bytesPerElement: compression.bytesPerElement))
     }
     
     /// Calculate the size of the output buffer.
