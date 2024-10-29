@@ -15,7 +15,7 @@ struct OmFileEncoder {
     public let compression: CompressionType
     
     /// The dimensions of the file
-    let dims: [UInt64]
+    let dimensions: [UInt64]
     
     /// How the dimensions are chunked
     let chunks: [UInt64]
@@ -26,8 +26,8 @@ struct OmFileEncoder {
     /// Return the total number of chunks in this file
     func number_of_chunks() -> UInt64 {
         var n = UInt64(1)
-        for i in 0..<dims.count {
-            n *= dims[i].divideRoundedUp(divisor: chunks[i])
+        for i in 0..<dimensions.count {
+            n *= dimensions[i].divideRoundedUp(divisor: chunks[i])
         }
         return n
     }
@@ -45,8 +45,8 @@ struct OmFileEncoder {
         let bufferSize = UInt64(P4NENC256_BOUND(n: Int(chunks.reduce(1, *)), bytesPerElement: compression.bytesPerElement))
         
         var nChunks = UInt64(1)
-        for i in 0..<dims.count {
-            nChunks *= dims[i].divideRoundedUp(divisor: chunks[i])
+        for i in 0..<dimensions.count {
+            nChunks *= dimensions[i].divideRoundedUp(divisor: chunks[i])
         }
         /// Assume the lut buffer is not compressible
         let lutBufferSize = nChunks * 8
@@ -56,7 +56,7 @@ struct OmFileEncoder {
     
     func number_of_chunks_in_array(arrayCount: [UInt64]) -> UInt64 {
         var numberOfChunksInArray = UInt64(1)
-        for i in 0..<dims.count {
+        for i in 0..<dimensions.count {
             numberOfChunksInArray *= arrayCount[i].divideRoundedUp(divisor: chunks[i])
         }
         return numberOfChunksInArray
@@ -128,16 +128,16 @@ struct OmFileEncoder {
         var lengthLast = UInt64(0)
         
         /// Count length in chunk and find first buffer offset position
-        for i in (0..<dims.count).reversed() {
-            let nChunksInThisDimension = dims[i].divideRoundedUp(divisor: chunks[i])
+        for i in (0..<dimensions.count).reversed() {
+            let nChunksInThisDimension = dimensions[i].divideRoundedUp(divisor: chunks[i])
             let c0 = (UInt64(chunkIndex) / rollingMultiplty) % nChunksInThisDimension
             let c0Offset = (chunkIndexOffsetInThisArray / rollingMultiplty) % nChunksInThisDimension
-            let length0 = min((c0+1) * chunks[i], dims[i]) - c0 * chunks[i]
+            let length0 = min((c0+1) * chunks[i], dimensions[i]) - c0 * chunks[i]
             //let chunkGlobal0 = c0 * chunks[i] ..< c0 * chunks[i] + length0
             //let clampedGlobal0 = chunkGlobal0//.clamped(to: dimRead[i])
             //let clampedLocal0 = clampedGlobal0.substract(c0 * chunks[i])
             
-            if i == dims.count-1 {
+            if i == dimensions.count-1 {
                 lengthLast = length0
             }
 
@@ -145,7 +145,7 @@ struct OmFileEncoder {
             //print("i", i, "arrayRead[i].count", arrayRead[i].count, "length0", length0, "arrayDimensions[i]", arrayDimensions[i])
             assert(length0 <= arrayCount[i])
             assert(length0 <= arrayDimensions[i])
-            if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
+            if i == dimensions.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
                 // if fast dimension and only partially read
                 linearReadCount = length0
                 linearRead = false
@@ -219,14 +219,14 @@ struct OmFileEncoder {
             rollingMultiplyTargetCube = 1
             linearRead = true
             linearReadCount = 1
-            for i in (0..<dims.count).reversed() {
+            for i in (0..<dimensions.count).reversed() {
                 let qPos = ((UInt64(readCoordinate) / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunks[i]
                 let length0 = min((qPos+1) * chunks[i], arrayCount[i]) - qPos * chunks[i]
                 
                 /// More forward
                 readCoordinate += Int(rollingMultiplyTargetCube)
                 
-                if i == dims.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
+                if i == dimensions.count-1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0) {
                     // if fast dimension and only partially read
                     linearReadCount = length0
                     linearRead = false

@@ -81,7 +81,7 @@ final class OmFileFormatTests: XCTestCase {
         let lutSize = try writer.writeLut(out: buffer, fn: fn)
         let jsonVariable = OmFileJSONVariable(
             name: nil,
-            dimensions: writer.dims,
+            dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
@@ -127,7 +127,7 @@ final class OmFileFormatTests: XCTestCase {
         let lutSize = try writer.writeLut(out: buffer, fn: fn)
         let jsonVariable = OmFileJSONVariable(
             name: nil,
-            dimensions: writer.dims,
+            dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
@@ -163,7 +163,7 @@ final class OmFileFormatTests: XCTestCase {
         let lutSize = try writer.writeLut(out: buffer, fn: fn)
         let jsonVariable = OmFileJSONVariable(
             name: nil,
-            dimensions: writer.dims,
+            dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
@@ -197,7 +197,7 @@ final class OmFileFormatTests: XCTestCase {
         let lutSize = try writer.writeLut(out: buffer, fn: fn)
         let jsonVariable = OmFileJSONVariable(
             name: nil,
-            dimensions: writer.dims,
+            dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
@@ -242,7 +242,7 @@ final class OmFileFormatTests: XCTestCase {
         let lutSize = try writer.writeLut(out: buffer, fn: fn)
         let jsonVariable = OmFileJSONVariable(
             name: nil,
-            dimensions: writer.dims,
+            dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,
@@ -341,7 +341,7 @@ final class OmFileFormatTests: XCTestCase {
         let lutSize = try writer.writeLut(out: buffer, fn: fn)
         let jsonVariable = OmFileJSONVariable(
             name: nil,
-            dimensions: writer.dims,
+            dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimensionNames: nil,
             scalefactor: writer.scalefactor,

@@ -95,7 +95,7 @@ public final class OmFileWriterArray {
     public let datatype: DataType
     
     /// The dimensions of the file
-    let dims: [UInt64]
+    let dimensions: [UInt64]
     
     /// How the dimensions are chunked
     let chunks: [UInt64]
@@ -114,13 +114,13 @@ public final class OmFileWriterArray {
             print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
         }*/
         
-        self.encoder = OmFileEncoder(scalefactor: scalefactor, compression: compression, dims: dimensions, chunks: chunkDimensions, lutChunkElementCount: lutChunkElementCount)
+        self.encoder = OmFileEncoder(scalefactor: scalefactor, compression: compression, dimensions: dimensions, chunks: chunkDimensions, lutChunkElementCount: lutChunkElementCount)
         let nChunks = self.encoder.number_of_chunks()
         
         // +1 to store also the start address
         self.lookUpTable = .init(repeating: 0, count: Int(nChunks + 1))
         self.chunks = chunkDimensions
-        self.dims = dimensions
+        self.dimensions = dimensions
         self.compression = compression
         self.datatype = datatype
         self.scalefactor = scalefactor
