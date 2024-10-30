@@ -23,12 +23,17 @@ extension OmFileReaderBackend {
                 var dataRead = om_decoder_data_read_t()
                 om_decoder_data_read_init(&dataRead, &indexRead)
                 
+                var error: om_error_t = ERROR_OK
                 /// Loop over data blocks and read compressed data chunks
-                while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count) {
+                while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count, &error) {
                     //print("read data \(dataRead)")
                     let dataData = ptr.baseAddress!.advanced(by: dataRead.offset)
-                    
-                    let _ = om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer)
+                    guard om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
+                        fatalError("Om decoder: \(String(cString: om_error_string(error)))")
+                    }
+                }
+                guard error == ERROR_OK else {
+                    fatalError("Om decoder: \(String(cString: om_error_string(error)))")
                 }
             }
         })
@@ -127,7 +132,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             io_size_max
         )
         guard error == ERROR_OK else {
-            fatalError()
+            fatalError("Om encoder: \(String(cString: om_error_string(error)))")
         }
         let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: chunkBufferSize, alignment: 4)

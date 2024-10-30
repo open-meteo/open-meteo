@@ -28,7 +28,10 @@ typedef enum {
     ERROR_INVALID_COMPRESSION_TYPE = 1,
     ERROR_INVALID_DATA_TYPE = 2,
     ERROR_INVALID_LUT_CHUNK_LENGTH = 3,
+    ERROR_OUT_OF_BOUND_READ = 4,
 } om_error_t;
+
+const char* om_error_string(om_error_t error);
 
 /// Data types
 typedef enum {

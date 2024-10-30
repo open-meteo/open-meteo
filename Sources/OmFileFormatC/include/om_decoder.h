@@ -302,7 +302,7 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
  *       and merging thresholds (`io_size_merge`) defined in the `decoder`. It also handles 
  *       transitioning between different LUT chunks if required.
  */
-bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, size_t indexDataCount);
+bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, size_t indexDataCount, om_error_t* error);
 
 
 /**
@@ -364,6 +364,6 @@ size_t om_decoder_read_buffer_size(const om_decoder_t* decoder);
  * @warning The `into` buffer must be large enough to accommodate the decompressed data 
  *          from all chunks within the specified range, or memory corruption may occur.
  */
-size_t om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunkIndex, const void *data, size_t dataCount, void *into, void *chunkBuffer);
+bool om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunkIndex, const void *data, size_t dataCount, void *into, void *chunkBuffer, om_error_t* error);
 
 #endif // OM_DECODER_H

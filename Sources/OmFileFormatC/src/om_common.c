@@ -11,6 +11,22 @@
 #include "vp4.h"
 #include "fp.h"
 
+const char* om_error_string(om_error_t error) {
+    switch (error) {
+        case ERROR_OK:
+            return "No error occured";
+        case ERROR_INVALID_COMPRESSION_TYPE:
+            return "Invalid compression type";
+        case ERROR_INVALID_DATA_TYPE:
+            return "Invalid data type";
+        case ERROR_INVALID_LUT_CHUNK_LENGTH:
+            return "Invalid LUT chunk length. Max 256.";
+        case ERROR_OUT_OF_BOUND_READ:
+            return "Corrupted data with potential out-of-bound read";
+    }
+    return "";
+}
+
 void om_common_copy_float_to_int16(size_t length, float scale_factor, float add_offset, const void* src, void* dst) {
     for (size_t i = 0; i < length; ++i) {
         float val = ((float *)src)[i];

@@ -6,7 +6,7 @@
 //
 
 #include <stdlib.h>
-#include <assert.h>
+//#include <assert.h>
 #include "vp4.h"
 #include "fp.h"
 #include "delta2d.h"
@@ -284,8 +284,8 @@ bool om_decoder_next_index_read(const om_decoder_t* decoder, om_decoder_index_re
     }
     
     size_t readEnd = ((chunkIndex + endAlignOffset) / decoder->lut_chunk_element_count + 1) * decoder->lut_chunk_length;
-    size_t lutTotalSize = divide_rounded_up(decoder->number_of_chunks, decoder->lut_chunk_element_count) * decoder->lut_chunk_length;
-    assert(readEnd <= lutTotalSize);
+    //size_t lutTotalSize = divide_rounded_up(decoder->number_of_chunks, decoder->lut_chunk_element_count) * decoder->lut_chunk_length;
+    //assert(readEnd <= lutTotalSize);
     
     index_read->offset = decoder->lut_start + readStart;
     index_read->count = readEnd - readStart;
@@ -293,7 +293,7 @@ bool om_decoder_next_index_read(const om_decoder_t* decoder, om_decoder_index_re
     return true;
 }
 
-bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* data_read, const void* index_data, size_t index_data_size) {
+bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* data_read, const void* index_data, size_t index_data_size, om_error_t* error) {
     if (data_read->nextChunk.lowerBound >= data_read->nextChunk.upperBound) {
         return false;
     }
@@ -314,7 +314,10 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
         
         
         size_t readPos = data_read->indexRange.lowerBound - chunkIndex - startOffset;
-        assert((readPos + 1) * sizeof(int64_t) <= index_data_size);
+        if (readPos < 0 || (readPos + 1) * sizeof(int64_t) > index_data_size) {
+            error = ERROR_OUT_OF_BOUND_READ;
+            return false;
+        }
         
         size_t startPos = isOffset0 ? 0 : data[readPos];
         size_t endPos = startPos;
@@ -322,7 +325,10 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
         // Loop to the next chunk until the end is reached
         while (true) {
             readPos = data_read->nextChunk.lowerBound - data_read->indexRange.lowerBound - startOffset + 1;
-            assert((readPos + 1) * sizeof(int64_t) <= index_data_size);
+            if (readPos < 0 || (readPos + 1) * sizeof(int64_t) > index_data_size) {
+                error = ERROR_OUT_OF_BOUND_READ;
+                return false;
+            }
             size_t dataEndPos = data[readPos];
             
             // Merge and split IO requests, ensuring at least one IO request is sent
@@ -373,8 +379,10 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
     {
         size_t thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - lutChunk * lutChunkElementCount;
         size_t start = lutChunk * lutChunkLength - lutOffset;
-        assert(start >= 0);
-        assert(start + lutChunkLength <= index_data_size);
+        if (start < 0 || start + lutChunkLength > index_data_size) {
+            error = ERROR_OUT_OF_BOUND_READ;
+            return false;
+        }
         
         // Decompress LUT chunk
         p4nddec64(indexDataPtr + start, thisLutChunkElementCount, (uint64_t*)uncompressedLut);
@@ -392,8 +400,10 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
         if (nextLutChunk != lutChunk) {
             size_t nextLutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - nextLutChunk * lutChunkElementCount;
             size_t start = nextLutChunk * lutChunkLength - lutOffset;
-            assert(start >= 0);
-            assert(start + lutChunkLength <= index_data_size);
+            if (start < 0 || start + lutChunkLength > index_data_size) {
+                error = ERROR_OUT_OF_BOUND_READ;
+                return false;
+            }
             
             // Decompress LUT chunk
             p4nddec64(indexDataPtr + start, nextLutChunkElementCount, (uint64_t*)uncompressedLut);
@@ -570,16 +580,23 @@ size_t _om_decoder_decode_chunk(const om_decoder_t *decoder, size_t chunk, const
     return uncompressedBytes;
 }
 
-size_t om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunk, const void *data, size_t data_size, void *into, void *chunkBuffer) {
+bool om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunk, const void *data, size_t data_size, void *into, void *chunkBuffer, om_error_t* error) {
     size_t pos = 0;
     //printf("chunkIndex.lowerBound %d %d\n",chunkIndex.lowerBound,chunkIndex.upperBound);
     for (size_t chunkNum = chunk.lowerBound; chunkNum < chunk.upperBound; ++chunkNum) {
         //printf("chunkIndex %d pos=%d dataCount=%d \n",chunkNum, pos, dataCount);
-        assert(pos < data_size);
+        if (pos >= data_size) {
+            error = ERROR_OUT_OF_BOUND_READ;
+            return false;
+        }
         size_t uncompressedBytes = _om_decoder_decode_chunk(decoder, chunkNum, (const uint8_t *)data + pos, into, chunkBuffer);
         pos += uncompressedBytes;
     }
     //printf("%d %d \n", pos, dataCount);
-    assert(pos == data_size);
+    
+    if (pos != data_size) {
+        error = ERROR_OUT_OF_BOUND_READ;
+        return false;
+    }
     return pos;
 }

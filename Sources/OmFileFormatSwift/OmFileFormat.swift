@@ -641,7 +641,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 65536
             )
             guard error == ERROR_OK else {
-                fatalError()
+                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
             }
             fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
