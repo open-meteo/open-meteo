@@ -29,10 +29,10 @@ public struct OmFileJSONVariable: Codable {
     let name: String?
     
     /// The dimensions of the file
-    let dimensions: [UInt64]
+    let dimensions: [Int]
     
     /// How the dimensions are chunked
-    let chunks: [UInt64]
+    let chunks: [Int]
     
     let dimension_names: [String]?
     
@@ -44,14 +44,14 @@ public struct OmFileJSONVariable: Codable {
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
     let compression: OmFileFormatC.om_compression_t
     
-    /// Data type like float, int32, uint64
+    /// Data type like float, int32, Int
     let data_type: OmFileFormatC.om_datatype_t
     
     /// The offset position of the beginning of the look up table LUT. The LUT comtains then data positions for each chunk
-    let lut_offset: UInt64
+    let lut_offset: Int
     
     /// The total size of the compressed LUT.
-    let lut_size: UInt64
+    let lut_size: Int
 }
 
 extension OmFileFormatC.om_compression_t: Codable {
