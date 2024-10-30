@@ -614,25 +614,25 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
-        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*6) { ptr in
+        withUnsafeTemporaryAllocation(of: Int.self, capacity: 2*6) { ptr in
             // dimensions
-            ptr[0] = UInt64(dim0)
-            ptr[1] = UInt64(dim1)
+            ptr[0] = dim0
+            ptr[1] = dim1
             // chunks
-            ptr[2] = UInt64(chunk0)
-            ptr[3] = UInt64(chunk1)
+            ptr[2] = chunk0
+            ptr[3] = chunk1
             // read offset
-            ptr[4] = UInt64(dim0Read.lowerBound)
-            ptr[5] = UInt64(dim1Read.lowerBound)
+            ptr[4] = dim0Read.lowerBound
+            ptr[5] = dim1Read.lowerBound
             // read count
-            ptr[6] = UInt64(dim0Read.count)
-            ptr[7] = UInt64(dim1Read.count)
+            ptr[6] = dim0Read.count
+            ptr[7] = dim1Read.count
             // cube offset
             ptr[8] = 0
-            ptr[9] = UInt64(arrayDim1Range.lowerBound)
+            ptr[9] = arrayDim1Range.lowerBound
             // cube dimensions
-            ptr[10] = UInt64(dim0Read.count)
-            ptr[11] = UInt64(arrayDim1Length)
+            ptr[10] = dim0Read.count
+            ptr[11] = arrayDim1Length
             
             let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
             var decoder = om_decoder_t()
@@ -651,7 +651,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 10),
                 8, // ignored if lutChunkElementCount == 1
                 1,
-                UInt64(OmHeader.length),
+                OmHeader.length,
                 512,
                 65536
             )

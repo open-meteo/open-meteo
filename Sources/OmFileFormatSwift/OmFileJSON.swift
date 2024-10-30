@@ -42,10 +42,10 @@ public struct OmFileJSONVariable: Codable {
     let add_offset: Float
     
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
-    let compression: OmFileFormatC.om_compression_t
+    let compression: CompressionType
     
     /// Data type like float, int32, Int
-    let data_type: OmFileFormatC.om_datatype_t
+    let data_type: DataType
     
     /// The offset position of the beginning of the look up table LUT. The LUT comtains then data positions for each chunk
     let lut_offset: Int

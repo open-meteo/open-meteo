@@ -64,8 +64,8 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                     dimension_names: nil,
                     scale_factor: metaV1.pointee.scalefactor,
                     add_offset: 0,
-                    compression: .init(UInt32(metaV1.pointee.compression)),
-                    data_type: DATA_TYPE_FLOAT,
+                    compression: .init(rawValue: metaV1.pointee.compression)!,
+                    data_type: .float,
                     lut_offset: OmHeader.length,
                     lut_size: 0 // ignored if lutChunkElementCount == 1
                 )
@@ -111,8 +111,8 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             &decoder,
             v.scale_factor,
             v.add_offset,
-            v.compression,
-            v.data_type,
+            v.compression.toC(),
+            v.data_type.toC(),
             v.dimensions.count,
             v.dimensions,
             v.chunks,
