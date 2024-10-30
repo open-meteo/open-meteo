@@ -46,21 +46,21 @@ public final class OmFileWriterArray {
     /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
     private var lookUpTable: [Int]
     
-    var encoder: om_encoder_t
+    private var encoder: om_encoder_t
     
     /// Position of last chunk that has been written
-    public var chunkIndex: Int = 0
+    var chunkIndex: Int = 0
     
     /// The scalefactor that is applied to all write data
-    public let scale_factor: Float
+    let scale_factor: Float
     
     /// The offset that is applied to all write data
-    public let add_offset: Float
+    let add_offset: Float
     
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
-    public let compression: CompressionType
+    let compression: CompressionType
     
-    public let datatype: DataType
+    let datatype: DataType
     
     /// The dimensions of the file
     let dimensions: [Int]
@@ -105,7 +105,7 @@ public final class OmFileWriterArray {
     /// `arrayDimensions` specify the total dimensions of the input array
     /// `arrayRead` specify which parts of this array should be read
     /// It is important that this function can write data out to a FileHandle to empty the buffer. Otherwise the buffer could grow to multiple gigabytes
-    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle, out: OmWriteBuffer) throws {
+    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle, buffer: OmWriteBuffer) throws {
         assert(array.count == arrayDimensions.reduce(1, *))
         assert(arrayDimensions.allSatisfy({$0 >= 0}))
         assert(arrayRead.allSatisfy({$0.lowerBound >= 0}))
@@ -115,45 +115,66 @@ public final class OmFileWriterArray {
         let arrayCount = arrayRead.map({$0.count})
         
         /// For performance the output buffer should be able to hold a multiple of the chunk buffer size
-        out.reallocate(minimumCapacity: chunkBufferSize * 4)
+        buffer.reallocate(minimumCapacity: chunkBufferSize * 4)
         
         /// How many chunks can be written to the output. This could be only a single one, or multiple
         let numberOfChunksInArray = om_encoder_number_of_chunks_in_array(&encoder, arrayCount)
         
         /// Store data start address if this is the first time this read is called
         if chunkIndex == 0 {
-            lookUpTable[chunkIndex] = out.totalBytesWritten
+            lookUpTable[chunkIndex] = buffer.totalBytesWritten
         }
         
         // This loop could be done in parallel. However, the order of chunks must remain the same in the LUT and final output buffer.
         // For multithreading, multiple buffers are required that need to be copied into the final buffer afterwards
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
-            assert(out.remainingCapacity >= chunkBufferSize)
-            let bytes_written = om_encoder_compress_chunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, chunkIndex, chunkIndexOffsetInThisArray, out.bufferAtWritePosition, chunkBuffer.baseAddress)
+            assert(buffer.remainingCapacity >= chunkBufferSize)
+            let bytes_written = om_encoder_compress_chunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, chunkIndex, chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
 
-            out.incrementWritePosition(by: bytes_written)
+            buffer.incrementWritePosition(by: bytes_written)
             
             // Store chunk offset in LUT
-            lookUpTable[chunkIndex+1] = out.totalBytesWritten
+            lookUpTable[chunkIndex+1] = buffer.totalBytesWritten
             chunkIndex += 1
             
             // Write buffer to disk if the next chunk may not fit anymore in the output buffer
-            if out.remainingCapacity < chunkBufferSize {
-                try out.writeToFile(fn: fn)
+            if buffer.remainingCapacity < chunkBufferSize {
+                try buffer.writeToFile(fn: fn)
             }
         }
     }
     
     /// Compress the lookup table and write it to the output buffer
-    public func writeLut(out: OmWriteBuffer) -> Int {
+    public func writeLut(buffer: OmWriteBuffer) -> Int {
         /// The size of the total compressed LUT including some padding
         let buffer_size = om_encoder_compress_lut_buffer_size(&encoder, lookUpTable, lookUpTable.count)
-        out.reallocate(minimumCapacity: buffer_size)
+        buffer.reallocate(minimumCapacity: buffer_size)
         
         /// Compress the LUT and return the actual compressed LUT size
-        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, lookUpTable.count, out.bufferAtWritePosition, buffer_size)
-        out.incrementWritePosition(by: compressed_lut_size)
+        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, lookUpTable.count, buffer.bufferAtWritePosition, buffer_size)
+        buffer.incrementWritePosition(by: compressed_lut_size)
         return compressed_lut_size
+    }
+    
+    /// Compress the lookup table, write it to the output buffer and return the JSON meta data object
+    public func compressLutAndReturnMeta(buffer: OmWriteBuffer) -> OmFileJSONVariable {
+        let lut_offset = buffer.totalBytesWritten
+        
+        let lut_size = writeLut(buffer: buffer)
+        
+        /// Generate the JSON meta attributes
+        return OmFileJSONVariable(
+            name: nil,
+            dimensions: dimensions,
+            chunks: chunks,
+            dimension_names: nil,
+            scale_factor: scale_factor,
+            add_offset: add_offset,
+            compression: compression,
+            data_type: datatype,
+            lut_offset: lut_offset,
+            lut_size: lut_size
+        )
     }
     
     deinit {

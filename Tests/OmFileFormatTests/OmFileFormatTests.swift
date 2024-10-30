@@ -76,21 +76,8 @@ final class OmFileFormatTests: XCTestCase {
         
         let data = (0..<100000).map({Float($0 % 10000)})
         OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10], fn: fn, out: buffer)
-        let lutStart = buffer.totalBytesWritten
-        let lutSize = writer.writeLut(out: buffer)
-        let jsonVariable = OmFileJSONVariable(
-            name: nil,
-            dimensions: writer.dimensions,
-            chunks: writer.chunks,
-            dimension_names: nil,
-            scale_factor: writer.scale_factor,
-            add_offset: writer.add_offset,
-            compression: writer.compression,
-            data_type: .float,
-            lut_offset: lutStart,
-            lut_size: lutSize
-        )
+        try writer.writeData(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10], fn: fn, buffer: buffer)
+        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
         try buffer.writeToFile(fn: fn)
@@ -116,29 +103,16 @@ final class OmFileFormatTests: XCTestCase {
         
         // Directly feed individual chunks
         OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, out: buffer)
-        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, out: buffer)
-        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1], fn: fn, out: buffer)
-        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, out: buffer)
-        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, out: buffer)
-        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1], fn: fn, out: buffer)
-        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn, out: buffer)
-        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn, out: buffer)
-        try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1], fn: fn, out: buffer)
-        let lutStart = buffer.totalBytesWritten
-        let lutSize = writer.writeLut(out: buffer)
-        let jsonVariable = OmFileJSONVariable(
-            name: nil,
-            dimensions: writer.dimensions,
-            chunks: writer.chunks,
-            dimension_names: nil,
-            scale_factor: writer.scale_factor,
-            add_offset: writer.add_offset,
-            compression: writer.compression,
-            data_type: .float,
-            lut_offset: lutStart,
-            lut_size: lutSize
-        )
+        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
+        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
+        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1], fn: fn, buffer: buffer)
+        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
+        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
+        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1], fn: fn, buffer: buffer)
+        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn, buffer: buffer)
+        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn, buffer: buffer)
+        try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1], fn: fn, buffer: buffer)
+        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
         try buffer.writeToFile(fn: fn)
@@ -161,22 +135,9 @@ final class OmFileFormatTests: XCTestCase {
         /// Deliberately add NaN on all positions that should not be written to the file. Only the inner 5x5 array is written
         let data = [.nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan, Float(0.0), 1.0, 2.0, 3.0, 4.0, .nan, .nan, 5.0, 6.0, 7.0, 8.0, 9.0, .nan, .nan, 10.0, 11.0, 12.0, 13.0, 14.0, .nan, .nan, 15.0, 16.0, 17.0, 18.0, 19.0, .nan, .nan, 20.0, 21.0, 22.0, 23.0, 24.0, .nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan]
         OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6], fn: fn, out: buffer)
+        try writer.writeData(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6], fn: fn, buffer: buffer)
         
-        let lutStart = buffer.totalBytesWritten
-        let lutSize = writer.writeLut(out: buffer)
-        let jsonVariable = OmFileJSONVariable(
-            name: nil,
-            dimensions: writer.dimensions,
-            chunks: writer.chunks,
-            dimension_names: nil,
-            scale_factor: writer.scale_factor,
-            add_offset: writer.add_offset,
-            compression: writer.compression,
-            data_type: .float,
-            lut_offset: lutStart,
-            lut_size: lutSize
-        )
+        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
         try buffer.writeToFile(fn: fn)
@@ -199,21 +160,8 @@ final class OmFileFormatTests: XCTestCase {
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0]
         OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [3,3,3], arrayRead: [0..<3, 0..<3, 0..<3], fn: fn, out: buffer)
-        let lutStart = buffer.totalBytesWritten
-        let lutSize = writer.writeLut(out: buffer)
-        let jsonVariable = OmFileJSONVariable(
-            name: nil,
-            dimensions: writer.dimensions,
-            chunks: writer.chunks,
-            dimension_names: nil,
-            scale_factor: writer.scale_factor,
-            add_offset: writer.add_offset,
-            compression: writer.compression,
-            data_type: .float,
-            lut_offset: lutStart,
-            lut_size: lutSize
-        )
+        try writer.writeData(array: data, arrayDimensions: [3,3,3], arrayRead: [0..<3, 0..<3, 0..<3], fn: fn, buffer: buffer)
+        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
         try buffer.writeToFile(fn: fn)
@@ -246,21 +194,8 @@ final class OmFileFormatTests: XCTestCase {
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn, out: buffer)
-        let lutStart = buffer.totalBytesWritten
-        let lutSize = writer.writeLut(out: buffer)
-        let jsonVariable = OmFileJSONVariable(
-            name: nil,
-            dimensions: writer.dimensions,
-            chunks: writer.chunks,
-            dimension_names: nil,
-            scale_factor: writer.scale_factor,
-            add_offset: writer.add_offset,
-            compression: writer.compression,
-            data_type: .float,
-            lut_offset: lutStart,
-            lut_size: lutSize
-        )
+        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn, buffer: buffer)
+        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
         try buffer.writeToFile(fn: fn)
@@ -347,21 +282,8 @@ final class OmFileFormatTests: XCTestCase {
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn, out: buffer)
-        let lutStart = buffer.totalBytesWritten
-        let lutSize = writer.writeLut(out: buffer)
-        let jsonVariable = OmFileJSONVariable(
-            name: nil,
-            dimensions: writer.dimensions,
-            chunks: writer.chunks,
-            dimension_names: nil,
-            scale_factor: writer.scale_factor,
-            add_offset: writer.add_offset,
-            compression: writer.compression,
-            data_type: .float,
-            lut_offset: lutStart,
-            lut_size: lutSize
-        )
+        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn, buffer: buffer)
+        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
         try buffer.writeToFile(fn: fn)
