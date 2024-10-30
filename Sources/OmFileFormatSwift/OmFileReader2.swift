@@ -50,7 +50,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     /// Open a file and decode om file meta data. In this casem fn is typically mmap or just plain memory
     public static func open_file(fn: Backend, lutChunkElementCount: UInt64 = 256) throws -> Self {
         return try fn.withUnsafeBytes({ptr in
-            // TODO Support for old files. Read header and check for old file
+            // Support for old files. Read header and check for old file
             guard ptr[0] == OmHeader.magicNumber1, ptr[1] == OmHeader.magicNumber2 else {
                 fatalError("Not an OM file")
             }
@@ -110,6 +110,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         om_decoder_init(
             &decoder,
             v.scale_factor,
+            v.add_offset,
             v.compression,
             v.data_type,
             UInt64(v.dimensions.count),

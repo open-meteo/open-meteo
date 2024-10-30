@@ -639,6 +639,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             om_decoder_init(
                 &decoder,
                 scalefactor,
+                0, // add offset
                 c,
                 OmFileFormatC.DATA_TYPE_FLOAT,
                 2,

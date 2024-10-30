@@ -17,13 +17,9 @@ public final class OmFileWriter2 {
     
     public var totalBytesWritten = UInt64(0)
     
-    /// Total capacity
-    public let capacity: UInt64
-    
     public init(capacity: UInt64) {
         self.writePosition = 0
         self.totalBytesWritten = 0
-        self.capacity = capacity
         self.buffer = .allocate(byteCount: Int(capacity), alignment: 1)
     }
     
@@ -127,52 +123,33 @@ public final class OmFileWriterArray {
     
     let chunkBuffer: UnsafeMutableRawBufferPointer
     
-    /**
-     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
-     
-     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not usefull!
-     
-     Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
-     */
+    /// `lutChunkElementCount` should be 256 for production files. Only for testing a lower number can be used.
     public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, datatype: DataType, scale_factor: Float, add_offset: Float, lutChunkElementCount: Int = 256) {
-        
-        /*let chunkSizeByte = chunkDimensions.reduce(1, *) * 4
-        if chunkSizeByte > 1024 * 1024 * 4 {
-            print("WARNING: Chunk size greater than 4 MB (\(Float(chunkSizeByte) / 1024 / 1024) MB)!")
-        }*/
-        
-        
-        
-        var encoder = om_encoder_t()
-        
-        // TODO Remove alloc. Scope could be an issue for arrays!!!!
-        let ptrDims = UnsafeMutablePointer<UInt64>.allocate(capacity: dimensions.count * 2)
-        let ptrChunks = UnsafeMutablePointer<UInt64>.allocate(capacity: dimensions.count * 2)
-        
-        for i in 0..<dimensions.count {
-            ptrDims[i] = dimensions[i]
-            ptrChunks[i] = chunkDimensions[i]
-        }
-        om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), ptrDims, ptrChunks, UInt64(dimensions.count), UInt64(lutChunkElementCount))
-        self.encoder = encoder
 
+        assert(dimensions.count == chunkDimensions.count)
         
-        let nChunks = om_encoder_number_of_chunks(&encoder)
-        
-        /// This is the minimum output buffer size for each compressed size. In practice the buffer should be much larger.
-        chunkBufferSize = om_encoder_compress_chunk_buffer_size(&encoder)
-        
-        /// Each thread needs its own chunk buffer to compress data. This implementation is single threaded
-        chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
-        
-        // +1 to store also the start address
-        self.lookUpTable = .init(repeating: 0, count: Int(nChunks + 1))
         self.chunks = chunkDimensions
         self.dimensions = dimensions
         self.compression = compression
         self.datatype = datatype
         self.scale_factor = scale_factor
         self.add_offset = add_offset
+        
+        // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
+        self.encoder = om_encoder_t()
+        om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, UInt64(dimensions.count), UInt64(lutChunkElementCount))
+
+        /// Number of total chunks in the compressed files
+        let nChunks = om_encoder_number_of_chunks(&encoder)
+        
+        /// This is the minimum output buffer size for each compressed size. In practice the buffer should be much larger.
+        self.chunkBufferSize = om_encoder_compress_chunk_buffer_size(&encoder)
+        
+        /// Each thread needs its own chunk buffer to compress data. This implementation is single threaded
+        self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
+        
+        /// Allocate space for a lookup table. Needs to be number_of_chunks+1 to store start address and for each chunk then end address
+        self.lookUpTable = .init(repeating: 0, count: Int(nChunks + 1))
     }
     
     /// Compress data
