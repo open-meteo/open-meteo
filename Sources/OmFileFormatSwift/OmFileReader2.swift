@@ -10,30 +10,30 @@ import Foundation
 
 extension OmFileReaderBackend {
     /// Read and decode
-    func decode(decoder: UnsafePointer<om_decoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         self.withUnsafeBytes({ ptr in
-            var indexRead = om_decoder_index_read_t()
-            om_decoder_index_read_init(decoder, &indexRead)
+            var indexRead = OmDecoder_indexRead_t()
+            OmDecoder_indexReadInit(decoder, &indexRead)
             
             /// Loop over index blocks and read index data
-            while om_decoder_next_index_read(decoder, &indexRead) {
+            while OmDecoder_nextIndexRead(decoder, &indexRead) {
                 //print("read index \(indexRead)")
                 let indexData = ptr.baseAddress!.advanced(by: indexRead.offset)
                 
-                var dataRead = om_decoder_data_read_t()
-                om_decoder_data_read_init(&dataRead, &indexRead)
+                var dataRead = OmDecoder_dataRead_t()
+                OmDecoder_dataReadInit(&dataRead, &indexRead)
                 
-                var error: om_error_t = ERROR_OK
+                var error: OmError_t = ERROR_OK
                 /// Loop over data blocks and read compressed data chunks
-                while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count, &error) {
+                while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
                     //print("read data \(dataRead)")
                     let dataData = ptr.baseAddress!.advanced(by: dataRead.offset)
-                    guard om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
-                        fatalError("Om decoder: \(String(cString: om_error_string(error)))")
+                    guard OmDecoder_decodeChunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
+                        fatalError("Om decoder: \(String(cString: OmError_string(error)))")
                     }
                 }
                 guard error == ERROR_OK else {
-                    fatalError("Om decoder: \(String(cString: om_error_string(error)))")
+                    fatalError("Om decoder: \(String(cString: OmError_string(error)))")
                 }
             }
         })
@@ -111,8 +111,8 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         let readOffset = dimRead.map({$0.lowerBound})
         let readCount = dimRead.map({$0.count})
         
-        var decoder = om_decoder_t()
-        let error = om_decoder_init(
+        var decoder = OmDecoder_t()
+        let error = OmDecoder_init(
             &decoder,
             v.scale_factor,
             v.add_offset,
@@ -132,9 +132,9 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             io_size_max
         )
         guard error == ERROR_OK else {
-            fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+            fatalError("Om encoder: \(String(cString: OmError_string(error)))")
         }
-        let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
+        let chunkBufferSize = OmDecoder_readBufferSize(&decoder)
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: chunkBufferSize, alignment: 4)
         fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
         chunkBuffer.deallocate()

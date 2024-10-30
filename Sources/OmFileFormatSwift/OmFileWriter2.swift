@@ -46,7 +46,7 @@ public final class OmFileWriterArray {
     /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
     private var lookUpTable: [Int]
     
-    private var encoder: om_encoder_t
+    private var encoder: OmEncoder_t
     
     /// Position of last chunk that has been written
     var chunkIndex: Int = 0
@@ -85,11 +85,11 @@ public final class OmFileWriterArray {
         self.add_offset = add_offset
         
         // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
-        self.encoder = om_encoder_t()
+        self.encoder = OmEncoder_t()
         let error = om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
         
         guard error == ERROR_OK else {
-            fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+            fatalError("Om encoder: \(String(cString: OmError_string(error)))")
         }
 
         /// Number of total chunks in the compressed files

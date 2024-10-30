@@ -7,66 +7,6 @@
  * schemes and allows reading partial or entire datasets in a chunked manner.
  *
  * Created by Patrick Zippenfenig on 22.10.2024.
- * 
- * Usage Example in Swift:
- * --------------
- * var decoder = om_decoder_t();
- * om_decoder_init(
- *     &decoder,
- *     v.scalefactor,               // Scale factor for adjusting data during decompression
- *     v.compression,               // Compression method used in the file (e.g., FPX, P4NZ)
- *     v.dataType,                  // Data type of the compressed data (e.g., float, double)
- *     UInt64(v.dimensions.count),  // Number of dimensions in the data
- *     v.dimensions,                // Array specifying the size of each dimension
- *     v.chunks,                    // Array specifying chunk sizes for each dimension
- *     readOffset,                  // Offset specifying where to begin reading in each dimension
- *     readCount,                   // Number of elements to read from each dimension
- *     intoCubeOffset,              // Offset within the output cube to store decompressed data
- *     intoCubeDimension,           // Dimensions of the output cube (may be larger than readCount)
- *     v.lutSize,              // Maximum size of the compressed LUT in bytes
- *     lutChunkElementCount,        // Number of elements in each LUT chunk (typically 256)
- *     v.lutOffset,                 // Starting offset of the LUT in the file
- *     io_size_merge,               // Maximum size for merging smaller I/O reads. Default: 512
- *     io_size_max                  // Maximum size for a single I/O operation. Default: 65536
- * );
- * 
- * let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(
- *     byteCount: Int(om_decoder_read_buffer_size(&decoder)),
- *     alignment: 4
- * );
- * 
- * mmap.withUnsafeBytes({ ptr in
- *     var indexRead = om_decoder_index_read_t();
- *     om_decoder_index_read_init(&decoder, &indexRead);
- *     
- *     // Loop over index blocks and read index data
- *     while (om_decoder_next_index_read(&decoder, &indexRead)) {
- *         // Access the index data based on read offset
- *         let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset));
- *         
- *         var dataRead = om_decoder_data_read_t();
- *         om_decoder_data_read_init(&dataRead, &indexRead);
- *         
- *         // Loop over data blocks and read compressed data chunks
- *         while (om_decoder_next_data_read(&decoder, &dataRead, indexData, indexRead.count)) {
- *             let dataData = ptr.baseAddress!.advanced(by: Int(dataRead.offset));
- *             
- *             om_decoder_decode_chunks(
- *                 &decoder,
- *                 dataRead.chunkIndex,
- *                 dataData,
- *                 dataRead.count,
- *                 into,         // Target buffer for decompressed data
- *                 chunkBuffer   // Temporary buffer for holding decompressed chunk data
- *             );
- *         }
- *     }
- * });
- * 
- * @note This example shows the main steps of setting up the decoder, iterating over index reads, 
- *       and processing the decompressed data chunks. Functions like `om_decoder_index_read_init`, 
- *       `om_decoder_next_index_read`, `om_decoder_data_read_init`, `om_decoder_next_data_read`, 
- *       and `om_decoder_decode_chunks` are essential to this process.
  */
 
 #ifndef OM_DECODER_H
@@ -77,17 +17,17 @@
 typedef struct {
     size_t lowerBound;
     size_t upperBound;
-} om_range_t;
+} OmRange_t;
 
 typedef struct {
     size_t offset;
     size_t count;
-    om_range_t indexRange;
-    om_range_t chunkIndex;
-    om_range_t nextChunk;
-} om_decoder_index_read_t;
+    OmRange_t indexRange;
+    OmRange_t chunkIndex;
+    OmRange_t nextChunk;
+} OmDecoder_indexRead_t;
 
-typedef om_decoder_index_read_t om_decoder_data_read_t;
+typedef OmDecoder_indexRead_t OmDecoder_dataRead_t;
 
 
 typedef struct {
@@ -150,7 +90,7 @@ typedef struct {
     
     /// Numer of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
     int8_t bytes_per_element_compressed;
-} om_decoder_t;
+} OmDecoder_t;
 
 /**
  * @brief Initializes the `om_decoder_t` structure with the specified parameters.
@@ -160,63 +100,28 @@ typedef struct {
  * decoder for reading and processing compressed data, managing the scaling and decompression callbacks.
  * 
  * @param decoder A pointer to an `om_decoder_t` structure that will be initialized.
- * @param scalefactor A floating-point value used to scale the decompressed data. This factor
- *                    is applied when converting decompressed values to the desired scale.
+ * @param scale_factor A floating-point value used to scale the decompressed data.
+ * @param add_offset A floating-point value used to offset the decompressed data.
  * @param compression Specifies the type of compression applied to the data.
  *                    Possible values include `COMPRESSION_PFOR_16BIT_DELTA2D`, `COMPRESSION_FPX_XOR2D`, 
  *                    and `COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC`.
- * @param data_type Specifies the type of data, such as `DATA_TYPE_FLOAT` or `DATA_TYPE_DOUBLE`.
- *                  This affects the decompression and copy methods used.
- * @param dims_count The number of dimensions of the data (e.g., 3 for 3D data). This value is 
- *                   stored in `decoder->dims_count`.
- * @param dims A pointer to an array containing the size of each dimension. This defines the shape
- *             of the data being read and is stored in `decoder->dims`.
- * @param chunks A pointer to an array specifying the chunk sizes for each dimension. This array
- *               indicates how data is partitioned into chunks for reading and is stored in `decoder->chunks`.
- * @param read_offset A pointer to an array specifying the offsets for reading data in each dimension.
- *                    This array sets the starting points for data reads and is stored in `decoder->read_offset`.
- * @param read_count A pointer to an array specifying the number of elements to read along each dimension.
- *                   It defines how much data to read starting from `read_offset` and is stored in `decoder->read_count`.
- * @param cube_offset A pointer to an array specifying the offset of the target cube in each dimension.
- *                    This is used when reading data into a larger array and is stored in `decoder->cube_offset`.
- * @param cube_dimensions A pointer to an array specifying the dimensions of the target cube being read.
- *                        It can be the same as `read_count` but allows reading into larger arrays.
- *                        This is stored in `decoder->cube_dimensions`.
+ * @param data_type Specifies the type of data, such as `DATA_TYPE_FLOAT` or `DATA_TYPE_DOUBLE`. This affects the decompression and copy methods used.
+ * @param dimension_count The number of dimensions of the data (e.g., 3 for 3D data). All following array must have the some dimension count.
+ * @param dimensions A pointer to an array containing the size of each dimension. This defines the shape of the data being read.
+ * @param chunks A pointer to an array specifying the chunk sizes for each dimension and indicates how data is partitioned into chunks.
+ * @param read_offset A pointer to an array specifying the offsets for reading data in each dimension. This array sets the starting points for data reads.
+ * @param read_count A pointer to an array specifying the number of elements to read along each dimension. It defines how much data to read starting from `read_offset`.
+ * @param cube_offset A pointer to an array specifying the offset of the target cube in each dimension. This is used when reading data into a larger array.
+ * @param cube_dimensions A pointer to an array specifying the dimensions of the target cube being writen to.It can be the same as `read_count` but allows writing into larger arrays..
  * @param lut_size  The length (in bytes) of the compressed Look-Up Table (LUT). Ignored for Verion 1/2 files if lut_chunk_element_count == 1.
- * @param lut_chunk_element_count The number of elements in each LUT chunk. Default is 256. A value
- *                                of 1 indicates that the LUT is not compressed. This is stored in `decoder->lut_chunk_element_count`.
- * @param lut_start  The starting byte position of the LUT in the file. This is stored in `decoder->lut_start`.
- * @param io_size_merge The maximum size (in bytes) for merging consecutive IO operations.
- *                      It helps to optimize read performance by merging small reads and is stored in `decoder->io_size_merge`.
- * @param io_size_max The maximum size (in bytes) for a single IO operation before it is split.
- *                    It defines the threshold for splitting large reads and is stored in `decoder->io_size_max`.
+ * @param lut_chunk_element_count The number of elements in each LUT chunk. Default is 256. A value  of 1 indicates that the LUT is not compressed (Version 1/2 files).
+ * @param lut_start  The starting byte position of the LUT in the file.
+ * @param io_size_merge The maximum size (in bytes) for merging consecutive IO operations. It helps to optimize read performance by merging small reads.
+ * @param io_size_max The maximum size (in bytes) for a single IO operation before it is split. It defines the threshold for splitting large reads.
  * 
- * @note The function configures the appropriate decompression callback functions based on the 
- *       specified compression and data type. For example, it handles different types of 
- *       decompression and copy routines for `COMPRESSION_PFOR_16BIT_DELTA2D` and `COMPRESSION_FPX_XOR2D`.
- * 
- * @warning The function asserts if an unsupported compression type is provided, which may cause 
- *          a program to terminate if an invalid `compression` value is used.
- * 
- * @todo Add support for additional compression types and data types as required.
- * 
- * @example
- * om_decoder_t decoder;
- * om_decoder_init(&decoder, 1.0f, COMPRESSION_PFOR_16BIT_DELTA2D, DATA_TYPE_FLOAT, 3, dims, chunks,
- *                 read_offset, read_count, cube_offset, cube_dimensions, 256, 54, 0, 1024, 4096);
- * 
- * @details This function computes the total number of chunks required based on the data dimensions
- *          and chunk sizes using the formula:
- *          \code
- *          size_t n = 1;
- *          for (size_t i = 0; i < dims_count; i++) {
- *              n *= divide_rounded_up(dims[i], chunks[i]);
- *          }
- *          decoder->number_of_chunks = n;
- *          \endcode
- *          This value is stored in `decoder->number_of_chunks` and is used for managing the read operations.
+ * @returns Return an om_error_t if the compression or dimension is invalid
  */
-om_error_t om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset, const om_compression_t compression, const om_datatype_t data_type, size_t dims_count, const size_t* dims, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max);
+OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, size_t dimension_count, const size_t* dimensions, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max);
 
 /**
  * @brief Initializes an `om_decoder_index_read_t` structure for reading chunk indices.
@@ -231,7 +136,7 @@ om_error_t om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_o
  * @param index_read A pointer to an `om_decoder_index_read_t` structure that will be 
  *                   initialized with the computed chunk index range and other related values.
  */
-void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_read_t *indexRead);
+void OmDecoder_indexReadInit(const OmDecoder_t* decoder, OmDecoder_indexRead_t *indexRead);
 
 
 /**
@@ -246,11 +151,11 @@ void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_re
  * @param index_read A pointer to an `om_decoder_index_read_t` structure, which will be updated with the next
  *                   range of chunks to read and the corresponding offset and size of the read operation.
  * 
- * @return `true` if the next read range was successfully computed and updated in `index_read`.
+ * @returns `true` if the next read range was successfully computed and updated in `index_read`.
  *         `false` if there are no more chunks left to read, indicating that the end of the read range has been reached.
  * 
  */
-bool om_decoder_next_index_read(const om_decoder_t* decoder, om_decoder_index_read_t* index_read);
+bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* index_read);
 
 
 /**
@@ -267,7 +172,7 @@ bool om_decoder_next_index_read(const om_decoder_t* decoder, om_decoder_index_re
  *                         contains information about the index range and the initial 
  *                         chunk index to be used for reading.
  */
-void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decoder_index_read_t *index_read);
+void OmDecoder_dataReadInit(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read);
 
 
 /**
@@ -298,11 +203,9 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
  * @returns `true` if the next data segment was successfully prepared and ready for reading, 
  *          `false` if there are no more data segments to read or if the range is exhausted.
  * 
- * @note This function ensures that read operations respect the maximum I/O size (`io_size_max`)
- *       and merging thresholds (`io_size_merge`) defined in the `decoder`. It also handles 
- *       transitioning between different LUT chunks if required.
+ * @returns May return an out-of-bounds read error on corrupted data.
  */
-bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read_t* dataRead, const void* indexData, size_t indexDataCount, om_error_t* error);
+bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dataRead, const void* indexData, size_t indexDataCount, OmError_t* error);
 
 
 /**
@@ -325,7 +228,7 @@ bool om_decoder_next_data_read(const om_decoder_t *decoder, om_decoder_data_read
  *       the decoding process, ensuring that there is sufficient space to store the 
  *       decompressed data of a chunk.
  */
-size_t om_decoder_read_buffer_size(const om_decoder_t* decoder);
+size_t OmDecoder_readBufferSize(const OmDecoder_t* decoder);
 
 
 /**
@@ -353,17 +256,10 @@ size_t om_decoder_read_buffer_size(const om_decoder_t* decoder);
  * @param[out] chunkBuffer  A temporary buffer used for storing intermediate decompressed 
  *                          chunk data before copying it into the final output buffer. 
  *                          Must be sized according to `om_decoder_read_buffer_size`
- * 
- * @returns The total number of uncompressed bytes processed from the given chunk range.
- *          This value is equal to `data_size` if all chunks are decoded correctly.
- * 
- * @note The function asserts that the sum of uncompressed bytes matches the provided 
- *       `data_size`, ensuring that the entire input buffer has been processed without 
- *       any leftover data.
- * 
- * @warning The `into` buffer must be large enough to accommodate the decompressed data 
- *          from all chunks within the specified range, or memory corruption may occur.
+ * @param[out] error  May return an out-of-bounds read error on corrupted data.
+ *
+ * @returns `false` if an erorr occured.
  */
-bool om_decoder_decode_chunks(const om_decoder_t *decoder, om_range_t chunkIndex, const void *data, size_t dataCount, void *into, void *chunkBuffer, om_error_t* error);
+bool OmDecoder_decodeChunks(const OmDecoder_t *decoder, OmRange_t chunkIndex, const void *data, size_t dataCount, void *into, void *chunkBuffer, OmError_t* error);
 
 #endif // OM_DECODER_H

@@ -31,8 +31,8 @@ public enum DataType: UInt8, Codable {
     case float = 8
     case double = 9
     
-    func toC() -> OmFileFormatC.om_datatype_t {
-        return OmFileFormatC.om_datatype_t(rawValue: UInt32(self.rawValue))
+    func toC() -> OmFileFormatC.OmDataType_t {
+        return OmFileFormatC.OmDataType_t(rawValue: UInt32(self.rawValue))
     }
 }
 
@@ -63,8 +63,8 @@ public enum CompressionType: UInt8, Codable {
         }
     }
     
-    func toC() -> OmFileFormatC.om_compression_t {
-        return OmFileFormatC.om_compression_t(rawValue: UInt32(self.rawValue))
+    func toC() -> OmFileFormatC.OmCompression_t {
+        return OmFileFormatC.OmCompression_t(rawValue: UInt32(self.rawValue))
     }
 }
 
@@ -619,9 +619,9 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             ptr[10] = dim0Read.count
             ptr[11] = arrayDim1Length
             
-            let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
-            var decoder = om_decoder_t()
-            let error = om_decoder_init(
+            let c = OmFileFormatC.OmCompression_t(rawValue: UInt32(compression.rawValue))
+            var decoder = OmDecoder_t()
+            let error = OmDecoder_init(
                 &decoder,
                 scalefactor,
                 0, // add offset
@@ -641,7 +641,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 65536
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+                fatalError("Om encoder: \(String(cString: OmError_string(error)))")
             }
             fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }

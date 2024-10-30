@@ -13,7 +13,7 @@
 #include "delta2d.h"
 
 
-om_error_t om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count) {
+OmError_t om_encoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count) {
     encoder->scale_factor = scale_factor;
     encoder->add_offset = add_offset;
     encoder->dimensions = dimensions;
@@ -105,7 +105,7 @@ om_error_t om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_
     return ERROR_OK;
 }
 
-size_t om_encoder_number_of_chunks(const om_encoder_t* encoder) {
+size_t om_encoder_number_of_chunks(const OmEncoder_t* encoder) {
     size_t n = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         n *= divide_rounded_up(encoder->dimensions[i], encoder->chunks[i]);
@@ -113,7 +113,7 @@ size_t om_encoder_number_of_chunks(const om_encoder_t* encoder) {
     return n;
 }
 
-size_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const size_t* array_count) {
+size_t om_encoder_number_of_chunks_in_array(const OmEncoder_t* encoder, const size_t* array_count) {
     size_t numberOfChunksInArray = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         numberOfChunksInArray *= divide_rounded_up(array_count[i], encoder->chunks[i]);
@@ -121,7 +121,7 @@ size_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const s
     return numberOfChunksInArray;
 }
 
-size_t om_encoder_compress_chunk_buffer_size(const om_encoder_t* encoder) {
+size_t om_encoder_compress_chunk_buffer_size(const OmEncoder_t* encoder) {
     size_t chunkLength = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         chunkLength *= encoder->chunks[i];
@@ -130,7 +130,7 @@ size_t om_encoder_compress_chunk_buffer_size(const om_encoder_t* encoder) {
     return (chunkLength + 255) /256 + (chunkLength + 32) * encoder->bytes_per_element_compressed;
 }
 
-size_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount) {
+size_t om_encoder_compress_lut_buffer_size(const OmEncoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount) {
     unsigned char buffer[MAX_LUT_ELEMENTS+32] = {0};
     size_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     size_t maxLength = 0;
@@ -144,7 +144,7 @@ size_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const si
     return maxLength * nLutChunks + 32 * sizeof(size_t);
 }
 
-size_t om_encoder_compress_lut(const om_encoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount, uint8_t* out, size_t compressed_lut_buffer_size) {
+size_t om_encoder_compress_lut(const OmEncoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount, uint8_t* out, size_t compressed_lut_buffer_size) {
     size_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     size_t lutSize = compressed_lut_buffer_size - 32 * sizeof(size_t);
     size_t lutChunkLength = lutSize / nLutChunks;
@@ -157,7 +157,7 @@ size_t om_encoder_compress_lut(const om_encoder_t* encoder, const size_t* lookUp
     return lutSize;
 }
 
-size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const size_t* arrayDimensions, const size_t* arrayOffset, const size_t* arrayCount, size_t chunkIndex, size_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
+size_t om_encoder_compress_chunk(const OmEncoder_t* encoder, const void* array, const size_t* arrayDimensions, const size_t* arrayOffset, const size_t* arrayCount, size_t chunkIndex, size_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
     /// The total size of `arrayDimensions`. Only used to check for out of bound reads
     size_t arrayTotalCount = 1;
     for (size_t i = 0; i < encoder->dimension_count; i++) {

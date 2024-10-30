@@ -29,9 +29,9 @@ typedef enum {
     ERROR_INVALID_DATA_TYPE = 2,
     ERROR_INVALID_LUT_CHUNK_LENGTH = 3,
     ERROR_OUT_OF_BOUND_READ = 4,
-} om_error_t;
+} OmError_t;
 
-const char* om_error_string(om_error_t error);
+const char* OmError_string(OmError_t error);
 
 /// Data types
 typedef enum {
@@ -45,14 +45,14 @@ typedef enum {
     DATA_TYPE_UINT64 = 7,
     DATA_TYPE_FLOAT = 8,
     DATA_TYPE_DOUBLE = 9
-} om_datatype_t;
+} OmDataType_t;
 
 /// Compression types
 typedef enum {
     COMPRESSION_PFOR_16BIT_DELTA2D = 0, // Lossy compression using 2D delta coding and scalefactor. Only supports float and scales to 16-bit integer.
     COMPRESSION_FPX_XOR2D = 1, // Lossless float/double compression using 2D xor coding.
     COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
-} om_compression_t;
+} OmCompression_t;
 
 
 /// Divide and round up

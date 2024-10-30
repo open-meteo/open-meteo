@@ -53,10 +53,3 @@ public struct OmFileJSONVariable: Codable {
     /// The total size of the compressed LUT.
     let lut_size: Int
 }
-
-extension OmFileFormatC.om_compression_t: Codable {
-    
-}
-extension OmFileFormatC.om_datatype_t: Codable {
-    
-}
