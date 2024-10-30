@@ -140,7 +140,7 @@ typedef struct {
     om_compress_copy_callback decompress_copy_callback;
     
     /// A scalefactor to convert floats to integers
-    float scalefactor;
+    float scale_factor;
 
     /// Numer of bytes for a single element of the data type
     int8_t bytes_per_element;

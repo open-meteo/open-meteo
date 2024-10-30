@@ -61,12 +61,12 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                     name: "data",
                     dimensions: [UInt64(metaV1.pointee.dim0), UInt64(metaV1.pointee.dim1)],
                     chunks: [UInt64(metaV1.pointee.chunk0), UInt64(metaV1.pointee.chunk1)],
-                    dimensionNames: nil,
-                    scalefactor: metaV1.pointee.scalefactor,
+                    dimension_names: nil,
+                    scale_factor: metaV1.pointee.scalefactor,
                     compression: .init(UInt32(metaV1.pointee.compression)),
-                    dataType: DATA_TYPE_FLOAT,
-                    lutOffset: UInt64(OmHeader.length),
-                    lutSize: 0 // ignored if lutChunkElementCount == 1
+                    data_type: DATA_TYPE_FLOAT,
+                    lut_offset: UInt64(OmHeader.length),
+                    lut_size: 0 // ignored if lutChunkElementCount == 1
                 )
                 let json = OmFileJSON(variables: [variable], someAttributes: nil)
                 return OmFileReader2(fn: fn, json: json, lutChunkElementCount: 1)
@@ -108,9 +108,9 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         var decoder = om_decoder_t()
         om_decoder_init(
             &decoder,
-            v.scalefactor,
+            v.scale_factor,
             v.compression,
-            v.dataType,
+            v.data_type,
             UInt64(v.dimensions.count),
             v.dimensions,
             v.chunks,
@@ -118,9 +118,9 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             readCount,
             intoCubeOffset,
             intoCubeDimension,
-            v.lutSize,
+            v.lut_size,
             lutChunkElementCount,
-            v.lutOffset,
+            v.lut_offset,
             io_size_merge,
             io_size_max
         )

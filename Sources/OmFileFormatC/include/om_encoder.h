@@ -14,7 +14,7 @@
 
 // Encoder struct
 typedef struct {
-    float scalefactor;
+    float scale_factor;
     const uint64_t *dimensions;
     const uint64_t *chunks;
     uint64_t dimension_count;
@@ -38,7 +38,7 @@ typedef struct {
 
 
 
-void om_encoder_init(om_encoder_t* encoder, float scalefactor, om_compression_t compression, om_datatype_t datatype, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count);
+void om_encoder_init(om_encoder_t* encoder, float scale_factor, om_compression_t compression, om_datatype_t datatype, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count);
 
 uint64_t om_encoder_number_of_chunks(const om_encoder_t* encoder);
 uint64_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const uint64_t* array_count);

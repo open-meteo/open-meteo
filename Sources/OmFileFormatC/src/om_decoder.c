@@ -39,7 +39,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     }
     
     decoder->number_of_chunks = nChunks;
-    decoder->scalefactor = scalefactor;
+    decoder->scale_factor = scalefactor;
     decoder->dimensions = dims;
     decoder->dimensions_count = dims_count;
     decoder->chunks = chunks;
@@ -468,7 +468,7 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
     // Copy data from the chunk buffer to the output buffer.
     while (true) {
         /// Copy values from chunk buffer into output buffer
-        (*decoder->decompress_copy_callback)(linearReadCount, decoder->scalefactor, &chunk_buffer[d * decoder->bytes_per_element_compressed], &into[q * decoder->bytes_per_element]);
+        (*decoder->decompress_copy_callback)(linearReadCount, decoder->scale_factor, &chunk_buffer[d * decoder->bytes_per_element_compressed], &into[q * decoder->bytes_per_element]);
         
         q += linearReadCount - 1;
         d += linearReadCount - 1;

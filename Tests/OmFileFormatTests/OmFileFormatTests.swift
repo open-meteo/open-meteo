@@ -83,12 +83,12 @@ final class OmFileFormatTests: XCTestCase {
             name: nil,
             dimensions: writer.dimensions,
             chunks: writer.chunks,
-            dimensionNames: nil,
-            scalefactor: writer.scalefactor,
+            dimension_names: nil,
+            scale_factor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
-            lutOffset: lutStart,
-            lutSize: lutSize
+            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            lut_offset: lutStart,
+            lut_size: lutSize
         )
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try buffer.writeTrailer(meta: json, fn: fn)
@@ -129,12 +129,12 @@ final class OmFileFormatTests: XCTestCase {
             name: nil,
             dimensions: writer.dimensions,
             chunks: writer.chunks,
-            dimensionNames: nil,
-            scalefactor: writer.scalefactor,
+            dimension_names: nil,
+            scale_factor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
-            lutOffset: lutStart,
-            lutSize: lutSize
+            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            lut_offset: lutStart,
+            lut_size: lutSize
         )
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try buffer.writeTrailer(meta: json, fn: fn)
@@ -165,12 +165,12 @@ final class OmFileFormatTests: XCTestCase {
             name: nil,
             dimensions: writer.dimensions,
             chunks: writer.chunks,
-            dimensionNames: nil,
-            scalefactor: writer.scalefactor,
+            dimension_names: nil,
+            scale_factor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
-            lutOffset: lutStart,
-            lutSize: lutSize
+            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            lut_offset: lutStart,
+            lut_size: lutSize
         )
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try buffer.writeTrailer(meta: json, fn: fn)
@@ -199,12 +199,12 @@ final class OmFileFormatTests: XCTestCase {
             name: nil,
             dimensions: writer.dimensions,
             chunks: writer.chunks,
-            dimensionNames: nil,
-            scalefactor: writer.scalefactor,
+            dimension_names: nil,
+            scale_factor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
-            lutOffset: lutStart,
-            lutSize: lutSize
+            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            lut_offset: lutStart,
+            lut_size: lutSize
         )
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try buffer.writeTrailer(meta: json, fn: fn)
@@ -244,12 +244,12 @@ final class OmFileFormatTests: XCTestCase {
             name: nil,
             dimensions: writer.dimensions,
             chunks: writer.chunks,
-            dimensionNames: nil,
-            scalefactor: writer.scalefactor,
+            dimension_names: nil,
+            scale_factor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
-            lutOffset: lutStart,
-            lutSize: lutSize
+            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            lut_offset: lutStart,
+            lut_size: lutSize
         )
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try buffer.writeTrailer(meta: json, fn: fn)
@@ -343,12 +343,12 @@ final class OmFileFormatTests: XCTestCase {
             name: nil,
             dimensions: writer.dimensions,
             chunks: writer.chunks,
-            dimensionNames: nil,
-            scalefactor: writer.scalefactor,
+            dimension_names: nil,
+            scale_factor: writer.scalefactor,
             compression: writer.compression.toC(),
-            dataType: OmFileFormatC.DATA_TYPE_FLOAT,
-            lutOffset: lutStart,
-            lutSize: lutSize
+            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            lut_offset: lutStart,
+            lut_size: lutSize
         )
         let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
         try buffer.writeTrailer(meta: json, fn: fn)
