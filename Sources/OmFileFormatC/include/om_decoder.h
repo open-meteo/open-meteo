@@ -142,8 +142,11 @@ typedef struct {
     /// A scalefactor to convert floats to integers
     float scalefactor;
 
-    /// Numer of bytes for a single element after decompression. Does not need to be the output datatype. E.g. Compression can use 16 bit and convert to float
+    /// Numer of bytes for a single element of the data type
     int8_t bytes_per_element;
+    
+    /// Numer of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
+    int8_t bytes_per_element_compressed;
 } om_decoder_t;
 
 /**

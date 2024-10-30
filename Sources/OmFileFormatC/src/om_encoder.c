@@ -16,40 +16,40 @@
 #define P4NENC256_BOUND(n) ((n + 255) /256 + (n + 32) * sizeof(uint32_t))
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float
-void om_encoder_copy_float_to_int16(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_encoder_copy_float_to_int16(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        float val = ((float *)src)[offset_read + i];
+        float val = ((float *)src)[i];
         if (isnan(val)) {
-            ((int16_t *)dst)[offset_read + i] = INT16_MAX;
+            ((int16_t *)dst)[i] = INT16_MAX;
         } else {
             float scaled = val * scale_factor;
-            ((int16_t *)dst)[offset_write + i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
+            ((int16_t *)dst)[i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
         }
     }
 }
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
-void om_encoder_copy_float_to_int16_log10(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_encoder_copy_float_to_int16_log10(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        float val = ((float *)src)[offset_read + i];
+        float val = ((float *)src)[i];
         if (isnan(val)) {
-            ((float *)dst)[offset_write + i] = INT16_MAX;
+            ((float *)dst)[i] = INT16_MAX;
         } else {
             float scaled = log10f(1 + val) * scale_factor;
-            ((float *)dst)[offset_write + i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
+            ((float *)dst)[i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
         }
     }
 }
 
-void om_encoder_copy_float(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_encoder_copy_float(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        ((float *)dst)[offset_write + i] = ((float *)src)[offset_read + i];
+        ((float *)dst)[i] = ((float *)src)[i];
     }
 }
 
-void om_encoder_copy_double(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_encoder_copy_double(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        ((double *)dst)[offset_write + i] = ((double *)src)[offset_read + i];
+        ((double *)dst)[i] = ((double *)src)[i];
     }
 }
 
@@ -72,7 +72,8 @@ void om_encoder_init(om_encoder_t* encoder, float scalefactor, om_compression_t 
     // TODO more compression and datatypes
     switch (compression) {
         case COMPRESSION_P4NZDEC256:
-            encoder->bytes_per_element = 2;
+            encoder->bytes_per_element = 4;
+            encoder->bytes_per_element_compressed = 2;
             encoder->compress_copy_callback = om_encoder_copy_float_to_int16;
             encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode;
             encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
@@ -81,11 +82,13 @@ void om_encoder_init(om_encoder_t* encoder, float scalefactor, om_compression_t 
         case COMPRESSION_FPXDEC32:
             if (data_type == DATA_TYPE_FLOAT) {
                 encoder->bytes_per_element = 4;
+                encoder->bytes_per_element_compressed = 4;
                 encoder->compress_callback = om_encoder_compress_fpxenc32;
                 encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor;
                 encoder->compress_copy_callback = om_encoder_copy_float;
             } else if (data_type == DATA_TYPE_DOUBLE) {
                 encoder->bytes_per_element = 8;
+                encoder->bytes_per_element_compressed = 8;
                 encoder->compress_callback = om_encoder_compress_fpxenc64;
                 encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor_double;
                 encoder->compress_copy_callback = om_encoder_copy_double;
@@ -93,7 +96,8 @@ void om_encoder_init(om_encoder_t* encoder, float scalefactor, om_compression_t 
             break;
             
         case COMPRESSION_P4NZDEC256_LOGARITHMIC:
-            encoder->bytes_per_element = 2;
+            encoder->bytes_per_element = 4;
+            encoder->bytes_per_element_compressed = 2;
             encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
             encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode;
             encoder->compress_copy_callback = om_encoder_copy_float_to_int16_log10;
@@ -132,6 +136,7 @@ uint64_t om_encoder_chunk_buffer_size(const om_encoder_t* encoder) {
 
 // Calculate minimum chunk write buffer size
 uint64_t om_encoder_minimum_chunk_write_buffer(const om_encoder_t* encoder) {
+    // TODO size of element
     return P4NENC256_BOUND(om_encoder_number_of_chunks(encoder));
 }
 
@@ -169,7 +174,7 @@ void om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUp
     }
 }
 
-size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const float* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer) {
+size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer) {
     /// The total size of `arrayDimensions`. Only used to check for out of bound reads
     uint64_t arrayTotalCount = 1;
     for (uint64_t i = 0; i < encoder->dimension_count; i++) {
@@ -219,7 +224,7 @@ size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const float* array
     while (true) {
         assert(readCoordinate + linearReadCount <= arrayTotalCount);
         assert(writeCoordinate + linearReadCount <= lengthInChunk);
-        (*encoder->compress_copy_callback)(linearReadCount, readCoordinate, writeCoordinate, encoder->scalefactor, array, chunkBuffer);
+        (*encoder->compress_copy_callback)(linearReadCount, encoder->scalefactor, &array[encoder->bytes_per_element * readCoordinate], &chunkBuffer[encoder->bytes_per_element_compressed * writeCoordinate]);
 
         readCoordinate += linearReadCount - 1;
         writeCoordinate += linearReadCount - 1;

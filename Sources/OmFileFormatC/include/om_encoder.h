@@ -29,8 +29,11 @@ typedef struct {
     /// Copy and scale individual values from a chunk into the output array
     om_compress_copy_callback compress_copy_callback;
     
-    /// Numer of bytes for a single element after decompression. Does not need to be the output datatype. E.g. Compression can use 16 bit and convert to float
+    /// Numer of bytes for a single element of the data type
     int8_t bytes_per_element;
+    
+    /// Numer of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
+    int8_t bytes_per_element_compressed;
 } om_encoder_t;
 
 
@@ -44,6 +47,6 @@ uint64_t om_encoder_minimum_chunk_write_buffer(const om_encoder_t* encoder);
 uint64_t om_encoder_output_buffer_capacity(const om_encoder_t* encoder);
 uint64_t om_encoder_size_of_compressed_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount);
 void om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t size_of_compressed_lut);
-size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const float* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer);
+size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer);
 
 #endif // OM_ENCODER_H

@@ -24,30 +24,30 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
 }
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float
-void om_decoder_copy_int16_to_float(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_decoder_copy_int16_to_float(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        int16_t val = ((int16_t *)src)[offset_read + i];
-        ((float *)dst)[offset_write + i] = (val == INT16_MAX) ? NAN : (float)val / scale_factor;
+        int16_t val = ((int16_t *)src)[i];
+        ((float *)dst)[i] = (val == INT16_MAX) ? NAN : (float)val / scale_factor;
     }
 }
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
-void om_decoder_copy_int16_to_float_log10(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_decoder_copy_int16_to_float_log10(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        int16_t val = ((int16_t *)src)[offset_read + i];
-        ((float *)dst)[offset_write + i] = (val == INT16_MAX) ? NAN : powf(10, (float)val / scale_factor) - 1;
+        int16_t val = ((int16_t *)src)[i];
+        ((float *)dst)[i] = (val == INT16_MAX) ? NAN : powf(10, (float)val / scale_factor) - 1;
     }
 }
 
-void om_decoder_copy_float(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_decoder_copy_float(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        ((float *)dst)[offset_write + i] = ((float *)src)[offset_read + i];
+        ((float *)dst)[i] = ((float *)src)[i];
     }
 }
 
-void om_decoder_copy_double(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+void om_decoder_copy_double(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
-        ((double *)dst)[offset_write + i] = ((double *)src)[offset_read + i];
+        ((double *)dst)[i] = ((double *)src)[i];
     }
 }
 
@@ -94,7 +94,8 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     // TODO more compression and datatypes
     switch (compression) {
         case COMPRESSION_P4NZDEC256:
-            decoder->bytes_per_element = 2;
+            decoder->bytes_per_element = 4;
+            decoder->bytes_per_element_compressed = 2;
             decoder->decompress_copy_callback = om_decoder_copy_int16_to_float;
             decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode;
             decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
@@ -103,11 +104,13 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
         case COMPRESSION_FPXDEC32:
             if (data_type == DATA_TYPE_FLOAT) {
                 decoder->bytes_per_element = 4;
+                decoder->bytes_per_element_compressed = 4;
                 decoder->decompress_callback = om_decoder_compress_fpxdec32;
                 decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor;
                 decoder->decompress_copy_callback = om_decoder_copy_float;
             } else if (data_type == DATA_TYPE_DOUBLE) {
                 decoder->bytes_per_element = 8;
+                decoder->bytes_per_element_compressed = 8;
                 decoder->decompress_callback = om_decoder_compress_fpxdec64;
                 decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor_double;
                 decoder->decompress_copy_callback = om_decoder_copy_double;
@@ -115,7 +118,8 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
             break;
             
         case COMPRESSION_P4NZDEC256_LOGARITHMIC:
-            decoder->bytes_per_element = 2;
+            decoder->bytes_per_element = 4;
+            decoder->bytes_per_element_compressed = 2;
             decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
             decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode;
             decoder->decompress_copy_callback = om_decoder_copy_int16_to_float_log10;
@@ -500,7 +504,7 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
     // Copy data from the chunk buffer to the output buffer.
     while (true) {
         /// Copy values from chunk buffer into output buffer
-        (*decoder->decompress_copy_callback)(linearReadCount, d, q, decoder->scalefactor, chunk_buffer, into);
+        (*decoder->decompress_copy_callback)(linearReadCount, decoder->scalefactor, &chunk_buffer[d * decoder->bytes_per_element_compressed], &into[q * decoder->bytes_per_element]);
         
         q += linearReadCount - 1;
         d += linearReadCount - 1;
