@@ -13,8 +13,6 @@
 #include "fp.h"
 #include "delta2d.h"
 
-#define P4NENC256_BOUND(n) ((n + 255) /256 + (n + 32) * sizeof(uint32_t))
-
 /// Assume chunk buffer is a 16 bit integer array and convert to float
 void om_encoder_copy_float_to_int16(uint64_t length, float scale_factor, const void* src, void* dst) {
     for (uint64_t i = 0; i < length; ++i) {
@@ -126,26 +124,13 @@ uint64_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const
 }
 
 // Calculate chunk buffer size
-uint64_t om_encoder_chunk_buffer_size(const om_encoder_t* encoder) {
+uint64_t om_encoder_compress_chunk_buffer_size(const om_encoder_t* encoder) {
     uint64_t chunkLength = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         chunkLength *= encoder->chunks[i];
     }
-    return P4NENC256_BOUND(chunkLength);
-}
-
-// Calculate minimum chunk write buffer size
-uint64_t om_encoder_minimum_chunk_write_buffer(const om_encoder_t* encoder) {
-    // TODO size of element
-    return P4NENC256_BOUND(om_encoder_number_of_chunks(encoder));
-}
-
-// Calculate output buffer capacity to store compressed data and LUT. Minimum 4K.
-uint64_t om_encoder_output_buffer_capacity(const om_encoder_t* encoder) {
-    uint64_t bufferSize = om_encoder_chunk_buffer_size(encoder);
-    uint64_t nChunks = om_encoder_number_of_chunks(encoder);
-    uint64_t lutBufferSize = nChunks * 8;
-    return max(4096, max(lutBufferSize, bufferSize));
+    // P4NENC256_BOUND. Compressor may write 32 integers more
+    return (chunkLength + 255) /256 + (chunkLength + 32) * encoder->bytes_per_element_compressed;
 }
 
 // Calculate the size of the compressed LUT buffer
@@ -166,17 +151,18 @@ uint64_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const 
 // Compress the LUT to an output buffer and return the size of the compressed LUT
 uint64_t om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t compressed_lut_buffer_size) {
     uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
-    uint64_t lutChunkLength = compressed_lut_buffer_size / nLutChunks;
+    uint64_t lutSize = compressed_lut_buffer_size - 32 * sizeof(uint64_t);
+    uint64_t lutChunkLength = lutSize / nLutChunks;
 
     for (uint64_t i = 0; i < nLutChunks; i++) {
         uint64_t rangeStart = i * encoder->lut_chunk_element_count;
         uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
         p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, &out[i * lutChunkLength]);
     }
-    return lutChunkLength * nLutChunks;
+    return lutSize;
 }
 
-size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer) {
+size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
     /// The total size of `arrayDimensions`. Only used to check for out of bound reads
     uint64_t arrayTotalCount = 1;
     for (uint64_t i = 0; i < encoder->dimension_count; i++) {

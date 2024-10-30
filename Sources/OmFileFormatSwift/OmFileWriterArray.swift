@@ -11,7 +11,7 @@ import Foundation
 /// All data is written to this buffer. It needs to be emptied periodically after writing large chunks of data.
 public final class OmFileWriter2 {
     /// All data is written to this buffer. The current offset is in `writeBufferPos`. This buffer must be written out before it is full.
-    public var buffer: UnsafeMutableBufferPointer<UInt8>
+    public var buffer: UnsafeMutableRawBufferPointer
         
     public var writePosition = UInt64(0)
     
@@ -24,7 +24,25 @@ public final class OmFileWriter2 {
         self.writePosition = 0
         self.totalBytesWritten = 0
         self.capacity = capacity
-        self.buffer = .allocate(capacity: Int(capacity))
+        self.buffer = .allocate(byteCount: Int(capacity), alignment: 1)
+    }
+    
+    /// How many bytes are left in the write buffer
+    var remainingCapacity: UInt64 {
+        return UInt64(buffer.count) - (writePosition)
+    }
+    
+    /// A pointer to the current write position
+    var bufferAtWritePosition: UnsafeMutableRawPointer {
+        return buffer.baseAddress!.advanced(by: Int(writePosition))
+    }
+    
+    /// Ensure the buffer has at least a minimum capacity
+    public func reallocate(minimumCapacity: UInt64) {
+        if remainingCapacity >= minimumCapacity {
+            return
+        }
+        buffer = UnsafeMutableRawBufferPointer(start: realloc(buffer.baseAddress, Int(minimumCapacity)), count: Int(minimumCapacity))
     }
     
     public func writeHeader<FileHandle: OmFileWriterBackend>(fn: FileHandle) throws {
@@ -45,7 +63,7 @@ public final class OmFileWriter2 {
     
     /// Write header. Only magic number and version 3
     public func writeHeader() {
-        assert(capacity - writePosition >= 3)
+        reallocate(minimumCapacity: 3)
         buffer[Int(writePosition) + 0] = OmHeader.magicNumber1
         buffer[Int(writePosition) + 1] = OmHeader.magicNumber2
         buffer[Int(writePosition) + 2] = 3
@@ -59,7 +77,8 @@ public final class OmFileWriter2 {
         
         // Serialise and write JSON
         let json = try JSONEncoder().encode(meta)
-        assert(capacity - writePosition >= json.count)
+        reallocate(minimumCapacity: UInt64(json.count))
+        
         let jsonLength = json.withUnsafeBytes({
             memcpy(buffer.baseAddress!.advanced(by: Int(writePosition)), $0.baseAddress!, $0.count)
             return UInt64($0.count)
@@ -71,8 +90,8 @@ public final class OmFileWriter2 {
         // TODO Additional version field and maybe some reserved stuff. E.g. if the JSON payload should be compressed later.
         
         // write length of JSON
-        assert(capacity - writePosition >= 8)
-        buffer.baseAddress!.advanced(by: Int(writePosition)).assumingMemoryBound(to: Int.self, capacity: 1)[0] = Int(jsonLength)
+        reallocate(minimumCapacity: 8)
+        buffer.baseAddress!.advanced(by: Int(writePosition)).assumingMemoryBound(to: Int.self)[0] = Int(jsonLength)
         writePosition += 8
         totalBytesWritten += 8
     }
@@ -100,6 +119,10 @@ public final class OmFileWriterArray {
     
     /// How the dimensions are chunked
     let chunks: [UInt64]
+    
+    let chunkBufferSize: UInt64
+    
+    let chunkBuffer: UnsafeMutableRawBufferPointer
     
     /**
      Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
@@ -133,6 +156,12 @@ public final class OmFileWriterArray {
         
         let nChunks = om_encoder_number_of_chunks(&encoder)
         
+        /// This is the minimum output buffer size for each compressed size. In practice the buffer should be much larger.
+        chunkBufferSize = om_encoder_compress_chunk_buffer_size(&encoder)
+        
+        /// Each thread needs its own chunk buffer to compress data. This implementation is single threaded
+        chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
+        
         // +1 to store also the start address
         self.lookUpTable = .init(repeating: 0, count: Int(nChunks + 1))
         self.chunks = chunkDimensions
@@ -150,17 +179,11 @@ public final class OmFileWriterArray {
         let arrayOffset = arrayRead.map({UInt64($0.lowerBound)})
         let arrayCount = arrayRead.map({UInt64($0.count)})
         
+        /// For performance the output buffer should be able to hold a multiple of the chunk buffer size
+        out.reallocate(minimumCapacity: chunkBufferSize * 4)
+        
+        /// How many chunks can be written to the output. This could be only a single one, or multiple
         let numberOfChunksInArray = om_encoder_number_of_chunks_in_array(&encoder, arrayCount)
-        
-        /// This is the minimum output buffer size for each compressed size. In practice the buffer should be a couple of MB.
-        let minimumBuffer = Int(om_encoder_minimum_chunk_write_buffer(&encoder))
-        
-        // Each thread needs its own chunk buffer to compress data
-        let chunkBufferSize = Int(om_encoder_chunk_buffer_size(&encoder))
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: chunkBufferSize, alignment: 1)
-        defer {
-            chunkBuffer.deallocate()
-        }
         
         if chunkIndex == 0 {
             // Store data start address
@@ -170,21 +193,18 @@ public final class OmFileWriterArray {
         // This loop could be done in parallel. However, the order of chunks must remain the same in the LUT and final output buffer.
         // For multithreading, multiple buffers are required that need to be copied into the final buffer afterwards
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
-            let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
-            let outSize = out.buffer.count - Int(out.writePosition)
-            assert(outSize >= minimumBuffer)
-            let writeLength = om_encoder_compress_chunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, outPtr, UInt64(outSize), chunkBuffer.baseAddress)
+            assert(out.remainingCapacity >= chunkBufferSize)
+            let bytes_written = om_encoder_compress_chunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, out.bufferAtWritePosition, chunkBuffer.baseAddress)
 
-            //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
-            out.writePosition += UInt64(writeLength)
-            out.totalBytesWritten += UInt64(writeLength)
+            out.writePosition += UInt64(bytes_written)
+            out.totalBytesWritten += UInt64(bytes_written)
             
             // Store chunk offset in LUT
             lookUpTable[chunkIndex+1] = out.totalBytesWritten
             chunkIndex += 1
             
             // Write buffer to disk if the next chunk may not fit anymore in the output buffer
-            if out.buffer.count - Int(out.writePosition) < minimumBuffer {
+            if out.remainingCapacity < chunkBufferSize {
                 try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
                 out.writePosition = 0
             }
@@ -193,10 +213,12 @@ public final class OmFileWriterArray {
     
     /// Returns LUT size
     public func writeLut(out: OmFileWriter2, fn: FileHandle) throws -> UInt64 {
+        /// The size of the total compressed LUT including some padding
         let buffer_size = om_encoder_compress_lut_buffer_size(&encoder, lookUpTable, UInt64(lookUpTable.count))
-        assert(out.buffer.count - Int(out.writePosition) >= Int(buffer_size))
+        out.reallocate(minimumCapacity: buffer_size)
         
-        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, UInt64(lookUpTable.count), out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), buffer_size)
+        /// Compress the LUT and return the actual compressed LUT size
+        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, UInt64(lookUpTable.count), out.bufferAtWritePosition, buffer_size)
         
         out.writePosition += UInt64(compressed_lut_size)
         out.totalBytesWritten += UInt64(compressed_lut_size)
@@ -206,8 +228,7 @@ public final class OmFileWriterArray {
         return UInt64(compressed_lut_size)
     }
     
-
-    func output_buffer_capacity() -> UInt64 {
-        om_encoder_output_buffer_capacity(&encoder)
+    deinit {
+        chunkBuffer.deallocate()
     }
 }

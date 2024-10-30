@@ -70,7 +70,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let writer = OmFileWriterArray(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
-        let buffer = OmFileWriter2(capacity: writer.output_buffer_capacity())
+        let buffer = OmFileWriter2(capacity: 1)
         
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -108,7 +108,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
-        let buffer = OmFileWriter2(capacity: writer.output_buffer_capacity())
+        let buffer = OmFileWriter2(capacity: 1)
         
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -151,7 +151,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
-        let buffer = OmFileWriter2(capacity: writer.output_buffer_capacity())
+        let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
         /// Deliberately add NaN on all positions that should not be written to the file. Only the inner 5x5 array is written
@@ -187,7 +187,7 @@ final class OmFileFormatTests: XCTestCase {
         
         let dims = [UInt64(3),3,3]
         let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
-        let buffer = OmFileWriter2(capacity: writer.output_buffer_capacity())
+        let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0]
@@ -232,7 +232,7 @@ final class OmFileFormatTests: XCTestCase {
         
         let dims = [UInt64(5),5]
         let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1, lutChunkElementCount: 2)
-        let buffer = OmFileWriter2(capacity: writer.output_buffer_capacity())
+        let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
@@ -331,7 +331,7 @@ final class OmFileFormatTests: XCTestCase {
         
         let dims = [UInt64(5),5]
         let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1, lutChunkElementCount: 2)
-        let buffer = OmFileWriter2(capacity: writer.output_buffer_capacity())
+        let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
