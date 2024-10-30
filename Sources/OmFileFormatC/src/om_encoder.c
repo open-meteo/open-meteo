@@ -148,8 +148,8 @@ uint64_t om_encoder_output_buffer_capacity(const om_encoder_t* encoder) {
     return max(4096, max(lutBufferSize, bufferSize));
 }
 
-// Calculate the size of the compressed LUT
-uint64_t om_encoder_size_of_compressed_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount) {
+// Calculate the size of the compressed LUT buffer
+uint64_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount) {
     unsigned char buffer[MAX_LUT_ELEMENTS+32] = {0};
     uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     uint64_t maxLength = 0;
@@ -159,19 +159,21 @@ uint64_t om_encoder_size_of_compressed_lut(const om_encoder_t* encoder, const ui
         size_t len = p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, buffer);
         if (len > maxLength) maxLength = len;
     }
-    return maxLength * nLutChunks;
+    /// Compression function can write 32 integers more
+    return maxLength * nLutChunks + 32 * sizeof(uint64_t);
 }
 
-// Compress the LUT to an output buffer
-void om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t size_of_compressed_lut) {
+// Compress the LUT to an output buffer and return the size of the compressed LUT
+uint64_t om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t compressed_lut_buffer_size) {
     uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
-    uint64_t lutChunkLength = size_of_compressed_lut / nLutChunks;
+    uint64_t lutChunkLength = compressed_lut_buffer_size / nLutChunks;
 
     for (uint64_t i = 0; i < nLutChunks; i++) {
         uint64_t rangeStart = i * encoder->lut_chunk_element_count;
         uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
         p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, &out[i * lutChunkLength]);
     }
+    return lutChunkLength * nLutChunks;
 }
 
 size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer) {

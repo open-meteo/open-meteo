@@ -45,8 +45,8 @@ uint64_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const
 uint64_t om_encoder_chunk_buffer_size(const om_encoder_t* encoder);
 uint64_t om_encoder_minimum_chunk_write_buffer(const om_encoder_t* encoder);
 uint64_t om_encoder_output_buffer_capacity(const om_encoder_t* encoder);
-uint64_t om_encoder_size_of_compressed_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount);
-void om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t size_of_compressed_lut);
+uint64_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount);
+uint64_t om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t size_of_compressed_lut);
 size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer);
 
 #endif // OM_ENCODER_H

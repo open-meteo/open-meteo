@@ -193,16 +193,17 @@ public final class OmFileWriterArray {
     
     /// Returns LUT size
     public func writeLut(out: OmFileWriter2, fn: FileHandle) throws -> UInt64 {
-        let size_of_compressed_lut = om_encoder_size_of_compressed_lut(&encoder, lookUpTable, UInt64(lookUpTable.count))
-        assert(out.buffer.count - Int(out.writePosition) >= Int(size_of_compressed_lut))
-        om_encoder_compress_lut(&encoder, lookUpTable, UInt64(lookUpTable.count), out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), size_of_compressed_lut)
+        let buffer_size = om_encoder_compress_lut_buffer_size(&encoder, lookUpTable, UInt64(lookUpTable.count))
+        assert(out.buffer.count - Int(out.writePosition) >= Int(buffer_size))
         
-        out.writePosition += UInt64(size_of_compressed_lut)
-        out.totalBytesWritten += UInt64(size_of_compressed_lut)
+        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, UInt64(lookUpTable.count), out.buffer.baseAddress!.advanced(by: Int(out.writePosition)), buffer_size)
+        
+        out.writePosition += UInt64(compressed_lut_size)
+        out.totalBytesWritten += UInt64(compressed_lut_size)
         
         try fn.write(contentsOf: out.buffer[0..<Int(out.writePosition)].map({$0}))
         out.writePosition = 0
-        return UInt64(size_of_compressed_lut)
+        return UInt64(compressed_lut_size)
     }
     
 
