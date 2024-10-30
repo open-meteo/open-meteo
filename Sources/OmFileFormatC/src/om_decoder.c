@@ -23,42 +23,6 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
     data_read->nextChunk = index_read->chunkIndex;
 }
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float
-void om_decoder_copy_int16_to_float(uint64_t length, float scale_factor, const void* src, void* dst) {
-    for (uint64_t i = 0; i < length; ++i) {
-        int16_t val = ((int16_t *)src)[i];
-        ((float *)dst)[i] = (val == INT16_MAX) ? NAN : (float)val / scale_factor;
-    }
-}
-
-/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
-void om_decoder_copy_int16_to_float_log10(uint64_t length, float scale_factor, const void* src, void* dst) {
-    for (uint64_t i = 0; i < length; ++i) {
-        int16_t val = ((int16_t *)src)[i];
-        ((float *)dst)[i] = (val == INT16_MAX) ? NAN : powf(10, (float)val / scale_factor) - 1;
-    }
-}
-
-void om_decoder_copy_float(uint64_t length, float scale_factor, const void* src, void* dst) {
-    for (uint64_t i = 0; i < length; ++i) {
-        ((float *)dst)[i] = ((float *)src)[i];
-    }
-}
-
-void om_decoder_copy_double(uint64_t length, float scale_factor, const void* src, void* dst) {
-    for (uint64_t i = 0; i < length; ++i) {
-        ((double *)dst)[i] = ((double *)src)[i];
-    }
-}
-
-uint64_t om_decoder_compress_fpxdec32(const void* src, uint64_t length, void* dst) {
-    return fpxdec32((unsigned char *)src, length, (uint32_t *)dst, 0);
-}
-
-uint64_t om_decoder_compress_fpxdec64(const void* src, uint64_t length, void* dst) {
-    return fpxdec64((unsigned char *)src, length, (uint64_t *)dst, 0);
-}
-
 
 // Initialization function for OmFileDecoder
 void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max) {
@@ -96,7 +60,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
         case COMPRESSION_P4NZDEC256:
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
-            decoder->decompress_copy_callback = om_decoder_copy_int16_to_float;
+            decoder->decompress_copy_callback = om_common_copy_int16_to_float;
             decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode;
             decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
             break;
@@ -105,15 +69,15 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
             if (data_type == DATA_TYPE_FLOAT) {
                 decoder->bytes_per_element = 4;
                 decoder->bytes_per_element_compressed = 4;
-                decoder->decompress_callback = om_decoder_compress_fpxdec32;
+                decoder->decompress_callback = om_common_decompress_fpxdec32;
                 decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor;
-                decoder->decompress_copy_callback = om_decoder_copy_float;
+                decoder->decompress_copy_callback = om_common_copy_float;
             } else if (data_type == DATA_TYPE_DOUBLE) {
                 decoder->bytes_per_element = 8;
                 decoder->bytes_per_element_compressed = 8;
-                decoder->decompress_callback = om_decoder_compress_fpxdec64;
+                decoder->decompress_callback = om_common_decompress_fpxdec64;
                 decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor_double;
-                decoder->decompress_copy_callback = om_decoder_copy_double;
+                decoder->decompress_copy_callback = om_common_copy_double;
             }
             break;
             
@@ -122,7 +86,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
             decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode;
-            decoder->decompress_copy_callback = om_decoder_copy_int16_to_float_log10;
+            decoder->decompress_copy_callback = om_common_copy_int16_to_float_log10;
             break;
             
         default:

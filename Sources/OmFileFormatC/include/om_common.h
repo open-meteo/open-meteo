@@ -62,4 +62,30 @@ typedef enum {
       __typeof__ (b) _b = (b); \
     _a < _b ? _a : _b; })
 
+/// Assume chunk buffer is a 16 bit integer array and convert to float
+void om_common_copy_float_to_int16(uint64_t length, float scale_factor, const void* src, void* dst);
+
+/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
+void om_common_copy_float_to_int16_log10(uint64_t length, float scale_factor, const void* src, void* dst);
+
+/// Assume chunk buffer is a 16 bit integer array and convert to float
+void om_common_copy_int16_to_float(uint64_t length, float scale_factor, const void* src, void* dst);
+
+/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
+void om_common_copy_int16_to_float_log10(uint64_t length, float scale_factor, const void* src, void* dst);
+
+void om_common_copy_float(uint64_t length, float scale_factor, const void* src, void* dst);
+
+void om_common_copy_double(uint64_t length, float scale_factor, const void* src, void* dst);
+
+uint64_t om_common_compress_fpxenc32(const void* src, uint64_t length, void* dst);
+
+uint64_t om_common_compress_fpxenc64(const void* src, uint64_t length, void* dst);
+
+uint64_t om_common_decompress_fpxdec32(const void* src, uint64_t length, void* dst);
+
+uint64_t om_common_decompress_fpxdec64(const void* src, uint64_t length, void* dst);
+
+
+
 #endif // OM_COMMON_H
