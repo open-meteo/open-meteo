@@ -71,13 +71,13 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
                 decoder->bytes_per_element_compressed = 4;
                 decoder->decompress_callback = om_common_decompress_fpxdec32;
                 decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor;
-                decoder->decompress_copy_callback = om_common_copy_float;
+                decoder->decompress_copy_callback = om_common_copy32;
             } else if (data_type == DATA_TYPE_DOUBLE) {
                 decoder->bytes_per_element = 8;
                 decoder->bytes_per_element_compressed = 8;
                 decoder->decompress_callback = om_common_decompress_fpxdec64;
                 decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor_double;
-                decoder->decompress_copy_callback = om_common_copy_double;
+                decoder->decompress_copy_callback = om_common_copy64;
             }
             break;
             

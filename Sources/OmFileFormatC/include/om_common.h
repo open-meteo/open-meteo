@@ -74,9 +74,10 @@ void om_common_copy_int16_to_float(uint64_t length, float scale_factor, const vo
 /// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
 void om_common_copy_int16_to_float_log10(uint64_t length, float scale_factor, const void* src, void* dst);
 
-void om_common_copy_float(uint64_t length, float scale_factor, const void* src, void* dst);
-
-void om_common_copy_double(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy8(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy16(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy32(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy64(uint64_t length, float scale_factor, const void* src, void* dst);
 
 uint64_t om_common_compress_fpxenc32(const void* src, uint64_t length, void* dst);
 

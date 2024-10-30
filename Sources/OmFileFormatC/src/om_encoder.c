@@ -38,13 +38,13 @@ void om_encoder_init(om_encoder_t* encoder, float scalefactor, om_compression_t 
                 encoder->bytes_per_element_compressed = 4;
                 encoder->compress_callback = om_common_compress_fpxenc32;
                 encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor;
-                encoder->compress_copy_callback = om_common_copy_float;
+                encoder->compress_copy_callback = om_common_copy32;
             } else if (data_type == DATA_TYPE_DOUBLE) {
                 encoder->bytes_per_element = 8;
                 encoder->bytes_per_element_compressed = 8;
                 encoder->compress_callback = om_common_compress_fpxenc64;
                 encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor_double;
-                encoder->compress_copy_callback = om_common_copy_double;
+                encoder->compress_copy_callback = om_common_copy64;
             }
             break;
             
