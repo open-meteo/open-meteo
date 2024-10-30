@@ -15,8 +15,9 @@
 
 
 // Initialize om_file_encoder
-void om_encoder_init(om_encoder_t* encoder, float scale_factor, om_compression_t compression, om_datatype_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) {
+void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) {
     encoder->scale_factor = scale_factor;
+    encoder->add_offset = add_offset;
     encoder->dimensions = dimensions;
     encoder->chunks = chunks;
     encoder->dimension_count = dimension_count;
@@ -167,7 +168,7 @@ size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const void* array,
     while (true) {
         assert(readCoordinate + linearReadCount <= arrayTotalCount);
         assert(writeCoordinate + linearReadCount <= lengthInChunk);
-        (*encoder->compress_copy_callback)(linearReadCount, encoder->scale_factor, &array[encoder->bytes_per_element * readCoordinate], &chunkBuffer[encoder->bytes_per_element_compressed * writeCoordinate]);
+        (*encoder->compress_copy_callback)(linearReadCount, encoder->scale_factor, encoder->add_offset, &array[encoder->bytes_per_element * readCoordinate], &chunkBuffer[encoder->bytes_per_element_compressed * writeCoordinate]);
 
         readCoordinate += linearReadCount - 1;
         writeCoordinate += linearReadCount - 1;

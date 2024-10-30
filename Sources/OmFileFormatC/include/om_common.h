@@ -13,7 +13,7 @@
 #include <stdbool.h>
 
 /// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
-typedef void(*om_compress_copy_callback)(uint64_t length, float scalef_actor, const void* src, void* dest);
+typedef void(*om_compress_copy_callback)(uint64_t length, float scale_factor, float add_offset, const void* src, void* dest);
 
 /// compress input, of n-elements to output and return number of compressed byte
 typedef uint64_t(*om_compress_callback)(const void* src, uint64_t length, void* dest);
@@ -63,21 +63,21 @@ typedef enum {
     _a < _b ? _a : _b; })
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float
-void om_common_copy_float_to_int16(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy_float_to_int16(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
-void om_common_copy_float_to_int16_log10(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy_float_to_int16_log10(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float
-void om_common_copy_int16_to_float(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy_int16_to_float(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
-void om_common_copy_int16_to_float_log10(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy_int16_to_float_log10(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-void om_common_copy8(uint64_t length, float scale_factor, const void* src, void* dst);
-void om_common_copy16(uint64_t length, float scale_factor, const void* src, void* dst);
-void om_common_copy32(uint64_t length, float scale_factor, const void* src, void* dst);
-void om_common_copy64(uint64_t length, float scale_factor, const void* src, void* dst);
+void om_common_copy8(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy16(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy32(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy64(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 uint64_t om_common_compress_fpxenc32(const void* src, uint64_t length, void* dst);
 

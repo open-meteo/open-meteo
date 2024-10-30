@@ -14,7 +14,6 @@
 
 // Encoder struct
 typedef struct {
-    float scale_factor;
     const uint64_t *dimensions;
     const uint64_t *chunks;
     uint64_t dimension_count;
@@ -29,6 +28,11 @@ typedef struct {
     /// Copy and scale individual values from a chunk into the output array
     om_compress_copy_callback compress_copy_callback;
     
+    float scale_factor;
+    
+    /// An offset to convert floats to integers while scaling
+    float add_offset;
+    
     /// Numer of bytes for a single element of the data type
     int8_t bytes_per_element;
     
@@ -38,7 +42,7 @@ typedef struct {
 
 
 
-void om_encoder_init(om_encoder_t* encoder, float scale_factor, om_compression_t compression, om_datatype_t datatype, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count);
+void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t datatype, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count);
 
 uint64_t om_encoder_number_of_chunks(const om_encoder_t* encoder);
 uint64_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const uint64_t* array_count);

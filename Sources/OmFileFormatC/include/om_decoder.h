@@ -141,6 +141,9 @@ typedef struct {
     
     /// A scalefactor to convert floats to integers
     float scale_factor;
+    
+    /// An offset to convert floats to integers while scaling
+    float add_offset;
 
     /// Numer of bytes for a single element of the data type
     int8_t bytes_per_element;
@@ -213,7 +216,7 @@ typedef struct {
  *          \endcode
  *          This value is stored in `decoder->number_of_chunks` and is used for managing the read operations.
  */
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max);
+void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max);
 
 /**
  * @brief Initializes an `om_decoder_index_read_t` structure for reading chunk indices.

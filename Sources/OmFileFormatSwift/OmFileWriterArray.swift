@@ -107,7 +107,10 @@ public final class OmFileWriterArray {
     public var chunkIndex: Int = 0
     
     /// The scalefactor that is applied to all write data
-    public let scalefactor: Float
+    public let scale_factor: Float
+    
+    /// The offset that is applied to all write data
+    public let add_offset: Float
     
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
     public let compression: CompressionType
@@ -131,7 +134,7 @@ public final class OmFileWriterArray {
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
-    public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, datatype: DataType, scalefactor: Float, lutChunkElementCount: Int = 256) {
+    public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, datatype: DataType, scale_factor: Float, add_offset: Float, lutChunkElementCount: Int = 256) {
         
         /*let chunkSizeByte = chunkDimensions.reduce(1, *) * 4
         if chunkSizeByte > 1024 * 1024 * 4 {
@@ -150,7 +153,7 @@ public final class OmFileWriterArray {
             ptrDims[i] = dimensions[i]
             ptrChunks[i] = chunkDimensions[i]
         }
-        om_encoder_init(&encoder, scalefactor, compression.toC(), datatype.toC(), ptrDims, ptrChunks, UInt64(dimensions.count), UInt64(lutChunkElementCount))
+        om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), ptrDims, ptrChunks, UInt64(dimensions.count), UInt64(lutChunkElementCount))
         self.encoder = encoder
 
         
@@ -168,7 +171,8 @@ public final class OmFileWriterArray {
         self.dimensions = dimensions
         self.compression = compression
         self.datatype = datatype
-        self.scalefactor = scalefactor
+        self.scale_factor = scale_factor
+        self.add_offset = add_offset
     }
     
     /// Compress data

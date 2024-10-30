@@ -63,6 +63,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                     chunks: [UInt64(metaV1.pointee.chunk0), UInt64(metaV1.pointee.chunk1)],
                     dimension_names: nil,
                     scale_factor: metaV1.pointee.scalefactor,
+                    add_offset: 0,
                     compression: .init(UInt32(metaV1.pointee.compression)),
                     data_type: DATA_TYPE_FLOAT,
                     lut_offset: UInt64(OmHeader.length),

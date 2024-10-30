@@ -39,6 +39,8 @@ public struct OmFileJSONVariable: Codable {
     /// The scalefactor that is applied to convert floating point values to integers
     let scale_factor: Float
     
+    let add_offset: Float
+    
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
     let compression: OmFileFormatC.om_compression_t
     

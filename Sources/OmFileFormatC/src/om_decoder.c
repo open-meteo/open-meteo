@@ -25,7 +25,7 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
 
 
 // Initialization function for OmFileDecoder
-void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max) {
+void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset, const om_compression_t compression, const om_datatype_t data_type, uint64_t dims_count, const uint64_t* dims, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max) {
     // Calculate the number of chunks based on dims and chunks
     uint64_t nChunks = 1;
     for (uint64_t i = 0; i < dims_count; i++) {
@@ -40,6 +40,7 @@ void om_decoder_init(om_decoder_t* decoder, const float scalefactor, const om_co
     
     decoder->number_of_chunks = nChunks;
     decoder->scale_factor = scalefactor;
+    decoder->add_offset = add_offset;
     decoder->dimensions = dims;
     decoder->dimensions_count = dims_count;
     decoder->chunks = chunks;
@@ -468,7 +469,7 @@ uint64_t _om_decoder_decode_chunk(const om_decoder_t *decoder, uint64_t chunk, c
     // Copy data from the chunk buffer to the output buffer.
     while (true) {
         /// Copy values from chunk buffer into output buffer
-        (*decoder->decompress_copy_callback)(linearReadCount, decoder->scale_factor, &chunk_buffer[d * decoder->bytes_per_element_compressed], &into[q * decoder->bytes_per_element]);
+        (*decoder->decompress_copy_callback)(linearReadCount, decoder->scale_factor, decoder->add_offset, &chunk_buffer[d * decoder->bytes_per_element_compressed], &into[q * decoder->bytes_per_element]);
         
         q += linearReadCount - 1;
         d += linearReadCount - 1;

@@ -69,7 +69,7 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileWriterArray(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
+        let writer = OmFileWriterArray(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
         let buffer = OmFileWriter2(capacity: 1)
         
         let fn = try FileHandle.createNewFile(file: file)
@@ -84,7 +84,8 @@ final class OmFileFormatTests: XCTestCase {
             dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimension_names: nil,
-            scale_factor: writer.scalefactor,
+            scale_factor: writer.scale_factor,
+            add_offset: writer.add_offset,
             compression: writer.compression.toC(),
             data_type: OmFileFormatC.DATA_TYPE_FLOAT,
             lut_offset: lutStart,
@@ -107,7 +108,7 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
+        let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
         let buffer = OmFileWriter2(capacity: 1)
         
         let fn = try FileHandle.createNewFile(file: file)
@@ -130,7 +131,8 @@ final class OmFileFormatTests: XCTestCase {
             dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimension_names: nil,
-            scale_factor: writer.scalefactor,
+            scale_factor: writer.scale_factor,
+            add_offset: writer.add_offset,
             compression: writer.compression.toC(),
             data_type: OmFileFormatC.DATA_TYPE_FLOAT,
             lut_offset: lutStart,
@@ -150,7 +152,7 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
+        let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
         let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -166,7 +168,8 @@ final class OmFileFormatTests: XCTestCase {
             dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimension_names: nil,
-            scale_factor: writer.scalefactor,
+            scale_factor: writer.scale_factor,
+            add_offset: writer.add_offset,
             compression: writer.compression.toC(),
             data_type: OmFileFormatC.DATA_TYPE_FLOAT,
             lut_offset: lutStart,
@@ -186,7 +189,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let dims = [UInt64(3),3,3]
-        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1)
+        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
         let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -200,7 +203,8 @@ final class OmFileFormatTests: XCTestCase {
             dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimension_names: nil,
-            scale_factor: writer.scalefactor,
+            scale_factor: writer.scale_factor,
+            add_offset: writer.add_offset,
             compression: writer.compression.toC(),
             data_type: OmFileFormatC.DATA_TYPE_FLOAT,
             lut_offset: lutStart,
@@ -231,7 +235,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let dims = [UInt64(5),5]
-        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1, lutChunkElementCount: 2)
+        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
         let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -245,7 +249,8 @@ final class OmFileFormatTests: XCTestCase {
             dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimension_names: nil,
-            scale_factor: writer.scalefactor,
+            scale_factor: writer.scale_factor,
+            add_offset: writer.add_offset,
             compression: writer.compression.toC(),
             data_type: OmFileFormatC.DATA_TYPE_FLOAT,
             lut_offset: lutStart,
@@ -330,7 +335,7 @@ final class OmFileFormatTests: XCTestCase {
         try FileManager.default.removeItemIfExists(at: file)
         
         let dims = [UInt64(5),5]
-        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scalefactor: 1, lutChunkElementCount: 2)
+        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
         let buffer = OmFileWriter2(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
         
@@ -344,7 +349,8 @@ final class OmFileFormatTests: XCTestCase {
             dimensions: writer.dimensions,
             chunks: writer.chunks,
             dimension_names: nil,
-            scale_factor: writer.scalefactor,
+            scale_factor: writer.scale_factor,
+            add_offset: writer.add_offset,
             compression: writer.compression.toC(),
             data_type: OmFileFormatC.DATA_TYPE_FLOAT,
             lut_offset: lutStart,
