@@ -1,5 +1,5 @@
 //
-//  Header.h
+//  om_encoder.c
 //  OpenMeteoApi
 //
 //  Created by Patrick Zippenfenig on 29.10.2024.
@@ -8,13 +8,11 @@
 #include "om_encoder.h"
 #include <stdlib.h>
 #include <assert.h>
-#include <math.h>
 #include "vp4.h"
 #include "fp.h"
 #include "delta2d.h"
 
 
-// Initialize om_file_encoder
 void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count) {
     encoder->scale_factor = scale_factor;
     encoder->add_offset = add_offset;
@@ -23,9 +21,47 @@ void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset
     encoder->dimension_count = dimension_count;
     encoder->lut_chunk_element_count = lut_chunk_element_count;
     
+    
+    // Set element sizes and copy function
+    switch (data_type) {
+        case DATA_TYPE_INT8:
+        case DATA_TYPE_UINT8:
+            encoder->bytes_per_element = 1;
+            encoder->bytes_per_element_compressed = 1;
+            encoder->compress_copy_callback = om_common_copy8;
+            break;
+        
+        case DATA_TYPE_INT16:
+        case DATA_TYPE_UINT16:
+            encoder->bytes_per_element = 2;
+            encoder->bytes_per_element_compressed = 2;
+            encoder->compress_copy_callback = om_common_copy16;
+            break;
+            
+        case DATA_TYPE_INT32:
+        case DATA_TYPE_UINT32:
+        case DATA_TYPE_FLOAT:
+            encoder->bytes_per_element = 4;
+            encoder->bytes_per_element_compressed = 4;
+            encoder->compress_copy_callback = om_common_copy32;
+            break;
+            
+        case DATA_TYPE_INT64:
+        case DATA_TYPE_UINT64:
+        case DATA_TYPE_DOUBLE:
+            encoder->bytes_per_element = 8;
+            encoder->bytes_per_element_compressed = 8;
+            encoder->compress_copy_callback = om_common_copy32;
+            break;
+            
+        default:
+            assert(0 && "Unsupported data type");
+    }
+    
     // TODO more compression and datatypes
     switch (compression) {
-        case COMPRESSION_P4NZDEC256:
+        case COMPRESSION_PFOR_16BIT_DELTA2D:
+            assert(data_type == DATA_TYPE_FLOAT);
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
             encoder->compress_copy_callback = om_common_copy_float_to_int16;
@@ -33,23 +69,26 @@ void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset
             encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
             break;
             
-        case COMPRESSION_FPXDEC32:
-            if (data_type == DATA_TYPE_FLOAT) {
-                encoder->bytes_per_element = 4;
-                encoder->bytes_per_element_compressed = 4;
-                encoder->compress_callback = om_common_compress_fpxenc32;
-                encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor;
-                encoder->compress_copy_callback = om_common_copy32;
-            } else if (data_type == DATA_TYPE_DOUBLE) {
-                encoder->bytes_per_element = 8;
-                encoder->bytes_per_element_compressed = 8;
-                encoder->compress_callback = om_common_compress_fpxenc64;
-                encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor_double;
-                encoder->compress_copy_callback = om_common_copy64;
+        case COMPRESSION_FPX_XOR2D:
+            switch (data_type) {
+                case DATA_TYPE_FLOAT:
+                    encoder->compress_callback = om_common_compress_fpxenc32;
+                    encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor;
+                    break;
+                    
+                case DATA_TYPE_DOUBLE:
+                    encoder->compress_callback = om_common_compress_fpxenc64;
+                    encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor_double;
+                    break;
+                default:
+                    
+                    assert(false && "Unsupported data type for compression FPX XOR2D");
+                    break;
             }
             break;
             
-        case COMPRESSION_P4NZDEC256_LOGARITHMIC:
+        case COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC:
+            assert(data_type == DATA_TYPE_FLOAT);
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
             encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
@@ -62,7 +101,6 @@ void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset
     }
 }
 
-// Calculate number of chunks
 size_t om_encoder_number_of_chunks(const om_encoder_t* encoder) {
     size_t n = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
@@ -79,7 +117,6 @@ size_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const s
     return numberOfChunksInArray;
 }
 
-// Calculate chunk buffer size
 size_t om_encoder_compress_chunk_buffer_size(const om_encoder_t* encoder) {
     size_t chunkLength = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
@@ -89,7 +126,6 @@ size_t om_encoder_compress_chunk_buffer_size(const om_encoder_t* encoder) {
     return (chunkLength + 255) /256 + (chunkLength + 32) * encoder->bytes_per_element_compressed;
 }
 
-// Calculate the size of the compressed LUT buffer
 size_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount) {
     unsigned char buffer[MAX_LUT_ELEMENTS+32] = {0};
     size_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
@@ -104,7 +140,6 @@ size_t om_encoder_compress_lut_buffer_size(const om_encoder_t* encoder, const si
     return maxLength * nLutChunks + 32 * sizeof(size_t);
 }
 
-// Compress the LUT to an output buffer and return the size of the compressed LUT
 size_t om_encoder_compress_lut(const om_encoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount, uint8_t* out, size_t compressed_lut_buffer_size) {
     size_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     size_t lutSize = compressed_lut_buffer_size - 32 * sizeof(size_t);

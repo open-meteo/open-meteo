@@ -23,6 +23,7 @@ typedef void(*om_compress_filter_callback)(const size_t length0, const size_t le
 
 #define MAX_LUT_ELEMENTS 256
 
+/// Data types
 typedef enum {
     DATA_TYPE_INT8 = 0,
     DATA_TYPE_UINT8 = 1,
@@ -36,11 +37,11 @@ typedef enum {
     DATA_TYPE_DOUBLE = 9
 } om_datatype_t;
 
-// Define an enum for the compression types.
+/// Compression types
 typedef enum {
-    COMPRESSION_P4NZDEC256 = 0,          // Lossy compression using 2D delta coding and scalefactor. Only supports float and scales to 16-bit integer.
-    COMPRESSION_FPXDEC32 = 1,            // Lossless compression using 2D xor coding.
-    COMPRESSION_P4NZDEC256_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
+    COMPRESSION_PFOR_16BIT_DELTA2D = 0, // Lossy compression using 2D delta coding and scalefactor. Only supports float and scales to 16-bit integer.
+    COMPRESSION_FPX_XOR2D = 1, // Lossless float/double compression using 2D xor coding.
+    COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
 } om_compression_t;
 
 
@@ -62,16 +63,16 @@ typedef enum {
       __typeof__ (b) _b = (b); \
     _a < _b ? _a : _b; })
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float
+/// Copy 16 bit integer array and convert to float
 void om_common_copy_float_to_int16(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
+/// Copy 16 bit integer array and convert to float and scale log10
 void om_common_copy_float_to_int16_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float
+/// Convert int16 and scale to float
 void om_common_copy_int16_to_float(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
+/// Convert int16 and scale to float with log10
 void om_common_copy_int16_to_float_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 void om_common_copy8(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
@@ -80,11 +81,8 @@ void om_common_copy32(size_t length, float scale_factor, float add_offset, const
 void om_common_copy64(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 size_t om_common_compress_fpxenc32(const void* src, size_t length, void* dst);
-
 size_t om_common_compress_fpxenc64(const void* src, size_t length, void* dst);
-
 size_t om_common_decompress_fpxdec32(const void* src, size_t length, void* dst);
-
 size_t om_common_decompress_fpxdec64(const void* src, size_t length, void* dst);
 
 

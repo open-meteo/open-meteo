@@ -163,8 +163,8 @@ typedef struct {
  * @param scalefactor A floating-point value used to scale the decompressed data. This factor
  *                    is applied when converting decompressed values to the desired scale.
  * @param compression Specifies the type of compression applied to the data.
- *                    Possible values include `COMPRESSION_P4NZDEC256`, `COMPRESSION_FPXDEC32`, 
- *                    and `COMPRESSION_P4NZDEC256_LOGARITHMIC`.
+ *                    Possible values include `COMPRESSION_PFOR_16BIT_DELTA2D`, `COMPRESSION_FPX_XOR2D`, 
+ *                    and `COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC`.
  * @param data_type Specifies the type of data, such as `DATA_TYPE_FLOAT` or `DATA_TYPE_DOUBLE`.
  *                  This affects the decompression and copy methods used.
  * @param dims_count The number of dimensions of the data (e.g., 3 for 3D data). This value is 
@@ -193,7 +193,7 @@ typedef struct {
  * 
  * @note The function configures the appropriate decompression callback functions based on the 
  *       specified compression and data type. For example, it handles different types of 
- *       decompression and copy routines for `COMPRESSION_P4NZDEC256` and `COMPRESSION_FPXDEC32`.
+ *       decompression and copy routines for `COMPRESSION_PFOR_16BIT_DELTA2D` and `COMPRESSION_FPX_XOR2D`.
  * 
  * @warning The function asserts if an unsupported compression type is provided, which may cause 
  *          a program to terminate if an invalid `compression` value is used.
@@ -202,7 +202,7 @@ typedef struct {
  * 
  * @example
  * om_decoder_t decoder;
- * om_decoder_init(&decoder, 1.0f, COMPRESSION_P4NZDEC256, DATA_TYPE_FLOAT, 3, dims, chunks,
+ * om_decoder_init(&decoder, 1.0f, COMPRESSION_PFOR_16BIT_DELTA2D, DATA_TYPE_FLOAT, 3, dims, chunks,
  *                 read_offset, read_count, cube_offset, cube_dimensions, 256, 54, 0, 1024, 4096);
  * 
  * @details This function computes the total number of chunks required based on the data dimensions

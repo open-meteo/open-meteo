@@ -30,24 +30,6 @@ public enum DataType: UInt8, Codable {
     case uint64 = 7
     case float = 8
     case double = 9
-
-    public var bytesPerElement: Int {
-        switch self {
-        case .int8, .uint8:
-            return 1
-        case .int16, .uint16:
-            return 2
-        case .int32, .uint32:
-            return 4
-        case .int64, .uint64:
-            return 8
-        case .float:
-            return 4
-        case .double:
-            return 8
-        }
-    }
-    
     
     func toC() -> OmFileFormatC.om_datatype_t {
         return OmFileFormatC.om_datatype_t(rawValue: UInt32(self.rawValue))
@@ -56,12 +38,15 @@ public enum DataType: UInt8, Codable {
 
 public enum CompressionType: UInt8, Codable {
     /// Lossy compression using 2D delta coding and scalefactor. Only support float ad scaled to 16 bit integer
+    /// TODO rename to `pfor_16bit_delta2d`
     case p4nzdec256 = 0
     
     /// Lossless compression using 2D xor coding
+    /// /// TODO rename to `fpx_xor2d`
     case fpxdec32 = 1
     
     ///  Similar to `p4nzdec256` but apply `log10(1+x)` before
+    ///  /// TODO rename to `pfor_16bit_delta2d_logarithmic`
     case p4nzdec256logarithmic = 3
     
     // TODO: Use a new compression type to properly implement data type switching. Deprecate the old one

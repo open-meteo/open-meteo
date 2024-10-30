@@ -7,12 +7,10 @@
 
 #include "om_common.h"
 #include <stdlib.h>
-#include <assert.h>
 #include <math.h>
 #include "vp4.h"
 #include "fp.h"
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float
 void om_common_copy_float_to_int16(size_t length, float scale_factor, float add_offset, const void* src, void* dst) {
     for (size_t i = 0; i < length; ++i) {
         float val = ((float *)src)[i];
@@ -25,7 +23,6 @@ void om_common_copy_float_to_int16(size_t length, float scale_factor, float add_
     }
 }
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
 void om_common_copy_float_to_int16_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst) {
     for (size_t i = 0; i < length; ++i) {
         float val = ((float *)src)[i];
@@ -38,7 +35,6 @@ void om_common_copy_float_to_int16_log10(size_t length, float scale_factor, floa
     }
 }
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float
 void om_common_copy_int16_to_float(size_t length, float scale_factor, float add_offset, const void* src, void* dst) {
     for (size_t i = 0; i < length; ++i) {
         int16_t val = ((int16_t *)src)[i];
@@ -46,7 +42,6 @@ void om_common_copy_int16_to_float(size_t length, float scale_factor, float add_
     }
 }
 
-/// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
 void om_common_copy_int16_to_float_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst) {
     for (size_t i = 0; i < length; ++i) {
         int16_t val = ((int16_t *)src)[i];
