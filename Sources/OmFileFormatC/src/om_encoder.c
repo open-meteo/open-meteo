@@ -16,49 +16,49 @@
 #define P4NENC256_BOUND(n) ((n + 255) /256 + (n + 32) * sizeof(uint32_t))
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float
-void om_encoder_copy_float_to_int16(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
-    for (uint64_t i = 0; i < count; ++i) {
-        float val = ((float *)chunk_buffer)[read_offset + i];
+void om_encoder_copy_float_to_int16(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+    for (uint64_t i = 0; i < length; ++i) {
+        float val = ((float *)src)[offset_read + i];
         if (isnan(val)) {
-            ((int16_t *)into)[write_offset + i] = INT16_MAX;
+            ((int16_t *)dst)[offset_read + i] = INT16_MAX;
         } else {
-            float scaled = val * scalefactor;
-            ((int16_t *)into)[write_offset + i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
+            float scaled = val * scale_factor;
+            ((int16_t *)dst)[offset_write + i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
         }
     }
 }
 
 /// Assume chunk buffer is a 16 bit integer array and convert to float and scale log10
-void om_encoder_copy_float_to_int16_log10(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
-    for (uint64_t i = 0; i < count; ++i) {
-        float val = ((float *)chunk_buffer)[read_offset + i];
+void om_encoder_copy_float_to_int16_log10(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+    for (uint64_t i = 0; i < length; ++i) {
+        float val = ((float *)src)[offset_read + i];
         if (isnan(val)) {
-            ((float *)into)[write_offset + i] = INT16_MAX;
+            ((float *)dst)[offset_write + i] = INT16_MAX;
         } else {
-            float scaled = log10f(1 + val) * scalefactor;
-            ((float *)into)[write_offset + i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
+            float scaled = log10f(1 + val) * scale_factor;
+            ((float *)dst)[offset_write + i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
         }
     }
 }
 
-void om_encoder_copy_float(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
-    for (uint64_t i = 0; i < count; ++i) {
-        ((float *)into)[write_offset + i] = ((float *)chunk_buffer)[read_offset + i];
+void om_encoder_copy_float(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+    for (uint64_t i = 0; i < length; ++i) {
+        ((float *)dst)[offset_write + i] = ((float *)src)[offset_read + i];
     }
 }
 
-void om_encoder_copy_double(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into) {
-    for (uint64_t i = 0; i < count; ++i) {
-        ((double *)into)[write_offset + i] = ((double *)chunk_buffer)[read_offset + i];
+void om_encoder_copy_double(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scale_factor, const void* src, void* dst) {
+    for (uint64_t i = 0; i < length; ++i) {
+        ((double *)dst)[offset_write + i] = ((double *)src)[offset_read + i];
     }
 }
 
-uint64_t om_encoder_compress_fpxenc32(const void* in, uint64_t count, void* out) {
-    return fpxenc32((uint32_t*)in, count, (unsigned char *)out, 0);
+uint64_t om_encoder_compress_fpxenc32(const void* src, uint64_t length, void* dst) {
+    return fpxenc32((uint32_t*)src, length, (unsigned char *)dst, 0);
 }
 
-uint64_t om_encoder_compress_fpxenc64(const void* in, uint64_t count, void* out) {
-    return fpxenc64((uint64_t*)in, count, (unsigned char *)out, 0);
+uint64_t om_encoder_compress_fpxenc64(const void* src, uint64_t length, void* dst) {
+    return fpxenc64((uint64_t*)src, length, (unsigned char *)dst, 0);
 }
 
 // Initialize om_file_encoder
@@ -169,7 +169,7 @@ void om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUp
     }
 }
 
-size_t om_encoder_writeSingleChunk(const om_encoder_t* encoder, const float* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer) {
+size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const float* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer) {
     /// The total size of `arrayDimensions`. Only used to check for out of bound reads
     uint64_t arrayTotalCount = 1;
     for (uint64_t i = 0; i < encoder->dimension_count; i++) {

@@ -10,14 +10,7 @@
 
 #include "om_common.h"
 
-/// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
-typedef void(*om_compress_copy_callback)(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into);
 
-/// compress input, of n-elements to output and return number of compressed byte
-typedef uint64_t(*om_compress_callback)(const void* in, uint64_t count, void* out);
-
-/// Perform a 2d filter operation
-typedef void(*om_compress_filter_callback)(const size_t length0, const size_t length1, void* chunkBuffer);
 
 // Encoder struct
 typedef struct {
@@ -51,6 +44,6 @@ uint64_t om_encoder_minimum_chunk_write_buffer(const om_encoder_t* encoder);
 uint64_t om_encoder_output_buffer_capacity(const om_encoder_t* encoder);
 uint64_t om_encoder_size_of_compressed_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount);
 void om_encoder_compress_lut(const om_encoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t size_of_compressed_lut);
-size_t om_encoder_writeSingleChunk(const om_encoder_t* encoder, const float* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer);
+size_t om_encoder_compress_chunk(const om_encoder_t* encoder, const float* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint64_t outSize, uint8_t* chunkBuffer);
 
 #endif // OM_ENCODER_H

@@ -173,7 +173,7 @@ public final class OmFileWriterArray {
             let outPtr = out.buffer.baseAddress!.advanced(by: Int(out.writePosition))
             let outSize = out.buffer.count - Int(out.writePosition)
             assert(outSize >= minimumBuffer)
-            let writeLength = om_encoder_writeSingleChunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, outPtr, UInt64(outSize), chunkBuffer.baseAddress)
+            let writeLength = om_encoder_compress_chunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, outPtr, UInt64(outSize), chunkBuffer.baseAddress)
 
             //print("compressed size", writeLength, "lengthInChunk", lengthInChunk, "start offset", totalBytesWritten)
             out.writePosition += UInt64(writeLength)

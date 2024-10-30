@@ -12,6 +12,15 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
+typedef void(*om_compress_copy_callback)(uint64_t length, uint64_t offset_read, uint64_t offset_write, float scalef_actor, const void* src, void* dest);
+
+/// compress input, of n-elements to output and return number of compressed byte
+typedef uint64_t(*om_compress_callback)(const void* src, uint64_t length, void* dest);
+
+/// Perform a 2d filter operation
+typedef void(*om_compress_filter_callback)(const size_t length0, const size_t length1, void* buffer);
+
 #define MAX_LUT_ELEMENTS 256
 
 typedef enum {

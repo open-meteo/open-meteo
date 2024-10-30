@@ -90,16 +90,6 @@ typedef struct {
 typedef om_decoder_index_read_t om_decoder_data_read_t;
 
 
-
-/// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
-typedef void(*om_decompress_copy_callback)(uint64_t count, uint64_t read_offset, uint64_t write_offset, float scalefactor, const void* chunk_buffer, void* into);
-
-/// decompress input, of n-elements to output and return number of compressed byte
-typedef uint64_t(*om_decompress_callback)(const void* in, uint64_t count, void* out);
-
-/// Perform a 2d filter operation
-typedef void(*om_decompress_filter_callback)(const size_t length0, const size_t length1, void* chunkBuffer);
-
 typedef struct {
     /// Number of dimensions
     uint64_t dimensions_count;
@@ -141,13 +131,13 @@ typedef struct {
     const uint64_t* cube_offset;
     
     /// The callback to decompress data
-    om_decompress_callback decompress_callback;
+    om_compress_callback decompress_callback;
 
     /// The filter function for each decompressed block. E.g. a 2D delta coding.
-    om_decompress_filter_callback decompress_filter_callback;
+    om_compress_filter_callback decompress_filter_callback;
 
     /// Copy and scale individual values from a chunk into the output array
-    om_decompress_copy_callback decompress_copy_callback;
+    om_compress_copy_callback decompress_copy_callback;
     
     /// A scalefactor to convert floats to integers
     float scalefactor;
