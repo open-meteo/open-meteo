@@ -13,7 +13,7 @@
 #include "om_decoder.h"
 
 
-void OmDecoder_dataReadInit(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read) {
+void OmDecoder_initDataRead(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read) {
     data_read->offset = 0;
     data_read->count = 0;
     data_read->indexRange = index_read->indexRange;
@@ -138,7 +138,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
     return ERROR_OK;
 }
 
-void OmDecoder_indexReadInit(const OmDecoder_t* decoder, OmDecoder_indexRead_t *index_read) {
+void OmDecoder_initIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t *index_read) {
     size_t chunkStart = 0;
     size_t chunkEnd = 1;
     

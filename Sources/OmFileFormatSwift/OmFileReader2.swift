@@ -13,7 +13,7 @@ extension OmFileReaderBackend {
     func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         self.withUnsafeBytes({ ptr in
             var indexRead = OmDecoder_indexRead_t()
-            OmDecoder_indexReadInit(decoder, &indexRead)
+            OmDecoder_initIndexRead(decoder, &indexRead)
             
             /// Loop over index blocks and read index data
             while OmDecoder_nextIndexRead(decoder, &indexRead) {
@@ -21,7 +21,7 @@ extension OmFileReaderBackend {
                 let indexData = ptr.baseAddress!.advanced(by: indexRead.offset)
                 
                 var dataRead = OmDecoder_dataRead_t()
-                OmDecoder_dataReadInit(&dataRead, &indexRead)
+                OmDecoder_initDataRead(&dataRead, &indexRead)
                 
                 var error: OmError_t = ERROR_OK
                 /// Loop over data blocks and read compressed data chunks

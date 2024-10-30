@@ -68,7 +68,7 @@ public final class OmFileWriterArray {
     /// How the dimensions are chunked
     let chunks: [Int]
     
-    let chunkBufferSize: Int
+    let compressedChunkBufferSize: Int
     
     let chunkBuffer: UnsafeMutableRawBufferPointer
     
@@ -86,17 +86,19 @@ public final class OmFileWriterArray {
         
         // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
         self.encoder = OmEncoder_t()
-        let error = om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
+        let error = OmEncoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
         
         guard error == ERROR_OK else {
             fatalError("Om encoder: \(String(cString: OmError_string(error)))")
         }
 
         /// Number of total chunks in the compressed files
-        let nChunks = om_encoder_number_of_chunks(&encoder)
+        let nChunks = OmEncoder_countChunks(&encoder)
         
         /// This is the minimum output buffer size for each compressed size. In practice the buffer should be much larger.
-        self.chunkBufferSize = om_encoder_compress_chunk_buffer_size(&encoder)
+        self.compressedChunkBufferSize = OmEncoder_compressedChunkBufferSize(&encoder)
+        
+        let chunkBufferSize = OmEncoder_chunkBufferSize(&encoder)
         
         /// Each thread needs its own chunk buffer to compress data. This implementation is single threaded
         self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: chunkBufferSize, alignment: 1)
@@ -119,10 +121,10 @@ public final class OmFileWriterArray {
         let arrayCount = arrayRead.map({$0.count})
         
         /// For performance the output buffer should be able to hold a multiple of the chunk buffer size
-        buffer.reallocate(minimumCapacity: chunkBufferSize * 4)
+        buffer.reallocate(minimumCapacity: compressedChunkBufferSize * 4)
         
         /// How many chunks can be written to the output. This could be only a single one, or multiple
-        let numberOfChunksInArray = om_encoder_number_of_chunks_in_array(&encoder, arrayCount)
+        let numberOfChunksInArray = OmEncoder_countChunksInArray(&encoder, arrayCount)
         
         /// Store data start address if this is the first time this read is called
         if chunkIndex == 0 {
@@ -132,8 +134,8 @@ public final class OmFileWriterArray {
         // This loop could be done in parallel. However, the order of chunks must remain the same in the LUT and final output buffer.
         // For multithreading, multiple buffers are required that need to be copied into the final buffer afterwards
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
-            assert(buffer.remainingCapacity >= chunkBufferSize)
-            let bytes_written = om_encoder_compress_chunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, chunkIndex, chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
+            assert(buffer.remainingCapacity >= compressedChunkBufferSize)
+            let bytes_written = OmEncoder_compressChunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, chunkIndex, chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
 
             buffer.incrementWritePosition(by: bytes_written)
             
@@ -142,7 +144,7 @@ public final class OmFileWriterArray {
             chunkIndex += 1
             
             // Write buffer to disk if the next chunk may not fit anymore in the output buffer
-            if buffer.remainingCapacity < chunkBufferSize {
+            if buffer.remainingCapacity < compressedChunkBufferSize {
                 try buffer.writeToFile(fn: fn)
             }
         }
@@ -151,11 +153,11 @@ public final class OmFileWriterArray {
     /// Compress the lookup table and write it to the output buffer
     public func writeLut(buffer: OmWriteBuffer) -> Int {
         /// The size of the total compressed LUT including some padding
-        let buffer_size = om_encoder_compress_lut_buffer_size(&encoder, lookUpTable, lookUpTable.count)
+        let buffer_size = OmEncoder_lutBufferSize(&encoder, lookUpTable, lookUpTable.count)
         buffer.reallocate(minimumCapacity: buffer_size)
         
         /// Compress the LUT and return the actual compressed LUT size
-        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, lookUpTable.count, buffer.bufferAtWritePosition, buffer_size)
+        let compressed_lut_size = OmEncoder_compressLut(&encoder, lookUpTable, lookUpTable.count, buffer.bufferAtWritePosition, buffer_size)
         buffer.incrementWritePosition(by: compressed_lut_size)
         return compressed_lut_size
     }

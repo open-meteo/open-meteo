@@ -136,7 +136,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
  * @param index_read A pointer to an `om_decoder_index_read_t` structure that will be 
  *                   initialized with the computed chunk index range and other related values.
  */
-void OmDecoder_indexReadInit(const OmDecoder_t* decoder, OmDecoder_indexRead_t *indexRead);
+void OmDecoder_initIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t *indexRead);
 
 
 /**
@@ -172,7 +172,7 @@ bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* 
  *                         contains information about the index range and the initial 
  *                         chunk index to be used for reading.
  */
-void OmDecoder_dataReadInit(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read);
+void OmDecoder_initDataRead(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read);
 
 
 /**
