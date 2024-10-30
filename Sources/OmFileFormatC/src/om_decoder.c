@@ -100,20 +100,20 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_copy_callback = om_common_copy_int16_to_float;
-            decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode;
-            decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
+            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode;
+            decoder->decompress_callback = (om_compress_callback_t)p4nzdec128v16;
             break;
             
         case COMPRESSION_FPX_XOR2D:
             switch (data_type) {
                 case DATA_TYPE_FLOAT:
                     decoder->decompress_callback = om_common_decompress_fpxdec32;
-                    decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor;
+                    decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode_xor;
                     break;
                     
                 case DATA_TYPE_DOUBLE:
                     decoder->decompress_callback = om_common_decompress_fpxdec64;
-                    decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor_double;
+                    decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode_xor_double;
                     break;
                     
                 default:
@@ -127,8 +127,8 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
             }
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
-            decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
-            decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode;
+            decoder->decompress_callback = (om_compress_callback_t)p4nzdec128v16;
+            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode;
             decoder->decompress_copy_callback = om_common_copy_int16_to_float_log10;
             break;
             
@@ -315,7 +315,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
         
         size_t readPos = data_read->indexRange.lowerBound - chunkIndex - startOffset;
         if (readPos < 0 || (readPos + 1) * sizeof(int64_t) > index_data_size) {
-            error = ERROR_OUT_OF_BOUND_READ;
+            (*error) = ERROR_OUT_OF_BOUND_READ;
             return false;
         }
         
@@ -326,7 +326,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
         while (true) {
             readPos = data_read->nextChunk.lowerBound - data_read->indexRange.lowerBound - startOffset + 1;
             if (readPos < 0 || (readPos + 1) * sizeof(int64_t) > index_data_size) {
-                error = ERROR_OUT_OF_BOUND_READ;
+                (*error) = ERROR_OUT_OF_BOUND_READ;
                 return false;
             }
             size_t dataEndPos = data[readPos];
@@ -380,7 +380,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
         size_t thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - lutChunk * lutChunkElementCount;
         size_t start = lutChunk * lutChunkLength - lutOffset;
         if (start < 0 || start + lutChunkLength > index_data_size) {
-            error = ERROR_OUT_OF_BOUND_READ;
+            (*error) = ERROR_OUT_OF_BOUND_READ;
             return false;
         }
         
@@ -401,7 +401,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
             size_t nextLutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - nextLutChunk * lutChunkElementCount;
             size_t start = nextLutChunk * lutChunkLength - lutOffset;
             if (start < 0 || start + lutChunkLength > index_data_size) {
-                error = ERROR_OUT_OF_BOUND_READ;
+                (*error) = ERROR_OUT_OF_BOUND_READ;
                 return false;
             }
             
@@ -586,7 +586,7 @@ bool OmDecoder_decodeChunks(const OmDecoder_t *decoder, OmRange_t chunk, const v
     for (size_t chunkNum = chunk.lowerBound; chunkNum < chunk.upperBound; ++chunkNum) {
         //printf("chunkIndex %d pos=%d dataCount=%d \n",chunkNum, pos, dataCount);
         if (pos >= data_size) {
-            error = ERROR_OUT_OF_BOUND_READ;
+            (*error) = ERROR_OUT_OF_BOUND_READ;
             return false;
         }
         size_t uncompressedBytes = _om_decoder_decode_chunk(decoder, chunkNum, (const uint8_t *)data + pos, into, chunkBuffer);
@@ -595,7 +595,7 @@ bool OmDecoder_decodeChunks(const OmDecoder_t *decoder, OmRange_t chunk, const v
     //printf("%d %d \n", pos, dataCount);
     
     if (pos != data_size) {
-        error = ERROR_OUT_OF_BOUND_READ;
+        (*error) = ERROR_OUT_OF_BOUND_READ;
         return false;
     }
     return pos;

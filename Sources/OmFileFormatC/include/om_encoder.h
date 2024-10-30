@@ -19,13 +19,13 @@ typedef struct {
     size_t lut_chunk_element_count;
     
     /// The callback to decompress data
-    om_compress_callback compress_callback;
+    om_compress_callback_t compress_callback;
 
     /// The filter function for each compressed block. E.g. a 2D delta coding.
-    om_compress_filter_callback compress_filter_callback;
+    om_compress_filter_callback_t compress_filter_callback;
 
     /// Copy and scale individual values from a chunk into the output array
-    om_compress_copy_callback compress_copy_callback;
+    om_compress_copy_callback_t compress_copy_callback;
     
     float scale_factor;
     

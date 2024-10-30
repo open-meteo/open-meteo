@@ -13,13 +13,13 @@
 #include <stdbool.h>
 
 /// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
-typedef void(*om_compress_copy_callback)(size_t length, float scale_factor, float add_offset, const void* src, void* dest);
+typedef void(*om_compress_copy_callback_t)(size_t length, float scale_factor, float add_offset, const void* src, void* dest);
 
 /// compress input, of n-elements to output and return number of compressed byte
-typedef size_t(*om_compress_callback)(const void* src, size_t length, void* dest);
+typedef size_t(*om_compress_callback_t)(const void* src, size_t length, void* dest);
 
 /// Perform a 2d filter operation
-typedef void(*om_compress_filter_callback)(const size_t length0, const size_t length1, void* buffer);
+typedef void(*om_compress_filter_callback_t)(const size_t length0, const size_t length1, void* buffer);
 
 #define MAX_LUT_ELEMENTS 256
 

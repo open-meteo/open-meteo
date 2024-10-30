@@ -66,20 +66,20 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
             encoder->compress_copy_callback = om_common_copy_float_to_int16;
-            encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode;
-            encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
+            encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode;
+            encoder->compress_callback = (om_compress_callback_t)p4nzenc128v16;
             break;
             
         case COMPRESSION_FPX_XOR2D:
             switch (data_type) {
                 case DATA_TYPE_FLOAT:
                     encoder->compress_callback = om_common_compress_fpxenc32;
-                    encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor;
+                    encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode_xor;
                     break;
                     
                 case DATA_TYPE_DOUBLE:
                     encoder->compress_callback = om_common_compress_fpxenc64;
-                    encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor_double;
+                    encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode_xor_double;
                     break;
                     
                 default:
@@ -93,8 +93,8 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
             }
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
-            encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
-            encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode;
+            encoder->compress_callback = (om_compress_callback_t)p4nzenc128v16;
+            encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode;
             encoder->compress_copy_callback = om_common_copy_float_to_int16_log10;
             break;
             

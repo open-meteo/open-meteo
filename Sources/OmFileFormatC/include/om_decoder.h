@@ -71,13 +71,13 @@ typedef struct {
     const size_t* cube_offset;
     
     /// The callback to decompress data
-    om_compress_callback decompress_callback;
+    om_compress_callback_t decompress_callback;
 
     /// The filter function for each decompressed block. E.g. a 2D delta coding.
-    om_compress_filter_callback decompress_filter_callback;
+    om_compress_filter_callback_t decompress_filter_callback;
 
     /// Copy and scale individual values from a chunk into the output array
-    om_compress_copy_callback decompress_copy_callback;
+    om_compress_copy_callback_t decompress_copy_callback;
     
     /// A scalefactor to convert floats to integers
     float scale_factor;
