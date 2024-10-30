@@ -86,7 +86,10 @@ public final class OmFileWriterArray {
         
         // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
         self.encoder = om_encoder_t()
-        om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
+        let error = om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
+        guard error == ERROR_OK else {
+            fatalError()
+        }
 
         /// Number of total chunks in the compressed files
         let nChunks = om_encoder_number_of_chunks(&encoder)

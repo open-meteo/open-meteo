@@ -23,6 +23,13 @@ typedef void(*om_compress_filter_callback)(const size_t length0, const size_t le
 
 #define MAX_LUT_ELEMENTS 256
 
+typedef enum {
+    ERROR_OK = 0, // not an error
+    ERROR_INVALID_COMPRESSION_TYPE = 1,
+    ERROR_INVALID_DATA_TYPE = 2,
+    ERROR_INVALID_LUT_CHUNK_LENGTH = 3,
+} om_error_t;
+
 /// Data types
 typedef enum {
     DATA_TYPE_INT8 = 0,

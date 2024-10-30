@@ -22,7 +22,7 @@ void om_decoder_data_read_init(om_decoder_data_read_t *data_read, const om_decod
     data_read->nextChunk = index_read->chunkIndex;
 }
 
-void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset, const om_compression_t compression, const om_datatype_t data_type, size_t dims_count, const size_t* dims, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max) {
+om_error_t om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset, const om_compression_t compression, const om_datatype_t data_type, size_t dims_count, const size_t* dims, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max) {
     // Calculate the number of chunks based on dims and chunks
     size_t nChunks = 1;
     for (size_t i = 0; i < dims_count; i++) {
@@ -50,8 +50,10 @@ void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset,
     decoder->lut_start = lut_start;
     decoder->io_size_merge = io_size_merge;
     decoder->io_size_max = io_size_max;
-
-    assert(lut_chunk_element_count > 0 && lut_chunk_element_count <= MAX_LUT_ELEMENTS);
+    
+    if (lut_chunk_element_count < 0 || lut_chunk_element_count > MAX_LUT_ELEMENTS) {
+        return ERROR_INVALID_LUT_CHUNK_LENGTH;
+    }
     
     // Set element sizes and copy function
     switch (data_type) {
@@ -86,14 +88,15 @@ void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset,
             break;
             
         default:
-            assert(0 && "Unsupported data type");
+            return ERROR_INVALID_DATA_TYPE;
     }
     
     // TODO more compression and datatypes
     switch (compression) {
         case COMPRESSION_PFOR_16BIT_DELTA2D:
-            assert(data_type == DATA_TYPE_FLOAT);
-            
+            if (data_type != DATA_TYPE_FLOAT) {
+                return ERROR_INVALID_DATA_TYPE;
+            }
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_copy_callback = om_common_copy_int16_to_float;
@@ -112,16 +115,16 @@ void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset,
                     decoder->decompress_callback = om_common_decompress_fpxdec64;
                     decoder->decompress_filter_callback = (om_compress_filter_callback)delta2d_decode_xor_double;
                     break;
-                default:
                     
-                    assert(false && "Unsupported data type for compression FPX XOR2D");
-                    break;
+                default:
+                    return ERROR_INVALID_DATA_TYPE;
             }
             break;
             
         case COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC:
-            assert(data_type == DATA_TYPE_FLOAT);
-            
+            if (data_type != DATA_TYPE_FLOAT) {
+                return ERROR_INVALID_DATA_TYPE;
+            }
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_callback = (om_compress_callback)p4nzdec128v16;
@@ -130,8 +133,9 @@ void om_decoder_init(om_decoder_t* decoder, float scalefactor, float add_offset,
             break;
             
         default:
-            assert(0 && "Unsupported compression type");
+            return ERROR_INVALID_COMPRESSION_TYPE;
     }
+    return ERROR_OK;
 }
 
 void om_decoder_index_read_init(const om_decoder_t* decoder, om_decoder_index_read_t *index_read) {

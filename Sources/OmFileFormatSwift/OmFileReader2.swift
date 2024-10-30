@@ -107,7 +107,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         let readCount = dimRead.map({$0.count})
         
         var decoder = om_decoder_t()
-        om_decoder_init(
+        let error = om_decoder_init(
             &decoder,
             v.scale_factor,
             v.add_offset,
@@ -126,6 +126,9 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             io_size_merge,
             io_size_max
         )
+        guard error == ERROR_OK else {
+            fatalError()
+        }
         let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: chunkBufferSize, alignment: 4)
         fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)

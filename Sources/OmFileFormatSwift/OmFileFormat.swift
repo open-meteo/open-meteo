@@ -621,7 +621,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             
             let c = OmFileFormatC.om_compression_t(rawValue: UInt32(compression.rawValue))
             var decoder = om_decoder_t()
-            om_decoder_init(
+            let error = om_decoder_init(
                 &decoder,
                 scalefactor,
                 0, // add offset
@@ -640,6 +640,9 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 512,
                 65536
             )
+            guard error == ERROR_OK else {
+                fatalError()
+            }
             fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
     }

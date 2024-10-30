@@ -42,7 +42,7 @@ typedef struct {
 
 
 
-void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count);
+om_error_t om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count);
 
 size_t om_encoder_number_of_chunks(const om_encoder_t* encoder);
 size_t om_encoder_number_of_chunks_in_array(const om_encoder_t* encoder, const size_t* array_count);

@@ -13,14 +13,13 @@
 #include "delta2d.h"
 
 
-void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count) {
+om_error_t om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset, om_compression_t compression, om_datatype_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count) {
     encoder->scale_factor = scale_factor;
     encoder->add_offset = add_offset;
     encoder->dimensions = dimensions;
     encoder->chunks = chunks;
     encoder->dimension_count = dimension_count;
     encoder->lut_chunk_element_count = lut_chunk_element_count;
-    
     
     // Set element sizes and copy function
     switch (data_type) {
@@ -55,13 +54,15 @@ void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset
             break;
             
         default:
-            assert(0 && "Unsupported data type");
+            return ERROR_INVALID_DATA_TYPE;
     }
     
     // TODO more compression and datatypes
     switch (compression) {
         case COMPRESSION_PFOR_16BIT_DELTA2D:
-            assert(data_type == DATA_TYPE_FLOAT);
+            if (data_type != DATA_TYPE_FLOAT) {
+                return ERROR_INVALID_DATA_TYPE;
+            }
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
             encoder->compress_copy_callback = om_common_copy_float_to_int16;
@@ -80,15 +81,16 @@ void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset
                     encoder->compress_callback = om_common_compress_fpxenc64;
                     encoder->compress_filter_callback = (om_compress_filter_callback)delta2d_encode_xor_double;
                     break;
-                default:
                     
-                    assert(false && "Unsupported data type for compression FPX XOR2D");
-                    break;
+                default:
+                    return ERROR_INVALID_DATA_TYPE;
             }
             break;
             
         case COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC:
-            assert(data_type == DATA_TYPE_FLOAT);
+            if (data_type != DATA_TYPE_FLOAT) {
+                return ERROR_INVALID_DATA_TYPE;
+            }
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
             encoder->compress_callback = (om_compress_callback)p4nzenc128v16;
@@ -97,8 +99,10 @@ void om_encoder_init(om_encoder_t* encoder, float scale_factor, float add_offset
             break;
             
         default:
-            assert(0 && "Unsupported compression type for copying data.");
+            return ERROR_INVALID_COMPRESSION_TYPE;
     }
+    
+    return ERROR_OK;
 }
 
 size_t om_encoder_number_of_chunks(const om_encoder_t* encoder) {
