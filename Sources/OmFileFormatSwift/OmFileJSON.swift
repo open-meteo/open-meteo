@@ -19,12 +19,9 @@ public struct OmFileJSON: Codable {
 /// Represent a variable inside an OpenMeteo file.
 /// A variable can have arbitrary attributes, but the following are required for decding:
 /// `dimensions` and `chunks` to describe the shape of data
-/// `compression` and `scalefactor` define how data is compressed
-/// `lutOffset` and `lutChunkSize` are required to locate data inside the file
+/// `compression`, `scale_factor` and `add_offset` define how data is compressed
+/// `lut_offset` and `lut_size` are required to locate the lookup table to decompress data
 ///
-/// TODO:
-/// - datatype
-/// - finalise naming
 public struct OmFileJSONVariable: Codable {
     let name: String?
     

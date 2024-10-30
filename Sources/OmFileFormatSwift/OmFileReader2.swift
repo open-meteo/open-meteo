@@ -8,38 +8,6 @@
 import Foundation
 @_implementationOnly import OmFileFormatC
 
-extension OmFileReaderBackend {
-    /// Read and decode
-    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
-        self.withUnsafeBytes({ ptr in
-            var indexRead = OmDecoder_indexRead_t()
-            OmDecoder_initIndexRead(decoder, &indexRead)
-            
-            /// Loop over index blocks and read index data
-            while OmDecoder_nextIndexRead(decoder, &indexRead) {
-                //print("read index \(indexRead)")
-                let indexData = ptr.baseAddress!.advanced(by: indexRead.offset)
-                
-                var dataRead = OmDecoder_dataRead_t()
-                OmDecoder_initDataRead(&dataRead, &indexRead)
-                
-                var error: OmError_t = ERROR_OK
-                /// Loop over data blocks and read compressed data chunks
-                while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
-                    //print("read data \(dataRead)")
-                    let dataData = ptr.baseAddress!.advanced(by: dataRead.offset)
-                    guard OmDecoder_decodeChunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
-                        fatalError("Om decoder: \(String(cString: OmError_string(error)))")
-                    }
-                }
-                guard error == ERROR_OK else {
-                    fatalError("Om decoder: \(String(cString: OmError_string(error)))")
-                }
-            }
-        })
-    }
-}
-
 /// High level implementation to read an OpenMeteo file
 /// Decodes meta data which may include JSON
 /// Handles actual file reads. The current implementation just uses MMAP or plain memory.
@@ -56,6 +24,8 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     public static func open_file(fn: Backend, lutChunkElementCount: Int = 256) throws -> Self {
         return try fn.withUnsafeBytes({ptr in
             // Support for old files. Read header and check for old file
+            // If possble always read the first 40 bytes to decode a Version 1/2 file
+            // Once all old files are migrates, this can be removed entirely
             guard ptr[0] == OmHeader.magicNumber1, ptr[1] == OmHeader.magicNumber2 else {
                 fatalError("Not an OM file")
             }
@@ -63,7 +33,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             if version == 1 || version == 2 {
                 let metaV1 = ptr.baseAddress!.assumingMemoryBound(to: OmHeader.self)
                 let variable = OmFileJSONVariable(
-                    name: "data",
+                    name: nil,
                     dimensions: [metaV1.pointee.dim0, metaV1.pointee.dim1],
                     chunks: [metaV1.pointee.chunk0, metaV1.pointee.chunk1],
                     dimension_names: nil,
@@ -82,7 +52,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
                 fatalError("Unknown version \(version)")
             }
             
-            // Version 2 files below use JSON meta data
+            // Version 3 use JSON meta data at the end
             let fileSize = fn.count
             /// The last 8 bytes of the file are the size of the JSON payload
             let jsonLength = ptr.baseAddress!.advanced(by: fileSize - 8).assumingMemoryBound(to: Int.self).pointee
@@ -155,5 +125,38 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
             )
         })
         return out
+    }
+}
+
+
+extension OmFileReaderBackend {
+    /// Read and decode
+    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+        self.withUnsafeBytes({ ptr in
+            var indexRead = OmDecoder_indexRead_t()
+            OmDecoder_initIndexRead(decoder, &indexRead)
+            
+            /// Loop over index blocks and read index data
+            while OmDecoder_nextIndexRead(decoder, &indexRead) {
+                //print("read index \(indexRead)")
+                let indexData = ptr.baseAddress!.advanced(by: indexRead.offset)
+                
+                var dataRead = OmDecoder_dataRead_t()
+                OmDecoder_initDataRead(&dataRead, &indexRead)
+                
+                var error: OmError_t = ERROR_OK
+                /// Loop over data blocks and read compressed data chunks
+                while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
+                    //print("read data \(dataRead)")
+                    let dataData = ptr.baseAddress!.advanced(by: dataRead.offset)
+                    guard OmDecoder_decodeChunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
+                        fatalError("Om decoder: \(String(cString: OmError_string(error)))")
+                    }
+                }
+                guard error == ERROR_OK else {
+                    fatalError("Om decoder: \(String(cString: OmError_string(error)))")
+                }
+            }
+        })
     }
 }
