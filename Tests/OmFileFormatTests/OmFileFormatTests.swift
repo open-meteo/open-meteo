@@ -83,7 +83,7 @@ final class OmFileFormatTests: XCTestCase {
         try buffer.writeToFile(fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn)
+        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
         
         let a1 = read.read([50..<51, 20..<21, 1..<2])
         XCTAssertEqual(a1, [201.0])
@@ -118,7 +118,7 @@ final class OmFileFormatTests: XCTestCase {
         try buffer.writeToFile(fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn)
+        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
         
         let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
@@ -143,7 +143,7 @@ final class OmFileFormatTests: XCTestCase {
         try buffer.writeToFile(fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn)
+        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
         
         let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
@@ -167,7 +167,7 @@ final class OmFileFormatTests: XCTestCase {
         try buffer.writeToFile(fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn)
+        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
         
         
         let a = read.read([0..<3, 0..<3, 0..<3])
@@ -201,7 +201,7 @@ final class OmFileFormatTests: XCTestCase {
         try buffer.writeToFile(fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn, lutChunkElementCount: 2)
+        let read = try OmFileReader2.open_file(fn: readFn, lutChunkElementCount: 2).getVariables()[0]
         
 
         let a = read.read([0..<5, 0..<5])
@@ -289,7 +289,7 @@ final class OmFileFormatTests: XCTestCase {
         try buffer.writeToFile(fn: fn)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn, lutChunkElementCount: 2)
+        let read = try OmFileReader2.open_file(fn: readFn, lutChunkElementCount: 2).getVariables()[0]
         
 
         let a = read.read([0..<5, 0..<5], io_size_max: 0, io_size_merge: 0)
@@ -377,8 +377,8 @@ final class OmFileFormatTests: XCTestCase {
             fatalError("Not expected")
         })
         
-        let read = try OmFileReader2.open_file(fn: try MmapFile(fn: fn))
-        let dims = read.json.variables[0].dimensions
+        let read = try OmFileReader2.open_file(fn: try MmapFile(fn: fn)).getVariables()[0]
+        let dims = read.variable.dimensions
         let a = read.read([0..<5, 0..<5], io_size_max: 0, io_size_merge: 0)
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
         
