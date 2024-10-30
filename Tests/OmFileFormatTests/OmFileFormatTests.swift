@@ -86,8 +86,8 @@ final class OmFileFormatTests: XCTestCase {
             dimension_names: nil,
             scale_factor: writer.scale_factor,
             add_offset: writer.add_offset,
-            compression: writer.compression.toC(),
-            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            compression: writer.compression,
+            data_type: .float,
             lut_offset: lutStart,
             lut_size: lutSize
         )
@@ -134,8 +134,8 @@ final class OmFileFormatTests: XCTestCase {
             dimension_names: nil,
             scale_factor: writer.scale_factor,
             add_offset: writer.add_offset,
-            compression: writer.compression.toC(),
-            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            compression: writer.compression,
+            data_type: .float,
             lut_offset: lutStart,
             lut_size: lutSize
         )
@@ -172,8 +172,8 @@ final class OmFileFormatTests: XCTestCase {
             dimension_names: nil,
             scale_factor: writer.scale_factor,
             add_offset: writer.add_offset,
-            compression: writer.compression.toC(),
-            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            compression: writer.compression,
+            data_type: .float,
             lut_offset: lutStart,
             lut_size: lutSize
         )
@@ -209,8 +209,8 @@ final class OmFileFormatTests: XCTestCase {
             dimension_names: nil,
             scale_factor: writer.scale_factor,
             add_offset: writer.add_offset,
-            compression: writer.compression.toC(),
-            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            compression: writer.compression,
+            data_type: .float,
             lut_offset: lutStart,
             lut_size: lutSize
         )
@@ -256,8 +256,8 @@ final class OmFileFormatTests: XCTestCase {
             dimension_names: nil,
             scale_factor: writer.scale_factor,
             add_offset: writer.add_offset,
-            compression: writer.compression.toC(),
-            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            compression: writer.compression,
+            data_type: .float,
             lut_offset: lutStart,
             lut_size: lutSize
         )
@@ -357,8 +357,8 @@ final class OmFileFormatTests: XCTestCase {
             dimension_names: nil,
             scale_factor: writer.scale_factor,
             add_offset: writer.add_offset,
-            compression: writer.compression.toC(),
-            data_type: OmFileFormatC.DATA_TYPE_FLOAT,
+            compression: writer.compression,
+            data_type: .float,
             lut_offset: lutStart,
             lut_size: lutSize
         )
