@@ -24,6 +24,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case freezing_rain_probability
     case ice_pellets_probability
     case snowfall_probability
+    case surface_temperature
     
     var storePreviousForecast: Bool {
         switch self {
@@ -55,7 +56,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .precipitation: return 10
         case .wind_speed_10m, .wind_speed_80m: return 10
         case .wind_direction_10m, .wind_direction_80m: return 1
-        //case .surface_temperature: return 20
+        case .surface_temperature: return 20
         case .snowfall_water_equivalent: return 10
         case .wind_gusts_10m: return 10
         //case .pressure_msl: return 10
@@ -69,7 +70,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
         case .wind_speed_10m, .wind_speed_80m:
             return .hermite(bounds: 0...1e9)
@@ -100,7 +101,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var unit: SiUnit {
         switch self {
-        case .temperature_2m: return .celsius
+        case .temperature_2m, .surface_temperature: return .celsius
         case .cloud_cover: return .percentage
         case .relative_humidity_2m: return .percentage
         case .precipitation, .snowfall_water_equivalent: return .millimetre
@@ -117,7 +118,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return true
         default:
             return false
