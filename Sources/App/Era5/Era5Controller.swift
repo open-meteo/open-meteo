@@ -146,11 +146,6 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         for variable in variables {
             switch variable {
             case .raw(let v):
-                // TODO: remove one all cloud cover data has been downloaded
-                if v == .cloud_cover {
-                    try prefetchData(derived: .cloud_cover, time: time)
-                    break
-                }
                 try prefetchData(raw: v, time: time)
             case .derived(let v):
                 try prefetchData(derived: v, time: time)
@@ -302,10 +297,6 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
     func get(variable: Era5HourlyVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
-            // TODO: remove one all cloud cover data has been downloaded
-            if variable == .cloud_cover {
-                return try get(derived: .cloud_cover, time: time)
-            }
             return try get(raw: variable, time: time)
         case .derived(let variable):
             return try get(derived: variable, time: time)
