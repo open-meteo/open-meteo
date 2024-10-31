@@ -6,9 +6,6 @@ import SwiftNetCDF
 /**
 NCEP NBM downloader
  
- TODO:
- - surface elevation height and land-sea-mask
- 
  Note: Depending on the run, different variables are available. See: https://vlab.noaa.gov/web/mdl/nbm-v4.2-weather-elements and  https://vlab.noaa.gov/web/mdl/nbm-data-availability-v4.2
  */
 struct NbmDownload: AsyncCommand {
@@ -43,6 +40,12 @@ struct NbmDownload: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
         
+        @Option(name: "lsm-file", help: "Path to LSM GRIB file")
+        var lsmFile: String?
+        
+        @Option(name: "hgt-file", help: "Path to domain elevation height GRIB file")
+        var hgtFile: String?
+        
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
     }
@@ -54,6 +57,11 @@ struct NbmDownload: AsyncCommand {
     func run(using context: CommandContext, signature: Signature) async throws {
         let domain = try NbmDomain.load(rawValue: signature.domain)
         disableIdleSleep()
+        
+        if let lsm = signature.lsmFile, let hgt = signature.hgtFile {
+            try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [lsm, hgt], createNetCdf: true, shift180LongitudeAndFlipLatitude: false)
+            return
+        }
         
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
@@ -161,13 +169,6 @@ struct NbmDownload: AsyncCommand {
                     grib2d.array.flipEverySecondScanLine()
                 }
                 //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
-                
-                /// Generate land mask from regular data for GFS Wave013
-                //if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
-                    //let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
-                    //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
-                   // try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
-               // }
                 
                 // NBM contains instantanous values for solar flux. Convert it to backwards averaged.
                 if let variable = variable.variable as? NbmSurfaceVariable, variable == .shortwave_radiation {

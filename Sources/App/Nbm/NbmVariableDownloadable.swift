@@ -14,6 +14,8 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
         switch self {
         case .temperature_2m:
             return ":TMP:2 m above ground:\(timestep) hour fcst:"
+        case .surface_temperature:
+            return ":TMP:surface:\(timestep) hour fcst:"
         case .cape:
             return ":CAPE:surface:\(timestep) hour fcst:"
         case .shortwave_radiation:
@@ -72,7 +74,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
     
     func multiplyAdd(domain: NbmDomain) -> (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature:
             return (1, -273.15)
         default:
             return nil

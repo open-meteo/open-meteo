@@ -313,7 +313,7 @@ struct DownloadEra5Command: AsyncCommand {
                 let shortName = message.get(attribute: "shortName")!
                 var data = try message.getDouble().map(Float.init)
                 switch shortName {
-                case "orog", "mterh":
+                case "orog", "mterh", "h":
                     elevation = data
                 case "z":
                     data.multiplyAdd(multiply: 1/9.80665, add: 0)

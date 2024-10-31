@@ -9,6 +9,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case wind_v_component_10m
     case wind_gusts_10m
     case dew_point_2m
+    case cloud_cover
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
@@ -41,6 +42,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case wind_v_component_10m_spread
     case wind_gusts_10m_spread
     case dew_point_2m_spread
+    case cloud_cover_spread
     case cloud_cover_low_spread
     case cloud_cover_mid_spread
     case cloud_cover_high_spread
@@ -71,6 +73,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wind_gusts_10m: return "instantaneous_10m_wind_gust"
         case .dew_point_2m: return "2m_dewpoint_temperature"
         case .temperature_2m: return "2m_temperature"
+        case .cloud_cover: return "total_cloud_cover"
         case .cloud_cover_low: return "low_cloud_cover"
         case .cloud_cover_mid: return "medium_cloud_cover"
         case .cloud_cover_high: return "high_cloud_cover"
@@ -102,6 +105,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         switch self {
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
         case .dew_point_2m: return (-273.15, 1)
+        case .cloud_cover, .cloud_cover_spread: return (0, 100) // fraction to percent
         case .cloud_cover_low, .cloud_cover_low_spread: return (0, 100) // fraction to percent
         case .cloud_cover_mid, .cloud_cover_mid_spread: return (0, 100)
         case .cloud_cover_high, .cloud_cover_high_spread: return (0, 100)
@@ -130,6 +134,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
                 .wind_u_component_10m, .wind_v_component_10m: return 20 // 0.05 m/s resolution. Typically 10, but want to have sligthly higher resolution
         case .wind_u_component_100m_spread, .wind_v_component_100m_spread,
                 .wind_u_component_10m_spread, .wind_v_component_10m_spread: return 50 // 0.02 m/s resolution
+        case .cloud_cover, .cloud_cover_spread: return 1
         case .cloud_cover_low, .cloud_cover_low_spread: return 1
         case .cloud_cover_mid, .cloud_cover_mid_spread: return 1
         case .cloud_cover_high, .cloud_cover_high_spread: return 1
@@ -179,6 +184,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .hermite(bounds: nil)
         case .dew_point_2m, .dew_point_2m_spread:
             return .hermite(bounds: nil)
+        case .cloud_cover, .cloud_cover_spread:
+            return .hermite(bounds: 0...100)
         case .cloud_cover_low, .cloud_cover_low_spread:
             return .hermite(bounds: 0...100)
         case .cloud_cover_mid, .cloud_cover_mid_spread:
@@ -301,6 +308,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return "49.128"
         case .dew_point_2m:
             return "168.128"
+        case .cloud_cover:
+            return "164.128"
         case .cloud_cover_low:
             return "186.128"
         case .cloud_cover_mid:
@@ -359,6 +368,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
         case .dew_point_2m: return .celsius
         case .temperature_2m: return .celsius
+        case .cloud_cover, .cloud_cover_spread: return .percentage
         case .cloud_cover_low, .cloud_cover_low_spread: return .percentage
         case .cloud_cover_mid, .cloud_cover_mid_spread: return .percentage
         case .cloud_cover_high, .cloud_cover_high_spread: return .percentage
@@ -404,6 +414,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         if attributes.dataType == "es" {
             switch attributes.shortName {
             case "2t": return .temperature_2m_spread
+            case "tcc": return .cloud_cover_spread
             case "lcc": return .cloud_cover_low_spread
             case "mcc": return .cloud_cover_mid_spread
             case "hcc": return .cloud_cover_high_spread
@@ -436,6 +447,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         
         switch attributes.shortName {
         case "2t": return .temperature_2m
+        case "tcc": return .cloud_cover
         case "lcc": return .cloud_cover_low
         case "mcc": return .cloud_cover_mid
         case "hcc": return .cloud_cover_high
