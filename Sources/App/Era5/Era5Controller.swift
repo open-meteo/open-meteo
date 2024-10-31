@@ -27,7 +27,6 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case rain
     case et0_fao_evapotranspiration
     case cloudcover
-    case cloud_cover
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
@@ -207,12 +206,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .pressure_msl, time: time)
         case .snowfall:
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
-        case .cloud_cover:
-            fallthrough
         case .cloudcover:
-            try prefetchData(raw: .cloud_cover_low, time: time)
-            try prefetchData(raw: .cloud_cover_mid, time: time)
-            try prefetchData(raw: .cloud_cover_high, time: time)
+            try prefetchData(raw: .cloud_cover, time: time)
         case .direct_normal_irradiance:
             try prefetchData(raw: .direct_radiation, time: time)
         case .rain:
@@ -372,13 +367,8 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let temperature = try get(raw: .temperature_2m, time: time).data
             let pressure = try get(raw: .pressure_msl, time: time)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: targetElevation), pressure.unit)
-        case .cloud_cover:
-            fallthrough
         case .cloudcover:
-            let low = try get(raw: .cloud_cover_low, time: time).data
-            let mid = try get(raw: .cloud_cover_mid, time: time).data
-            let high = try get(raw: .cloud_cover_high, time: time).data
-            return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percentage)
+            return try get(raw: .cloud_cover, time: time)
         case .snowfall:
             let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
