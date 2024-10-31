@@ -43,6 +43,12 @@ struct NbmDownload: AsyncCommand {
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
         
+        @Option(name: "lsm-file", help: "Path to LSM GRIB file")
+        var lsmFile: String?
+        
+        @Option(name: "hgt-file", help: "Path to domain elevation height GRIB file")
+        var hgtFile: String?
+        
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
     }
@@ -54,6 +60,11 @@ struct NbmDownload: AsyncCommand {
     func run(using context: CommandContext, signature: Signature) async throws {
         let domain = try NbmDomain.load(rawValue: signature.domain)
         disableIdleSleep()
+        
+        if let lsm = signature.lsmFile, let hgt = signature.hgtFile {
+            try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [lsm, hgt], createNetCdf: true, shift180LongitudeAndFlipLatitude: false)
+            return
+        }
         
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
