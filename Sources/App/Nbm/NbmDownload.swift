@@ -6,9 +6,6 @@ import SwiftNetCDF
 /**
 NCEP NBM downloader
  
- TODO:
- - surface elevation height and land-sea-mask
- 
  Note: Depending on the run, different variables are available. See: https://vlab.noaa.gov/web/mdl/nbm-v4.2-weather-elements and  https://vlab.noaa.gov/web/mdl/nbm-data-availability-v4.2
  */
 struct NbmDownload: AsyncCommand {
@@ -172,13 +169,6 @@ struct NbmDownload: AsyncCommand {
                     grib2d.array.flipEverySecondScanLine()
                 }
                 //try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
-                
-                /// Generate land mask from regular data for GFS Wave013
-                //if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
-                    //let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
-                    //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
-                   // try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
-               // }
                 
                 // NBM contains instantanous values for solar flux. Convert it to backwards averaged.
                 if let variable = variable.variable as? NbmSurfaceVariable, variable == .shortwave_radiation {
