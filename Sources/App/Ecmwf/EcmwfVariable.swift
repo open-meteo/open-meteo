@@ -217,7 +217,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     case divergence_of_wind_100hPa
     case divergence_of_wind_50hPa
     
-
+    case wind_gusts_10m
     
     // Cloudcover is calculated while downloading
     case cloud_cover
@@ -277,6 +277,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             fallthrough
         case .wind_u_component_10m, .wind_u_component_100m:
             fallthrough
+        case .wind_gusts_10m:
+            fallthrough
         case .temperature_2m:
             fallthrough
         case .cloud_cover:
@@ -312,7 +314,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     }
     
     var isElevationCorrectable: Bool {
-        return self == .temperature_2m || self == .surface_temperature || self == .soil_temperature_0_to_7cm
+        switch self {
+        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
+            fallthrough
+        case .temperature_2m, .surface_pressure:
+            return true
+        default:
+            return false
+        }
     }
     
     static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
@@ -471,6 +480,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return .metrePerSecond
         case .wind_u_component_100m:
             return .metrePerSecond
+        case .wind_gusts_10m:
+            return .metrePerSecond
         }
     }
     
@@ -479,7 +490,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         switch self {
         case .precipitation: fallthrough
         case .runoff: return nil
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 0
+        case .soil_temperature_0_to_7cm: return 1
+        case .soil_temperature_7_to_28cm: return 2
+        case .soil_temperature_28_to_100cm: return 3
+        case .soil_temperature_100_to_255cm: return 4
         case .surface_temperature: return nil
         case .geopotential_height_1000hPa: return 1000
         case .geopotential_height_925hPa: return 925
@@ -607,8 +621,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return 2
         case .relative_humidity_2m:
             return 2
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
-            return nil
+        case .soil_moisture_0_to_7cm:
+            return 1
+        case .soil_moisture_7_to_28cm:
+            return 2
+        case .soil_moisture_28_to_100cm:
+            return 3
+        case .soil_moisture_100_to_255cm:
+            return 4
         case .cape:
             return nil
         case .shortwave_radiation:
@@ -616,6 +636,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .wind_v_component_100m:
             return nil
         case .wind_u_component_100m:
+            return nil
+        case .wind_gusts_10m:
             return nil
         }
     }
@@ -757,13 +779,15 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         //case .soil_moisture_7_to_28cm:
         //    return "swvl2"
         case .cape:
-            return "cape"
+            return "mucape"
         case .shortwave_radiation:
             return "ssrd"
         case .wind_v_component_100m:
             return "100v"
         case .wind_u_component_100m:
             return "100u"
+        case .wind_gusts_10m:
+            return "10fg"
         }
     }
     
@@ -905,13 +929,15 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return 0.1
         case .shortwave_radiation:
             return 1
+        case .wind_gusts_10m:
+            return 10
         }
     }
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .surface_temperature: fallthrough
-        case .soil_temperature_0_to_7cm: fallthrough
+        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough
@@ -974,6 +1000,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .relative_humidity_100hPa: fallthrough
         case .relative_humidity_50hPa: return .hermite(bounds: 0...100)
         case .shortwave_radiation: return .solar_backwards_averaged
+        case .wind_gusts_10m: return .hermite(bounds: 0...1000)
         default: return .hermite(bounds: nil)
         }
     }
