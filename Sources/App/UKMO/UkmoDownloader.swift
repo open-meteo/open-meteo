@@ -172,9 +172,10 @@ struct UkmoDownload: AsyncCommand {
         let deadLineHours: Double
         switch domain {
         case .global_deterministic_10km:
-            deadLineHours = 5
+            // High delays on AWS server since 2024-11-07
+            deadLineHours = 12
         case .uk_deterministic_2km:
-            deadLineHours = 1
+            deadLineHours = 6
         }
         Process.alarm(seconds: Int(deadLineHours+0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
