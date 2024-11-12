@@ -20,6 +20,7 @@ extension Curl {
         enum LevelType: String, Decodable {
             case sfc
             case pl
+            case sol
         }
         /// pressure or surface level
         let levtype: LevelType
