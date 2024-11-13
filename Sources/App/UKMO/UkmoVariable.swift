@@ -213,6 +213,12 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 return nil
             case .freezing_level_height:
                 return nil
+            case .direct_radiation:
+                // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
+                // Data after 54 hours is 3 hourly
+                if forecastHour > 54 {
+                    return nil
+                }
             default:
                 break
             }
