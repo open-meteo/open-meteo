@@ -122,38 +122,40 @@ struct UkmoDownload: AsyncCommand {
         
         for variable in [UkmoSurfaceVariable.shortwave_radiation, .direct_radiation] {
             for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
-                let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
-                let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: 0)
-                guard let omRead = try readFile.openRead() else {
-                    continue
-                }
-                let fileName = readFile.getFilePath()
-                application.logger.info("Correcting file \(fileName)")
-                let tempFile = fileName + "~"
-                try FileManager.default.removeItemIfExists(at: tempFile)
-                let fn = try FileHandle.createNewFile(file: tempFile)
-                
-                let writer = try OmFileWriterState<FileHandle>(fn: fn, dim0: omRead.dim0, dim1: omRead.dim1, chunk0: omRead.chunk0, chunk1: omRead.chunk1, compression: omRead.compression, scalefactor: omRead.scalefactor, fsync: true)
-                try writer.writeHeader()
-                
-                // loop over data in chunks
-                for locations in (0..<omRead.dim0).chunks(ofCount: omRead.chunk0) {
-                    var data = try omRead.read(dim0Slow: locations, dim1: nil)
-                    let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locations, timerange: fileTime)
-                    for i in data.indices {
-                        if factor.data[i] < 0.05 {
-                            continue
-                        }
-                        data[i] /= factor.data[i]
+                for previousDay in 1..<10 { // 0..<10}
+                    let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
+                    let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                    guard let omRead = try readFile.openRead() else {
+                        continue
                     }
-                    try writer.write(ArraySlice(data))
+                    let fileName = readFile.getFilePath()
+                    application.logger.info("Correcting file \(fileName)")
+                    let tempFile = fileName + "~"
+                    try FileManager.default.removeItemIfExists(at: tempFile)
+                    let fn = try FileHandle.createNewFile(file: tempFile)
+                    
+                    let writer = try OmFileWriterState<FileHandle>(fn: fn, dim0: omRead.dim0, dim1: omRead.dim1, chunk0: omRead.chunk0, chunk1: omRead.chunk1, compression: omRead.compression, scalefactor: omRead.scalefactor, fsync: true)
+                    try writer.writeHeader()
+                    
+                    // loop over data in chunks
+                    for locations in (0..<omRead.dim0).chunks(ofCount: omRead.chunk0) {
+                        var data = try omRead.read(dim0Slow: locations, dim1: nil)
+                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locations, timerange: fileTime)
+                        for i in data.indices {
+                            if factor.data[i] < 0.05 {
+                                continue
+                            }
+                            data[i] /= factor.data[i]
+                        }
+                        try writer.write(ArraySlice(data))
+                    }
+                    
+                    try writer.writeTail()
+                    try writer.fn.close()
+                    
+                    // Overwrite existing file, with newly created
+                    try FileManager.default.moveFileOverwrite(from: tempFile, to: fileName)
                 }
-                
-                try writer.writeTail()
-                try writer.fn.close()
-                
-                // Overwrite existing file, with newly created
-                try FileManager.default.moveFileOverwrite(from: tempFile, to: fileName)
             }
         }
     }
