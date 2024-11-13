@@ -43,6 +43,11 @@ extension Int {
 }
 
 extension Range where Element == Int {
+    /// The lower bound uses a regular division, the upper bound uses divideRoundedUp
+    func divideRoundedUp(divisor: Int) -> Range<Int> {
+        return lowerBound / divisor ..< upperBound.divideRoundedUp(divisor: divisor)
+    }
+    
     /// Return the intersect position between 2 ranges
     public func intersect(fileTime: Range<Int>) -> (file: CountableRange<Int>, array: CountableRange<Int>)? {
         let fileLower = fileTime.lowerBound

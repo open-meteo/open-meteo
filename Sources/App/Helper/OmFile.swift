@@ -123,7 +123,7 @@ struct OmFileSplitter {
             return
         }
         let subring = start ..< indexTime.upperBound
-        for timeChunk in subring.lowerBound / nTimePerFile ..< subring.upperBound.divideRoundedUp(divisor: nTimePerFile) {
+        for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile) {
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
@@ -214,7 +214,7 @@ struct OmFileSplitter {
             return out
         }
         let subring = start ..< indexTime.upperBound
-        for timeChunk in subring.lowerBound / nTimePerFile ..< subring.upperBound.divideRoundedUp(divisor: nTimePerFile) {
+        for timeChunk in subring.divideRoundedUp(divisor: nTimePerFile) {
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
@@ -264,7 +264,7 @@ struct OmFileSplitter {
     func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256, storePreviousForecast: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
         let indexTime = time.toIndexTime()
-        let indextimeChunked  = indexTime.lowerBound / nTimePerFile ..< indexTime.upperBound.divideRoundedUp(divisor: nTimePerFile)
+        let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)
         
         // Number of previous days of forecast to keep. Max 7 past days
         let nPreviousDays = storePreviousForecast ? max(1, min(8, time.range.count / 86400)) : 1
