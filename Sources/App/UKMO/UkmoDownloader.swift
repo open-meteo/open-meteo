@@ -228,10 +228,22 @@ struct UkmoDownload: AsyncCommand {
                         if let scaling = variable.multiplyAdd {
                             data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                         }
-                        if let variable = variable as? UkmoSurfaceVariable, variable == .cloud_base {
-                            for i in data.indices {
-                                if data[i].isNaN {
-                                    data[i] = 0
+                        if let variable = variable as? UkmoSurfaceVariable {
+                            if variable == .cloud_base {
+                                for i in data.indices {
+                                    if data[i].isNaN {
+                                        data[i] = 0
+                                    }
+                                }
+                            }
+                            /// UKMO provides solar radiation as instant values. Convert to backwards averaged data.
+                            if variable == .direct_radiation || variable == .shortwave_radiation {
+                                let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                                for i in data.indices {
+                                    if factor.data[i] < 0.05 {
+                                        continue
+                                    }
+                                    data[i] /= factor.data[i]
                                 }
                             }
                         }
