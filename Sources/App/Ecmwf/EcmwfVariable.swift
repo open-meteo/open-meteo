@@ -86,6 +86,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
 /// Only AIFS has additional levels 100, 400 and 600
 enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, GenericVariableMixable {
     case precipitation
+    case precipitation_type
     /// only in aifs
     case dew_point_2m
     case runoff
@@ -340,6 +341,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     
     var unit: SiUnit {
         switch self {
+        case .precipitation_type: return .dimensionless
         case .precipitation: fallthrough
         case .runoff: return .millimetre
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
@@ -488,7 +490,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// pressure level in hPa or meter in the grib files
     var level: Int? {
         switch self {
-        case .precipitation: fallthrough
+        case .precipitation, .precipitation_type: fallthrough
         case .runoff: return nil
         case .soil_temperature_0_to_7cm: return 1
         case .soil_temperature_7_to_28cm: return 2
@@ -644,6 +646,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     
     var gribName: String? {
         switch self {
+        case .precipitation_type: return "ptype"
         case .precipitation: return "tp"
         case .runoff: return "ro"
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return "sot" // sot?
@@ -793,6 +796,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     
     var scalefactor: Float {
         switch self {
+        case .precipitation_type: return 1
         case .precipitation: fallthrough
         case .runoff: return 10
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 20
