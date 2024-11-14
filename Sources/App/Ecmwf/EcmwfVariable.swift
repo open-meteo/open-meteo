@@ -86,6 +86,16 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
 /// Only AIFS has additional levels 100, 400 and 600
 enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, GenericVariableMixable {
     case precipitation
+    /**
+     0 = No precipitation
+     1 = Rain
+     3 = Freezing rain (i.e. supercooled raindrops which freeze on contact with the ground and other surfaces)
+     5 = Snow
+     6 = Wet snow (i.e. snow particles which are starting to melt)
+     7 = Mixture of rain and snow
+     8 = Ice pellets
+     12 = Freezing drizzle (i.e. supercooled drizzle which freezes on contact with the ground and other surfaces)
+     */
     case precipitation_type
     /// only in aifs
     case dew_point_2m
