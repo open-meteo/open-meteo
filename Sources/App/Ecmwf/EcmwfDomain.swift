@@ -18,9 +18,10 @@ enum EcmwfDomain: String, GenericDomain {
         if self == .aifs025 {
             return Array(stride(from: 0, through: 360, by: dtHours))
         }
+        let fullLength = isEnsemble || self == .ifs025
         switch run {
-        case 0,12: return Array(stride(from: 0, through: 144, by: dtHours)) + Array(stride(from: 150, through: 360, by: 6))
-        case 6,18: return Array(stride(from: 0, through: 144, by: dtHours))
+        case 0,12: return Array(stride(from: 0, through: 144, by: dtHours)) + Array(stride(from: 150, through: fullLength ? 360 : 240, by: 6))
+        case 6,18: return Array(stride(from: 0, through: fullLength ? 144 : 90, by: dtHours))
         default: fatalError("Invalid run")
         }
     }
