@@ -8,8 +8,26 @@
 import Foundation
 @_implementationOnly import OmFileFormatC
 
+public struct OffsetSize {
+    let offset: Int
+    let size: Int
+}
+
 /// Writes om file header and trailer
 public final class OmFileWriter2 {
+    static public func write(value: Int8, name: String, children: [OffsetSize], buffer: OmWriteBuffer) -> OffsetSize {
+        
+    }
+    
+    static public func writeArray(lutStart: Int, lutEnd: Int, name: String, children: [OffsetSize], buffer: OmWriteBuffer) -> OffsetSize {
+        
+    }
+
+    
+    static public func writeTrailer(buffer: OmWriteBuffer, root: OffsetSize) throws {
+        
+    }
+    
     /// Write header. Only magic number and version 3
     static public func writeHeader(buffer: OmWriteBuffer) {
         buffer.reallocate(minimumCapacity: 3)
@@ -167,6 +185,12 @@ public final class OmFileWriterArray {
         let lut_offset = buffer.totalBytesWritten
         
         let lut_size = writeLut(buffer: buffer)
+        
+        // let name = "data"
+        // let children
+        // om_variable_write_prefix(buffer, length_of_name, name, number_chilrden)
+        
+        // should only turn lut offset and size!!!!
         
         /// Generate the JSON meta attributes
         return OmFileJSONVariable(

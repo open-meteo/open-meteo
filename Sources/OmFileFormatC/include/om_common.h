@@ -35,16 +35,29 @@ const char* OmError_string(OmError_t error);
 
 /// Data types
 typedef enum {
-    DATA_TYPE_INT8 = 0,
-    DATA_TYPE_UINT8 = 1,
-    DATA_TYPE_INT16 = 2,
-    DATA_TYPE_UINT16 = 3,
-    DATA_TYPE_INT32 = 4,
-    DATA_TYPE_UINT32 = 5,
-    DATA_TYPE_INT64 = 6,
-    DATA_TYPE_UINT64 = 7,
-    DATA_TYPE_FLOAT = 8,
-    DATA_TYPE_DOUBLE = 9
+    DATA_TYPE_NONE = 0,
+    DATA_TYPE_INT8 = 1,
+    DATA_TYPE_UINT8 = 2,
+    DATA_TYPE_INT16 = 3,
+    DATA_TYPE_UINT16 = 4,
+    DATA_TYPE_INT32 = 5,
+    DATA_TYPE_UINT32 = 6,
+    DATA_TYPE_INT64 = 7,
+    DATA_TYPE_UINT64 = 8,
+    DATA_TYPE_FLOAT = 9,
+    DATA_TYPE_DOUBLE = 10,
+    DATA_TYPE_STRING = 11,
+    DATA_TYPE_INT8_ARRAY = 12,
+    DATA_TYPE_UINT8_ARRAY = 13,
+    DATA_TYPE_INT16_ARRAY = 14,
+    DATA_TYPE_UINT16_ARRAY = 15,
+    DATA_TYPE_INT32_ARRAY = 16,
+    DATA_TYPE_UINT32_ARRAY = 17,
+    DATA_TYPE_INT64_ARRAY = 18,
+    DATA_TYPE_UINT64_ARRAY = 19,
+    DATA_TYPE_FLOAT_ARRAY = 20,
+    DATA_TYPE_DOUBLE_ARRAY = 21,
+    DATA_TYPE_STRING_ARRAY = 22
 } OmDataType_t;
 
 /// Compression types
@@ -54,6 +67,94 @@ typedef enum {
     COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
 } OmCompression_t;
 
+typedef struct {
+    uint64_t offset;
+    uint64_t size;
+} OmOffsetSize_t;
+
+/// Old files directly contain array information for 2 dimensional arrays
+/// File content: Header, look-up-table, compressed data
+typedef struct {
+    uint8_t magic_number1;
+    uint8_t magic_number2;
+    uint8_t version;
+    uint8_t compression_type; // OmCompression_t
+    float scale_factor;
+    uint64_t dim0;
+    uint64_t dim1;
+    uint64_t chunk0;
+    uint64_t chunk1;
+    // followed by lookup table and then data
+} OmHeaderV1_t;
+
+/// Newer version only contain magic number "OM" and the version 3
+typedef struct {
+    uint8_t magic_number1;
+    uint8_t magic_number2;
+    uint8_t version;
+} OmHeaderV3_t;
+
+/// Trailer only present in version 3 files
+typedef struct {
+    uint8_t magic_number1;
+    uint8_t magic_number2;
+    uint8_t version;
+    uint8_t reserved;
+    OmOffsetSize_t root; // 2x 64 bit
+} OmTrailer_t;
+
+typedef struct {
+    uint64_t dimension_count;
+    uint64_t lut_offset;
+    uint64_t lut_size;
+    
+    float scale_factor;
+    float add_offset;
+    
+    //Payload after generic variable stuff
+    //uint64_t[dimension_count] dimensions;
+    //uint64_t[dimension_count] chunks;
+} OmVariableArray_t;
+
+typedef union {
+    int8_t int8;
+    int16_t int16;
+    int32_t int32;
+    int64_t int64;
+    uint8_t uint8;
+    uint16_t uint16;
+    uint32_t uint32;
+    uint64_t uint64;
+    OmVariableArray_t array;
+    // TODO strings
+} OmVariableValueEnum_t;
+
+
+typedef struct {
+    uint8_t data_type; // OmDataType_t
+    uint8_t compression_type; // OmCompression_t
+    uint16_t length_of_name; // maximum 65k name strings
+    uint32_t number_of_children;
+    
+    
+    OmVariableValueEnum_t value;
+
+    // Afterwards additional payload from value types
+    //uint64_t[dimension_count] dimensions;
+    //uint64_t[dimension_count] chunks;
+    
+    // Followed by payload: NOTE: Lets to try 64 bit align it somehow
+    //uint32_t[number_of_children] children_length;
+    //uint32_t[number_of_children] children_offset;
+    //char[length_of_name] name;
+    //void* value;
+    
+} OmVariableV3_t;
+
+
+
+/// only expose an opague pointer
+typedef void* OmVariable_t;
 
 /// Divide and round up
 #define divide_rounded_up(dividend,divisor) \
