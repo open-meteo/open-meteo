@@ -49,6 +49,9 @@ struct UkmoDownload: AsyncCommand {
         
         @Flag(name: "skip-missing", help: "Ignore missing files while downloading")
         var skipMissing: Bool
+        
+        @Flag(name: "fix-solar", help: "Fix old solar files")
+        var fixSolar: Bool
     }
 
     var help: String {
@@ -83,6 +86,14 @@ struct UkmoDownload: AsyncCommand {
         
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
+            
+            if signature.fixSolar {
+                // timeinterval devided by chunk time range
+                let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
+                try self.fixSolarFiles(application: context.application, domain: domain, timerange: time)
+                return
+            }
+            
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false)
@@ -101,6 +112,51 @@ struct UkmoDownload: AsyncCommand {
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
             try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+        }
+    }
+    
+    /// read each file in chunks, apply shortwave correction and write again
+    func fixSolarFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
+        let nTimePerFile = domain.omFileLength
+        let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
+        
+        for variable in [UkmoSurfaceVariable.shortwave_radiation, .direct_radiation] {
+            for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
+                for previousDay in 1..<10 { // 0..<10}
+                    let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
+                    let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                    guard let omRead = try readFile.openRead() else {
+                        continue
+                    }
+                    let fileName = readFile.getFilePath()
+                    application.logger.info("Correcting file \(fileName)")
+                    let tempFile = fileName + "~"
+                    try FileManager.default.removeItemIfExists(at: tempFile)
+                    let fn = try FileHandle.createNewFile(file: tempFile)
+                    
+                    let writer = try OmFileWriterState<FileHandle>(fn: fn, dim0: omRead.dim0, dim1: omRead.dim1, chunk0: omRead.chunk0, chunk1: omRead.chunk1, compression: omRead.compression, scalefactor: omRead.scalefactor, fsync: true)
+                    try writer.writeHeader()
+                    
+                    // loop over data in chunks
+                    for locations in (0..<omRead.dim0).chunks(ofCount: omRead.chunk0) {
+                        var data = try omRead.read(dim0Slow: locations, dim1: nil)
+                        let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: locations, timerange: fileTime)
+                        for i in data.indices {
+                            if factor.data[i] < 0.05 {
+                                continue
+                            }
+                            data[i] /= factor.data[i]
+                        }
+                        try writer.write(ArraySlice(data))
+                    }
+                    
+                    try writer.writeTail()
+                    try writer.fn.close()
+                    
+                    // Overwrite existing file, with newly created
+                    try FileManager.default.moveFileOverwrite(from: tempFile, to: fileName)
+                }
+            }
         }
     }
     
@@ -228,10 +284,22 @@ struct UkmoDownload: AsyncCommand {
                         if let scaling = variable.multiplyAdd {
                             data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                         }
-                        if let variable = variable as? UkmoSurfaceVariable, variable == .cloud_base {
-                            for i in data.indices {
-                                if data[i].isNaN {
-                                    data[i] = 0
+                        if let variable = variable as? UkmoSurfaceVariable {
+                            if variable == .cloud_base {
+                                for i in data.indices {
+                                    if data[i].isNaN {
+                                        data[i] = 0
+                                    }
+                                }
+                            }
+                            /// UKMO provides solar radiation as instant values. Convert to backwards averaged data.
+                            if variable == .direct_radiation || variable == .shortwave_radiation {
+                                let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                                for i in data.indices {
+                                    if factor.data[i] < 0.05 {
+                                        continue
+                                    }
+                                    data[i] /= factor.data[i]
                                 }
                             }
                         }
