@@ -32,13 +32,13 @@ size_t om_read_trailer_size(); // -> 20 bytes
 
 /// read header of a file. Older files return root start and end directly, new files require to read trailer. For newer files, root is set to 0.
 /// Data should be read afterwards from offset by size. This data is a pointer to `OmVariable_t`
-OmError_t om_read_header(const void* src, int *version, OmOffsetSize_t* root);
-OmError_t om_read_trailer(const void* src, int *version, OmOffsetSize_t* root);
+OmError_t om_read_header(const void* src, OmOffsetSize_t* root);
+OmError_t om_read_trailer(const void* src, OmOffsetSize_t* root);
 
 /// After reading data for the variable, initlise it. This is literally a simple cast to an opague pointer. Source memory must remain accessible!
-OmVariable_t* om_variable_init(void* src);
+const OmVariable_t* om_variable_init(const void* src);
 
-OmError_t om_variable_get_name(const OmVariable_t* variable, size_t* name_length, char** name);
+OmError_t om_variable_get_name(const OmVariable_t* variable, uint16_t* name_length, char** name);
 OmDataType_t om_variable_get_type(const OmVariable_t* variable);
 
 /// Check if a variable is legacy or version 3. Legacy files are the entire header containing magic number and version.
@@ -49,26 +49,22 @@ OmError_t om_variable_get_child(const OmVariable_t* variable, int nChild, OmOffs
 int om_variable_number_of_children(const OmVariable_t* variable);
 
 
-int om_variable_size_of_prefix(size_t length_of_name, size_t number_of_children);
-int om_variable_write_prefix(void* dst, size_t length_of_name, size_t number_of_children, size_t children_length, size_t children_offset, char* name);
+OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value);
 
 
-int om_variable_size_of_int8();
-void om_variable_write_int8(void* dst);
-OmError_t om_variable_read_int8(const OmVariable_t* variable, int8_t* value);
+size_t om_variable_size_of_scalar(uint16_t length_of_name, uint32_t number_of_children, OmDataType_t data_type);
+void om_variable_write_scalar(void* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, const void* value);
 
-int om_variable_size_of_numeric_array(size_t dimension_count);
-int om_variable_write_numeric_array(void* dst, char compression_type, scalefactor, dataoffset, size_t dimension_count, size_t *dimensions, size_t *chunks, lut_offset, lut_size);
+// todo write string, string array
 
-
-OmError_t OmDecoder_init(OmDecoder_t* decoder, int version, const OmVariable_t* variable, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t io_size_merge, size_t io_size_max);
-
+size_t om_variable_size_of_numeric_array(uint16_t length_of_name, uint32_t number_of_children, uint64_t dimension_count);
+int om_variable_write_numeric_array(void* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset);
 
 
 size_t om_write_header_size(); // 3
 size_t om_write_trailer_size(); // 20
 OmError_t om_write_header(void* dest);
-OmError_t om_write_trailer(void* dest, const OmOffsetSize_t* root);
+OmError_t om_write_trailer(void* dest, const OmOffsetSize_t root);
 
 
 #endif // OM_VARIABLE_H

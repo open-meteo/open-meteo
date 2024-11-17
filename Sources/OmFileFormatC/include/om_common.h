@@ -104,9 +104,9 @@ typedef struct {
 } OmTrailer_t;
 
 typedef struct {
-    uint64_t dimension_count;
-    uint64_t lut_offset;
     uint64_t lut_size;
+    uint64_t lut_offset;
+    uint64_t dimension_count;
     
     float scale_factor;
     float add_offset;
@@ -116,39 +116,31 @@ typedef struct {
     //uint64_t[dimension_count] chunks;
 } OmVariableArray_t;
 
-typedef union {
-    int8_t int8;
-    int16_t int16;
-    int32_t int32;
-    int64_t int64;
-    uint8_t uint8;
-    uint16_t uint16;
-    uint32_t uint32;
-    uint64_t uint64;
-    OmVariableArray_t array;
-    // TODO strings
-} OmVariableValueEnum_t;
-
-
 typedef struct {
     uint8_t data_type; // OmDataType_t
     uint8_t compression_type; // OmCompression_t
     uint16_t length_of_name; // maximum 65k name strings
     uint32_t number_of_children;
     
-    
-    OmVariableValueEnum_t value;
-
-    // Afterwards additional payload from value types
-    //uint64_t[dimension_count] dimensions;
-    //uint64_t[dimension_count] chunks;
+    /// Additional attributes are only set for numic arrays or strings
+    union {
+        OmVariableArray_t array;
+        uint64_t string_size;
+    } additional;
     
     // Followed by payload: NOTE: Lets to try 64 bit align it somehow
     //uint32_t[number_of_children] children_length;
     //uint32_t[number_of_children] children_offset;
-    //char[length_of_name] name;
+    
+    // Afterwards additional payload from value types
+    //uint64_t[dimension_count] dimensions;
+    //uint64_t[dimension_count] chunks;
+    
+    // Scalars are now set
     //void* value;
     
+    // name is always last
+    //char[length_of_name] name;
 } OmVariableV3_t;
 
 

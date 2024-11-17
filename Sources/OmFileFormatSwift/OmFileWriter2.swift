@@ -9,58 +9,84 @@ import Foundation
 @_implementationOnly import OmFileFormatC
 
 public struct OffsetSize {
-    let offset: Int
-    let size: Int
+    let offset: UInt64
+    let size: UInt64
+    
+    var cOffsetSize: OmOffsetSize_t {
+        return OmOffsetSize_t(offset: offset, size: size)
+    }
 }
 
 /// Writes om file header and trailer
 public final class OmFileWriter2 {
     static public func write(value: Int8, name: String, children: [OffsetSize], buffer: OmWriteBuffer) -> OffsetSize {
-        
+        var name = name
+        return name.withUTF8{ name in
+            guard name.count <= UInt16.max else { fatalError() }
+            guard children.count <= UInt32.max else { fatalError() }
+            let size = om_variable_size_of_scalar(UInt16(name.count), UInt32(children.count), DATA_TYPE_INT8)
+            buffer.reallocate(minimumCapacity: Int(size))
+            let childrenSize = children.map{$0.size}
+            let childrenOffset = children.map{$0.offset}
+            var value = value
+            withUnsafePointer(to: &value, { value in
+                om_variable_write_scalar(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenSize, childrenOffset, name.baseAddress, DATA_TYPE_INT8, value)
+            })
+            let offset = buffer.totalBytesWritten
+            buffer.incrementWritePosition(by: size)
+            return OffsetSize(offset: UInt64(offset), size: UInt64(size))
+        }
     }
     
-    static public func writeArray(lutStart: Int, lutEnd: Int, name: String, children: [OffsetSize], buffer: OmWriteBuffer) -> OffsetSize {
-        
-    }
-
-    
-    static public func writeTrailer(buffer: OmWriteBuffer, root: OffsetSize) throws {
-        
+    static public func writeArray(value: OmFileWriterArrayFinalisd, name: String, children: [OffsetSize], buffer: OmWriteBuffer) -> OffsetSize {
+        guard value.dimensions.count == value.chunks.count else {
+            fatalError()
+        }
+        var name = name
+        return name.withUTF8{ name in
+            guard name.count <= UInt16.max else { fatalError() }
+            let size = om_variable_size_of_numeric_array(UInt16(name.count), UInt32(children.count), UInt64(value.dimensions.count))
+            buffer.reallocate(minimumCapacity: Int(size))
+            let childrenSize = children.map{$0.size}
+            let childrenOffset = children.map{$0.offset}
+            let dimensions = value.dimensions.map{UInt64($0)}
+            let chunks = value.chunks.map{UInt64($0)}
+            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenSize, childrenOffset, name.baseAddress, value.datatype.toC(), value.compression.toC(), value.scale_factor, value.add_offset, UInt64(dimensions.count), dimensions, chunks, UInt64(value.lutSize), UInt64(value.lutOffset))
+            let offset = buffer.totalBytesWritten
+            buffer.incrementWritePosition(by: size)
+            return OffsetSize(offset: UInt64(offset), size: UInt64(size))
+        }
     }
     
     /// Write header. Only magic number and version 3
     static public func writeHeader(buffer: OmWriteBuffer) {
-        buffer.reallocate(minimumCapacity: 3)
+        let size = om_write_header_size()
+        buffer.reallocate(minimumCapacity: size)
+        om_write_header(buffer.bufferAtWritePosition)
+        buffer.incrementWritePosition(by: size)
+        
+        /*buffer.reallocate(minimumCapacity: 3)
         buffer.bufferAtWritePosition.assumingMemoryBound(to: UInt8.self).pointee = OmHeader.magicNumber1
         buffer.incrementWritePosition(by: 1)
         buffer.bufferAtWritePosition.assumingMemoryBound(to: UInt8.self).pointee = OmHeader.magicNumber2
         buffer.incrementWritePosition(by: 1)
         buffer.bufferAtWritePosition.assumingMemoryBound(to: UInt8.self).pointee = 3 // version
-        buffer.incrementWritePosition(by: 1)
+        buffer.incrementWritePosition(by: 1)*/
     }
     
-    static public func writeTrailer(buffer: OmWriteBuffer, meta: OmFileJSON) throws {
-        // Serialise and write JSON
-        let json = try JSONEncoder().encode(meta)
-        buffer.reallocate(minimumCapacity: json.count)
-        let jsonLength = json.withUnsafeBytes({
-            memcpy(buffer.bufferAtWritePosition, $0.baseAddress!, $0.count)
-            return $0.count
-        })
-        buffer.incrementWritePosition(by: jsonLength)
-        
+    static public func writeTrailer(buffer: OmWriteBuffer, rootVariable: OffsetSize) throws {
         // TODO Pad to 64 bit?
-        // TODO Additional version field and maybe some reserved stuff. E.g. if the JSON payload should be compressed later.
         
         // write length of JSON
-        buffer.reallocate(minimumCapacity: 8)
-        buffer.bufferAtWritePosition.assumingMemoryBound(to: Int.self)[0] = jsonLength
-        buffer.incrementWritePosition(by: 8)
+        let size = om_write_trailer_size()
+        buffer.reallocate(minimumCapacity: size)
+        om_write_trailer(buffer.bufferAtWritePosition, rootVariable.cOffsetSize)
+        buffer.incrementWritePosition(by: size)
     }
 }
 
 /// Compress a single variable inside an om file. A om file may contain mutliple variables
-public final class OmFileWriterArray {
+public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol> {
     /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
     private var lookUpTable: [Int]
     
@@ -78,8 +104,6 @@ public final class OmFileWriterArray {
     /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
     let compression: CompressionType
     
-    let datatype: DataType
-    
     /// The dimensions of the file
     let dimensions: [Int]
     
@@ -91,20 +115,19 @@ public final class OmFileWriterArray {
     let chunkBuffer: UnsafeMutableRawBufferPointer
     
     /// `lutChunkElementCount` should be 256 for production files. Only for testing a lower number can be used.
-    public init(dimensions: [Int], chunkDimensions: [Int], compression: CompressionType, datatype: DataType, scale_factor: Float, add_offset: Float, lutChunkElementCount: Int = 256) {
+    public init(dimensions: [Int], chunkDimensions: [Int], compression: CompressionType, scale_factor: Float, add_offset: Float, lutChunkElementCount: Int = 256) {
 
         assert(dimensions.count == chunkDimensions.count)
         
         self.chunks = chunkDimensions
         self.dimensions = dimensions
         self.compression = compression
-        self.datatype = datatype
         self.scale_factor = scale_factor
         self.add_offset = add_offset
         
         // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
         self.encoder = OmEncoder_t()
-        let error = OmEncoder_init(&encoder, scale_factor, add_offset, compression.toC(), datatype.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
+        let error = OmEncoder_init(&encoder, scale_factor, add_offset, compression.toC(), OmType.dataTypeArray.toC(), &self.dimensions, &self.chunks, dimensions.count, lutChunkElementCount)
         
         guard error == ERROR_OK else {
             fatalError("Om encoder: \(String(cString: OmError_string(error)))")
@@ -129,7 +152,7 @@ public final class OmFileWriterArray {
     /// `arrayDimensions` specify the total dimensions of the input array
     /// `arrayRead` specify which parts of this array should be read
     /// It is important that this function can write data out to a FileHandle to empty the buffer. Otherwise the buffer could grow to multiple gigabytes
-    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle, buffer: OmWriteBuffer) throws {
+    public func writeData<FileHandle: OmFileWriterBackend>(array: [OmFileWriterArray], arrayDimensions: [Int], arrayRead: [Range<Int>], fn: FileHandle, buffer: OmWriteBuffer) throws {
         assert(array.count == arrayDimensions.reduce(1, *))
         assert(arrayDimensions.allSatisfy({$0 >= 0}))
         assert(arrayRead.allSatisfy({$0.lowerBound >= 0}))
@@ -153,7 +176,9 @@ public final class OmFileWriterArray {
         // For multithreading, multiple buffers are required that need to be copied into the final buffer afterwards
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
             assert(buffer.remainingCapacity >= compressedChunkBufferSize)
-            let bytes_written = OmEncoder_compressChunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, chunkIndex, chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
+            let bytes_written = withUnsafePointer(to: array) { array in
+                OmEncoder_compressChunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, chunkIndex, chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
+            }
 
             buffer.incrementWritePosition(by: bytes_written)
             
@@ -169,7 +194,9 @@ public final class OmFileWriterArray {
     }
     
     /// Compress the lookup table and write it to the output buffer
-    public func writeLut(buffer: OmWriteBuffer) -> Int {
+    public func finalise(buffer: OmWriteBuffer) -> OmFileWriterArrayFinalisd {
+        let lut_offset = buffer.totalBytesWritten
+        
         /// The size of the total compressed LUT including some padding
         let buffer_size = OmEncoder_lutBufferSize(&encoder, lookUpTable, lookUpTable.count)
         buffer.reallocate(minimumCapacity: buffer_size)
@@ -177,37 +204,43 @@ public final class OmFileWriterArray {
         /// Compress the LUT and return the actual compressed LUT size
         let compressed_lut_size = OmEncoder_compressLut(&encoder, lookUpTable, lookUpTable.count, buffer.bufferAtWritePosition, buffer_size)
         buffer.incrementWritePosition(by: compressed_lut_size)
-        return compressed_lut_size
-    }
-    
-    /// Compress the lookup table, write it to the output buffer and return the JSON meta data object
-    public func compressLutAndReturnMeta(buffer: OmWriteBuffer) -> OmFileJSONVariable {
-        let lut_offset = buffer.totalBytesWritten
-        
-        let lut_size = writeLut(buffer: buffer)
-        
-        // let name = "data"
-        // let children
-        // om_variable_write_prefix(buffer, length_of_name, name, number_chilrden)
-        
-        // should only turn lut offset and size!!!!
-        
-        /// Generate the JSON meta attributes
-        return OmFileJSONVariable(
-            name: nil,
-            dimensions: dimensions,
-            chunks: chunks,
-            dimension_names: nil,
+        return OmFileWriterArrayFinalisd(
             scale_factor: scale_factor,
             add_offset: add_offset,
             compression: compression,
-            data_type: datatype,
-            lut_offset: lut_offset,
-            lut_size: lut_size
+            datatype: OmType.dataTypeArray,
+            dimensions: dimensions,
+            chunks: chunks,
+            lutSize: compressed_lut_size,
+            lutOffset: lut_offset
         )
     }
     
     deinit {
         chunkBuffer.deallocate()
     }
+}
+
+/// Attributes of an compressed array that had been written and now contains LUT size and offset
+public struct OmFileWriterArrayFinalisd {
+    /// The scalefactor that is applied to all write data
+    let scale_factor: Float
+    
+    /// The offset that is applied to all write data
+    let add_offset: Float
+    
+    /// Type of compression and coding. E.g. delta, zigzag coding is then implemented in different compression routines
+    let compression: CompressionType
+    
+    let datatype: DataType
+    
+    /// The dimensions of the file
+    let dimensions: [Int]
+    
+    /// How the dimensions are chunked
+    let chunks: [Int]
+    
+    let lutSize: Int
+    
+    let lutOffset: Int
 }

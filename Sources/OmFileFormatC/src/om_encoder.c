@@ -23,31 +23,31 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
     
     // Set element sizes and copy function
     switch (data_type) {
-        case DATA_TYPE_INT8:
-        case DATA_TYPE_UINT8:
+        case DATA_TYPE_INT8_ARRAY:
+        case DATA_TYPE_UINT8_ARRAY:
             encoder->bytes_per_element = 1;
             encoder->bytes_per_element_compressed = 1;
             encoder->compress_copy_callback = om_common_copy8;
             break;
         
-        case DATA_TYPE_INT16:
-        case DATA_TYPE_UINT16:
+        case DATA_TYPE_INT16_ARRAY:
+        case DATA_TYPE_UINT16_ARRAY:
             encoder->bytes_per_element = 2;
             encoder->bytes_per_element_compressed = 2;
             encoder->compress_copy_callback = om_common_copy16;
             break;
             
-        case DATA_TYPE_INT32:
-        case DATA_TYPE_UINT32:
-        case DATA_TYPE_FLOAT:
+        case DATA_TYPE_INT32_ARRAY:
+        case DATA_TYPE_UINT32_ARRAY:
+        case DATA_TYPE_FLOAT_ARRAY:
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 4;
             encoder->compress_copy_callback = om_common_copy32;
             break;
             
-        case DATA_TYPE_INT64:
-        case DATA_TYPE_UINT64:
-        case DATA_TYPE_DOUBLE:
+        case DATA_TYPE_INT64_ARRAY:
+        case DATA_TYPE_UINT64_ARRAY:
+        case DATA_TYPE_DOUBLE_ARRAY:
             encoder->bytes_per_element = 8;
             encoder->bytes_per_element_compressed = 8;
             encoder->compress_copy_callback = om_common_copy32;
@@ -60,7 +60,7 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
     // TODO more compression and datatypes
     switch (compression) {
         case COMPRESSION_PFOR_16BIT_DELTA2D:
-            if (data_type != DATA_TYPE_FLOAT) {
+            if (data_type != DATA_TYPE_FLOAT_ARRAY) {
                 return ERROR_INVALID_DATA_TYPE;
             }
             encoder->bytes_per_element = 4;
@@ -72,12 +72,12 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
             
         case COMPRESSION_FPX_XOR2D:
             switch (data_type) {
-                case DATA_TYPE_FLOAT:
+                case DATA_TYPE_FLOAT_ARRAY:
                     encoder->compress_callback = om_common_compress_fpxenc32;
                     encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode_xor;
                     break;
                     
-                case DATA_TYPE_DOUBLE:
+                case DATA_TYPE_DOUBLE_ARRAY:
                     encoder->compress_callback = om_common_compress_fpxenc64;
                     encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode_xor_double;
                     break;
@@ -88,7 +88,7 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
             break;
             
         case COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC:
-            if (data_type != DATA_TYPE_FLOAT) {
+            if (data_type != DATA_TYPE_FLOAT_ARRAY) {
                 return ERROR_INVALID_DATA_TYPE;
             }
             encoder->bytes_per_element = 4;

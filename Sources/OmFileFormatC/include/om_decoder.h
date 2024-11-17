@@ -13,6 +13,7 @@
 #define OM_DECODER_H
 
 #include "om_common.h"
+#include "om_variable.h"
 
 typedef struct {
     size_t lowerBound;
@@ -121,7 +122,9 @@ typedef struct {
  * 
  * @returns Return an om_error_t if the compression or dimension is invalid
  */
-OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, size_t dimension_count, const size_t* dimensions, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max);
+OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, size_t dimension_count, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_chunk_element_count, size_t io_size_merge, size_t io_size_max);
+
+//OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, size_t dimension_count, const size_t* dimensions, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max);
 
 /**
  * @brief Initializes an `om_decoder_index_read_t` structure for reading chunk indices.

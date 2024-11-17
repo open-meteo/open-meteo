@@ -22,7 +22,9 @@ void OmDecoder_initDataRead(OmDecoder_dataRead_t *data_read, const OmDecoder_ind
     data_read->nextChunk = index_read->chunkIndex;
 }
 
-OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, size_t dimension_count, const size_t* dimensions, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max) {
+//OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, size_t dimension_count, const size_t* dimensions, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max)
+
+OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, size_t dimension_count, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_chunk_element_count, size_t io_size_merge, size_t io_size_max){
     // Calculate the number of chunks based on dims and chunks
     size_t nChunks = 1;
     for (size_t i = 0; i < dimension_count; i++) {
@@ -57,31 +59,31 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
     
     // Set element sizes and copy function
     switch (data_type) {
-        case DATA_TYPE_INT8:
-        case DATA_TYPE_UINT8:
+        case DATA_TYPE_INT8_ARRAY:
+        case DATA_TYPE_UINT8_ARRAY:
             decoder->bytes_per_element = 1;
             decoder->bytes_per_element_compressed = 1;
             decoder->decompress_copy_callback = om_common_copy8;
             break;
         
-        case DATA_TYPE_INT16:
-        case DATA_TYPE_UINT16:
+        case DATA_TYPE_INT16_ARRAY:
+        case DATA_TYPE_UINT16_ARRAY:
             decoder->bytes_per_element = 2;
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_copy_callback = om_common_copy16;
             break;
             
-        case DATA_TYPE_INT32:
-        case DATA_TYPE_UINT32:
-        case DATA_TYPE_FLOAT:
+        case DATA_TYPE_INT32_ARRAY:
+        case DATA_TYPE_UINT32_ARRAY:
+        case DATA_TYPE_FLOAT_ARRAY:
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 4;
             decoder->decompress_copy_callback = om_common_copy32;
             break;
             
-        case DATA_TYPE_INT64:
-        case DATA_TYPE_UINT64:
-        case DATA_TYPE_DOUBLE:
+        case DATA_TYPE_INT64_ARRAY:
+        case DATA_TYPE_UINT64_ARRAY:
+        case DATA_TYPE_DOUBLE_ARRAY:
             decoder->bytes_per_element = 8;
             decoder->bytes_per_element_compressed = 8;
             decoder->decompress_copy_callback = om_common_copy32;
@@ -94,7 +96,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
     // TODO more compression and datatypes
     switch (compression) {
         case COMPRESSION_PFOR_16BIT_DELTA2D:
-            if (data_type != DATA_TYPE_FLOAT) {
+            if (data_type != DATA_TYPE_FLOAT_ARRAY) {
                 return ERROR_INVALID_DATA_TYPE;
             }
             decoder->bytes_per_element = 4;
@@ -106,12 +108,12 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
             
         case COMPRESSION_FPX_XOR2D:
             switch (data_type) {
-                case DATA_TYPE_FLOAT:
+                case DATA_TYPE_FLOAT_ARRAY:
                     decoder->decompress_callback = om_common_decompress_fpxdec32;
                     decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode_xor;
                     break;
                     
-                case DATA_TYPE_DOUBLE:
+                case DATA_TYPE_DOUBLE_ARRAY:
                     decoder->decompress_callback = om_common_decompress_fpxdec64;
                     decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode_xor_double;
                     break;
@@ -122,7 +124,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offs
             break;
             
         case COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC:
-            if (data_type != DATA_TYPE_FLOAT) {
+            if (data_type != DATA_TYPE_FLOAT_ARRAY) {
                 return ERROR_INVALID_DATA_TYPE;
             }
             decoder->bytes_per_element = 4;

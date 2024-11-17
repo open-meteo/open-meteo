@@ -20,16 +20,29 @@ public enum OmFileFormatSwiftError: Error {
 
 
 public enum DataType: UInt8, Codable {
-    case int8 = 0
-    case uint8 = 1
-    case int16 = 2
-    case uint16 = 3
-    case int32 = 4
-    case uint32 = 5
-    case int64 = 6
-    case uint64 = 7
-    case float = 8
-    case double = 9
+    case none = 0
+    case int8 = 1
+    case uint8 = 2
+    case int16 = 3
+    case uint16 = 4
+    case int32 = 5
+    case uint32 = 6
+    case int64 = 7
+    case uint64 = 8
+    case float = 9
+    case double = 10
+    case string = 11
+    case int8_array = 12
+    case uint8_array = 13
+    case int16_array = 14
+    case uint16_array = 15
+    case int32_array = 16
+    case uint32_array = 17
+    case int64_array = 18
+    case uint64_array = 19
+    case float_array = 20
+    case double_array = 21
+    case string_array = 22
     
     func toC() -> OmFileFormatC.OmDataType_t {
         return OmFileFormatC.OmDataType_t(rawValue: UInt32(self.rawValue))
