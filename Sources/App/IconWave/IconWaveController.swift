@@ -81,6 +81,7 @@ enum MarineVariable: String, GenericVariableMixable {
     case wave_height
     case wave_period
     case wave_direction
+    case wave_peak_period
     case wind_wave_height
     case wind_wave_period
     case wind_wave_peak_period

@@ -32,6 +32,9 @@ extension MarineVariable: FlatBuffersVariable {
             return .init(variable: .oceanCurrentVelocity)
         case .ocean_current_direction:
             return .init(variable: .oceanCurrentDirection)
+        case .wave_peak_period:
+            // TODO register in SDK
+            return .init(variable: .wavePeriod)
         }
     }
 }
