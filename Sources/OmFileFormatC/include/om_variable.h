@@ -37,8 +37,18 @@ void om_variable_get_name(const OmVariable_t* variable, uint16_t* name_length, c
 /// Get the type of the current variable
 OmDataType_t om_variable_get_type(const OmVariable_t* variable);
 
+/// Get the compression type of the current variable
+OmCompression_t om_variable_get_compression(const OmVariable_t* variable);
+
+float om_variable_get_scale_factor(const OmVariable_t* variable);
+
+float om_variable_get_add_offset(const OmVariable_t* variable);
+
 /// Check if a variable is legacy or version 3. Legacy files are the entire header containing magic number and version.
 bool _om_variable_is_version3(const OmVariable_t* variable);
+
+/// Check if a variable an array
+bool _om_variable_is_array(const OmVariableV3_t* variable);
 
 /// Return number of dimensions
 uint64_t om_variable_number_of_dimensions(const OmVariable_t* variable);

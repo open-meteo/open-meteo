@@ -23,6 +23,8 @@ const char* OmError_string(OmError_t error) {
             return "Invalid LUT chunk length. Max 256.";
         case ERROR_OUT_OF_BOUND_READ:
             return "Corrupted data with potential out-of-bound read";
+        case ERROR_NOT_AN_OM_FILE:
+            return "Not an OM file";
     }
     return "";
 }
