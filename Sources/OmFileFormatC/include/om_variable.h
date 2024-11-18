@@ -44,6 +44,9 @@ OmDataType_t om_variable_get_type(const OmVariable_t* variable);
 /// Check if a variable is legacy or version 3. Legacy files are the entire header containing magic number and version.
 bool _om_variable_is_version3(const OmVariable_t* variable);
 
+const uint64_t* _om_variable_get_dimensions(const OmVariable_t* variable);
+const uint64_t* _om_variable_get_chunks(const OmVariable_t* variable);
+
 /// Get the file position where a specified child can be read
 OmError_t om_variable_get_child(const OmVariable_t* variable, int nChild, OmOffsetSize_t* child);
 int om_variable_number_of_children(const OmVariable_t* variable);

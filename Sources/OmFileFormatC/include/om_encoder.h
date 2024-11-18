@@ -13,10 +13,10 @@
 
 // Encoder struct
 typedef struct {
-    const size_t *dimensions;
-    const size_t *chunks;
-    size_t dimension_count;
-    size_t lut_chunk_element_count;
+    const uint64_t *dimensions;
+    const uint64_t *chunks;
+    uint64_t dimension_count;
+    uint64_t lut_chunk_element_count;
     
     /// The callback to decompress data
     om_compress_callback_t compress_callback;
@@ -41,27 +41,27 @@ typedef struct {
 
 /// Initialise the OmEncoder structure with information about the shape of data
 /// May return an error on invalid compression or data types
-OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const size_t* dimensions, const size_t* chunks, size_t dimension_count, size_t lut_chunk_element_count);
+OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) ;
 
 /// Get the number of chunks that is caluclated from dimensions and chunks
-size_t OmEncoder_countChunks(const OmEncoder_t* encoder);
+uint64_t OmEncoder_countChunks(const OmEncoder_t* encoder);
 
 /// Calculate how many chunks can be filled from a given input
-size_t OmEncoder_countChunksInArray(const OmEncoder_t* encoder, const size_t* array_count);
+uint64_t OmEncoder_countChunksInArray(const OmEncoder_t* encoder, const uint64_t* array_count);
 
 /// The buffer size required to collect a single chunk of data
-size_t OmEncoder_chunkBufferSize(const OmEncoder_t* encoder);
+uint64_t OmEncoder_chunkBufferSize(const OmEncoder_t* encoder);
 
 /// The buffer size required to compress a single chunk.
-size_t OmEncoder_compressedChunkBufferSize(const OmEncoder_t* encoder);
+uint64_t OmEncoder_compressedChunkBufferSize(const OmEncoder_t* encoder);
 
 /// Calculate the required buffer size for the entire compressed LUT
-size_t OmEncoder_lutBufferSize(const OmEncoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount);
+uint64_t OmEncoder_lutBufferSize(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount);
 
 /// Compress the LUT and return the size of compressed LUT in bytes
-size_t OmEncoder_compressLut(const OmEncoder_t* encoder, const size_t* lookUpTable, size_t lookUpTableCount, uint8_t* out, size_t size_of_compressed_lut);
+uint64_t OmEncoder_compressLut(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t size_of_compressed_lut);
 
 /// Compress a single chunk. Chunk buffer must be of size `OmEncoder_chunkBufferSize`
-size_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, const size_t* arrayDimensions, const size_t* arrayOffset, const size_t* arrayCount, size_t chunkIndex, size_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer);
+uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer);
 
 #endif // OM_ENCODER_H

@@ -13,13 +13,13 @@
 #include <stdbool.h>
 
 /// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
-typedef void(*om_compress_copy_callback_t)(size_t length, float scale_factor, float add_offset, const void* src, void* dest);
+typedef void(*om_compress_copy_callback_t)(uint64_t length, float scale_factor, float add_offset, const void* src, void* dest);
 
 /// compress input, of n-elements to output and return number of compressed byte
-typedef size_t(*om_compress_callback_t)(const void* src, size_t length, void* dest);
+typedef uint64_t(*om_compress_callback_t)(const void* src, uint64_t length, void* dest);
 
 /// Perform a 2d filter operation
-typedef void(*om_compress_filter_callback_t)(const size_t length0, const size_t length1, void* buffer);
+typedef void(*om_compress_filter_callback_t)(const uint64_t length0, const uint64_t length1, void* buffer);
 
 #define MAX_LUT_ELEMENTS 256
 
@@ -167,26 +167,26 @@ typedef void* OmVariable_t;
     _a < _b ? _a : _b; })
 
 /// Copy 16 bit integer array and convert to float
-void om_common_copy_float_to_int16(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_float_to_int16(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Copy 16 bit integer array and convert to float and scale log10
-void om_common_copy_float_to_int16_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_float_to_int16_log10(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Convert int16 and scale to float
-void om_common_copy_int16_to_float(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_int16_to_float(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Convert int16 and scale to float with log10
-void om_common_copy_int16_to_float_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_int16_to_float_log10(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-void om_common_copy8(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
-void om_common_copy16(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
-void om_common_copy32(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
-void om_common_copy64(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy8(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy16(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy32(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy64(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-size_t om_common_compress_fpxenc32(const void* src, size_t length, void* dst);
-size_t om_common_compress_fpxenc64(const void* src, size_t length, void* dst);
-size_t om_common_decompress_fpxdec32(const void* src, size_t length, void* dst);
-size_t om_common_decompress_fpxdec64(const void* src, size_t length, void* dst);
+uint64_t om_common_compress_fpxenc32(const void* src, uint64_t length, void* dst);
+uint64_t om_common_compress_fpxenc64(const void* src, uint64_t length, void* dst);
+uint64_t om_common_decompress_fpxdec32(const void* src, uint64_t length, void* dst);
+uint64_t om_common_decompress_fpxdec64(const void* src, uint64_t length, void* dst);
 
 
 

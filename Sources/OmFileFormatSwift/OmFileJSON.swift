@@ -9,7 +9,7 @@
 
 /// The entry level JSON structure to descode all meta data inside an OpenMeteo file
 /// Should contain an attribute `variable` with a list of variables in this file
-public struct OmFileJSON: Codable {
+/*public struct OmFileJSON: Codable {
     /// A list of variables inside this file
     let variables: [OmFileJSONVariable]
     
@@ -50,3 +50,4 @@ public struct OmFileJSONVariable: Codable {
     /// The total size of the compressed LUT.
     let lut_size: Int
 }
+*/

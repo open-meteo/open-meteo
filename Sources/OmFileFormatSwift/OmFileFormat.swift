@@ -612,7 +612,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
-        withUnsafeTemporaryAllocation(of: Int.self, capacity: 2*6) { ptr in
+        /*withUnsafeTemporaryAllocation(of: Int.self, capacity: 2*6) { ptr in
             // dimensions
             ptr[0] = dim0
             ptr[1] = dim1
@@ -657,7 +657,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 fatalError("Om encoder: \(String(cString: OmError_string(error)))")
             }
             fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
-        }
+        }*/
     }
 }
 

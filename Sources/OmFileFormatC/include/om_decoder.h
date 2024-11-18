@@ -16,13 +16,13 @@
 #include "om_variable.h"
 
 typedef struct {
-    size_t lowerBound;
-    size_t upperBound;
+    uint64_t lowerBound;
+    uint64_t upperBound;
 } OmRange_t;
 
 typedef struct {
-    size_t offset;
-    size_t count;
+    uint64_t offset;
+    uint64_t count;
     OmRange_t indexRange;
     OmRange_t chunkIndex;
     OmRange_t nextChunk;
@@ -33,43 +33,43 @@ typedef OmDecoder_indexRead_t OmDecoder_dataRead_t;
 
 typedef struct {
     /// Number of dimensions
-    size_t dimensions_count;
+    uint64_t dimensions_count;
 
     /// Combine smaller IO reads to a single larger read. If consecutive reads are smaller than `io_size_merge` they might be merged. Default should be 512 bytes.
-    size_t io_size_merge;
+    uint64_t io_size_merge;
 
     /// The maximum IO size before IO operations are split up. Default 64k. If data is in memory, this can be set higher.
-    size_t io_size_max;
+    uint64_t io_size_max;
 
     /// Each 256 LUT entries are compressed into a LUT chunk. The LUT chunk length returns the size in byte how large a maximum compressed size for a LUT chunk is.
-    size_t lut_chunk_length;
+    uint64_t lut_chunk_length;
 
     /// How many elements in the look up table LUT should be compressed. Default 256. A value of 1 assumes that the LUT is not compressed and assumes a om version 1/2 file.
-    size_t lut_chunk_element_count;
+    uint64_t lut_chunk_element_count;
 
     /// The offset position where the LUT should start
-    size_t lut_start;
+    uint64_t lut_start;
 
-    /// size_t of data chunks in this file. This value is computed in the initialisation.
-    size_t number_of_chunks;
+    /// uint64_t of data chunks in this file. This value is computed in the initialisation.
+    uint64_t number_of_chunks;
     
     /// The dimensions of the data array. The last dimension is the "fast" dimension meaning the elements are sequential in memory
-    const size_t* dimensions;
+    const uint64_t* dimensions;
 
     /// The chunk lengths for each dimension
-    const size_t* chunks;
+    const uint64_t* chunks;
 
     /// The read offset to start reading data in each dimension
-    const size_t* read_offset;
+    const uint64_t* read_offset;
 
     /// How many elements in each dimension to read
-    const size_t* read_count;
+    const uint64_t* read_count;
 
     /// The dimensions of the target array. This can be the same as `read_count`, but it is also possible to read into a larger array
-    const size_t* cube_dimensions;
+    const uint64_t* cube_dimensions;
 
     /// The offset for each dimension if data is read into a larger array.
-    const size_t* cube_offset;
+    const uint64_t* cube_offset;
     
     /// The callback to decompress data
     om_compress_callback_t decompress_callback;
@@ -122,9 +122,9 @@ typedef struct {
  * 
  * @returns Return an om_error_t if the compression or dimension is invalid
  */
-OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, size_t dimension_count, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_chunk_element_count, size_t io_size_merge, size_t io_size_max);
+OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uint64_t dimension_count, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_element_count, uint64_t io_size_merge, uint64_t io_size_max);
 
-//OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, size_t dimension_count, const size_t* dimensions, const size_t* chunks, const size_t* read_offset, const size_t* read_count, const size_t* cube_offset, const size_t* cube_dimensions, size_t lut_size, size_t lut_chunk_element_count, size_t lut_start, size_t io_size_merge, size_t io_size_max);
+//OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, uint64_t dimension_count, const uint64_t* dimensions, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max);
 
 /**
  * @brief Initializes an `om_decoder_index_read_t` structure for reading chunk indices.
@@ -208,7 +208,7 @@ void OmDecoder_initDataRead(OmDecoder_dataRead_t *data_read, const OmDecoder_ind
  * 
  * @returns May return an out-of-bounds read error on corrupted data.
  */
-bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dataRead, const void* indexData, size_t indexDataCount, OmError_t* error);
+bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dataRead, const void* indexData, uint64_t indexDataCount, OmError_t* error);
 
 
 /**
@@ -231,7 +231,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
  *       the decoding process, ensuring that there is sufficient space to store the 
  *       decompressed data of a chunk.
  */
-size_t OmDecoder_readBufferSize(const OmDecoder_t* decoder);
+uint64_t OmDecoder_readBufferSize(const OmDecoder_t* decoder);
 
 
 /**
@@ -263,6 +263,6 @@ size_t OmDecoder_readBufferSize(const OmDecoder_t* decoder);
  *
  * @returns `false` if an erorr occured.
  */
-bool OmDecoder_decodeChunks(const OmDecoder_t *decoder, OmRange_t chunkIndex, const void *data, size_t dataCount, void *into, void *chunkBuffer, OmError_t* error);
+bool OmDecoder_decodeChunks(const OmDecoder_t *decoder, OmRange_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer, OmError_t* error);
 
 #endif // OM_DECODER_H
