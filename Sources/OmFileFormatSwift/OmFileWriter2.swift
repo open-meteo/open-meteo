@@ -152,7 +152,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol> {
     /// `arrayDimensions` specify the total dimensions of the input array
     /// `arrayRead` specify which parts of this array should be read
     /// It is important that this function can write data out to a FileHandle to empty the buffer. Otherwise the buffer could grow to multiple gigabytes
-    public func writeData<FileHandle: OmFileWriterBackend>(array: [OmType], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>], fn: FileHandle, buffer: OmWriteBuffer) throws {
+    public func writeData<FileHandle: OmFileWriterBackend>(array: [Float], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>], fn: FileHandle, buffer: OmWriteBuffer) throws {
         assert(array.count == arrayDimensions.reduce(1, *))
         assert(arrayDimensions.allSatisfy({$0 >= 0}))
         assert(arrayRead.allSatisfy({$0.lowerBound >= 0}))
@@ -176,9 +176,9 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol> {
         // For multithreading, multiple buffers are required that need to be copied into the final buffer afterwards
         for chunkIndexOffsetInThisArray in 0..<numberOfChunksInArray {
             assert(buffer.remainingCapacity >= compressedChunkBufferSize)
-            let bytes_written = withUnsafePointer(to: array) { array in
-                OmEncoder_compressChunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
-            }
+            //let bytes_written = withUnsafePointer(to: array) { array in
+            let bytes_written = OmEncoder_compressChunk(&encoder, array, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
+            //}
 
             buffer.incrementWritePosition(by: Int(bytes_written))
             

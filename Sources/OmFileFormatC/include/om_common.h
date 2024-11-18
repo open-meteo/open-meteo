@@ -65,7 +65,8 @@ typedef enum {
 typedef enum {
     COMPRESSION_PFOR_16BIT_DELTA2D = 0, // Lossy compression using 2D delta coding and scalefactor. Only supports float and scales to 16-bit integer.
     COMPRESSION_FPX_XOR2D = 1, // Lossless float/double compression using 2D xor coding.
-    COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
+    COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3, // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
+    COMPRESSION_NONE = 4
 } OmCompression_t;
 
 typedef struct {

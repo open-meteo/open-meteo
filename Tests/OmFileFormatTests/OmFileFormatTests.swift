@@ -144,6 +144,15 @@ final class OmFileFormatTests: XCTestCase {
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
         let read = try OmFileReader2(fn: readFn)
+        XCTAssertEqual(read.dataType, .float_array)
+        XCTAssertEqual(read.compression, .p4nzdec256)
+        XCTAssertEqual(read.scaleFactor, 1)
+        XCTAssertEqual(read.addOffset, 0)
+        XCTAssertEqual(read.dimensions.count, 2)
+        XCTAssertEqual(read.dimensions[0], 5)
+        XCTAssertEqual(read.dimensions[1], 5)
+        XCTAssertEqual(read.chunks[0], 2)
+        XCTAssertEqual(read.chunks[1], 2)
         
         let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])

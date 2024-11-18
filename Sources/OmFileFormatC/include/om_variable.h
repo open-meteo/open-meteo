@@ -72,13 +72,13 @@ OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value);
 size_t om_variable_write_scalar_size(uint16_t length_of_name, uint32_t number_of_children, OmDataType_t data_type);
 
 /// Write a scalar variable with name and children variables
-void om_variable_write_scalar(void* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, const void* value);
+void om_variable_write_scalar(char* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, const void* value);
 
 /// Get the size of meta attributes of a numeric array if written to a file. Does not contain any data. Only offsets for the actual data.
 size_t om_variable_write_numeric_array_size(uint16_t length_of_name, uint32_t number_of_children, uint64_t dimension_count);
 
 /// Write meta data for a numeric array to file
-void om_variable_write_numeric_array(void* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset);
+void om_variable_write_numeric_array(char* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset);
 
 /// The size of a OM header for newer files. Always 3 bytes.
 size_t om_write_header_size();
@@ -87,9 +87,9 @@ size_t om_write_header_size();
 size_t om_write_trailer_size();
 
 /// Write an header for newer OM files
-void om_write_header(void* dest);
+void om_write_header(char* dest);
 
 /// Write an trailer for newer OM files including the root variable
-void om_write_trailer(void* dest, const OmOffsetSize_t root);
+void om_write_trailer(char* dest, const OmOffsetSize_t root);
 
 #endif // OM_VARIABLE_H

@@ -56,9 +56,27 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         return DataType(rawValue: UInt8(om_variable_get_type(variable).rawValue))!
     }
     
+    var compression: CompressionType {
+        return CompressionType(rawValue: UInt8(om_variable_get_compression(variable).rawValue))!
+    }
+    
+    var scaleFactor: Float {
+        return om_variable_get_scale_factor(variable)
+    }
+    
+    var addOffset: Float {
+        return om_variable_get_add_offset(variable)
+    }
+    
     var dimensions: UnsafeBufferPointer<UInt64> {
         let count = om_variable_number_of_dimensions(variable);
         let dimensions = om_variable_get_dimensions(variable);
+        return .init(start: dimensions, count: Int(count))
+    }
+    
+    var chunks: UnsafeBufferPointer<UInt64> {
+        let count = om_variable_number_of_dimensions(variable);
+        let dimensions = om_variable_get_chunks(variable);
         return .init(start: dimensions, count: Int(count))
     }
     

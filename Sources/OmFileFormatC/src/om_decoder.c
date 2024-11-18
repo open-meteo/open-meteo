@@ -32,6 +32,16 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
     uint64_t lut_size, lut_start;
     
     if (_om_variable_is_version3(variable)) {
+        const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
+        scalefactor = meta->additional.array.scale_factor;
+        add_offset = meta->additional.array.add_offset;
+        data_type = meta->data_type;
+        compression = meta->compression_type;
+        lut_size = meta->additional.array.lut_size;
+        lut_start = meta->additional.array.lut_offset;
+        dimensions = om_variable_get_dimensions(variable);
+        chunks = om_variable_get_chunks(variable);
+    } else {
         const OmHeaderV1_t* meta = (const OmHeaderV1_t*)variable;
         scalefactor = meta->scale_factor;
         add_offset = 0;
@@ -43,16 +53,6 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
         lut_size = 0; // ignored
         dimensions = &meta->dim0;
         chunks = &meta->chunk0;
-    } else {
-        const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
-        scalefactor = meta->additional.array.scale_factor;
-        add_offset = meta->additional.array.add_offset;
-        data_type = meta->data_type;
-        compression = meta->compression_type;
-        lut_size = meta->additional.array.lut_size;
-        lut_start = meta->additional.array.lut_offset;
-        dimensions = om_variable_get_dimensions(variable);
-        chunks = om_variable_get_chunks(variable);
     }
     
     // Calculate the number of chunks based on dims and chunks
