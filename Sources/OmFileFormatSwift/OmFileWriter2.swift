@@ -24,7 +24,7 @@ public final class OmFileWriter2 {
         return name.withUTF8{ name in
             guard name.count <= UInt16.max else { fatalError() }
             guard children.count <= UInt32.max else { fatalError() }
-            let size = om_variable_size_of_scalar(UInt16(name.count), UInt32(children.count), DATA_TYPE_INT8)
+            let size = om_variable_write_scalar_size(UInt16(name.count), UInt32(children.count), DATA_TYPE_INT8)
             buffer.reallocate(minimumCapacity: Int(size))
             let childrenSize = children.map{$0.size}
             let childrenOffset = children.map{$0.offset}
@@ -45,7 +45,7 @@ public final class OmFileWriter2 {
         var name = name
         return name.withUTF8{ name in
             guard name.count <= UInt16.max else { fatalError() }
-            let size = om_variable_size_of_numeric_array(UInt16(name.count), UInt32(children.count), UInt64(value.dimensions.count))
+            let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(value.dimensions.count))
             buffer.reallocate(minimumCapacity: Int(size))
             let childrenSize = children.map{$0.size}
             let childrenOffset = children.map{$0.offset}
