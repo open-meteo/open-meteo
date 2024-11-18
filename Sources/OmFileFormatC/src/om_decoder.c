@@ -51,8 +51,8 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
         compression = meta->compression_type;
         lut_size = meta->additional.array.lut_size;
         lut_start = meta->additional.array.lut_offset;
-        dimensions = _om_variable_get_dimensions(variable);
-        chunks = _om_variable_get_chunks(variable);
+        dimensions = om_variable_get_dimensions(variable);
+        chunks = om_variable_get_chunks(variable);
     }
     
     // Calculate the number of chunks based on dims and chunks

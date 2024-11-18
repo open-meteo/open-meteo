@@ -56,23 +56,31 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         return DataType(rawValue: UInt8(om_variable_get_type(variable).rawValue))!
     }
     
+    var dimensions: UnsafeBufferPointer<UInt64> {
+        let count = om_variable_number_of_dimensions(variable);
+        let dimensions = om_variable_get_dimensions(variable);
+        return .init(start: dimensions, count: Int(count))
+    }
+    
     var name: String? {
         var size: UInt16 = 0
         var name: UnsafeMutablePointer<Int8>? = nil
-        guard om_variable_get_name(variable, &size, &name) == ERROR_OK, size > 0, let name = name else {
+        om_variable_get_name(variable, &size, &name);
+        guard size > 0, let name = name else {
             return nil
         }
         let buffer = Data(bytesNoCopy: name, count: Int(size), deallocator: .none)
         return String(data: buffer, encoding: .utf8)
     }
     
-    var numberOfChildren: Int32 {
+    var numberOfChildren: UInt32 {
         return om_variable_number_of_children(variable)
     }
     
     func getChild(_ index: Int32) -> OmFileReader2<Backend>? {
         var child = OmOffsetSize_t(offset: 0, size: 0)
-        guard om_variable_get_child(variable, index, &child) == ERROR_OK else {
+        om_variable_get_child(variable, index, &child)
+        guard child.size > 0 else {
             return nil
         }
         return fn.withUnsafeBytes {ptr in

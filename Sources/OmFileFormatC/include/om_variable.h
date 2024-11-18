@@ -40,19 +40,22 @@ OmDataType_t om_variable_get_type(const OmVariable_t* variable);
 /// Check if a variable is legacy or version 3. Legacy files are the entire header containing magic number and version.
 bool _om_variable_is_version3(const OmVariable_t* variable);
 
+/// Return number of dimensions
+uint64_t om_variable_number_of_dimensions(const OmVariable_t* variable);
+
 /// Get a pointer to the dimensions of a OM variable
-const uint64_t* _om_variable_get_dimensions(const OmVariable_t* variable);
+const uint64_t* om_variable_get_dimensions(const OmVariable_t* variable);
 
 /// Get a pointer to the chunk dimensions of an OM Variable
-const uint64_t* _om_variable_get_chunks(const OmVariable_t* variable);
+const uint64_t* om_variable_get_chunks(const OmVariable_t* variable);
 
 /// Return how many chilrden are available for a given variable
-int om_variable_number_of_children(const OmVariable_t* variable);
+uint32_t om_variable_number_of_children(const OmVariable_t* variable);
 
 /// Get the file offset where a specified child can be read
-OmOffsetSize_t* om_variable_get_child(const OmVariable_t* variable, int nChild);
+void om_variable_get_child(const OmVariable_t* variable, int nChild, OmOffsetSize_t* child);
 
-/// Read a vaariable as a scalar
+/// Read a variable as a scalar
 OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value);
 
 /// Get the length of a scalar variable if written to a file
