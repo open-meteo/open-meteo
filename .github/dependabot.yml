@@ -1,10 +1,12 @@
+# waiting for https://github.com/dependabot/dependabot-core/issues/2264
 version: 2
 updates:
 - package-ecosystem: swift
   directory: "/"
   schedule:
-    interval: daily
-    time: "13:00"
+    #interval: daily
+    #time: "13:00"
+    interval: "weekly"
   open-pull-requests-limit: 10
   reviewers:
   - patrick-zippenfenig
@@ -14,16 +16,20 @@ updates:
   commit-message:
     prefix: "fix: "
   groups:
-    swift-core:
+    swift-dependencies:
       patterns:
-        - "github.com/apple/*"
-    vapor:
-      patterns:
-        - "github.com/vapor/*"
+        - "*"
+    #swift-core:
+    #  patterns:
+    #    - "github.com/apple/*"
+    #vapor:
+    #  patterns:
+    #    - "github.com/vapor/*"
 - package-ecosystem: "github-actions"
   directory: "/"
   schedule:
-    interval: daily
-    time: "13:00"
+    #interval: daily
+    #time: "13:00"
+    interval: "weekly"
   commit-message:
     prefix: "fix: "
