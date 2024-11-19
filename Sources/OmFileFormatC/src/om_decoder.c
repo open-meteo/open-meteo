@@ -32,13 +32,13 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
     uint64_t lut_size, lut_start;
     
     if (_om_variable_is_version3(variable)) {
-        const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
-        scalefactor = meta->additional.array.scale_factor;
-        add_offset = meta->additional.array.add_offset;
+        const OmVariableArrayV3_t* meta = (const OmVariableArrayV3_t*)variable;
+        scalefactor = meta->scale_factor;
+        add_offset = meta->add_offset;
         data_type = meta->data_type;
         compression = meta->compression_type;
-        lut_size = meta->additional.array.lut_size;
-        lut_start = meta->additional.array.lut_offset;
+        lut_size = meta->lut_size;
+        lut_start = meta->lut_offset;
         dimensions = om_variable_get_dimensions(variable);
         chunks = om_variable_get_chunks(variable);
     } else {

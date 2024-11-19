@@ -106,30 +106,11 @@ typedef struct {
 } OmTrailer_t;
 
 typedef struct {
-    uint64_t lut_size;
-    uint64_t lut_offset;
-    uint64_t dimension_count;
-    
-    float scale_factor;
-    float add_offset;
-    
-    //Payload after generic variable stuff
-    //uint64_t[dimension_count] dimensions;
-    //uint64_t[dimension_count] chunks;
-} OmVariableArray_t;
-
-typedef struct {
     uint8_t data_type; // OmDataType_t
     uint8_t compression_type; // OmCompression_t
     uint16_t length_of_name; // maximum 65k name strings
     uint32_t number_of_children;
-    
-    /// Additional attributes are only set for numic arrays or strings
-    union {
-        OmVariableArray_t array;
-        uint64_t string_size;
-    } additional;
-    
+
     // Followed by payload: NOTE: Lets to try 64 bit align it somehow
     //uint32_t[number_of_children] children_length;
     //uint32_t[number_of_children] children_offset;
@@ -145,6 +126,40 @@ typedef struct {
     //char[length_of_name] name;
 } OmVariableV3_t;
 
+typedef struct {
+    uint8_t data_type; // OmDataType_t
+    uint8_t compression_type; // OmCompression_t
+    uint16_t length_of_name; // maximum 65k name strings
+    uint32_t number_of_children;
+    uint64_t lut_size;
+    uint64_t lut_offset;
+    uint64_t dimension_count;
+    
+    float scale_factor;
+    float add_offset;
+    
+    // Followed by payload: NOTE: Lets to try 64 bit align it somehow
+    //uint32_t[number_of_children] children_length;
+    //uint32_t[number_of_children] children_offset;
+    
+    // Afterwards additional payload from value types
+    //uint64_t[dimension_count] dimensions;
+    //uint64_t[dimension_count] chunks;
+    
+    // name is always last
+    //char[length_of_name] name;
+} OmVariableArrayV3_t;
+
+typedef struct {
+    uint8_t data_type; // OmDataType_t
+    uint8_t compression_type; // OmCompression_t
+    uint16_t length_of_name; // maximum 65k name strings
+    uint32_t number_of_children;
+    uint64_t string_size;
+    // followed by the string value
+    // name is always last
+    //char[length_of_name] name;
+} OmVariablStringV3_t;
 
 
 /// only expose an opague pointer
