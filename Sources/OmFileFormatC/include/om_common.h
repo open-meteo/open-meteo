@@ -115,10 +115,6 @@ typedef struct {
     //uint32_t[number_of_children] children_length;
     //uint32_t[number_of_children] children_offset;
     
-    // Afterwards additional payload from value types
-    //uint64_t[dimension_count] dimensions;
-    //uint64_t[dimension_count] chunks;
-    
     // Scalars are now set
     //void* value;
     
