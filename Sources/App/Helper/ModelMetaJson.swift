@@ -70,6 +70,11 @@ struct ModelUpdateMetaJson: Codable {
     /// E.g. `3600` for updates every 1 hour
     let update_interval_seconds: Int
     
+    /// Time at which that model run has been available on the current server
+    var lastRunAvailabilityTime: Timestamp {
+        Timestamp(last_run_availability_time)
+    }
+    
     /// Write a new meta data JSON
     static func update(domain: GenericDomain, run: Timestamp, end: Timestamp, now: Timestamp = .now()) throws {
         let meta = ModelUpdateMetaJson(

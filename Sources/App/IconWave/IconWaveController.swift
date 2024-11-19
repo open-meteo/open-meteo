@@ -42,10 +42,17 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
             }
-            let mfwave = try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
-                MfWaveReader(reader: reader)
+            let waveModel: (any GenericReaderProtocol)?;
+            if let update = try MfWaveDomain.mfwave.getMetaJson()?.lastRunAvailabilityTime, update <= Timestamp.now().subtract(hours: 26) {
+                // mf model outdated, use ECMWF
+                waveModel = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            } else {
+                // use mf wave
+                waveModel = try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
+                    MfWaveReader(reader: reader)
+                }
             }
-            let readers: [(any GenericReaderProtocol)?] = [mfwave, mfcurrents, ewam, gwam]
+            let readers: [(any GenericReaderProtocol)?] = [waveModel, mfcurrents, ewam, gwam]
             return readers.compactMap({$0})
             /*
             let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)
