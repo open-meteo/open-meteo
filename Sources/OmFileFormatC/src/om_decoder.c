@@ -46,7 +46,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
         scalefactor = meta->scale_factor;
         add_offset = 0;
         //dimension_count_file = 2;
-        data_type = DATA_TYPE_FLOAT;
+        data_type = DATA_TYPE_FLOAT_ARRAY;
         compression = (OmCompression_t)meta->compression_type;
         lut_chunk_element_count = 1;
         lut_start = 40; // Right after header
