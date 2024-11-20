@@ -34,6 +34,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case wave_height
     case wave_direction
     case wave_period
+    case wave_peak_period
     
     case temperature_2m_spread
     case wind_u_component_100m_spread
@@ -95,6 +96,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wave_height: return "significant_height_of_combined_wind_waves_and_swell"
         case .wave_direction: return "mean_wave_direction"
         case .wave_period: return "mean_wave_period"
+        case .wave_peak_period: return "peak_wave_period"
         case .boundary_layer_height: return "boundary_layer_height"
         case .total_column_integrated_water_vapour: return "total_column_water_vapour"
         default: return nil
@@ -161,7 +163,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return 50 // 0.02m resolution
         case .wave_direction:
             return 1
-        case .wave_period:
+        case .wave_period, .wave_peak_period:
             return 20 // 0.05s resolution
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
             return 10
@@ -224,7 +226,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .hermite(bounds: nil)
         case .wave_direction:
             return .linearDegrees
-        case .wave_period:
+        case .wave_period, .wave_peak_period:
             return .hermite(bounds: nil)
         case .boundary_layer_height, .boundary_layer_height_spread:
             return .hermite(bounds: 0...10e9)
@@ -246,7 +248,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         
         // Waves are only available for ERA5 ocean at 0.5° resolution
         switch self {
-        case .wave_height, .wave_period, .wave_direction:
+        case .wave_height, .wave_period, .wave_direction, .wave_peak_period:
             return domain == .era5_ocean
         default:
             if domain == .era5_ocean {
@@ -348,7 +350,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             fatalError("Not supported")
         case .wave_direction:
             fatalError("Not supported")
-        case .wave_period:
+        case .wave_period, .wave_peak_period:
             fatalError("Not supported")
         case .boundary_layer_height:
             return "159.128"
@@ -390,7 +392,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .metre
         case .wave_direction:
             return .degreeDirection
-        case .wave_period:
+        case .wave_period, .wave_peak_period:
             return .seconds
         case .dew_point_2m_spread, .temperature_2m_spread, .soil_temperature_0_to_7cm_spread, .soil_temperature_7_to_28cm_spread, .soil_temperature_28_to_100cm_spread, .soil_temperature_100_to_255cm_spread: return .kelvin
         case .boundary_layer_height, .boundary_layer_height_spread:
@@ -476,6 +478,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case "swh": return .wave_height
         case "mwd": return .wave_direction
         case "mwp": return .wave_period
+        case "pp1d": return .wave_peak_period
         default:
             return nil
         }

@@ -102,7 +102,7 @@ struct SyncCommand: AsyncCommand {
         let yearRange = signature.year.map { yearStr in
             if yearStr.contains("-") {
                 let split = yearStr.split(separator: "-")
-                guard split.count == 2, split[0].count == 4, split[0].count == 4, let start = Int(split[0]), let end = Int(split[0]), start >= 1800, start <= 2200, end >= 1800, end <= 2200 else {
+                guard split.count == 2, split[0].count == 4, split[1].count == 4, let start = Int(split[0]), let end = Int(split[1]), start >= 1800, start <= 2200, end >= 1800, end <= 2200 else {
                     fatalError("year invalid")
                 }
                 return Timestamp(start, 1, 1) ..< Timestamp(end+1, 1, 1)

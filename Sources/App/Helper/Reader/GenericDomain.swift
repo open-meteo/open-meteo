@@ -55,6 +55,10 @@ extension GenericDomain {
         }
     }
     
+    func getMetaJson() throws -> ModelUpdateMetaJson? {
+        return try MetaFileManager.get(OmFileManagerReadable.meta(domain: domainRegistry))
+    }
+    
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: OmFileManagerReadable {
         .staticFile(domain: domainRegistry, variable: "HSURF", chunk: nil)
