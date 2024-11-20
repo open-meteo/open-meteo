@@ -31,28 +31,32 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
     OmCompression_t compression;
     uint64_t lut_size, lut_start;
     
-    if (_om_variable_is_version3(variable)) {
-        const OmVariableArrayV3_t* meta = (const OmVariableArrayV3_t*)variable;
-        scalefactor = meta->scale_factor;
-        add_offset = meta->add_offset;
-        data_type = meta->data_type;
-        compression = meta->compression_type;
-        lut_size = meta->lut_size;
-        lut_start = meta->lut_offset;
-        dimensions = om_variable_get_dimensions(variable);
-        chunks = om_variable_get_chunks(variable);
-    } else {
-        const OmHeaderV1_t* meta = (const OmHeaderV1_t*)variable;
-        scalefactor = meta->scale_factor;
-        add_offset = 0;
-        //dimension_count_file = 2;
-        data_type = DATA_TYPE_FLOAT_ARRAY;
-        compression = (OmCompression_t)meta->compression_type;
-        lut_chunk_element_count = 1;
-        lut_start = 40; // Right after header
-        lut_size = 0; // ignored
-        dimensions = &meta->dim0;
-        chunks = &meta->chunk0;
+    const OmHeaderV1_t* metaV1 = (const OmHeaderV1_t*)variable;
+    const OmVariableArrayV3_t* metaV3 = (const OmVariableArrayV3_t*)variable;
+    
+    switch (_om_variable_memory_layout(variable)) {
+        case OM_MEMORY_LAYOUT_LEGACY:
+            scalefactor = metaV1->scale_factor;
+            add_offset = 0;
+            //dimension_count_file = 2;
+            data_type = DATA_TYPE_FLOAT_ARRAY;
+            compression = (OmCompression_t)metaV1->compression_type;
+            lut_chunk_element_count = 1;
+            lut_start = 40; // Right after header
+            lut_size = 0; // ignored
+            dimensions = &metaV1->dim0;
+            chunks = &metaV1->chunk0;
+        case OM_MEMORY_LAYOUT_ARRAY:
+            scalefactor = metaV3->scale_factor;
+            add_offset = metaV3->add_offset;
+            data_type = metaV3->data_type;
+            compression = metaV3->compression_type;
+            lut_size = metaV3->lut_size;
+            lut_start = metaV3->lut_offset;
+            dimensions = om_variable_get_dimensions(variable);
+            chunks = om_variable_get_chunks(variable);
+        case OM_MEMORY_LAYOUT_SCALAR:
+            return ERROR_INVALID_DATA_TYPE;
     }
     
     // Calculate the number of chunks based on dims and chunks

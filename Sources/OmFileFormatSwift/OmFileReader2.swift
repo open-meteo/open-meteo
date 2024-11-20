@@ -69,13 +69,13 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     var dimensions: UnsafeBufferPointer<UInt64> {
-        let count = om_variable_number_of_dimensions(variable);
+        let count = om_variable_get_number_of_dimensions(variable);
         let dimensions = om_variable_get_dimensions(variable);
         return .init(start: dimensions, count: Int(count))
     }
     
     var chunks: UnsafeBufferPointer<UInt64> {
-        let count = om_variable_number_of_dimensions(variable);
+        let count = om_variable_get_number_of_dimensions(variable);
         let dimensions = om_variable_get_chunks(variable);
         return .init(start: dimensions, count: Int(count))
     }
@@ -83,7 +83,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     var name: String? {
         var size: UInt16 = 0
         var name: UnsafeMutablePointer<Int8>? = nil
-        om_variable_get_name(variable, &size, &name);
+        om_read_variable_name(variable, &size, &name);
         guard size > 0, let name = name else {
             return nil
         }
@@ -92,7 +92,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     var numberOfChildren: UInt32 {
-        return om_variable_number_of_children(variable)
+        return om_variable_get_number_of_children(variable)
     }
     
     func getChild(_ index: Int32) -> OmFileReader2<Backend>? {

@@ -16,25 +16,12 @@ size_t om_read_trailer_size() {
     return sizeof(OmTrailer_t);
 }
 
-
-/// Compression types
-typedef enum {
-    OM_MEMORY_LAYOUT_LEGACY = 0,
-    OM_MEMORY_LAYOUT_ARRAY = 1,
-    OM_MEMORY_LAYOUT_SCALAR = 3,
-    //OM_MEMORY_LAYOUT_STRING = 4,
-    //OM_MEMORY_LAYOUT_STRING_ARRAY = 5,
-} OmMemoryLayout_t;
-
-OmMemoryLayout_t _om_variable_memory_layout(const OmVariable_t* variable);
-
-
 OmError_t om_read_header(const void* src, OmOffsetSize_t* root) {
     const OmHeaderV3_t* meta = (const OmHeaderV3_t*)src;
     if (meta->magic_number1 != 'O' || meta->magic_number2 != 'M' || meta->version > 3) {
         return ERROR_NOT_AN_OM_FILE;
     }
-    if (_om_variable_is_version3(src)) {
+    if (meta->version == 3) {
         root->size = 0;
         root->offset = 0;
     } else {
@@ -58,41 +45,73 @@ const OmVariable_t* om_variable_init(const void* src) {
     return src;
 }
 
-void om_variable_get_name(const OmVariable_t* variable, uint16_t* name_length, char** name) {
+void om_read_variable_name(const OmVariable_t* variable, uint16_t* name_length, char** name) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY: {
-            name_length = 0;
+            // Legacy files to not have a name field
+            *name_length = 0;
             *name = NULL;
         }
         case OM_MEMORY_LAYOUT_ARRAY: {
+            // 'Name' is after dimension arrays
             const OmVariableArrayV3_t* meta = (const OmVariableArrayV3_t*)variable;
-            name_length = meta->length_of_name;
+            *name_length = meta->length_of_name;
             *name = (char*)((void *)variable + sizeof(OmVariableArrayV3_t) + 16 * meta->number_of_children + 16 * meta->dimension_count);
         }
         case OM_MEMORY_LAYOUT_SCALAR: {
+            // 'Name' is after the scalar value
             const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
-            name_length = meta->length_of_name;
-            // TODO scaler name
+            *name_length = meta->length_of_name;
+            char* base = (char*)((void *)variable + sizeof(OmVariableV3_t) + 16 * meta->number_of_children);
+            switch (meta->data_type) {
+                case DATA_TYPE_INT8:
+                case DATA_TYPE_UINT8:
+                    *name = base + 1;
+                    break;
+                case DATA_TYPE_INT16:
+                case DATA_TYPE_UINT16:
+                    *name = base + 2;
+                    break;
+                case DATA_TYPE_INT32:
+                case DATA_TYPE_UINT32:
+                case DATA_TYPE_FLOAT:
+                    *name = base + 4;
+                    break;
+                case DATA_TYPE_INT64:
+                case DATA_TYPE_UINT64:
+                case DATA_TYPE_DOUBLE:
+                    *name = base + 8;
+                    break;
+                default:
+                    break;
+            }
         }
     }
 }
 
 OmDataType_t om_variable_get_type(const OmVariable_t* variable) {
-    if (_om_variable_is_version3(variable)) {
-        const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
-        return meta->data_type;
-    } else {
-        return DATA_TYPE_FLOAT_ARRAY;
+    switch (_om_variable_memory_layout(variable)) {
+        case OM_MEMORY_LAYOUT_LEGACY:
+            return DATA_TYPE_FLOAT_ARRAY;
+        case OM_MEMORY_LAYOUT_ARRAY:
+        case OM_MEMORY_LAYOUT_SCALAR: {
+            const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
+            return meta->data_type;
+        }
     }
 }
 
 OmCompression_t om_variable_get_compression(const OmVariable_t* variable) {
-    if (_om_variable_is_version3(variable)) {
-        const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
-        return meta->compression_type;
-    } else {
-        const OmHeaderV1_t* meta = (const OmHeaderV1_t*)variable;
-        return meta->compression_type;
+    switch (_om_variable_memory_layout(variable)) {
+        case OM_MEMORY_LAYOUT_LEGACY: {
+            const OmHeaderV1_t* meta = (const OmHeaderV1_t*)variable;
+            return meta->compression_type;
+        }
+        case OM_MEMORY_LAYOUT_ARRAY:
+        case OM_MEMORY_LAYOUT_SCALAR: {
+            const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
+            return meta->compression_type;
+        }
     }
 }
 
@@ -107,13 +126,7 @@ OmMemoryLayout_t _om_variable_memory_layout(const OmVariable_t* variable) {
     return isArray ? OM_MEMORY_LAYOUT_ARRAY : OM_MEMORY_LAYOUT_SCALAR;
 }
 
-bool _om_variable_is_version3(const OmVariable_t* variable) {
-    const OmHeaderV3_t* meta = (const OmHeaderV3_t*)variable;
-    bool isLegacy = meta->magic_number1 == 'O' && meta->magic_number2 == 'M' && (meta->version == 1 || meta->version == 2);
-    return !isLegacy;
-}
-
-uint64_t om_variable_number_of_dimensions(const OmVariable_t* variable) {
+uint64_t om_variable_get_number_of_dimensions(const OmVariable_t* variable) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY:
             return 2;
@@ -176,7 +189,7 @@ const uint64_t* om_variable_get_chunks(const OmVariable_t* variable) {
     }
 }
 
-uint32_t om_variable_number_of_children(const OmVariable_t* variable) {
+uint32_t om_variable_get_number_of_children(const OmVariable_t* variable) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY:
             return 0;
@@ -219,34 +232,22 @@ OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value) {
     const void* src = (const void*)((char *)variable + SIZE_VARIABLEV3 + 16 * meta->number_of_children);
     switch (meta->data_type) {
         case DATA_TYPE_INT8:
-            ((int8_t *)value)[0] = ((int8_t*)src)[0];
-            return ERROR_OK;
         case DATA_TYPE_UINT8:
-            ((uint8_t *)value)[0] = ((uint8_t*)src)[0];
+            *(int8_t *)value = *(int8_t*)src;
             return ERROR_OK;
         case DATA_TYPE_INT16:
-            ((int16_t *)value)[0] = ((int16_t*)src)[0];
-            return ERROR_OK;
         case DATA_TYPE_UINT16:
-            ((uint16_t *)value)[0] = ((uint16_t*)src)[0];
+            *(int16_t *)value = *(int16_t*)src;
             return ERROR_OK;
         case DATA_TYPE_INT32:
-            ((int32_t *)value)[0] = ((int32_t*)src)[0];
-            return ERROR_OK;
         case DATA_TYPE_UINT32:
-            ((uint32_t *)value)[0] = ((uint32_t*)src)[0];
+        case DATA_TYPE_FLOAT:
+            *(int32_t *)value = *(int32_t*)src;
             return ERROR_OK;
         case DATA_TYPE_INT64:
-            ((int64_t *)value)[0] = ((int64_t*)src)[0];
-            return ERROR_OK;
         case DATA_TYPE_UINT64:
-            ((uint64_t *)value)[0] = ((uint64_t*)src)[0];
-            return ERROR_OK;
-        case DATA_TYPE_FLOAT:
-            ((float *)value)[0] = ((float*)src)[0];
-            return ERROR_OK;
         case DATA_TYPE_DOUBLE:
-            ((double *)value)[0] = ((double*)src)[0];
+            *(int64_t *)value = *(int64_t*)src;
             return ERROR_OK;
         default:
             return ERROR_INVALID_DATA_TYPE;
