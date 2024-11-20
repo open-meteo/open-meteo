@@ -35,15 +35,13 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
     }
     
     public func write<OmType: OmFileScalarDataTypeProtocol>(value: OmType, name: String, children: [OffsetSize]) -> OffsetSize {
-        // TODO Pad to 64 bit?
-        
-        
         var name = name
         return name.withUTF8{ name in
             guard name.count <= UInt16.max else { fatalError() }
             guard children.count <= UInt32.max else { fatalError() }
             let type = OmType.dataTypeScalar.toC()
             let size = om_variable_write_scalar_size(UInt16(name.count), UInt32(children.count), type)
+            buffer.alignTo64Bytes()
             buffer.reallocate(minimumCapacity: Int(size))
             let childrenSize = children.map{$0.size}
             let childrenOffset = children.map{$0.offset}
@@ -65,14 +63,11 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         guard value.dimensions.count == value.chunks.count else {
             fatalError()
         }
-        
-        
-        // TODO Pad to 64 bit?
-        
         var name = name
         return name.withUTF8{ name in
             guard name.count <= UInt16.max else { fatalError() }
             let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(value.dimensions.count))
+            buffer.alignTo64Bytes()
             buffer.reallocate(minimumCapacity: Int(size))
             let childrenSize = children.map{$0.size}
             let childrenOffset = children.map{$0.offset}
@@ -86,7 +81,7 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
     }
     
     public func writeTrailer(rootVariable: OffsetSize) throws {
-        // TODO Pad to 64 bit?
+        buffer.alignTo64Bytes()
         
         // write length of JSON
         let size = om_write_trailer_size()

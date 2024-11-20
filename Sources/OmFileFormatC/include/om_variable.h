@@ -12,7 +12,6 @@
 
 /**
  TODO:
- - Proper 64 bit alignment
  - String and String array support
  */
 
