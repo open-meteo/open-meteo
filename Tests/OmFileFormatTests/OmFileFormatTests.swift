@@ -76,7 +76,7 @@ final class OmFileFormatTests: XCTestCase {
         let data = (0..<100000).map({Float($0 % 10000)})
         try writer.writeData(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10])
         let variableMeta = writer.finalise()
-        let variable = fileWriter.writeArray(value: variableMeta, name: "data", children: [])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
@@ -109,7 +109,7 @@ final class OmFileFormatTests: XCTestCase {
         try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2])
         try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1])
         let variableMeta = writer.finalise()
-        let variable = fileWriter.writeArray(value: variableMeta, name: "data", children: [])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
@@ -133,7 +133,7 @@ final class OmFileFormatTests: XCTestCase {
         try writer.writeData(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6])
         
         let variableMeta = writer.finalise()
-        let variable = fileWriter.writeArray(value: variableMeta, name: "data", children: [])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
@@ -168,7 +168,7 @@ final class OmFileFormatTests: XCTestCase {
         
         let int32Attribute = fileWriter.write(value: Int32(12323154), name: "int32", children: [])
         let doubleAttribute = fileWriter.write(value: Double(12323154), name: "double", children: [])
-        let variable = fileWriter.writeArray(value: variableMeta, name: "data", children: [int32Attribute, doubleAttribute])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [int32Attribute, doubleAttribute])
         
         try fileWriter.writeTrailer(rootVariable: variable)
         
@@ -210,7 +210,7 @@ final class OmFileFormatTests: XCTestCase {
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5])
         let variableMeta = writer.finalise()
-        let variable = fileWriter.writeArray(value: variableMeta, name: "data", children: [])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
@@ -297,7 +297,7 @@ final class OmFileFormatTests: XCTestCase {
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5])
         let variableMeta = writer.finalise()
-        let variable = fileWriter.writeArray(value: variableMeta, name: "data", children: [])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))

@@ -59,21 +59,21 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         return .init(dimensions: dimensions, chunkDimensions: chunkDimensions, compression: compression, scale_factor: scale_factor, add_offset: add_offset, buffer: buffer, fn: fn, lutChunkElementCount: lutChunkElementCount)
     }
     
-    public func writeArray(value: OmFileWriterArrayFinalisd, name: String, children: [OffsetSize]) -> OffsetSize {
-        guard value.dimensions.count == value.chunks.count else {
+    public func write(array: OmFileWriterArrayFinalisd, name: String, children: [OffsetSize]) -> OffsetSize {
+        guard array.dimensions.count == array.chunks.count else {
             fatalError()
         }
         var name = name
         return name.withUTF8{ name in
             guard name.count <= UInt16.max else { fatalError() }
-            let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(value.dimensions.count))
+            let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(array.dimensions.count))
             buffer.alignTo64Bytes()
             buffer.reallocate(minimumCapacity: Int(size))
             let childrenSize = children.map{$0.size}
             let childrenOffset = children.map{$0.offset}
-            let dimensions = value.dimensions.map{UInt64($0)}
-            let chunks = value.chunks.map{UInt64($0)}
-            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenSize, childrenOffset, name.baseAddress, value.datatype.toC(), value.compression.toC(), value.scale_factor, value.add_offset, UInt64(dimensions.count), dimensions, chunks, UInt64(value.lutSize), UInt64(value.lutOffset))
+            let dimensions = array.dimensions.map{UInt64($0)}
+            let chunks = array.chunks.map{UInt64($0)}
+            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenSize, childrenOffset, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(dimensions.count), dimensions, chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
             let offset = buffer.totalBytesWritten
             buffer.incrementWritePosition(by: size)
             return OffsetSize(offset: UInt64(offset), size: UInt64(size))
