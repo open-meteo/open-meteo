@@ -31,6 +31,17 @@ public final class OmWriteBuffer {
         writePosition = 0
     }
     
+    /// Add empty space if required to align to 64 bits
+    func alignTo64Bytes() {
+        let bytesToPadd = 8 - totalBytesWritten % 8
+        if bytesToPadd == 0 {
+            return
+        }
+        reallocate(minimumCapacity: bytesToPadd)
+        bufferAtWritePosition.initializeMemory(as: UInt8.self, repeating: 0, count: bytesToPadd)
+        incrementWritePosition(by: bytesToPadd)
+    }
+    
     /// How many bytes are left in the write buffer
     var remainingCapacity: Int {
         return buffer.count - (writePosition)

@@ -13,7 +13,7 @@ public protocol OmFileReaderBackend {
     var count: Int { get }
     var needsPrefetch: Bool { get }
     func prefetchData(offset: Int, count: Int)
-    func preRead(offset: Int, count: Int)
+    //func preRead(offset: Int, count: Int)
     
     func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType
 }

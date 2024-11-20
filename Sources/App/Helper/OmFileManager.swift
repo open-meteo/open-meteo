@@ -264,7 +264,7 @@ extension OmFileReader {
     
     // prefect and read all
     public func readAll() throws -> [Float] {
-        fn.prefetchData(offset: 0, count: fn.count)
+        reader.fn.prefetchData(offset: 0, count: reader.fn.count)
         return try read(dim0Slow: 0..<dim0, dim1: 0..<dim1)
     }
     

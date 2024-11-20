@@ -13,13 +13,13 @@
 #include <stdbool.h>
 
 /// The function to convert a single a a sequence of elements and convert data type. Applies scale factor.
-typedef void(*om_compress_copy_callback_t)(size_t length, float scale_factor, float add_offset, const void* src, void* dest);
+typedef void(*om_compress_copy_callback_t)(uint64_t length, float scale_factor, float add_offset, const void* src, void* dest);
 
 /// compress input, of n-elements to output and return number of compressed byte
-typedef size_t(*om_compress_callback_t)(const void* src, size_t length, void* dest);
+typedef uint64_t(*om_compress_callback_t)(const void* src, uint64_t length, void* dest);
 
 /// Perform a 2d filter operation
-typedef void(*om_compress_filter_callback_t)(const size_t length0, const size_t length1, void* buffer);
+typedef void(*om_compress_filter_callback_t)(const uint64_t length0, const uint64_t length1, void* buffer);
 
 #define MAX_LUT_ELEMENTS 256
 
@@ -29,30 +29,50 @@ typedef enum {
     ERROR_INVALID_DATA_TYPE = 2,
     ERROR_INVALID_LUT_CHUNK_LENGTH = 3,
     ERROR_OUT_OF_BOUND_READ = 4,
+    ERROR_NOT_AN_OM_FILE = 5
 } OmError_t;
 
 const char* OmError_string(OmError_t error);
 
 /// Data types
 typedef enum {
-    DATA_TYPE_INT8 = 0,
-    DATA_TYPE_UINT8 = 1,
-    DATA_TYPE_INT16 = 2,
-    DATA_TYPE_UINT16 = 3,
-    DATA_TYPE_INT32 = 4,
-    DATA_TYPE_UINT32 = 5,
-    DATA_TYPE_INT64 = 6,
-    DATA_TYPE_UINT64 = 7,
-    DATA_TYPE_FLOAT = 8,
-    DATA_TYPE_DOUBLE = 9
+    DATA_TYPE_NONE = 0,
+    DATA_TYPE_INT8 = 1,
+    DATA_TYPE_UINT8 = 2,
+    DATA_TYPE_INT16 = 3,
+    DATA_TYPE_UINT16 = 4,
+    DATA_TYPE_INT32 = 5,
+    DATA_TYPE_UINT32 = 6,
+    DATA_TYPE_INT64 = 7,
+    DATA_TYPE_UINT64 = 8,
+    DATA_TYPE_FLOAT = 9,
+    DATA_TYPE_DOUBLE = 10,
+    DATA_TYPE_STRING = 11,
+    DATA_TYPE_INT8_ARRAY = 12,
+    DATA_TYPE_UINT8_ARRAY = 13,
+    DATA_TYPE_INT16_ARRAY = 14,
+    DATA_TYPE_UINT16_ARRAY = 15,
+    DATA_TYPE_INT32_ARRAY = 16,
+    DATA_TYPE_UINT32_ARRAY = 17,
+    DATA_TYPE_INT64_ARRAY = 18,
+    DATA_TYPE_UINT64_ARRAY = 19,
+    DATA_TYPE_FLOAT_ARRAY = 20,
+    DATA_TYPE_DOUBLE_ARRAY = 21,
+    DATA_TYPE_STRING_ARRAY = 22
 } OmDataType_t;
 
 /// Compression types
 typedef enum {
     COMPRESSION_PFOR_16BIT_DELTA2D = 0, // Lossy compression using 2D delta coding and scalefactor. Only supports float and scales to 16-bit integer.
     COMPRESSION_FPX_XOR2D = 1, // Lossless float/double compression using 2D xor coding.
-    COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3 // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
+    COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC = 3, // Similar to `P4NZDEC256` but applies `log10(1+x)` before.
+    COMPRESSION_NONE = 4
 } OmCompression_t;
+
+typedef struct {
+    uint64_t offset;
+    uint64_t size;
+} OmOffsetSize_t;
 
 
 /// Divide and round up
@@ -74,26 +94,26 @@ typedef enum {
     _a < _b ? _a : _b; })
 
 /// Copy 16 bit integer array and convert to float
-void om_common_copy_float_to_int16(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_float_to_int16(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Copy 16 bit integer array and convert to float and scale log10
-void om_common_copy_float_to_int16_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_float_to_int16_log10(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Convert int16 and scale to float
-void om_common_copy_int16_to_float(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_int16_to_float(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
 /// Convert int16 and scale to float with log10
-void om_common_copy_int16_to_float_log10(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy_int16_to_float_log10(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-void om_common_copy8(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
-void om_common_copy16(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
-void om_common_copy32(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
-void om_common_copy64(size_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy8(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy16(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy32(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
+void om_common_copy64(uint64_t length, float scale_factor, float add_offset, const void* src, void* dst);
 
-size_t om_common_compress_fpxenc32(const void* src, size_t length, void* dst);
-size_t om_common_compress_fpxenc64(const void* src, size_t length, void* dst);
-size_t om_common_decompress_fpxdec32(const void* src, size_t length, void* dst);
-size_t om_common_decompress_fpxdec64(const void* src, size_t length, void* dst);
+uint64_t om_common_compress_fpxenc32(const void* src, uint64_t length, void* dst);
+uint64_t om_common_compress_fpxenc64(const void* src, uint64_t length, void* dst);
+uint64_t om_common_decompress_fpxdec32(const void* src, uint64_t length, void* dst);
+uint64_t om_common_decompress_fpxdec64(const void* src, uint64_t length, void* dst);
 
 
 

@@ -68,22 +68,19 @@ final class OmFileFormatTests: XCTestCase {
     func testWriteLarge() throws {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
-        
-        let writer = OmFileWriterArray(dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
-        let buffer = OmWriteBuffer(capacity: 1)
-        
         let fn = try FileHandle.createNewFile(file: file)
         
+        let fileWriter = OmFileWriter2(fn: fn, bufferCapacity: 1)
+        let writer = fileWriter.prepareArray(type: Float.self, dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
+        
         let data = (0..<100000).map({Float($0 % 10000)})
-        OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10], fn: fn, buffer: buffer)
-        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
-        let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
-        try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
-        try buffer.writeToFile(fn: fn)
+        try writer.writeData(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10])
+        let variableMeta = writer.finalise()
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
+        try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
+        let read = try OmFileReader2(fn: readFn)
         
         let a1 = read.read([50..<51, 20..<21, 1..<2])
         XCTAssertEqual(a1, [201.0])
@@ -96,29 +93,27 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
-        let buffer = OmWriteBuffer(capacity: 1)
-        
         let fn = try FileHandle.createNewFile(file: file)
+        let fileWriter = OmFileWriter2(fn: fn, bufferCapacity: 1)
+        
+        let writer = fileWriter.prepareArray(type: Float.self, dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
         
         // Directly feed individual chunks
-        OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
-        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
-        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1], fn: fn, buffer: buffer)
-        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
-        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2], fn: fn, buffer: buffer)
-        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1], fn: fn, buffer: buffer)
-        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn, buffer: buffer)
-        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2], fn: fn, buffer: buffer)
-        try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1], fn: fn, buffer: buffer)
-        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
-        let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
-        try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
-        try buffer.writeToFile(fn: fn)
+        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
+        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
+        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1])
+        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
+        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
+        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1])
+        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2])
+        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2])
+        try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1])
+        let variableMeta = writer.finalise()
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
+        try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
+        let read = try OmFileReader2(fn: readFn)
         
         let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
@@ -128,22 +123,30 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let writer = OmFileWriterArray(dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
-        let buffer = OmWriteBuffer(capacity: 1)
         let fn = try FileHandle.createNewFile(file: file)
+        let fileWriter = OmFileWriter2(fn: fn, bufferCapacity: 1)
+        
+        let writer = fileWriter.prepareArray(type: Float.self, dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
         
         /// Deliberately add NaN on all positions that should not be written to the file. Only the inner 5x5 array is written
         let data = [.nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan, Float(0.0), 1.0, 2.0, 3.0, 4.0, .nan, .nan, 5.0, 6.0, 7.0, 8.0, 9.0, .nan, .nan, 10.0, 11.0, 12.0, 13.0, 14.0, .nan, .nan, 15.0, 16.0, 17.0, 18.0, 19.0, .nan, .nan, 20.0, 21.0, 22.0, 23.0, 24.0, .nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan]
-        OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6], fn: fn, buffer: buffer)
+        try writer.writeData(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6])
         
-        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
-        let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
-        try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
-        try buffer.writeToFile(fn: fn)
+        let variableMeta = writer.finalise()
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
+        try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
+        let read = try OmFileReader2(fn: readFn)
+        XCTAssertEqual(read.dataType, .float_array)
+        XCTAssertEqual(read.compression, .p4nzdec256)
+        XCTAssertEqual(read.scaleFactor, 1)
+        XCTAssertEqual(read.addOffset, 0)
+        XCTAssertEqual(read.getDimensions().count, 2)
+        XCTAssertEqual(read.getDimensions()[0], 5)
+        XCTAssertEqual(read.getDimensions()[1], 5)
+        XCTAssertEqual(read.getChunkDimensions()[0], 2)
+        XCTAssertEqual(read.getChunkDimensions()[1], 2)
         
         let a = read.read([0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
@@ -153,22 +156,33 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let dims = [3,3,3]
-        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0)
-        let buffer = OmWriteBuffer(capacity: 1)
-        let fn = try FileHandle.createNewFile(file: file)
-        
+        let dims = [UInt64(3),3,3]
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0, 25.0, 26.0]
-        OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [3,3,3], arrayRead: [0..<3, 0..<3, 0..<3], fn: fn, buffer: buffer)
-        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
-        let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
-        try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
-        try buffer.writeToFile(fn: fn)
+        
+        let fn = try FileHandle.createNewFile(file: file)
+        let fileWriter = OmFileWriter2(fn: fn, bufferCapacity: 1)
+        
+        let writer = fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
+        try writer.writeData(array: data, arrayDimensions: [3,3,3], arrayRead: [0..<3, 0..<3, 0..<3])
+        let variableMeta = writer.finalise()
+        
+        let int32Attribute = fileWriter.write(value: Int32(12323154), name: "int32", children: [])
+        let doubleAttribute = fileWriter.write(value: Double(12323154), name: "double", children: [])
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [int32Attribute, doubleAttribute])
+        
+        try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn).getVariables()[0]
+        let read = try OmFileReader2(fn: readFn)
         
+        XCTAssertEqual(read.numberOfChildren, 2)
+        let child = read.getChild(0)!
+        XCTAssertEqual(child.readScalar(), Int32(12323154))
+        XCTAssertEqual(child.getName(), "int32")
+        let child2 = read.getChild(1)!
+        XCTAssertEqual(child2.readScalar(), Double(12323154))
+        XCTAssertEqual(child2.getName(), "double")
+        XCTAssertNil(read.getChild(2))
         
         let a = read.read([0..<3, 0..<3, 0..<3])
         XCTAssertEqual(a, data)
@@ -187,21 +201,20 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let dims = [5,5]
-        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
-        let buffer = OmWriteBuffer(capacity: 1)
+        let dims = [UInt64(5),5]
         let fn = try FileHandle.createNewFile(file: file)
+        let fileWriter = OmFileWriter2(fn: fn, bufferCapacity: 1)
+        
+        let writer = fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-        OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn, buffer: buffer)
-        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
-        let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
-        try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
-        try buffer.writeToFile(fn: fn)
+        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5])
+        let variableMeta = writer.finalise()
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
+        try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn, lutChunkElementCount: 2).getVariables()[0]
+        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2)
         
 
         let a = read.read([0..<5, 0..<5])
@@ -275,21 +288,20 @@ final class OmFileFormatTests: XCTestCase {
         let file = "writetest.om"
         try FileManager.default.removeItemIfExists(at: file)
         
-        let dims = [5,5]
-        let writer = OmFileWriterArray(dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, datatype: .float, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
-        let buffer = OmWriteBuffer(capacity: 1)
+        let dims = [UInt64(5),5]
         let fn = try FileHandle.createNewFile(file: file)
+        let fileWriter = OmFileWriter2(fn: fn, bufferCapacity: 1)
+        
+        let writer = fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-        OmFileWriter2.writeHeader(buffer: buffer)
-        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5], fn: fn, buffer: buffer)
-        let jsonVariable = writer.compressLutAndReturnMeta(buffer: buffer)
-        let json = OmFileJSON(variables: [jsonVariable], someAttributes: nil)
-        try OmFileWriter2.writeTrailer(buffer: buffer, meta: json)
-        try buffer.writeToFile(fn: fn)
+        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5])
+        let variableMeta = writer.finalise()
+        let variable = fileWriter.write(array: variableMeta, name: "data", children: [])
+        try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2.open_file(fn: readFn, lutChunkElementCount: 2).getVariables()[0]
+        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2)
         
 
         let a = read.read([0..<5, 0..<5], io_size_max: 0, io_size_merge: 0)
@@ -377,8 +389,8 @@ final class OmFileFormatTests: XCTestCase {
             fatalError("Not expected")
         })
         
-        let read = try OmFileReader2.open_file(fn: try MmapFile(fn: fn)).getVariables()[0]
-        let dims = read.variable.dimensions
+        let read = try OmFileReader2(fn: try MmapFile(fn: fn))
+        let dims = read.getDimensions()
         let a = read.read([0..<5, 0..<5], io_size_max: 0, io_size_merge: 0)
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
         
