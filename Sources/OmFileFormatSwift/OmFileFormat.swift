@@ -512,8 +512,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     public init(fn: Backend) throws {
         reader = try OmFileReader2(fn: fn)
         
-        let dimensions = reader.dimensions
-        let chunks = reader.chunks
+        let dimensions = reader.getDimensions()
+        let chunks = reader.getChunkDimensions()
         
         dim0 = Int(dimensions[0])
         dim1 = Int(dimensions[1])

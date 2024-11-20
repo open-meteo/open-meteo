@@ -110,6 +110,16 @@ typedef void* OmVariable_t;
 /// =========== Functions for reading ===============
 
 
+typedef struct {
+    const uint16_t size;
+    const char* value;
+} OmString_t;
+
+typedef struct {
+    const uint64_t count;
+    const uint64_t* values;
+} OmDimensions_t;
+
 /// Return the size in byte of the header that should be read. Always 40 byte to support legacy 2D files.
 size_t om_read_header_size();
 /// Size in bytes of the trailer that contains the root variable offset in newer files
@@ -126,7 +136,7 @@ OmError_t om_read_trailer(const void* src, OmOffsetSize_t* root);
 const OmVariable_t* om_variable_init(const void* src);
 
 /// Get the name of of a given variable. No guarantee for zero termination!
-void om_read_variable_name(const OmVariable_t* variable, uint16_t* name_length, char** name);
+OmString_t om_read_variable_name(const OmVariable_t* variable);
 
 /// Get the type of the current variable
 OmDataType_t om_variable_get_type(const OmVariable_t* variable);
@@ -138,20 +148,17 @@ float om_variable_get_scale_factor(const OmVariable_t* variable);
 
 float om_variable_get_add_offset(const OmVariable_t* variable);
 
-/// Return number of dimensions
-uint64_t om_variable_get_number_of_dimensions(const OmVariable_t* variable);
-
 /// Get a pointer to the dimensions of a OM variable
-const uint64_t* om_variable_get_dimensions(const OmVariable_t* variable);
+OmDimensions_t om_variable_get_dimensions(const OmVariable_t* variable);
 
 /// Get a pointer to the chunk dimensions of an OM Variable
-const uint64_t* om_variable_get_chunks(const OmVariable_t* variable);
+OmDimensions_t om_variable_get_chunks(const OmVariable_t* variable);
 
 /// Return how many chilrden are available for a given variable
 uint32_t om_variable_get_number_of_children(const OmVariable_t* variable);
 
 /// Get the file offset where a specified child can be read
-void om_variable_get_child(const OmVariable_t* variable, int nChild, OmOffsetSize_t* child);
+OmOffsetSize_t om_variable_get_child(const OmVariable_t* variable, int nChild);
 
 /// Read a variable as a scalar
 OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value);

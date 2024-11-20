@@ -68,26 +68,22 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         return om_variable_get_add_offset(variable)
     }
     
-    public var dimensions: UnsafeBufferPointer<UInt64> {
-        let count = om_variable_get_number_of_dimensions(variable);
+    public func getDimensions() -> UnsafeBufferPointer<UInt64> {
         let dimensions = om_variable_get_dimensions(variable);
-        return .init(start: dimensions, count: Int(count))
+        return UnsafeBufferPointer<UInt64>(start: dimensions.values, count: Int(dimensions.count))
     }
     
-    public var chunks: UnsafeBufferPointer<UInt64> {
-        let count = om_variable_get_number_of_dimensions(variable);
+    public func getChunkDimensions() -> UnsafeBufferPointer<UInt64> {
         let dimensions = om_variable_get_chunks(variable);
-        return .init(start: dimensions, count: Int(count))
+        return UnsafeBufferPointer<UInt64>(start: dimensions.values, count: Int(dimensions.count))
     }
     
-    public var name: String? {
-        var size: UInt16 = 0
-        var name: UnsafeMutablePointer<Int8>? = nil
-        om_read_variable_name(variable, &size, &name);
-        guard size > 0, let name = name else {
+    public func getName() -> String? {
+        let name = om_read_variable_name(variable);
+        guard name.size > 0 else {
             return nil
         }
-        let buffer = Data(bytesNoCopy: name, count: Int(size), deallocator: .none)
+        let buffer = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: name.value), count: Int(name.size), deallocator: .none)
         return String(data: buffer, encoding: .utf8)
     }
     
@@ -96,8 +92,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public func getChild(_ index: Int32) -> OmFileReader2<Backend>? {
-        var child = OmOffsetSize_t(offset: 0, size: 0)
-        om_variable_get_child(variable, index, &child)
+        let child = om_variable_get_child(variable, index)
         guard child.size > 0 else {
             return nil
         }

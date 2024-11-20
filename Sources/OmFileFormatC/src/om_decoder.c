@@ -31,11 +31,9 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
     OmCompression_t compression;
     uint64_t lut_size, lut_start;
     
-    const OmHeaderV1_t* metaV1 = (const OmHeaderV1_t*)variable;
-    const OmVariableArrayV3_t* metaV3 = (const OmVariableArrayV3_t*)variable;
-    
     switch (_om_variable_memory_layout(variable)) {
-        case OM_MEMORY_LAYOUT_LEGACY:
+        case OM_MEMORY_LAYOUT_LEGACY: {
+            const OmHeaderV1_t* metaV1 = (const OmHeaderV1_t*)variable;
             scalefactor = metaV1->scale_factor;
             add_offset = 0;
             //dimension_count_file = 2;
@@ -50,16 +48,19 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
             dimensions = &metaV1->dim0;
             chunks = &metaV1->chunk0;
             break;
-        case OM_MEMORY_LAYOUT_ARRAY:
+        }
+        case OM_MEMORY_LAYOUT_ARRAY: {
+            const OmVariableArrayV3_t* metaV3 = (const OmVariableArrayV3_t*)variable;
             scalefactor = metaV3->scale_factor;
             add_offset = metaV3->add_offset;
             data_type = metaV3->data_type;
             compression = metaV3->compression_type;
             lut_size = metaV3->lut_size;
             lut_start = metaV3->lut_offset;
-            dimensions = om_variable_get_dimensions(variable);
-            chunks = om_variable_get_chunks(variable);
+            dimensions = om_variable_get_dimensions(variable).values;
+            chunks = om_variable_get_chunks(variable).values;
             break;
+        }
         case OM_MEMORY_LAYOUT_SCALAR:
             return ERROR_INVALID_DATA_TYPE;
     }
