@@ -482,6 +482,7 @@ struct OmHeader {
     static var length: Int { 40 }
 }
 
+/// This is a wrapper for legay 2D reads using the new multi-dimensional reader
 public final class OmFileReader<Backend: OmFileReaderBackend> {
     public let reader: OmFileReader2<Backend>
     
@@ -527,58 +528,43 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         guard reader.fn.needsPrefetch else {
             return
         }
-        /*let dim0Read = dim0Read ?? 0..<dim0
+        // This function is only used for legacy 2D read functions
+        
+        let dim0Read = dim0Read ?? 0..<dim0
         let dim1Read = dim1Read ?? 0..<dim1
         
-        guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
-            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim0Read, allowed: dim0)
-        }
-        guard dim1Read.lowerBound >= 0 && dim1Read.lowerBound <= dim1 && dim1Read.upperBound <= dim1 else {
-            throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
-        }
-        
-        let nDim0Chunks = dim0.divideRoundedUp(divisor: chunk0)
-        let nDim1Chunks = dim1.divideRoundedUp(divisor: chunk1)
-        
-        let nChunks = nDim0Chunks * nDim1Chunks
-        var fetchStart = 0
-        var fetchEnd = 0
-        fn.withUnsafeBytes { ptr in
-            let chunkOffsets = ptr.assumingMemoryBound(to: UInt8.self).baseAddress!.advanced(by: OmHeader.length).assumingMemoryBound(to: Int.self, capacity: nChunks)
+        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
+            // read offset
+            ptr[0] = UInt64(dim0Read.lowerBound)
+            ptr[1] = UInt64(dim1Read.lowerBound)
+            // read count
+            ptr[2] = UInt64(dim0Read.count)
+            ptr[3] = UInt64(dim1Read.count)
+            // cube offset
+            ptr[4] = 0
+            ptr[5] = 0
+            // cube dimensions
+            ptr[6] = UInt64(dim0Read.count)
+            ptr[7] = UInt64(dim1Read.count)
             
-            let compressedDataStartOffset = OmHeader.length + nChunks * MemoryLayout<Int>.stride
-            
-            for c0 in dim0Read.divide(by: chunk0) {
-                let c1Range = dim1Read.divide(by: chunk1)
-                let c1Chunks = c1Range.add(c0 * nDim1Chunks)
-                // pre-read chunk table at specific offset
-                fn.prefetchData(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                fn.preRead(offset: OmHeader.length + max(c1Chunks.lowerBound - 1, 0) * MemoryLayout<Int>.stride, count: (c1Range.count+1) * MemoryLayout<Int>.stride)
-                
-                for c1 in c1Range {
-                    // load chunk from mmap
-                    let chunkNum = c0 * nDim1Chunks + c1
-                    let startPos = chunkNum == 0 ? 0 : chunkOffsets[chunkNum-1]
-                    let lengthCompressedBytes = chunkOffsets[chunkNum] - startPos
-                    
-                    let newfetchStart = compressedDataStartOffset + startPos
-                    let newfetchEnd = newfetchStart + lengthCompressedBytes
-                    
-                    if newfetchStart != fetchEnd {
-                        if fetchEnd != 0 {
-                            //print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
-                            fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
-                        }
-                        fetchStart = newfetchStart
-                        
-                    }
-                    fetchEnd = newfetchEnd
-                }
+            var decoder = OmDecoder_t()
+            let error = OmDecoder_init(
+                &decoder,
+                reader.variable,
+                2,
+                ptr.baseAddress,
+                ptr.baseAddress?.advanced(by: 2),
+                ptr.baseAddress?.advanced(by: 4),
+                ptr.baseAddress?.advanced(by: 6),
+                reader.lutChunkElementCount,
+                4096, // merge
+                65536*4 // io amax
+            )
+            guard error == ERROR_OK else {
+                fatalError("Om encoder: \(String(cString: OmError_string(error)))")
             }
+            reader.fn.decodePrefetch(decoder: &decoder)
         }
-        
-        //print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
-        fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)*/
     }
     
     /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
@@ -629,8 +615,8 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 4),
                 ptr.baseAddress?.advanced(by: 6),
                 reader.lutChunkElementCount,
-                512, // merge
-                65536 // io amax
+                4096, // merge
+                65536*4 // io amax
             )
             guard error == ERROR_OK else {
                 fatalError("Om encoder: \(String(cString: OmError_string(error)))")

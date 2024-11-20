@@ -203,5 +203,26 @@ extension OmFileReaderBackend {
             }
         })
     }
-}
 
+    /// Do an madvice to load data chunks from disk into page cache in the background
+    func decodePrefetch(decoder: UnsafePointer<OmDecoder_t>) {
+        self.withUnsafeBytes({ ptr in
+            var indexRead = OmDecoder_indexRead_t()
+            OmDecoder_initIndexRead(decoder, &indexRead)
+            
+            /// Loop over index blocks and read index data
+            while OmDecoder_nextIndexRead(decoder, &indexRead) {
+                let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
+                
+                var dataRead = OmDecoder_dataRead_t()
+                OmDecoder_initDataRead(&dataRead, &indexRead)
+                
+                var error: OmError_t = ERROR_OK
+                /// Loop over data blocks and read compressed data chunks
+                while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
+                    self.prefetchData(offset: Int(dataRead.offset), count: Int(dataRead.count))
+                }
+            }
+        })
+    }
+}
