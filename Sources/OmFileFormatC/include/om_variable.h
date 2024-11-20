@@ -19,7 +19,7 @@
 /// =========== Structures describing the data layout ===============
 
 
-/// Old files directly contain array information for 2 dimensional arrays
+/// Legacy files only contain one 2D array with attributes in the header
 /// File content: Header, look-up-table, compressed data
 typedef struct {
     uint8_t magic_number1;
@@ -199,7 +199,7 @@ typedef enum {
     //OM_MEMORY_LAYOUT_STRING_ARRAY = 5,
 } OmMemoryLayout_t;
 
-/// Check if a variable is legacy or version 3. Legacy files are the entire header containing magic number and version.
+/// Check if a variable is legacy or version 3 array of scalar. Legacy files are the entire header containing magic number and version.
 OmMemoryLayout_t _om_variable_memory_layout(const OmVariable_t* variable);
 
 

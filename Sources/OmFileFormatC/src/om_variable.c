@@ -105,6 +105,9 @@ OmCompression_t om_variable_get_compression(const OmVariable_t* variable) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY: {
             const OmHeaderV1_t* meta = (const OmHeaderV1_t*)variable;
+            if (meta->version == 1) {
+                return COMPRESSION_PFOR_16BIT_DELTA2D;
+            }
             return meta->compression_type;
         }
         case OM_MEMORY_LAYOUT_ARRAY:

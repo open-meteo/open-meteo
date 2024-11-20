@@ -12,9 +12,9 @@ import Foundation
 /// Decodes meta data which may include JSON
 /// Handles actual file reads. The current implementation just uses MMAP or plain memory.
 /// Later implementations may use async read operations
-struct OmFileReader2<Backend: OmFileReaderBackend> {
+public struct OmFileReader2<Backend: OmFileReaderBackend> {
     /// Points to the underlaying memory. Needs to remain in scrope to keep memory accessible
-    let fn: Backend
+    public let fn: Backend
     
     let variable: UnsafePointer<OmVariable_t?>?
     
@@ -26,7 +26,7 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         self.lutChunkElementCount = lutChunkElementCount
         self.fn = fn
         self.variable = fn.withUnsafeBytes {ptr in
-            let headerSize = om_read_header_size()
+            //let headerSize = om_read_header_size()
             var root = OmOffsetSize_t(offset: 0, size: 0)
             guard om_read_header(ptr.baseAddress, &root) == ERROR_OK else {
                 fatalError("Not an OM file")
@@ -52,35 +52,35 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         self.lutChunkElementCount = lutChunkElementCount
     }
     
-    var dataType: DataType {
+    public var dataType: DataType {
         return DataType(rawValue: UInt8(om_variable_get_type(variable).rawValue))!
     }
     
-    var compression: CompressionType {
+    public var compression: CompressionType {
         return CompressionType(rawValue: UInt8(om_variable_get_compression(variable).rawValue))!
     }
     
-    var scaleFactor: Float {
+    public var scaleFactor: Float {
         return om_variable_get_scale_factor(variable)
     }
     
-    var addOffset: Float {
+    public var addOffset: Float {
         return om_variable_get_add_offset(variable)
     }
     
-    var dimensions: UnsafeBufferPointer<UInt64> {
+    public var dimensions: UnsafeBufferPointer<UInt64> {
         let count = om_variable_get_number_of_dimensions(variable);
         let dimensions = om_variable_get_dimensions(variable);
         return .init(start: dimensions, count: Int(count))
     }
     
-    var chunks: UnsafeBufferPointer<UInt64> {
+    public var chunks: UnsafeBufferPointer<UInt64> {
         let count = om_variable_get_number_of_dimensions(variable);
         let dimensions = om_variable_get_chunks(variable);
         return .init(start: dimensions, count: Int(count))
     }
     
-    var name: String? {
+    public var name: String? {
         var size: UInt16 = 0
         var name: UnsafeMutablePointer<Int8>? = nil
         om_read_variable_name(variable, &size, &name);
@@ -91,11 +91,11 @@ struct OmFileReader2<Backend: OmFileReaderBackend> {
         return String(data: buffer, encoding: .utf8)
     }
     
-    var numberOfChildren: UInt32 {
+    public var numberOfChildren: UInt32 {
         return om_variable_get_number_of_children(variable)
     }
     
-    func getChild(_ index: Int32) -> OmFileReader2<Backend>? {
+    public func getChild(_ index: Int32) -> OmFileReader2<Backend>? {
         var child = OmOffsetSize_t(offset: 0, size: 0)
         om_variable_get_child(variable, index, &child)
         guard child.size > 0 else {

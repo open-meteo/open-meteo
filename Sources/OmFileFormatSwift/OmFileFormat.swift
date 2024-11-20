@@ -483,7 +483,7 @@ struct OmHeader {
 }
 
 public final class OmFileReader<Backend: OmFileReaderBackend> {
-    public let fn: Backend
+    public let reader: OmFileReader2<Backend>
     
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
@@ -509,34 +509,25 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     }
     
     public init(fn: Backend) throws {
-        // Fetch header
-        fn.preRead(offset: 0, count: OmHeader.length)
-        let header = fn.withUnsafeBytes {
-            $0.baseAddress!.withMemoryRebound(to: OmHeader.self, capacity: 1) { ptr in
-                ptr.pointee
-            }
-        }
+        reader = try OmFileReader2(fn: fn)
         
-        guard header.magicNumber1 == OmHeader.magicNumber1 && header.magicNumber2 == OmHeader.magicNumber2 else {
-            throw OmFileFormatSwiftError.notAOmFile
-        }
+        let dimensions = reader.dimensions
+        let chunks = reader.chunks
         
-        self.fn = fn
-        dim0 = header.dim0
-        dim1 = header.dim1
-        chunk0 = header.chunk0
-        chunk1 = header.chunk1
-        scalefactor = header.scalefactor
-        // bug in version 1: compression type was random
-        compression = header.version == 1 ? .p4nzdec256 : CompressionType(rawValue: header.compression)!
+        dim0 = Int(dimensions[0])
+        dim1 = Int(dimensions[1])
+        chunk0 = Int(chunks[0])
+        chunk1 = Int(chunks[1])
+        scalefactor = reader.scaleFactor
+        compression = reader.compression
     }
     
     /// Prefetch fhe required data regions into memory
     public func willNeed(dim0Slow dim0Read: Range<Int>? = nil, dim1 dim1Read: Range<Int>? = nil) throws {
-        guard fn.needsPrefetch else {
+        guard reader.fn.needsPrefetch else {
             return
         }
-        let dim0Read = dim0Read ?? 0..<dim0
+        /*let dim0Read = dim0Read ?? 0..<dim0
         let dim1Read = dim1Read ?? 0..<dim1
         
         guard dim0Read.lowerBound >= 0 && dim0Read.lowerBound <= dim0 && dim0Read.upperBound <= dim0 else {
@@ -587,7 +578,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         }
         
         //print("fetching from \(fetchStart) to \(fetchEnd)... count \(fetchEnd-fetchStart)")
-        fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)
+        fn.prefetchData(offset: fetchStart, count: fetchEnd-fetchStart)*/
     }
     
     /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
@@ -612,52 +603,40 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             throw OmFileFormatSwiftError.dimensionOutOfBounds(range: dim1Read, allowed: dim1)
         }
         
-        /*withUnsafeTemporaryAllocation(of: Int.self, capacity: 2*6) { ptr in
-            // dimensions
-            ptr[0] = dim0
-            ptr[1] = dim1
-            // chunks
-            ptr[2] = chunk0
-            ptr[3] = chunk1
+        // This function is only used for legacy 2D read functions
+        
+        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
             // read offset
-            ptr[4] = dim0Read.lowerBound
-            ptr[5] = dim1Read.lowerBound
+            ptr[0] = UInt64(dim0Read.lowerBound)
+            ptr[1] = UInt64(dim1Read.lowerBound)
             // read count
-            ptr[6] = dim0Read.count
-            ptr[7] = dim1Read.count
+            ptr[2] = UInt64(dim0Read.count)
+            ptr[3] = UInt64(dim1Read.count)
             // cube offset
-            ptr[8] = 0
-            ptr[9] = arrayDim1Range.lowerBound
+            ptr[4] = 0
+            ptr[5] = UInt64(arrayDim1Range.lowerBound)
             // cube dimensions
-            ptr[10] = dim0Read.count
-            ptr[11] = arrayDim1Length
+            ptr[6] = UInt64(dim0Read.count)
+            ptr[7] = UInt64(arrayDim1Length)
             
-            let c = OmFileFormatC.OmCompression_t(rawValue: UInt32(compression.rawValue))
             var decoder = OmDecoder_t()
             let error = OmDecoder_init(
                 &decoder,
-                scalefactor,
-                0, // add offset
-                c,
-                OmFileFormatC.DATA_TYPE_FLOAT,
+                reader.variable,
                 2,
                 ptr.baseAddress,
                 ptr.baseAddress?.advanced(by: 2),
                 ptr.baseAddress?.advanced(by: 4),
                 ptr.baseAddress?.advanced(by: 6),
-                ptr.baseAddress?.advanced(by: 8),
-                ptr.baseAddress?.advanced(by: 10),
-                8, // ignored if lutChunkElementCount == 1
-                1,
-                OmHeader.length,
-                512,
-                65536
+                reader.lutChunkElementCount,
+                512, // merge
+                65536 // io amax
             )
             guard error == ERROR_OK else {
                 fatalError("Om encoder: \(String(cString: OmError_string(error)))")
             }
-            fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
-        }*/
+            reader.fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
+        }
     }
 }
 
@@ -681,7 +660,7 @@ extension OmFileReader where Backend == MmapFile {
     
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
     public func wasDeleted() -> Bool {
-        fn.wasDeleted()
+        reader.fn.wasDeleted()
     }
 }
 
@@ -713,6 +692,6 @@ extension OmFileReader where Backend == MmapFileCached {
     
     /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
     public func wasDeleted() -> Bool {
-        fn.wasDeleted()
+        reader.fn.wasDeleted()
     }
 }

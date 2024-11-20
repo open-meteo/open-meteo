@@ -41,11 +41,15 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
             //dimension_count_file = 2;
             data_type = DATA_TYPE_FLOAT_ARRAY;
             compression = (OmCompression_t)metaV1->compression_type;
+            if (metaV1->version == 1) {
+                compression = COMPRESSION_PFOR_16BIT_DELTA2D;
+            }
             lut_chunk_element_count = 1;
             lut_start = 40; // Right after header
             lut_size = 0; // ignored
             dimensions = &metaV1->dim0;
             chunks = &metaV1->chunk0;
+            break;
         case OM_MEMORY_LAYOUT_ARRAY:
             scalefactor = metaV3->scale_factor;
             add_offset = metaV3->add_offset;
@@ -55,6 +59,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
             lut_start = metaV3->lut_offset;
             dimensions = om_variable_get_dimensions(variable);
             chunks = om_variable_get_chunks(variable);
+            break;
         case OM_MEMORY_LAYOUT_SCALAR:
             return ERROR_INVALID_DATA_TYPE;
     }
