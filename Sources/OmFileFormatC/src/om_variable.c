@@ -208,10 +208,10 @@ void om_variable_get_child(const OmVariable_t* variable, int nChild, OmOffsetSiz
         case OM_MEMORY_LAYOUT_LEGACY:
             return;
         case OM_MEMORY_LAYOUT_ARRAY:
-            sizeof_variable = SIZE_VARIABLEV3;
+            sizeof_variable = sizeof(OmVariableArrayV3_t);
             break;
         case OM_MEMORY_LAYOUT_SCALAR:
-            sizeof_variable = sizeof(OmVariableArrayV3_t);
+            sizeof_variable = SIZE_VARIABLEV3;
             break;
     }
     const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
@@ -300,43 +300,27 @@ void om_variable_write_scalar(void* dst, uint16_t length_of_name, uint32_t numbe
     char* base = (char*)(dst + SIZE_VARIABLEV3 + 16 * number_of_children);
     switch (data_type) {
         case DATA_TYPE_INT8:
-            ((int8_t *)base)[0] = ((int8_t*)value)[0];
-            base += 1;
-            break;
         case DATA_TYPE_UINT8:
-            ((uint8_t *)base)[0] = ((uint8_t*)value)[0];
+            *(int8_t *)base = *(int8_t*)value;
             base += 1;
             break;
         case DATA_TYPE_INT16:
-            ((int16_t *)base)[0] = ((int16_t*)value)[0];
-            base += 2;
-            break;
         case DATA_TYPE_UINT16:
-            ((uint16_t *)base)[0] = ((uint16_t*)value)[0];
+            *(int16_t *)base = *(int16_t*)value;
             base += 2;
             break;
         case DATA_TYPE_INT32:
-            ((int32_t *)base)[0] = ((int32_t*)value)[0];
-            base += 4;
-            break;
         case DATA_TYPE_UINT32:
-            ((uint32_t *)base)[0] = ((uint32_t*)value)[0];
+        case DATA_TYPE_FLOAT: {
+            int32_t v = *(int32_t*)value;
+            *(int32_t *)base = v;
             base += 4;
             break;
+        }
         case DATA_TYPE_INT64:
-            ((int64_t *)base)[0] = ((int64_t*)value)[0];
-            base += 8;
-            break;
         case DATA_TYPE_UINT64:
-            ((uint64_t *)base)[0] = ((uint64_t*)value)[0];
-            base += 8;
-            break;
-        case DATA_TYPE_FLOAT:
-            ((float *)base)[0] = ((float*)value)[0];
-            base += 4;
-            break;
         case DATA_TYPE_DOUBLE:
-            ((double *)base)[0] = ((double*)value)[0];
+            *(int64_t *)base = *(int64_t*)value;
             base += 8;
             break;
         default:
