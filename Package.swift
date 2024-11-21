@@ -28,6 +28,10 @@ let package = Package(
     platforms: [
         .macOS(.v12)
     ],
+    products: [
+        .library(name: "SwiftPFor2D", targets: ["SwiftPFor2D"]),
+        .library(name: "App", targets: ["App"]),
+    ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/google/flatbuffers.git", from: "24.3.25"),
