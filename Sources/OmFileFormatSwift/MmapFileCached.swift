@@ -37,6 +37,14 @@ public final class MmapFileCached {
 }
 
 extension MmapFileCached: OmFileReaderBackend {
+    public func getData(offset: Int, count: Int) -> UnsafeRawPointer {
+        if let frontend {
+            frontend.getData(offset: offset, count: count)
+        } else {
+            backend.getData(offset: offset, count: count)
+        }
+    }
+    
     /// Populate cache frontend before reading
     public func preRead(offset: Int, count: Int) {
         guard let frontend else {
@@ -70,14 +78,6 @@ extension MmapFileCached: OmFileReaderBackend {
     
     public var needsPrefetch: Bool {
         return true
-    }
-    
-    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
-        if let frontend {
-            try frontend.withUnsafeBytes(body)
-        } else {
-            try backend.withUnsafeBytes(body)
-        }
     }
 }
 

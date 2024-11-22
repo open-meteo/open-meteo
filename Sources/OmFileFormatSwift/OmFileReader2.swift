@@ -25,25 +25,25 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     public init(fn: Backend, lutChunkElementCount: UInt64 = 256) throws {
         self.lutChunkElementCount = lutChunkElementCount
         self.fn = fn
-        self.variable = fn.withUnsafeBytes {ptr in
-            //let headerSize = om_read_header_size()
-            var root = OmOffsetSize_t(offset: 0, size: 0)
-            guard om_read_header(ptr.baseAddress, &root) == ERROR_OK else {
+        
+        let headerSize = om_read_header_size()
+        var root = OmOffsetSize_t(offset: 0, size: 0)
+        let dataHead = fn.getData(offset: 0, count: headerSize)
+        guard om_read_header(dataHead, &root) == ERROR_OK else {
+            fatalError("Not an OM file")
+        }
+        if root.offset == 0 && root.size == 0 {
+            // version 3 file, read trailer
+            let fileSize = fn.count
+            let trailerSize = om_read_trailer_size()
+            let dataTrailer = fn.getData(offset: fileSize - trailerSize, count: trailerSize)
+            guard om_read_trailer(dataTrailer, &root) == ERROR_OK else {
                 fatalError("Not an OM file")
             }
-            if root.offset == 0 && root.size == 0 {
-                // version 3 file, read trailer
-                let fileSize = fn.count
-                let trailerSize = om_read_trailer_size()
-                let dataTrailer = ptr.baseAddress?.advanced(by: fileSize - trailerSize)
-                guard om_read_trailer(dataTrailer, &root) == ERROR_OK else {
-                    fatalError("Not an OM file")
-                }
-            }
-            /// Read data from root.offset by root.size
-            let dataRoot = ptr.baseAddress?.advanced(by: Int(root.offset))
-            return om_variable_init(dataRoot)
         }
+        /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
+        let dataRoot = fn.getData(offset: Int(root.offset), count: Int(root.size))
+        self.variable = om_variable_init(dataRoot)
     }
     
     init(fn: Backend, variable: UnsafePointer<OmVariable_t?>?, lutChunkElementCount: UInt64) {
@@ -96,14 +96,12 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         guard child.size > 0 else {
             return nil
         }
-        return fn.withUnsafeBytes {ptr in
-            /// Read data from child.offset by child.size
-            let dataChild = ptr.baseAddress?.advanced(by: Int(child.offset))
-            guard let childVariable = om_variable_init(dataChild) else {
-                fatalError()
-            }
-            return OmFileReader2(fn: fn, variable: childVariable, lutChunkElementCount: lutChunkElementCount)
+        /// Read data from child.offset by child.size
+        let dataChild = fn.getData(offset: Int(child.offset), count: Int(child.size))
+        guard let childVariable = om_variable_init(dataChild) else {
+            fatalError()
         }
+        return OmFileReader2(fn: fn, variable: childVariable, lutChunkElementCount: lutChunkElementCount)
     }
     
     public func readScalar<OmType: OmFileScalarDataTypeProtocol>() -> OmType? {
@@ -173,51 +171,47 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
 extension OmFileReaderBackend {
     /// Read and decode
     func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
-        self.withUnsafeBytes({ ptr in
-            var indexRead = OmDecoder_indexRead_t()
-            OmDecoder_initIndexRead(decoder, &indexRead)
+        var indexRead = OmDecoder_indexRead_t()
+        OmDecoder_initIndexRead(decoder, &indexRead)
+        
+        /// Loop over index blocks and read index data
+        while OmDecoder_nextIndexRead(decoder, &indexRead) {
+            let indexData = self.getData(offset: Int(indexRead.offset), count: Int(indexRead.count))
             
-            /// Loop over index blocks and read index data
-            while OmDecoder_nextIndexRead(decoder, &indexRead) {
-                let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
-                
-                var dataRead = OmDecoder_dataRead_t()
-                OmDecoder_initDataRead(&dataRead, &indexRead)
-                
-                var error: OmError_t = ERROR_OK
-                /// Loop over data blocks and read compressed data chunks
-                while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
-                    let dataData = ptr.baseAddress!.advanced(by: Int(dataRead.offset))
-                    guard OmDecoder_decodeChunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
-                        fatalError("OmDecoder: \(String(cString: OmError_string(error)))")
-                    }
-                }
-                guard error == ERROR_OK else {
+            var dataRead = OmDecoder_dataRead_t()
+            OmDecoder_initDataRead(&dataRead, &indexRead)
+            
+            var error: OmError_t = ERROR_OK
+            /// Loop over data blocks and read compressed data chunks
+            while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
+                let dataData = self.getData(offset: Int(dataRead.offset), count: Int(dataRead.count))
+                guard OmDecoder_decodeChunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
                     fatalError("OmDecoder: \(String(cString: OmError_string(error)))")
                 }
             }
-        })
+            guard error == ERROR_OK else {
+                fatalError("OmDecoder: \(String(cString: OmError_string(error)))")
+            }
+        }
     }
 
     /// Do an madvice to load data chunks from disk into page cache in the background
     func decodePrefetch(decoder: UnsafePointer<OmDecoder_t>) {
-        self.withUnsafeBytes({ ptr in
-            var indexRead = OmDecoder_indexRead_t()
-            OmDecoder_initIndexRead(decoder, &indexRead)
+        var indexRead = OmDecoder_indexRead_t()
+        OmDecoder_initIndexRead(decoder, &indexRead)
+        
+        /// Loop over index blocks and read index data
+        while OmDecoder_nextIndexRead(decoder, &indexRead) {
+            let indexData = self.getData(offset: Int(indexRead.offset), count: Int(indexRead.count))
             
-            /// Loop over index blocks and read index data
-            while OmDecoder_nextIndexRead(decoder, &indexRead) {
-                let indexData = ptr.baseAddress!.advanced(by: Int(indexRead.offset))
-                
-                var dataRead = OmDecoder_dataRead_t()
-                OmDecoder_initDataRead(&dataRead, &indexRead)
-                
-                var error: OmError_t = ERROR_OK
-                /// Loop over data blocks and read compressed data chunks
-                while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
-                    self.prefetchData(offset: Int(dataRead.offset), count: Int(dataRead.count))
-                }
+            var dataRead = OmDecoder_dataRead_t()
+            OmDecoder_initDataRead(&dataRead, &indexRead)
+            
+            var error: OmError_t = ERROR_OK
+            /// Loop over data blocks and read compressed data chunks
+            while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
+                self.prefetchData(offset: Int(dataRead.offset), count: Int(dataRead.count))
             }
-        })
+        }
     }
 }

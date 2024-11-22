@@ -15,7 +15,9 @@ public protocol OmFileReaderBackend {
     func prefetchData(offset: Int, count: Int)
     //func preRead(offset: Int, count: Int)
     
-    func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType
+    func getData(offset: Int, count: Int) -> UnsafeRawPointer
+    
+    //func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType
 }
 
 /// Need to maintain a strong reference
@@ -55,6 +57,11 @@ extension FileHandle: OmFileWriterBackend {
 
 /// Make `FileHandle` work as reader
 extension MmapFile: OmFileReaderBackend {
+    public func getData(offset: Int, count: Int) -> UnsafeRawPointer {
+        assert(offset + count <= data.count)
+        return UnsafeRawPointer(data.baseAddress!.advanced(by: offset))
+    }
+    
     public func prefetchData(offset: Int, count: Int) {
         self.prefetchData(offset: offset, count: count, advice: .willneed)
     }
@@ -67,10 +74,6 @@ extension MmapFile: OmFileReaderBackend {
         return data.count
     }
     
-    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
-        try data.withUnsafeBytes(body)
-    }
-    
     public var needsPrefetch: Bool {
         return true
     }
@@ -78,16 +81,19 @@ extension MmapFile: OmFileReaderBackend {
 
 /// Make `Data` work as reader
 extension DataAsClass: OmFileReaderBackend {
+    public func getData(offset: Int, count: Int) -> UnsafeRawPointer {
+        // NOTE: Probaly a bad idea to expose a pointer
+        return data.withUnsafeBytes({
+            $0.baseAddress!.advanced(by: offset)
+        })
+    }
+    
     public func preRead(offset: Int, count: Int) {
         
     }
     
     public var count: Int {
         return data.count
-    }
-    
-    public func withUnsafeBytes<ResultType>(_ body: (UnsafeRawBufferPointer) throws -> ResultType) rethrows -> ResultType {
-        return try data.withUnsafeBytes(body)
     }
     
     public var needsPrefetch: Bool {
