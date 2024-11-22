@@ -1,6 +1,8 @@
 import Foundation
 
-/// Mmap a all pages for a file
+/// Use a backend and frontend adapter to cache access!
+///
+/// NOTE: Currently buggy is hell due to concurrency issues. This need s proper rewrite in async await before it should be used.
 public final class MmapFileCached {
     public let backend: MmapFile
     public let frontend: MmapFile?
