@@ -162,6 +162,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         
         /// Each thread needs its own chunk buffer to compress data. This implementation is single threaded
         self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
+        chunkBuffer.initializeMemory(as: UInt8.self, repeating: 0)
         
         /// Allocate space for a lookup table. Needs to be number_of_chunks+1 to store start address and for each chunk then end address
         self.lookUpTable = .init(repeating: 0, count: Int(nChunks) + 1)

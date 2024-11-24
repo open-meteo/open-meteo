@@ -26,6 +26,7 @@ public final class OmBufferedWriter<FileHandle: OmFileWriterBackend> {
         self.totalBytesWritten = 0
         self.backend = backend
         self.buffer = .allocate(byteCount: initialCapacity, alignment: 1)
+        buffer.initializeMemory(as: UInt8.self, repeating: 0)
         self.initialCapacity = initialCapacity
     }
     
@@ -71,6 +72,7 @@ public final class OmBufferedWriter<FileHandle: OmFileWriterBackend> {
         // Need to grow buffer to a multiple of the initial capacity
         let newCapacity = minimumCapacity.divideRoundedUp(divisor: initialCapacity) * initialCapacity
         buffer = UnsafeMutableRawBufferPointer(start: realloc(buffer.baseAddress, newCapacity), count: newCapacity)
+        bufferAtWritePosition.initializeMemory(as: UInt8.self, repeating: 0, count: remainingCapacity)
     }
     
     /// Write buffer to file
