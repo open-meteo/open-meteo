@@ -6,3 +6,4 @@
 #include "om_decoder.h"
 #include "om_encoder.h"
 #include "om_variable.h"
+#include "om_file.h"
