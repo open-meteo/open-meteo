@@ -70,7 +70,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
     for (uint64_t i = 0; i < dimension_count; i++) {
         nChunks *= divide_rounded_up(dimensions[i], chunks[i]);
     }
-    uint64_t nLutChunks = divide_rounded_up(nChunks, lut_chunk_element_count);
+    const uint64_t nLutChunks = divide_rounded_up(nChunks, lut_chunk_element_count);
     uint64_t lut_chunk_length = lut_size / nLutChunks;
     if (lut_chunk_element_count == 1) {
         // OLD v1 files do not use compressed LUT
@@ -185,18 +185,23 @@ void OmDecoder_initIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t *
     uint64_t chunkEnd = 1;
     
     for (uint64_t i = 0; i < decoder->dimensions_count; i++) {
-        // Calculate lower and upper chunk indices for the current dimension
-        uint64_t chunkInThisDimensionLower = decoder->read_offset[i] / decoder->chunks[i];
-        uint64_t chunkInThisDimensionUpper = divide_rounded_up(decoder->read_offset[i] + decoder->read_count[i], decoder->chunks[i]);
-        uint64_t chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower;
+        const uint64_t dimension = decoder->dimensions[i];
+        const uint64_t chunk = decoder->chunks[i];
+        const uint64_t read_offset = decoder->read_offset[i];
+        const uint64_t read_count = decoder->read_count[i];
         
-        uint64_t firstChunkInThisDimension = chunkInThisDimensionLower;
-        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
+        // Calculate lower and upper chunk indices for the current dimension
+        const uint64_t chunkInThisDimensionLower = read_offset / chunk;
+        const uint64_t chunkInThisDimensionUpper = divide_rounded_up(read_offset + read_count, chunk);
+        const uint64_t chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower;
+        
+        const uint64_t firstChunkInThisDimension = chunkInThisDimensionLower;
+        const uint64_t nChunksInThisDimension = divide_rounded_up(dimension, chunk);
         
         // Update chunkStart and chunkEnd
         chunkStart = chunkStart * nChunksInThisDimension + firstChunkInThisDimension;
         
-        if (decoder->read_count[i] == decoder->dimensions[i]) {
+        if (read_count == dimension) {
             // The entire dimension is read
             chunkEnd = chunkEnd * nChunksInThisDimension;
         } else {
@@ -228,27 +233,33 @@ bool _om_decoder_next_chunk_position(const OmDecoder_t *decoder, OmRange_t *chun
     // Number of consecutive chunks that can be read linearly.
     uint64_t linearReadCount = 1;
     bool linearRead = true;
+    const uint64_t dimensions_count = decoder->dimensions_count;
     
-    for (int64_t i = decoder->dimensions_count - 1; i >= 0; --i) {
+    for (int64_t i = dimensions_count - 1; i >= 0; --i) {
+        const uint64_t dimension = decoder->dimensions[i];
+        const uint64_t chunk = decoder->chunks[i];
+        const uint64_t read_offset = decoder->read_offset[i];
+        const uint64_t read_count = decoder->read_count[i];
+        
         // Number of chunks in this dimension.
-        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
+        const uint64_t nChunksInThisDimension = divide_rounded_up(dimension, chunk);
         
         // Calculate chunk range in this dimension.
-        uint64_t chunkInThisDimensionLower = decoder->read_offset[i] / decoder->chunks[i];
-        uint64_t chunkInThisDimensionUpper = divide_rounded_up(decoder->read_offset[i] + decoder->read_count[i], decoder->chunks[i]);
-        uint64_t chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower;
+        const uint64_t chunkInThisDimensionLower = read_offset / chunk;
+        const uint64_t chunkInThisDimensionUpper = divide_rounded_up(read_offset + read_count, chunk);
+        const uint64_t chunkInThisDimensionCount = chunkInThisDimensionUpper - chunkInThisDimensionLower;
         
         // Move forward by one.
         chunk_index->lowerBound += rollingMultiply;
         
         // Check for linear read conditions.
-        if (i == decoder->dimensions_count - 1 && decoder->dimensions[i] != decoder->read_count[i]) {
+        if (i == dimensions_count - 1 && dimension != read_count) {
             // If the fast dimension is only partially read.
             linearReadCount = chunkInThisDimensionCount;
             linearRead = false;
         }
         
-        if (linearRead && decoder->dimensions[i] == decoder->read_count[i]) {
+        if (linearRead && dimension == read_count) {
             // The dimension is read entirely.
             linearReadCount *= nChunksInThisDimension;
         } else {
@@ -292,22 +303,22 @@ bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* 
     
     uint64_t chunkIndex = index_read->nextChunk.lowerBound;
     
-    bool isV3LUT = decoder->lut_chunk_element_count > 1;
-    uint64_t alignOffset = isV3LUT || index_read->indexRange.lowerBound == 0 ? 0 : 1;
-    uint64_t endAlignOffset = isV3LUT ? 1 : 0;
+    const bool isV3LUT = decoder->lut_chunk_element_count > 1;
+    const uint64_t alignOffset = isV3LUT || index_read->indexRange.lowerBound == 0 ? 0 : 1;
+    const uint64_t endAlignOffset = isV3LUT ? 1 : 0;
     
-    uint64_t readStart = (index_read->nextChunk.lowerBound - alignOffset) / decoder->lut_chunk_element_count * decoder->lut_chunk_length;
+    const uint64_t readStart = (index_read->nextChunk.lowerBound - alignOffset) / decoder->lut_chunk_element_count * decoder->lut_chunk_length;
     
     while (1) {
-        uint64_t maxRead = decoder->io_size_max / decoder->lut_chunk_length * decoder->lut_chunk_element_count;
-        uint64_t nextIncrement = max(1, min(maxRead, index_read->nextChunk.upperBound - index_read->nextChunk.lowerBound - 1));
+        const uint64_t maxRead = decoder->io_size_max / decoder->lut_chunk_length * decoder->lut_chunk_element_count;
+        const uint64_t nextIncrement = max(1, min(maxRead, index_read->nextChunk.upperBound - index_read->nextChunk.lowerBound - 1));
         
         if (index_read->nextChunk.lowerBound + nextIncrement >= index_read->nextChunk.upperBound) {
             if (!_om_decoder_next_chunk_position(decoder, &index_read->nextChunk)) {
                 break;
             }
-            uint64_t readStartNext = (index_read->nextChunk.lowerBound + endAlignOffset) / decoder->lut_chunk_element_count * decoder->lut_chunk_length - decoder->lut_chunk_length;
-            uint64_t readEndPrevious = chunkIndex / decoder->lut_chunk_element_count * decoder->lut_chunk_length;
+            const uint64_t readStartNext = (index_read->nextChunk.lowerBound + endAlignOffset) / decoder->lut_chunk_element_count * decoder->lut_chunk_length - decoder->lut_chunk_length;
+            const uint64_t readEndPrevious = chunkIndex / decoder->lut_chunk_element_count * decoder->lut_chunk_length;
             
             if (readStartNext - readEndPrevious > decoder->io_size_merge) {
                 break;
@@ -316,7 +327,7 @@ bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* 
             index_read->nextChunk.lowerBound += nextIncrement;
         }
         
-        uint64_t readEndNext = (index_read->nextChunk.lowerBound + endAlignOffset) / decoder->lut_chunk_element_count * decoder->lut_chunk_length;
+        const uint64_t readEndNext = (index_read->nextChunk.lowerBound + endAlignOffset) / decoder->lut_chunk_element_count * decoder->lut_chunk_length;
         
         if (readEndNext - readStart > decoder->io_size_max) {
             break;
@@ -325,7 +336,7 @@ bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* 
         chunkIndex = index_read->nextChunk.lowerBound;
     }
     
-    uint64_t readEnd = ((chunkIndex + endAlignOffset) / decoder->lut_chunk_element_count + 1) * decoder->lut_chunk_length;
+    const uint64_t readEnd = ((chunkIndex + endAlignOffset) / decoder->lut_chunk_element_count + 1) * decoder->lut_chunk_length;
     //uint64_t lutTotalSize = divide_rounded_up(decoder->number_of_chunks, decoder->lut_chunk_element_count) * decoder->lut_chunk_length;
     //assert(readEnd <= lutTotalSize);
     
@@ -343,16 +354,16 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
     uint64_t chunkIndex = data_read->nextChunk.lowerBound;
     data_read->chunkIndex.lowerBound = chunkIndex;
     
-    uint64_t lutChunkElementCount = decoder->lut_chunk_element_count;
-    uint64_t lutChunkLength = decoder->lut_chunk_length;
+    const uint64_t lutChunkElementCount = decoder->lut_chunk_element_count;
+    const uint64_t lutChunkLength = decoder->lut_chunk_length;
     
     // Version 1 case
     if (decoder->lut_chunk_element_count == 1) {
         // index is a flat Int64 array
         const uint64_t* data = (const uint64_t*)index_data;
         
-        bool isOffset0 = (data_read->indexRange.lowerBound == 0);
-        uint64_t startOffset = isOffset0 ? 1 : 0;
+        const bool isOffset0 = (data_read->indexRange.lowerBound == 0);
+        const uint64_t startOffset = isOffset0 ? 1 : 0;
         
         
         uint64_t readPos = data_read->indexRange.lowerBound - chunkIndex - startOffset;
@@ -361,7 +372,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
             return false;
         }
         
-        uint64_t startPos = isOffset0 ? 0 : data[readPos];
+        const uint64_t startPos = isOffset0 ? 0 : data[readPos];
         uint64_t endPos = startPos;
         
         // Loop to the next chunk until the end is reached
@@ -371,7 +382,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
                 (*error) = ERROR_OUT_OF_BOUND_READ;
                 return false;
             }
-            uint64_t dataEndPos = data[readPos];
+            const uint64_t dataEndPos = data[readPos];
             
             // Merge and split IO requests, ensuring at least one IO request is sent
             if (startPos != endPos && (dataEndPos - startPos > decoder->io_size_max || dataEndPos - endPos > decoder->io_size_merge)) {
@@ -398,8 +409,8 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
         
         // Old files do not compress LUT and data is after LUT
         // V1 header size
-        uint64_t om_header_v1_length = 40;
-        uint64_t dataStart = om_header_v1_length + decoder->number_of_chunks * sizeof(int64_t);
+        const uint64_t om_header_v1_length = sizeof(OmHeaderV1_t);
+        const uint64_t dataStart = om_header_v1_length + decoder->number_of_chunks * sizeof(int64_t);
         
         data_read->offset = startPos + dataStart;
         data_read->count = endPos - startPos;
@@ -415,44 +426,44 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
     uint64_t lutChunk = chunkIndex / lutChunkElementCount;
     
     // Offset byte in LUT relative to the index range
-    uint64_t lutOffset = data_read->indexRange.lowerBound / lutChunkElementCount * lutChunkLength;
+    const uint64_t lutOffset = data_read->indexRange.lowerBound / lutChunkElementCount * lutChunkLength;
     
     // Uncompress the first LUT index chunk and check the length
     {
-        uint64_t thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - lutChunk * lutChunkElementCount;
-        uint64_t start = lutChunk * lutChunkLength - lutOffset;
+        const uint64_t thisLutChunkElementCount = min((lutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - lutChunk * lutChunkElementCount;
+        const uint64_t start = lutChunk * lutChunkLength - lutOffset;
         if (start < 0 || start + lutChunkLength > index_data_size) {
             (*error) = ERROR_OUT_OF_BOUND_READ;
             return false;
         }
         
         // Decompress LUT chunk
-        p4nddec64(indexDataPtr + start, thisLutChunkElementCount, (uint64_t*)uncompressedLut);
+        p4nddec64(indexDataPtr + start, thisLutChunkElementCount, uncompressedLut);
     }
     
     // Index data relative to start index
-    uint64_t startPos = uncompressedLut[chunkIndex % lutChunkElementCount];
+    const uint64_t startPos = uncompressedLut[chunkIndex % lutChunkElementCount];
     uint64_t endPos = startPos;
     
     // Loop to the next chunk until the end is reached
     while (true) {
-        uint64_t nextLutChunk = (data_read->nextChunk.lowerBound + 1) / lutChunkElementCount;
+        const uint64_t nextLutChunk = (data_read->nextChunk.lowerBound + 1) / lutChunkElementCount;
         
         // Maybe the next LUT chunk needs to be uncompressed
         if (nextLutChunk != lutChunk) {
-            uint64_t nextLutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - nextLutChunk * lutChunkElementCount;
-            uint64_t start = nextLutChunk * lutChunkLength - lutOffset;
+            const uint64_t nextLutChunkElementCount = min((nextLutChunk + 1) * lutChunkElementCount, decoder->number_of_chunks+1) - nextLutChunk * lutChunkElementCount;
+            const uint64_t start = nextLutChunk * lutChunkLength - lutOffset;
             if (start < 0 || start + lutChunkLength > index_data_size) {
                 (*error) = ERROR_OUT_OF_BOUND_READ;
                 return false;
             }
             
             // Decompress LUT chunk
-            p4nddec64(indexDataPtr + start, nextLutChunkElementCount, (uint64_t*)uncompressedLut);
+            p4nddec64(indexDataPtr + start, nextLutChunkElementCount, uncompressedLut);
             lutChunk = nextLutChunk;
         }
         
-        uint64_t dataEndPos = uncompressedLut[(data_read->nextChunk.lowerBound + 1) % lutChunkElementCount];
+        const uint64_t dataEndPos = uncompressedLut[(data_read->nextChunk.lowerBound + 1) % lutChunkElementCount];
         
         // Merge and split IO requests, ensuring at least one IO request is sent
         if (startPos != endPos && (dataEndPos - startPos > decoder->io_size_max || dataEndPos - endPos > decoder->io_size_merge)) {
@@ -484,7 +495,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
 }
 
 // Internal function to decode a single chunk.
-uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunk, const void *data, void *into, void *chunk_buffer) {
+uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunk_buffer) {
     uint64_t rollingMultiply = 1;
     uint64_t rollingMultiplyChunkLength = 1;
     uint64_t rollingMultiplyTargetCube = 1;
@@ -496,43 +507,52 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunk, co
     int64_t lengthLast = 0;
     bool no_data = false;
     
+    const uint64_t dimensions_count = decoder->dimensions_count;
+    
     //printf("decode dimcount=%d \n", decoder->dims_count );
     
     // Count length in chunk and find first buffer offset position.
-    for (int64_t i = decoder->dimensions_count - 1; i >= 0; --i) {
-        uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
-        uint64_t c0 = (chunk / rollingMultiply) % nChunksInThisDimension;
-        uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dimensions[i]) - c0 * decoder->chunks[i];
+    for (int64_t i = dimensions_count - 1; i >= 0; --i) {
+        const uint64_t dimension = decoder->dimensions[i];
+        const uint64_t chunk = decoder->chunks[i];
+        const uint64_t read_offset = decoder->read_offset[i];
+        const uint64_t read_count = decoder->read_count[i];
+        const uint64_t cube_offset = decoder->cube_offset[i];
+        const uint64_t cube_dimension = decoder->cube_dimensions[i];
         
-        uint64_t chunkGlobal0Start = c0 * decoder->chunks[i];
-        uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
-        uint64_t clampedGlobal0Start = max(chunkGlobal0Start, decoder->read_offset[i]);
-        uint64_t clampedGlobal0End = min(chunkGlobal0End, decoder->read_offset[i] + decoder->read_count[i]);
-        uint64_t clampedLocal0Start = clampedGlobal0Start - c0 * decoder->chunks[i];
-        uint64_t lengthRead = clampedGlobal0End - clampedGlobal0Start;
+        const uint64_t nChunksInThisDimension = divide_rounded_up(dimension, chunk);
+        const uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
+        const uint64_t length0 = min((c0+1) * chunk, dimension) - c0 * chunk;
         
-        if (decoder->read_offset[i] + decoder->read_count[i] <= chunkGlobal0Start || decoder->read_offset[i] >= chunkGlobal0End) {
+        const uint64_t chunkGlobal0Start = c0 * chunk;
+        const uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
+        const uint64_t clampedGlobal0Start = max(chunkGlobal0Start, read_offset);
+        const uint64_t clampedGlobal0End = min(chunkGlobal0End, read_offset + read_count);
+        const uint64_t clampedLocal0Start = clampedGlobal0Start - c0 * chunk;
+        const uint64_t lengthRead = clampedGlobal0End - clampedGlobal0Start;
+        
+        if (read_offset + read_count <= chunkGlobal0Start || read_offset >= chunkGlobal0End) {
             no_data = true;
         }
         
-        if (i == decoder->dimensions_count - 1) {
+        if (i == dimensions_count - 1) {
             lengthLast = length0;
         }
         
-        uint64_t d0 = clampedLocal0Start;
-        uint64_t t0 = chunkGlobal0Start - decoder->read_offset[i] + d0;
-        uint64_t q0 = t0 + decoder->cube_offset[i];
+        const uint64_t d0 = clampedLocal0Start;
+        const uint64_t t0 = chunkGlobal0Start - read_offset + d0;
+        const uint64_t q0 = t0 + cube_offset;
         
         d += rollingMultiplyChunkLength * d0;
         q += rollingMultiplyTargetCube * q0;
         
-        if (i == decoder->dimensions_count - 1 && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
+        if (i == dimensions_count - 1 && !(lengthRead == length0 && read_count == length0 && cube_dimension == length0)) {
             // if fast dimension and only partially read
             linearReadCount = lengthRead;
             linearRead = false;
         }
         
-        if (linearRead && lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0) {
+        if (linearRead && lengthRead == length0 && read_count == length0 && cube_dimension == length0) {
             // dimension is read entirely
             // and can be copied linearly into the output buffer
             linearReadCount *= length0;
@@ -542,12 +562,12 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunk, co
         }
         
         rollingMultiply *= nChunksInThisDimension;
-        rollingMultiplyTargetCube *= decoder->cube_dimensions[i];
+        rollingMultiplyTargetCube *= cube_dimension;
         rollingMultiplyChunkLength *= length0;
     }
     
-    uint64_t lengthInChunk = rollingMultiplyChunkLength;
-    uint64_t uncompressedBytes = (*decoder->decompress_callback)(data, lengthInChunk, chunk_buffer);
+    const uint64_t lengthInChunk = rollingMultiplyChunkLength;
+    const uint64_t uncompressedBytes = (*decoder->decompress_callback)(data, lengthInChunk, chunk_buffer);
     
     if (no_data) {
         return uncompressedBytes;
@@ -569,23 +589,23 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunk, co
         rollingMultiplyChunkLength = 1;
         linearReadCount = 1;
         linearRead = true;
-        for (int64_t i = decoder->dimensions_count-1; i >= 0; i--) {
+        for (int64_t i = dimensions_count-1; i >= 0; i--) {
             //printf("i=%d q=%d d=%d\n", i,q,d);
-            uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
-            uint64_t c0 = (chunk / rollingMultiply) % nChunksInThisDimension;
-            uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dimensions[i]) - c0 * decoder->chunks[i];
+            const uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
+            const uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
+            const uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dimensions[i]) - c0 * decoder->chunks[i];
             
-            uint64_t chunkGlobal0Start = c0 * decoder->chunks[i];
-            uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
-            uint64_t clampedGlobal0Start = max(chunkGlobal0Start, decoder->read_offset[i]);
-            uint64_t clampedGlobal0End = min(chunkGlobal0End, decoder->read_offset[i] + decoder->read_count[i]);
-            uint64_t clampedLocal0End = clampedGlobal0End - c0 * decoder->chunks[i];
-            uint64_t lengthRead = clampedGlobal0End - clampedGlobal0Start;
+            const uint64_t chunkGlobal0Start = c0 * decoder->chunks[i];
+            const uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
+            const uint64_t clampedGlobal0Start = max(chunkGlobal0Start, decoder->read_offset[i]);
+            const uint64_t clampedGlobal0End = min(chunkGlobal0End, decoder->read_offset[i] + decoder->read_count[i]);
+            const uint64_t clampedLocal0End = clampedGlobal0End - c0 * decoder->chunks[i];
+            const uint64_t lengthRead = clampedGlobal0End - clampedGlobal0Start;
             
             d += rollingMultiplyChunkLength;
             q += rollingMultiplyTargetCube;
             
-            if ((i == decoder->dimensions_count - 1) && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
+            if ((i == dimensions_count - 1) && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
                 // if fast dimension and only partially read
                 linearReadCount = lengthRead;
                 linearRead = false;
@@ -599,7 +619,7 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunk, co
                 linearRead = false;
             }
             
-            uint64_t d0 = (d / rollingMultiplyChunkLength) % length0;
+            const uint64_t d0 = (d / rollingMultiplyChunkLength) % length0;
             if (d0 != clampedLocal0End && d0 != 0) {
                 //printf("break\n");
                 break; // No overflow in this dimension, break
