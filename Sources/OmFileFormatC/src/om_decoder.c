@@ -522,10 +522,9 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
         
         const uint64_t nChunksInThisDimension = divide_rounded_up(dimension, chunk);
         const uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
-        const uint64_t length0 = min((c0+1) * chunk, dimension) - c0 * chunk;
-        
         const uint64_t chunkGlobal0Start = c0 * chunk;
-        const uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
+        const uint64_t chunkGlobal0End = min((c0+1) * chunk, dimension);
+        const uint64_t length0 = chunkGlobal0End - chunkGlobal0Start;
         const uint64_t clampedGlobal0Start = max(chunkGlobal0Start, read_offset);
         const uint64_t clampedGlobal0End = min(chunkGlobal0End, read_offset + read_count);
         const uint64_t clampedLocal0Start = clampedGlobal0Start - c0 * chunk;
@@ -590,27 +589,32 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
         linearReadCount = 1;
         linearRead = true;
         for (int64_t i = dimensions_count-1; i >= 0; i--) {
-            //printf("i=%d q=%d d=%d\n", i,q,d);
-            const uint64_t nChunksInThisDimension = divide_rounded_up(decoder->dimensions[i], decoder->chunks[i]);
-            const uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
-            const uint64_t length0 = min((c0+1) * decoder->chunks[i], decoder->dimensions[i]) - c0 * decoder->chunks[i];
+            const uint64_t dimension = decoder->dimensions[i];
+            const uint64_t chunk = decoder->chunks[i];
+            const uint64_t read_offset = decoder->read_offset[i];
+            const uint64_t read_count = decoder->read_count[i];
+            const uint64_t cube_dimension = decoder->cube_dimensions[i];
             
-            const uint64_t chunkGlobal0Start = c0 * decoder->chunks[i];
-            const uint64_t chunkGlobal0End = chunkGlobal0Start + length0;
-            const uint64_t clampedGlobal0Start = max(chunkGlobal0Start, decoder->read_offset[i]);
-            const uint64_t clampedGlobal0End = min(chunkGlobal0End, decoder->read_offset[i] + decoder->read_count[i]);
-            const uint64_t clampedLocal0End = clampedGlobal0End - c0 * decoder->chunks[i];
+            //printf("i=%d q=%d d=%d\n", i,q,d);
+            const uint64_t nChunksInThisDimension = divide_rounded_up(dimension, chunk);
+            const uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
+            const uint64_t chunkGlobal0Start = c0 * chunk;
+            const uint64_t chunkGlobal0End = min((c0+1) * chunk, dimension);
+            const uint64_t length0 = chunkGlobal0End - chunkGlobal0Start;
+            const uint64_t clampedGlobal0Start = max(chunkGlobal0Start, read_offset);
+            const uint64_t clampedGlobal0End = min(chunkGlobal0End, read_offset + read_count);
+            const uint64_t clampedLocal0End = clampedGlobal0End - chunkGlobal0Start;
             const uint64_t lengthRead = clampedGlobal0End - clampedGlobal0Start;
             
             d += rollingMultiplyChunkLength;
             q += rollingMultiplyTargetCube;
             
-            if ((i == dimensions_count - 1) && !(lengthRead == length0 && decoder->read_count[i] == length0 && decoder->cube_dimensions[i] == length0)) {
+            if ((i == dimensions_count - 1) && !(lengthRead == length0 && read_count == length0 && cube_dimension == length0)) {
                 // if fast dimension and only partially read
                 linearReadCount = lengthRead;
                 linearRead = false;
             }
-            if (linearRead && (lengthRead == length0) && (decoder->read_count[i] == length0) && (decoder->cube_dimensions[i] == length0)) {
+            if (linearRead && (lengthRead == length0) && (read_count == length0) && (cube_dimension == length0)) {
                 // dimension is read entirely
                 // and can be copied linearly into the output buffer
                 linearReadCount *= length0;
@@ -629,7 +633,7 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
             q -= lengthRead * rollingMultiplyTargetCube;
             
             rollingMultiply *= nChunksInThisDimension;
-            rollingMultiplyTargetCube *= decoder->cube_dimensions[i];
+            rollingMultiplyTargetCube *= cube_dimension;
             rollingMultiplyChunkLength *= length0;
             //printf("next iter\n");
             if (i == 0) {
