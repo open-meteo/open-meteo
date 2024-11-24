@@ -208,9 +208,20 @@ final class OmFileFormatTests: XCTestCase {
         XCTAssertEqual(readFn.count, 240)
         let bytes = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: readFn.getData(offset: 0, count: readFn.count)), count: readFn.count, deallocator: .none).map{UInt8($0)}
         XCTAssertEqual(bytes[0..<3], [79, 77, 3])
+        XCTAssertEqual(bytes[3..<8], [0, 3, 34, 140, 2]) // chunk
+        XCTAssertEqual(bytes[8..<12], [2, 3, 114, 1]) // chunk
+        XCTAssertEqual(bytes[12..<16], [6, 3, 34, 0]) // chunk
+        XCTAssertEqual(bytes[16..<19], [8, 194, 2]) // chunk
+        XCTAssertEqual(bytes[19..<23], [18, 5, 226, 3]) // chunk
+        XCTAssertEqual(bytes[23..<26], [20, 198, 33]) // chunk
+        XCTAssertEqual(bytes[26..<29], [24, 194, 2]) // chunk
+        XCTAssertEqual(bytes[29..<30], [26]) // chunk
         XCTAssertEqual(bytes[30..<35], [3, 3, 37, 199, 45]) // lut
-        
-        XCTAssertEqual(bytes, [79, 77, 3, 0, 3, 34, 140, 2, 2, 3, 114, 1, 6, 3, 34, 0, 8, 194, 2, 18, 5, 226, 3, 20, 198, 33, 24, 194, 2, 26, 3, 3, 37, 199, 45, 0, 0, 0, 0, 0, 5, 4, 5, 0, 0, 0, 0, 0, 82, 9, 188, 0, 105, 110, 116, 51, 50, 0, 0, 0, 0, 0, 0, 0, 10, 4, 6, 0, 0, 0, 0, 0, 0, 0, 0, 64, 42, 129, 103, 65, 100, 111, 117, 98, 108, 101, 0, 0, 20, 0, 4, 0, 2, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97, 0, 0, 0, 0, 79, 77, 3, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0])
+        XCTAssertEqual(bytes[35..<40], [0, 0, 0, 0, 0]) // zero padding
+        XCTAssertEqual(bytes[40..<40+17], [5, 4, 5, 0, 0, 0, 0, 0, 82, 9, 188, 0, 105, 110, 116, 51, 50]) // scalar int32
+        XCTAssertEqual(bytes[65..<65+22], [4, 6, 0, 0, 0, 0, 0, 0, 0, 0, 64, 42, 129, 103, 65, 100, 111, 117, 98, 108, 101, 0]) // scalar double
+        XCTAssertEqual(bytes[88..<88+124], [20, 0, 4, 0, 2, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97]) // array meta
+        XCTAssertEqual(bytes[216..<240], [79, 77, 3, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0]) // trailer
     }
     
     func testWritev3() throws {
