@@ -160,7 +160,10 @@ uint64_t OmEncoder_compressLut(const OmEncoder_t* encoder, const uint64_t* lookU
     for (uint64_t i = 0; i < nLutChunks; i++) {
         const uint64_t rangeStart = i * encoder->lut_chunk_element_count;
         const uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
-        p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, &out[i * lutChunkLength]);
+        const uint64_t len = p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, &out[i * lutChunkLength]);
+        for (uint64_t j = i * lutChunkLength + len; j < (i+1) * lutChunkLength; j++) {
+            out[j] = 0; // fill remaining space with 0
+        }
     }
     return lutSize;
 }
