@@ -140,12 +140,12 @@ uint64_t OmEncoder_compressedChunkBufferSize(const OmEncoder_t* encoder) {
 
 uint64_t OmEncoder_lutBufferSize(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount) {
     unsigned char buffer[MAX_LUT_ELEMENTS+32] = {0};
-    uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
+    const uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     uint64_t maxLength = 0;
     for (int i = 0; i < nLutChunks; i++) {
-        uint64_t rangeStart = i * encoder->lut_chunk_element_count;
-        uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
-        uint64_t len = p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, buffer);
+        const uint64_t rangeStart = i * encoder->lut_chunk_element_count;
+        const uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
+        const uint64_t len = p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, buffer);
         if (len > maxLength) maxLength = len;
     }
     /// Compression function can write 32 integers more
@@ -153,22 +153,24 @@ uint64_t OmEncoder_lutBufferSize(const OmEncoder_t* encoder, const uint64_t* loo
 }
 
 uint64_t OmEncoder_compressLut(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t compressed_lut_buffer_size) {
-    uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
-    uint64_t lutSize = compressed_lut_buffer_size - 32 * sizeof(uint64_t);
-    uint64_t lutChunkLength = lutSize / nLutChunks;
+    const uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
+    const uint64_t lutSize = compressed_lut_buffer_size - 32 * sizeof(uint64_t);
+    const uint64_t lutChunkLength = lutSize / nLutChunks;
 
     for (uint64_t i = 0; i < nLutChunks; i++) {
-        uint64_t rangeStart = i * encoder->lut_chunk_element_count;
-        uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
+        const uint64_t rangeStart = i * encoder->lut_chunk_element_count;
+        const uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
         p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, &out[i * lutChunkLength]);
     }
     return lutSize;
 }
 
 uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
+    
+    const uint64_t dimension_count = encoder->dimension_count;
     /// The total size of `arrayDimensions`. Only used to check for out of bound reads
     uint64_t arrayTotalCount = 1;
-    for (uint64_t i = 0; i < encoder->dimension_count; i++) {
+    for (uint64_t i = 0; i < dimension_count; i++) {
         arrayTotalCount *= arrayDimensions[i];
     }
     
@@ -181,13 +183,16 @@ uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, 
     bool linearRead = true;
     uint64_t lengthLast = 0;
 
-    for (int64_t i = encoder->dimension_count - 1; i >= 0; i--) {
-        uint64_t nChunksInThisDimension = divide_rounded_up(encoder->dimensions[i], encoder->chunks[i]);
-        uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
-        uint64_t c0Offset = (chunkIndexOffsetInThisArray / rollingMultiply) % nChunksInThisDimension;
-        uint64_t length0 = min((c0 + 1) * encoder->chunks[i], encoder->dimensions[i]) - c0 * encoder->chunks[i];
+    for (int64_t i = dimension_count - 1; i >= 0; i--) {
+        const uint64_t dimension = encoder->dimensions[i];
+        const uint64_t chunk = encoder->chunks[i];
+        
+        const uint64_t nChunksInThisDimension = divide_rounded_up(dimension, chunk);
+        const uint64_t c0 = (chunkIndex / rollingMultiply) % nChunksInThisDimension;
+        const uint64_t c0Offset = (chunkIndexOffsetInThisArray / rollingMultiply) % nChunksInThisDimension;
+        const uint64_t length0 = min((c0 + 1) * chunk, dimension) - c0 * chunk;
 
-        if (i == encoder->dimension_count - 1) {
+        if (i == dimension_count - 1) {
             lengthLast = length0;
         }
 
@@ -195,7 +200,7 @@ uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, 
         assert(length0 <= arrayCount[i]);
         assert(length0 <= arrayDimensions[i]);
 
-        if (i == encoder->dimension_count - 1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0)) {
+        if (i == dimension_count - 1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0)) {
             linearReadCount = length0;
             linearRead = false;
         }
@@ -210,7 +215,7 @@ uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, 
         rollingMultiplyChunkLength *= length0;
     }
 
-    uint64_t lengthInChunk = rollingMultiplyChunkLength;
+    const uint64_t lengthInChunk = rollingMultiplyChunkLength;
 
     while (true) {
         assert(readCoordinate + linearReadCount <= arrayTotalCount);
@@ -225,12 +230,14 @@ uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, 
         linearRead = true;
         linearReadCount = 1;
 
-        for (int64_t i = encoder->dimension_count - 1; i >= 0; i--) {
-            uint64_t qPos = ((readCoordinate / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / encoder->chunks[i];
-            uint64_t length0 = min((qPos + 1) * encoder->chunks[i], arrayCount[i]) - qPos * encoder->chunks[i];
+        for (int64_t i = dimension_count - 1; i >= 0; i--) {
+            const uint64_t chunk = encoder->chunks[i];
+            
+            const uint64_t qPos = ((readCoordinate / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) / chunk;
+            const uint64_t length0 = min((qPos + 1) * chunk, arrayCount[i]) - qPos * chunk;
             readCoordinate += rollingMultiplyTargetCube;
 
-            if (i == encoder->dimension_count - 1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0)) {
+            if (i == dimension_count - 1 && !(arrayCount[i] == length0 && arrayDimensions[i] == length0)) {
                 linearReadCount = length0;
                 linearRead = false;
             }
@@ -239,7 +246,7 @@ uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, 
             } else {
                 linearRead = false;
             }
-            uint64_t q0 = ((readCoordinate / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % encoder->chunks[i];
+            const uint64_t q0 = ((readCoordinate / rollingMultiplyTargetCube) % arrayDimensions[i] - arrayOffset[i]) % encoder->chunks[i];
             if (q0 != 0 && q0 != length0) {
                 break;
             }
