@@ -173,14 +173,15 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
     /// `arrayDimensions` specify the total dimensions of the input array
     /// `arrayRead` specify which parts of this array should be read
     /// It is important that this function can write data out to a FileHandle to empty the buffer. Otherwise the buffer could grow to multiple gigabytes
-    public func writeData(array: [OmType], arrayDimensions: [UInt64], arrayRead: [Range<UInt64>]) throws {
+    public func writeData(array: [OmType], arrayDimensions: [UInt64]? = nil, arrayOffset: [UInt64]? = nil, arrayCount: [UInt64]? = nil) throws {
+        let arrayDimensions = arrayDimensions ?? self.dimensions
+        let arrayCount = arrayCount ?? arrayDimensions
+        let arrayOffset = arrayOffset ?? [UInt64](repeating: 0, count: arrayDimensions.count)
+        
         assert(array.count == arrayDimensions.reduce(1, *))
         assert(arrayDimensions.allSatisfy({$0 >= 0}))
-        assert(arrayRead.allSatisfy({$0.lowerBound >= 0}))
-        assert(zip(arrayDimensions, arrayRead).allSatisfy { $1.upperBound <= $0 })
-        
-        let arrayOffset = arrayRead.map({$0.lowerBound})
-        let arrayCount = arrayRead.map({UInt64($0.count)})
+        assert(arrayOffset.allSatisfy({$0 >= 0}))
+        assert(zip(arrayDimensions, zip(arrayOffset, arrayCount)).allSatisfy { $1.0 + $1.1 <= $0 })
         
         /// For performance the output buffer should be able to hold a multiple of the chunk buffer size
         try buffer.reallocate(minimumCapacity: Int(compressedChunkBufferSize) * 4)

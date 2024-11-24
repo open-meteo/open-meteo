@@ -18,16 +18,13 @@
 
 /// =========== Structures describing the data layout ===============
 
-
-
-
 typedef struct {
     uint8_t data_type; // OmDataType_t
     uint8_t compression_type; // OmCompression_t
     uint16_t length_of_name; // maximum 65k name strings
     uint32_t number_of_children;
 
-    // Followed by payload: NOTE: Lets to try 64 bit align it somehow
+    // Followed by payload
     //uint32_t[number_of_children] children_length;
     //uint32_t[number_of_children] children_offset;
 

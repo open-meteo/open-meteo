@@ -74,7 +74,7 @@ final class OmFileFormatTests: XCTestCase {
         let writer = try fileWriter.prepareArray(type: Float.self, dimensions: [100,100,10], chunkDimensions: [2,2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
         
         let data = (0..<100000).map({Float($0 % 10000)})
-        try writer.writeData(array: data, arrayDimensions: [100,100,10], arrayRead: [0..<100, 0..<100, 0..<10])
+        try writer.writeData(array: data)
         let variableMeta = try writer.finalise()
         let variable = try fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
@@ -103,15 +103,15 @@ final class OmFileFormatTests: XCTestCase {
         let writer = try fileWriter.prepareArray(type: Float.self, dimensions: [5,5], chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
         
         // Directly feed individual chunks
-        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
-        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
-        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1])
-        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
-        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2], arrayRead: [0..<2, 0..<2])
-        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [2,1], arrayRead: [0..<2, 0..<1])
-        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2])
-        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2], arrayRead: [0..<1, 0..<2])
-        try writer.writeData(array: [24.0], arrayDimensions: [1,1], arrayRead: [0..<1, 0..<1])
+        try writer.writeData(array: [0.0, 1.0, 5.0, 6.0], arrayDimensions: [2,2])
+        try writer.writeData(array: [2.0, 3.0, 7.0, 8.0], arrayDimensions: [2,2])
+        try writer.writeData(array: [4.0, 9.0], arrayDimensions: [2,1])
+        try writer.writeData(array: [10.0, 11.0, 15.0, 16.0], arrayDimensions: [2,2])
+        try writer.writeData(array: [12.0, 13.0, 17.0, 18.0], arrayDimensions: [2,2])
+        try writer.writeData(array: [14.0, 19.0], arrayDimensions: [2,1])
+        try writer.writeData(array: [20.0, 21.0], arrayDimensions: [1,2])
+        try writer.writeData(array: [22.0, 23.0], arrayDimensions: [1,2])
+        try writer.writeData(array: [24.0], arrayDimensions: [1,1])
         let variableMeta = try writer.finalise()
         let variable = try fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
@@ -138,7 +138,7 @@ final class OmFileFormatTests: XCTestCase {
         
         /// Deliberately add NaN on all positions that should not be written to the file. Only the inner 5x5 array is written
         let data = [.nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan, Float(0.0), 1.0, 2.0, 3.0, 4.0, .nan, .nan, 5.0, 6.0, 7.0, 8.0, 9.0, .nan, .nan, 10.0, 11.0, 12.0, 13.0, 14.0, .nan, .nan, 15.0, 16.0, 17.0, 18.0, 19.0, .nan, .nan, 20.0, 21.0, 22.0, 23.0, 24.0, .nan, .nan, .nan, .nan, .nan, .nan, .nan, .nan]
-        try writer.writeData(array: data, arrayDimensions: [7,7], arrayRead: [1..<6, 1..<6])
+        try writer.writeData(array: data, arrayDimensions: [7,7], arrayOffset: [1, 1], arrayCount: [5, 5])
         
         let variableMeta = try writer.finalise()
         let variable = try fileWriter.write(array: variableMeta, name: "data", children: [])
@@ -171,7 +171,7 @@ final class OmFileFormatTests: XCTestCase {
         let fileWriter = OmFileWriter2(fn: fn, initialCapacity: 8)
         
         let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
-        try writer.writeData(array: data, arrayDimensions: [3,3,3], arrayRead: [0..<3, 0..<3, 0..<3])
+        try writer.writeData(array: data)
         let variableMeta = try writer.finalise()
         
         let int32Attribute = try fileWriter.write(value: Int32(12323154), name: "int32", children: [])
@@ -221,7 +221,7 @@ final class OmFileFormatTests: XCTestCase {
         let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5])
+        try writer.writeData(array: data)
         let variableMeta = try writer.finalise()
         let variable = try fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
@@ -312,7 +312,7 @@ final class OmFileFormatTests: XCTestCase {
         let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
-        try writer.writeData(array: data, arrayDimensions: [5,5], arrayRead: [0..<5, 0..<5])
+        try writer.writeData(array: data)
         let variableMeta = try writer.finalise()
         let variable = try fileWriter.write(array: variableMeta, name: "data", children: [])
         try fileWriter.writeTrailer(rootVariable: variable)
