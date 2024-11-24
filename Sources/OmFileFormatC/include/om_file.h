@@ -39,6 +39,7 @@ typedef struct {
     uint8_t magic_number2;
     uint8_t version;
     uint8_t reserved;
+    uint32_t reserved2;
     OmOffsetSize_t root; // 2x 64 bit
 } OmTrailer_t;
 

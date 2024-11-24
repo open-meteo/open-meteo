@@ -78,6 +78,8 @@ public final class OmBufferedWriter<FileHandle: OmFileWriterBackend> {
         let readableBytes = UnsafeRawBufferPointer(start: buffer.baseAddress, count: writePosition)
         try backend.write(contentsOf: readableBytes)
         resetWritePosition()
+        // zero fill buffer
+        bufferAtWritePosition.initializeMemory(as: UInt8.self, repeating: 0, count: readableBytes.count)
     }
     
     deinit {
