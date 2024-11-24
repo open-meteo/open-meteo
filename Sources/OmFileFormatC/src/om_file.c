@@ -60,5 +60,6 @@ void om_write_trailer(void* dest, const OmOffsetSize_t root) {
     meta->magic_number1 = 'O';
     meta->magic_number2 = 'M';
     meta->version = 3;
+    meta->reserved = 0;
     meta->root = root;
 }
