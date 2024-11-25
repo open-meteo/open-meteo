@@ -4,6 +4,37 @@ import XCTest
 @_implementationOnly import OmFileFormatC
 
 final class OmFileFormatTests: XCTestCase {
+    func testHeaderAndTrailer() {
+        XCTAssertEqual(om_header_size(), 40)
+        XCTAssertEqual(om_trailer_size(), 24)
+        XCTAssertEqual(om_header_write_size(), 3)
+        
+        XCTAssertEqual(om_header_type([UInt8(79), 77, 3]), OM_HEADER_TRAILER)
+        XCTAssertEqual(om_header_type([UInt8(79), 77, 1]), OM_HEADER_LEGACY)
+        XCTAssertEqual(om_header_type([UInt8(79), 77, 2]), OM_HEADER_LEGACY)
+        XCTAssertEqual(om_header_type([UInt8(77), 77, 3]), OM_HEADER_INVALID)
+        
+        let position = om_trailer_read([UInt8(79), 77, 3, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0])
+        XCTAssertEqual(position.size, 124)
+        XCTAssertEqual(position.offset, 88)
+        
+        let position2 = om_trailer_read([UInt8(77), 77, 3, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0])
+        XCTAssertEqual(position2.size, 0)
+        XCTAssertEqual(position2.offset, 0)
+        
+        var header = [UInt8](repeating: 255, count: om_header_write_size())
+        om_header_write(&header)
+        XCTAssertEqual(om_header_type(header), OM_HEADER_TRAILER)
+        XCTAssertEqual(header, [79, 77, 3])
+        
+        var trailer = [UInt8](repeating: 255, count: om_trailer_size())
+        om_trailer_write(&trailer, .init(offset: 634764573452346, size: 45673452346))
+        let position3 = om_trailer_read(trailer)
+        XCTAssertEqual(position3.size, 45673452346)
+        XCTAssertEqual(position3.offset, 634764573452346)
+        XCTAssertEqual(trailer, [79, 77, 3, 0, 0, 0, 0, 0, 58, 168, 234, 164, 80, 65, 2, 0, 58, 147, 89, 162, 10, 0, 0, 0])
+    }
+    
     func testInMemory() throws {
         let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)

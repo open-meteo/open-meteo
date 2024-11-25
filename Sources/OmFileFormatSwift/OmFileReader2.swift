@@ -26,7 +26,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         self.lutChunkElementCount = lutChunkElementCount
         self.fn = fn
         
-        let headerSize = om_read_header_size()
+        let headerSize = om_header_size()
         let headerData = fn.getData(offset: 0, count: headerSize)
         
         switch om_header_type(headerData) {
@@ -34,15 +34,15 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
             self.variable = om_variable_init(headerData)
         case OM_HEADER_TRAILER:
             let fileSize = fn.count
-            let trailerSize = om_read_trailer_size()
+            let trailerSize = om_trailer_size()
             let trailerData = fn.getData(offset: fileSize - trailerSize, count: trailerSize)
-            var root = OmOffsetSize_t(offset: 0, size: 0)
-            guard om_read_trailer(trailerData, &root) == ERROR_OK else {
+            let position = om_trailer_read(trailerData)
+            guard position.size > 0 else {
                 fatalError("Not an OM file")
             }
             /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
-            let dataRoot = fn.getData(offset: Int(root.offset), count: Int(root.size))
-            self.variable = om_variable_init(dataRoot)
+            let dataVariable = fn.getData(offset: Int(position.offset), count: Int(position.size))
+            self.variable = om_variable_init(dataVariable)
         case OM_HEADER_INVALID:
             fallthrough
         default:

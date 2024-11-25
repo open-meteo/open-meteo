@@ -30,9 +30,9 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
             return
         }
         /// Write header
-        let size = om_write_header_size()
+        let size = om_header_write_size()
         try buffer.reallocate(minimumCapacity: size)
-        om_write_header(buffer.bufferAtWritePosition)
+        om_header_write(buffer.bufferAtWritePosition)
         buffer.incrementWritePosition(by: size)
     }
     
@@ -90,9 +90,9 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         try buffer.alignTo64Bytes()
         
         // write length of JSON
-        let size = om_write_trailer_size()
+        let size = om_trailer_size()
         try buffer.reallocate(minimumCapacity: size)
-        om_write_trailer(buffer.bufferAtWritePosition, rootVariable.cOffsetSize)
+        om_trailer_write(buffer.bufferAtWritePosition, rootVariable.cOffsetSize)
         buffer.incrementWritePosition(by: size)
         
         // Flush

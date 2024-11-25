@@ -45,38 +45,31 @@ typedef struct {
     uint8_t magic_number2;
     uint8_t version;
     uint8_t reserved;
-    uint32_t reserved2;
+    uint32_t reserved2; // can later be used for a 32 bit hash. E.g. xxhash
     OmOffsetSize_t root; // 2x 64 bit
 } OmTrailer_t;
 
 
 
-
 /// Return the size in byte of the header that should be read. Always 40 byte to support legacy 2D files.
-size_t om_read_header_size();
+size_t om_header_size();
+
 /// Size in bytes of the trailer that contains the root variable offset in newer files
-size_t om_read_trailer_size();
+size_t om_trailer_size();
+
+/// The size of a OM header for newer files. Always 3 bytes.
+size_t om_header_write_size();
 
 /// Check if the header is a OM file header and return if its a legacy version or a new version file
 OmHeaderType_t om_header_type(const void* src);
 
-/// Read the trailer of an OM file to get the root variable. Error if not an OM file.
-OmError_t om_read_trailer(const void* src, OmOffsetSize_t* root);
-
-
-
-
-
-/// The size of a OM header for newer files. Always 3 bytes.
-size_t om_write_header_size();
-
-/// The size of the trailer for newer files
-size_t om_write_trailer_size();
+/// Read the trailer of an OM file to get the root variable. Size is set to 0 if this is not an OM file.
+OmOffsetSize_t om_trailer_read(const void* src);
 
 /// Write an header for newer OM files
-void om_write_header(void* dest);
+void om_header_write(void* dest);
 
 /// Write an trailer for newer OM files including the root variable
-void om_write_trailer(void* dest, const OmOffsetSize_t root);
+void om_trailer_write(void* dest, const OmOffsetSize_t root);
 
 #endif // OM_FILE_H
