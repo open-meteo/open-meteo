@@ -14,19 +14,12 @@ size_t om_read_trailer_size() {
     return sizeof(OmTrailer_t);
 }
 
-OmError_t om_read_header(const void* src, OmOffsetSize_t* root) {
+OmHeaderType_t om_header_type(const void* src) {
     const OmHeaderV3_t* meta = (const OmHeaderV3_t*)src;
-    if (meta->magic_number1 != 'O' || meta->magic_number2 != 'M' || meta->version > 3) {
-        return ERROR_NOT_AN_OM_FILE;
+    if (meta->magic_number1 != 'O' || meta->magic_number2 != 'M' || meta->version > 3 || meta->version <= 0) {
+        return OM_HEADER_INVALID;
     }
-    if (meta->version == 3) {
-        root->size = 0;
-        root->offset = 0;
-    } else {
-        root->size = sizeof(OmHeaderV1_t);
-        root->offset = 0;
-    }
-    return ERROR_OK;
+    return meta->version == 3 ? OM_HEADER_TRAILER : OM_HEADER_LEGACY;
 }
 
 OmError_t om_read_trailer(const void* src, OmOffsetSize_t* root) {

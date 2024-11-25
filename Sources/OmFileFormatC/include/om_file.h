@@ -11,6 +11,12 @@
 
 #include "om_common.h"
 
+typedef enum {
+    OM_HEADER_INVALID = 0,
+    OM_HEADER_LEGACY = 1,
+    OM_HEADER_TRAILER = 2,
+} OmHeaderType_t;
+
 /// Legacy files only contain one 2D array with attributes in the header
 /// File content: Header, look-up-table, compressed data
 typedef struct {
@@ -51,10 +57,9 @@ size_t om_read_header_size();
 /// Size in bytes of the trailer that contains the root variable offset in newer files
 size_t om_read_trailer_size();
 
-/// read header of a file. Older files return root start and end directly, new files require to read trailer. For newer files, root is set to 0.
-/// Data should be read afterwards from offset by size. This data is a pointer to `OmVariable_t`.
-/// Error if not an OM file
-OmError_t om_read_header(const void* src, OmOffsetSize_t* root);
+/// Check if the header is a OM file header and return if its a legacy version or a new version file
+OmHeaderType_t om_header_type(const void* src);
+
 /// Read the trailer of an OM file to get the root variable. Error if not an OM file.
 OmError_t om_read_trailer(const void* src, OmOffsetSize_t* root);
 

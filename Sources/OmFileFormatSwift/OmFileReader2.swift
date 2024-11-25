@@ -27,23 +27,27 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         self.fn = fn
         
         let headerSize = om_read_header_size()
-        var root = OmOffsetSize_t(offset: 0, size: 0)
-        let dataHead = fn.getData(offset: 0, count: headerSize)
-        guard om_read_header(dataHead, &root) == ERROR_OK else {
-            fatalError("Not an OM file")
-        }
-        if root.offset == 0 && root.size == 0 {
-            // version 3 file, read trailer
+        let headerData = fn.getData(offset: 0, count: headerSize)
+        
+        switch om_header_type(headerData) {
+        case OM_HEADER_LEGACY:
+            self.variable = om_variable_init(headerData)
+        case OM_HEADER_TRAILER:
             let fileSize = fn.count
             let trailerSize = om_read_trailer_size()
-            let dataTrailer = fn.getData(offset: fileSize - trailerSize, count: trailerSize)
-            guard om_read_trailer(dataTrailer, &root) == ERROR_OK else {
+            let trailerData = fn.getData(offset: fileSize - trailerSize, count: trailerSize)
+            var root = OmOffsetSize_t(offset: 0, size: 0)
+            guard om_read_trailer(trailerData, &root) == ERROR_OK else {
                 fatalError("Not an OM file")
             }
+            /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
+            let dataRoot = fn.getData(offset: Int(root.offset), count: Int(root.size))
+            self.variable = om_variable_init(dataRoot)
+        case OM_HEADER_INVALID:
+            fallthrough
+        default:
+            fatalError("Not an OM file")
         }
-        /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
-        let dataRoot = fn.getData(offset: Int(root.offset), count: Int(root.size))
-        self.variable = om_variable_init(dataRoot)
     }
     
     init(fn: Backend, variable: UnsafePointer<OmVariable_t?>?, lutChunkElementCount: UInt64) {
