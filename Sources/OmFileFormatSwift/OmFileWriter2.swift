@@ -6,16 +6,8 @@
 //
 
 import Foundation
-@_implementationOnly import OmFileFormatC
+import OmFileFormatC
 
-public struct OffsetSize {
-    let offset: UInt64
-    let size: UInt64
-    
-    var cOffsetSize: OmOffsetSize_t {
-        return OmOffsetSize_t(offset: offset, size: size)
-    }
-}
 
 /// Writes om file header and trailer
 public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
@@ -36,7 +28,7 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         buffer.incrementWritePosition(by: size)
     }
     
-    public func write<OmType: OmFileScalarDataTypeProtocol>(value: OmType, name: String, children: [OffsetSize]) throws -> OffsetSize {
+    public func write<OmType: OmFileScalarDataTypeProtocol>(value: OmType, name: String, children: [OmOffsetSize_t]) throws -> OmOffsetSize_t {
         try writeHeaderIfRequired()
         var name = name
         return try name.withUTF8{ name in
@@ -46,15 +38,12 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
             let size = om_variable_write_scalar_size(UInt16(name.count), UInt32(children.count), type)
             try buffer.alignTo64Bytes()
             try buffer.reallocate(minimumCapacity: Int(size))
-            let childrenSize = children.map{$0.size}
-            let childrenOffset = children.map{$0.offset}
             var value = value
-            withUnsafePointer(to: &value, { value in
-                om_variable_write_scalar(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenSize, childrenOffset, name.baseAddress, type, value)
+            let variable = withUnsafePointer(to: &value, { value in
+                return om_variable_write_scalar(buffer.bufferAtWritePosition, UInt64(buffer.totalBytesWritten), UInt16(name.count), UInt32(children.count), children, name.baseAddress, type, value)
             })
-            let offset = buffer.totalBytesWritten
             buffer.incrementWritePosition(by: size)
-            return OffsetSize(offset: UInt64(offset), size: UInt64(size))
+            return variable
         }
     }
     
@@ -63,7 +52,7 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         return .init(dimensions: dimensions, chunkDimensions: chunkDimensions, compression: compression, scale_factor: scale_factor, add_offset: add_offset, buffer: buffer,  lutChunkElementCount: lutChunkElementCount)
     }
     
-    public func write(array: OmFileWriterArrayFinalisd, name: String, children: [OffsetSize]) throws -> OffsetSize {
+    public func write(array: OmFileWriterArrayFinalisd, name: String, children: [OmOffsetSize_t]) throws -> OmOffsetSize_t {
         try writeHeaderIfRequired()
         guard array.dimensions.count == array.chunks.count else {
             fatalError()
@@ -74,25 +63,20 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
             let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(array.dimensions.count))
             try buffer.alignTo64Bytes()
             try buffer.reallocate(minimumCapacity: Int(size))
-            let childrenSize = children.map{$0.size}
-            let childrenOffset = children.map{$0.offset}
-            let dimensions = array.dimensions.map{UInt64($0)}
-            let chunks = array.chunks.map{UInt64($0)}
-            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenSize, childrenOffset, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(dimensions.count), dimensions, chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
-            let offset = buffer.totalBytesWritten
+            let variable = om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt64(buffer.totalBytesWritten), UInt16(name.count), UInt32(children.count), children, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(array.dimensions.count), array.dimensions, array.chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
             buffer.incrementWritePosition(by: size)
-            return OffsetSize(offset: UInt64(offset), size: UInt64(size))
+            return variable
         }
     }
     
-    public func writeTrailer(rootVariable: OffsetSize) throws {
+    public func writeTrailer(rootVariable: OmOffsetSize_t) throws {
         try writeHeaderIfRequired()
         try buffer.alignTo64Bytes()
         
         // write length of JSON
         let size = om_trailer_size()
         try buffer.reallocate(minimumCapacity: size)
-        om_trailer_write(buffer.bufferAtWritePosition, rootVariable.cOffsetSize)
+        om_trailer_write(buffer.bufferAtWritePosition, rootVariable)
         buffer.incrementWritePosition(by: size)
         
         // Flush

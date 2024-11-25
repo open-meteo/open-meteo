@@ -24,7 +24,7 @@ OmHeaderType_t om_header_type(const void* src) {
     if (meta->magic_number1 != 'O' || meta->magic_number2 != 'M' || meta->version > 3 || meta->version <= 0) {
         return OM_HEADER_INVALID;
     }
-    return meta->version == 3 ? OM_HEADER_TRAILER : OM_HEADER_LEGACY;
+    return meta->version == 3 ? OM_HEADER_READ_TRAILER : OM_HEADER_LEGACY;
 }
 
 OmOffsetSize_t om_trailer_read(const void* src) {

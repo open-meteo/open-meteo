@@ -14,7 +14,7 @@
 typedef enum {
     OM_HEADER_INVALID = 0,
     OM_HEADER_LEGACY = 1,
-    OM_HEADER_TRAILER = 2,
+    OM_HEADER_READ_TRAILER = 2,
 } OmHeaderType_t;
 
 /// Legacy files only contain one 2D array with attributes in the header

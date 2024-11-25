@@ -6,7 +6,7 @@
 //
 
 import Foundation
-@_implementationOnly import OmFileFormatC
+import OmFileFormatC
 
 /// High level implementation to read an OpenMeteo file
 /// Decodes meta data which may include JSON
@@ -32,7 +32,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         switch om_header_type(headerData) {
         case OM_HEADER_LEGACY:
             self.variable = om_variable_init(headerData)
-        case OM_HEADER_TRAILER:
+        case OM_HEADER_READ_TRAILER:
             let fileSize = fn.count
             let trailerSize = om_trailer_size()
             let trailerData = fn.getData(offset: fileSize - trailerSize, count: trailerSize)

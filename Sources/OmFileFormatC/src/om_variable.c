@@ -169,9 +169,8 @@ OmOffsetSize_t om_variable_get_child(const OmVariable_t* variable, int nChild) {
     }
     const OmVariableV3_t* meta = (const OmVariableV3_t*)variable;
     if (nChild < meta->number_of_children) {
-        const uint64_t* sizes = (const uint64_t*)((void *)variable + sizeof_variable);
-        const uint64_t* offsets = (const uint64_t*)((void *)variable + sizeof_variable + 8 * meta->number_of_children);
-        return (OmOffsetSize_t){.offset = offsets[nChild], .size = sizes[nChild]};
+        const OmOffsetSize_t* chilrden = (const OmOffsetSize_t*)((void *)variable + sizeof_variable);
+        return chilrden[nChild];
     }
     
     return (OmOffsetSize_t){.offset = 0, .size = 0};
@@ -232,7 +231,7 @@ size_t om_variable_write_scalar_size(uint16_t length_of_name, uint32_t number_of
     }
 }
 
-void om_variable_write_scalar(void* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, const void* value) {
+OmOffsetSize_t om_variable_write_scalar(void* dst, uint64_t offset, uint16_t length_of_name, uint32_t number_of_children, const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, const void* value) {
     OmVariableV3_t* meta = (OmVariableV3_t*)dst;
     meta->data_type = (uint8_t)data_type;
     meta->compression_type = COMPRESSION_NONE;
@@ -240,55 +239,59 @@ void om_variable_write_scalar(void* dst, uint16_t length_of_name, uint32_t numbe
     meta->number_of_children = number_of_children;
     
     /// Set childen
-    uint64_t* baseChildSize = (uint64_t*)((char *)dst + SIZE_VARIABLEV3);
-    uint64_t* baseChildOffset = (uint64_t*)((char *)dst + SIZE_VARIABLEV3 + 8 * number_of_children);
+    OmOffsetSize_t* childrenDest = (OmOffsetSize_t*)((char *)dst + SIZE_VARIABLEV3);
     for (uint32_t i = 0; i<number_of_children; i++) {
-        baseChildSize[i] = children_length[i];
-        baseChildOffset[i] = children_offset[i];
+        childrenDest[i] = children[i];
     }
     
     /// Set value
-    char* base = (char*)(dst + SIZE_VARIABLEV3 + 16 * number_of_children);
+    char* destValue = (char*)(dst + SIZE_VARIABLEV3 + 16 * number_of_children);
+    uint8_t valueSize = 0;
     switch (data_type) {
         case DATA_TYPE_INT8:
         case DATA_TYPE_UINT8:
-            *(int8_t *)base = *(int8_t*)value;
-            base += 1;
+            *(int8_t *)destValue = *(int8_t*)value;
+            valueSize = 1;
             break;
         case DATA_TYPE_INT16:
         case DATA_TYPE_UINT16:
-            *(int16_t *)base = *(int16_t*)value;
-            base += 2;
+            *(int16_t *)destValue = *(int16_t*)value;
+            valueSize = 2;
             break;
         case DATA_TYPE_INT32:
         case DATA_TYPE_UINT32:
         case DATA_TYPE_FLOAT: {
             int32_t v = *(int32_t*)value;
-            *(int32_t *)base = v;
-            base += 4;
+            *(int32_t *)destValue = v;
+            valueSize = 4;
             break;
         }
         case DATA_TYPE_INT64:
         case DATA_TYPE_UINT64:
         case DATA_TYPE_DOUBLE:
-            *(int64_t *)base = *(int64_t*)value;
-            base += 8;
+            *(int64_t *)destValue = *(int64_t*)value;
+            valueSize = 8;
             break;
         default:
             break;
     }
     
     /// Set name
+    char* destName = (char*)(destValue + valueSize);
     for (uint16_t i = 0; i<length_of_name; i++) {
-        base[i] = name[i];
+        destName[i] = name[i];
     }
+    return (OmOffsetSize_t){
+        .size = SIZE_VARIABLEV3 + 16 * number_of_children + valueSize + length_of_name,
+        .offset = offset
+    };
 }
 
 size_t om_variable_write_numeric_array_size(uint16_t length_of_name, uint32_t number_of_children, uint64_t dimension_count) {
     return sizeof(OmVariableArrayV3_t) + length_of_name + number_of_children * 16 + dimension_count * 16;
 }
 
-void om_variable_write_numeric_array(void* dst, uint16_t length_of_name, uint32_t number_of_children, const uint64_t* children_length, const uint64_t* children_offset, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset) {
+OmOffsetSize_t om_variable_write_numeric_array(void* dst, uint64_t offset, uint16_t length_of_name, uint32_t number_of_children,  const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset) {
     
     OmVariableArrayV3_t* meta = (OmVariableArrayV3_t*)dst;
     meta->data_type = (uint8_t)data_type;
@@ -302,11 +305,9 @@ void om_variable_write_numeric_array(void* dst, uint16_t length_of_name, uint32_
     meta->lut_offset = lut_offset;
     
     /// Set childen
-    uint64_t* baseChildSize = (uint64_t*)(dst + sizeof(OmVariableArrayV3_t));
-    uint64_t* baseChildOffset = (uint64_t*)(dst + sizeof(OmVariableArrayV3_t) + 8 * number_of_children);
+    OmOffsetSize_t* childrenDest = (OmOffsetSize_t*)((char *)dst + sizeof(OmVariableArrayV3_t));
     for (uint32_t i = 0; i<number_of_children; i++) {
-        baseChildSize[i] = children_length[i];
-        baseChildOffset[i] = children_offset[i];
+        childrenDest[i] = children[i];
     }
     
     /// Set dimensions
@@ -321,5 +322,9 @@ void om_variable_write_numeric_array(void* dst, uint16_t length_of_name, uint32_
     for (uint16_t i = 0; i<length_of_name; i++) {
         baseName[i] = name[i];
     }
+    return (OmOffsetSize_t){
+        .size = sizeof(OmVariableArrayV3_t) + length_of_name + number_of_children * 16 + dimension_count * 16,
+        .offset = offset
+    };
 }
 
