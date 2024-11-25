@@ -297,7 +297,7 @@ size_t om_variable_write_numeric_array_size(uint16_t length_of_name, uint32_t nu
     return sizeof(OmVariableArrayV3_t) + length_of_name + number_of_children * 16 + dimension_count * 16;
 }
 
-OmOffsetSize_t om_variable_write_numeric_array(void* dst, uint64_t offset, uint16_t length_of_name, uint32_t number_of_children,  const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset) {
+OmOffsetSize_t om_variable_write_numeric_array(void* dst, uint64_t offset, uint16_t length_of_name, uint32_t number_of_children, const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset) {
     
     *(OmVariableArrayV3_t*)dst = (OmVariableArrayV3_t){
         .data_type = (uint8_t)data_type,

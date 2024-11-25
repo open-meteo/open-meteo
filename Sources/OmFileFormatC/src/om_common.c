@@ -11,7 +11,7 @@
 #include "vp4.h"
 #include "fp.h"
 
-const char* OmError_string(OmError_t error) {
+const char* om_error_string(OmError_t error) {
     switch (error) {
         case ERROR_OK:
             return "No error occured";

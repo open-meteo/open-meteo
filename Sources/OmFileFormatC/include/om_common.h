@@ -32,7 +32,7 @@ typedef enum {
     ERROR_NOT_AN_OM_FILE = 5
 } OmError_t;
 
-const char* OmError_string(OmError_t error);
+const char* om_error_string(OmError_t error);
 
 /// Data types
 typedef enum {

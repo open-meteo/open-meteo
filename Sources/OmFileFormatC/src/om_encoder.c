@@ -13,7 +13,7 @@
 #include "delta2d.h"
 
 
-OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) {
+OmError_t om_encoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) {
     encoder->scale_factor = scale_factor;
     encoder->add_offset = add_offset;
     encoder->dimensions = dimensions;
@@ -105,7 +105,7 @@ OmError_t OmEncoder_init(OmEncoder_t* encoder, float scale_factor, float add_off
     return ERROR_OK;
 }
 
-uint64_t OmEncoder_countChunks(const OmEncoder_t* encoder) {
+uint64_t om_encoder_count_chunks(const OmEncoder_t* encoder) {
     uint64_t n = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         n *= divide_rounded_up(encoder->dimensions[i], encoder->chunks[i]);
@@ -113,7 +113,7 @@ uint64_t OmEncoder_countChunks(const OmEncoder_t* encoder) {
     return n;
 }
 
-uint64_t OmEncoder_countChunksInArray(const OmEncoder_t* encoder, const uint64_t* array_count) {
+uint64_t om_encoder_count_chunks_in_array(const OmEncoder_t* encoder, const uint64_t* array_count) {
     uint64_t numberOfChunksInArray = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         numberOfChunksInArray *= divide_rounded_up(array_count[i], encoder->chunks[i]);
@@ -121,7 +121,7 @@ uint64_t OmEncoder_countChunksInArray(const OmEncoder_t* encoder, const uint64_t
     return numberOfChunksInArray;
 }
 
-uint64_t OmEncoder_chunkBufferSize(const OmEncoder_t* encoder) {
+uint64_t om_encoder_chunk_buffer_size(const OmEncoder_t* encoder) {
     uint64_t chunkLength = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         chunkLength *= encoder->chunks[i];
@@ -129,7 +129,7 @@ uint64_t OmEncoder_chunkBufferSize(const OmEncoder_t* encoder) {
     return chunkLength * encoder->bytes_per_element_compressed;
 }
 
-uint64_t OmEncoder_compressedChunkBufferSize(const OmEncoder_t* encoder) {
+uint64_t om_encoder_compressed_chunk_buffer_size(const OmEncoder_t* encoder) {
     uint64_t chunkLength = 1;
     for (int i = 0; i < encoder->dimension_count; i++) {
         chunkLength *= encoder->chunks[i];
@@ -138,7 +138,7 @@ uint64_t OmEncoder_compressedChunkBufferSize(const OmEncoder_t* encoder) {
     return (chunkLength + 255) /256 + (chunkLength + 32) * encoder->bytes_per_element_compressed;
 }
 
-uint64_t OmEncoder_lutBufferSize(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount) {
+uint64_t om_encoder_lut_buffer_size(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount) {
     unsigned char buffer[MAX_LUT_ELEMENTS+32] = {0};
     const uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     uint64_t maxLength = 0;
@@ -152,7 +152,7 @@ uint64_t OmEncoder_lutBufferSize(const OmEncoder_t* encoder, const uint64_t* loo
     return maxLength * nLutChunks + 32 * sizeof(uint64_t);
 }
 
-uint64_t OmEncoder_compressLut(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t compressed_lut_buffer_size) {
+uint64_t om_encoder_compress_lut(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount, uint8_t* out, uint64_t compressed_lut_buffer_size) {
     const uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     const uint64_t lutSize = compressed_lut_buffer_size - 32 * sizeof(uint64_t);
     const uint64_t lutChunkLength = lutSize / nLutChunks;
@@ -168,7 +168,7 @@ uint64_t OmEncoder_compressLut(const OmEncoder_t* encoder, const uint64_t* lookU
     return lutSize;
 }
 
-uint64_t OmEncoder_compressChunk(const OmEncoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
+uint64_t om_encoder_compress_chunk(const OmEncoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
     
     const uint64_t dimension_count = encoder->dimension_count;
     /// The total size of `arrayDimensions`. Only used to check for out of bound reads

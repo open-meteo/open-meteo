@@ -548,7 +548,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             ptr[7] = UInt64(dim1Read.count)
             
             var decoder = OmDecoder_t()
-            let error = OmDecoder_init(
+            let error = om_decoder_init(
                 &decoder,
                 reader.variable,
                 2,
@@ -561,7 +561,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 65536*4 // io amax
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: OmError_string(error)))")
+                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
             }
             reader.fn.decodePrefetch(decoder: &decoder)
         }
@@ -606,7 +606,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
             ptr[7] = UInt64(arrayDim1Length)
             
             var decoder = OmDecoder_t()
-            let error = OmDecoder_init(
+            let error = om_decoder_init(
                 &decoder,
                 reader.variable,
                 2,
@@ -619,7 +619,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 65536*4 // io amax
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: OmError_string(error)))")
+                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
             }
             reader.fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }

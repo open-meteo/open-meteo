@@ -122,7 +122,7 @@ typedef struct {
  * 
  * @returns Return an om_error_t if the compression or dimension is invalid
  */
-OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uint64_t dimension_count, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_element_count, uint64_t io_size_merge, uint64_t io_size_max);
+OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uint64_t dimension_count, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_element_count, uint64_t io_size_merge, uint64_t io_size_max);
 
 //OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, uint64_t dimension_count, const uint64_t* dimensions, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max);
 
@@ -139,7 +139,7 @@ OmError_t OmDecoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uin
  * @param index_read A pointer to an `om_decoder_index_read_t` structure that will be 
  *                   initialized with the computed chunk index range and other related values.
  */
-void OmDecoder_initIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t *indexRead);
+void om_decoder_init_index_read(const OmDecoder_t* decoder, OmDecoder_indexRead_t *indexRead);
 
 
 /**
@@ -158,7 +158,7 @@ void OmDecoder_initIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t *
  *         `false` if there are no more chunks left to read, indicating that the end of the read range has been reached.
  * 
  */
-bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* index_read);
+bool om_decoder_next_index_read(const OmDecoder_t* decoder, OmDecoder_indexRead_t* index_read);
 
 
 /**
@@ -175,7 +175,7 @@ bool OmDecoder_nextIndexRead(const OmDecoder_t* decoder, OmDecoder_indexRead_t* 
  *                         contains information about the index range and the initial 
  *                         chunk index to be used for reading.
  */
-void OmDecoder_initDataRead(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read);
+void om_decoder_init_data_read(OmDecoder_dataRead_t *data_read, const OmDecoder_indexRead_t *index_read);
 
 
 /**
@@ -208,7 +208,7 @@ void OmDecoder_initDataRead(OmDecoder_dataRead_t *data_read, const OmDecoder_ind
  * 
  * @returns May return an out-of-bounds read error on corrupted data.
  */
-bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dataRead, const void* indexData, uint64_t indexDataCount, OmError_t* error);
+bool om_decoder_next_data_read(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dataRead, const void* indexData, uint64_t indexDataCount, OmError_t* error);
 
 
 /**
@@ -231,7 +231,7 @@ bool OmDecoder_nexDataRead(const OmDecoder_t *decoder, OmDecoder_dataRead_t* dat
  *       the decoding process, ensuring that there is sufficient space to store the 
  *       decompressed data of a chunk.
  */
-uint64_t OmDecoder_readBufferSize(const OmDecoder_t* decoder);
+uint64_t om_decoder_read_buffer_size(const OmDecoder_t* decoder);
 
 
 /**
@@ -263,6 +263,6 @@ uint64_t OmDecoder_readBufferSize(const OmDecoder_t* decoder);
  *
  * @returns `false` if an erorr occured.
  */
-bool OmDecoder_decodeChunks(const OmDecoder_t *decoder, OmRange_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer, OmError_t* error);
+bool om_decoder_decode_chunks(const OmDecoder_t *decoder, OmRange_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer, OmError_t* error);
 
 #endif // OM_DECODER_H

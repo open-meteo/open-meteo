@@ -130,19 +130,19 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         
         // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
         self.encoder = OmEncoder_t()
-        let error = OmEncoder_init(&encoder, scale_factor, add_offset, compression.toC(), OmType.dataTypeArray.toC(), &self.dimensions, &self.chunks, UInt64(dimensions.count), lutChunkElementCount)
+        let error = om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), OmType.dataTypeArray.toC(), &self.dimensions, &self.chunks, UInt64(dimensions.count), lutChunkElementCount)
         
         guard error == ERROR_OK else {
-            fatalError("Om encoder: \(String(cString: OmError_string(error)))")
+            fatalError("Om encoder: \(String(cString: om_error_string(error)))")
         }
 
         /// Number of total chunks in the compressed files
-        let nChunks = OmEncoder_countChunks(&encoder)
+        let nChunks = om_encoder_count_chunks(&encoder)
         
         /// This is the minimum output buffer size for each compressed size. In practice the buffer should be much larger.
-        self.compressedChunkBufferSize = OmEncoder_compressedChunkBufferSize(&encoder)
+        self.compressedChunkBufferSize = om_encoder_compressed_chunk_buffer_size(&encoder)
         
-        let chunkBufferSize = OmEncoder_chunkBufferSize(&encoder)
+        let chunkBufferSize = om_encoder_chunk_buffer_size(&encoder)
         
         /// Each thread needs its own chunk buffer to compress data. This implementation is single threaded
         self.chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
@@ -172,7 +172,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         try buffer.reallocate(minimumCapacity: Int(compressedChunkBufferSize) * 4)
         
         /// How many chunks can be written to the output. This could be only a single one, or multiple
-        let numberOfChunksInArray = OmEncoder_countChunksInArray(&encoder, arrayCount)
+        let numberOfChunksInArray = om_encoder_count_chunks_in_array(&encoder, arrayCount)
         
         /// Store data start address if this is the first time this read is called
         if chunkIndex == 0 {
@@ -185,7 +185,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
             try buffer.reallocate(minimumCapacity: Int(compressedChunkBufferSize))
             
             let bytes_written = array.withUnsafeBytes { array in
-                return OmEncoder_compressChunk(&encoder, array.baseAddress, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
+                return om_encoder_compress_chunk(&encoder, array.baseAddress, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
             }
 
             buffer.incrementWritePosition(by: Int(bytes_written))
@@ -201,11 +201,11 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         let lut_offset = buffer.totalBytesWritten
         
         /// The size of the total compressed LUT including some padding
-        let buffer_size = OmEncoder_lutBufferSize(&encoder, lookUpTable, UInt64(lookUpTable.count))
+        let buffer_size = om_encoder_lut_buffer_size(&encoder, lookUpTable, UInt64(lookUpTable.count))
         try buffer.reallocate(minimumCapacity: Int(buffer_size))
         
         /// Compress the LUT and return the actual compressed LUT size
-        let compressed_lut_size = OmEncoder_compressLut(&encoder, lookUpTable, UInt64(lookUpTable.count), buffer.bufferAtWritePosition, buffer_size)
+        let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, UInt64(lookUpTable.count), buffer.bufferAtWritePosition, buffer_size)
         buffer.incrementWritePosition(by: Int(compressed_lut_size))
         return OmFileWriterArrayFinalisd(
             scale_factor: scale_factor,

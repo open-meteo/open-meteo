@@ -150,7 +150,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         let readCount = dimRead.map({UInt64($0.count)})
         
         var decoder = OmDecoder_t()
-        let error = OmDecoder_init(
+        let error = om_decoder_init(
             &decoder,
             variable,
             UInt64(nDimensions),
@@ -163,9 +163,9 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
             io_size_max
         )
         guard error == ERROR_OK else {
-            fatalError("OmDecoder: \(String(cString: OmError_string(error)))")
+            fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
         }
-        let chunkBufferSize = OmDecoder_readBufferSize(&decoder)
+        let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
         fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
         chunkBuffer.deallocate()
@@ -176,25 +176,25 @@ extension OmFileReaderBackend {
     /// Read and decode
     func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
         var indexRead = OmDecoder_indexRead_t()
-        OmDecoder_initIndexRead(decoder, &indexRead)
+        om_decoder_init_index_read(decoder, &indexRead)
         
         /// Loop over index blocks and read index data
-        while OmDecoder_nextIndexRead(decoder, &indexRead) {
+        while om_decoder_next_index_read(decoder, &indexRead) {
             let indexData = self.getData(offset: Int(indexRead.offset), count: Int(indexRead.count))
             
             var dataRead = OmDecoder_dataRead_t()
-            OmDecoder_initDataRead(&dataRead, &indexRead)
+            om_decoder_init_data_read(&dataRead, &indexRead)
             
             var error: OmError_t = ERROR_OK
             /// Loop over data blocks and read compressed data chunks
-            while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
+            while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count, &error) {
                 let dataData = self.getData(offset: Int(dataRead.offset), count: Int(dataRead.count))
-                guard OmDecoder_decodeChunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
-                    fatalError("OmDecoder: \(String(cString: OmError_string(error)))")
+                guard om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
+                    fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
                 }
             }
             guard error == ERROR_OK else {
-                fatalError("OmDecoder: \(String(cString: OmError_string(error)))")
+                fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
             }
         }
     }
@@ -202,18 +202,18 @@ extension OmFileReaderBackend {
     /// Do an madvice to load data chunks from disk into page cache in the background
     func decodePrefetch(decoder: UnsafePointer<OmDecoder_t>) {
         var indexRead = OmDecoder_indexRead_t()
-        OmDecoder_initIndexRead(decoder, &indexRead)
+        om_decoder_init_index_read(decoder, &indexRead)
         
         /// Loop over index blocks and read index data
-        while OmDecoder_nextIndexRead(decoder, &indexRead) {
+        while om_decoder_next_index_read(decoder, &indexRead) {
             let indexData = self.getData(offset: Int(indexRead.offset), count: Int(indexRead.count))
             
             var dataRead = OmDecoder_dataRead_t()
-            OmDecoder_initDataRead(&dataRead, &indexRead)
+            om_decoder_init_data_read(&dataRead, &indexRead)
             
             var error: OmError_t = ERROR_OK
             /// Loop over data blocks and read compressed data chunks
-            while OmDecoder_nexDataRead(decoder, &dataRead, indexData, indexRead.count, &error) {
+            while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count, &error) {
                 self.prefetchData(offset: Int(dataRead.offset), count: Int(dataRead.count))
             }
         }
