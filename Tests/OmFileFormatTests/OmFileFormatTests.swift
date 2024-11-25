@@ -1,7 +1,7 @@
 import XCTest
 @testable import OmFileFormatSwift
 @testable import App
-import OmFileFormatC
+@_implementationOnly import OmFileFormatC
 
 final class OmFileFormatTests: XCTestCase {
     func testHeaderAndTrailer() {

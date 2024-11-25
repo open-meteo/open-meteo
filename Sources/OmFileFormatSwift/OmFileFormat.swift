@@ -1,4 +1,4 @@
-import OmFileFormatC
+@_implementationOnly import OmFileFormatC
 @_implementationOnly import CHelper
 import Foundation
 

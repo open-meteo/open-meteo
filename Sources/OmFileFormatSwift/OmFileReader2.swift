@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import OmFileFormatC
+@_implementationOnly import OmFileFormatC
 
 /// High level implementation to read an OpenMeteo file
 /// Decodes meta data which may include JSON
