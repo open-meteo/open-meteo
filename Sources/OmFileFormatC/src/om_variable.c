@@ -51,7 +51,7 @@ OmString_t om_variable_get_name(const OmVariable_t* variable) {
     }
 }
 
-OmDataType_t om_variable_type(const OmVariable_t* variable) {
+OmDataType_t om_variable_get_type(const OmVariable_t* variable) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY:
             return DATA_TYPE_FLOAT_ARRAY;

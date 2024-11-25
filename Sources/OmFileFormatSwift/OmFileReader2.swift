@@ -57,7 +57,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public var dataType: DataType {
-        return DataType(rawValue: UInt8(om_variable_type(variable).rawValue))!
+        return DataType(rawValue: UInt8(om_variable_get_type(variable).rawValue))!
     }
     
     public var compression: CompressionType {

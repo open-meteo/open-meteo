@@ -35,6 +35,28 @@ final class OmFileFormatTests: XCTestCase {
         XCTAssertEqual(trailer, [79, 77, 3, 0, 0, 0, 0, 0, 58, 168, 234, 164, 80, 65, 2, 0, 58, 147, 89, 162, 10, 0, 0, 0])
     }
     
+    func testVariable() {
+        var name = "name"
+        name.withUTF8({ name in
+            let sizeScalar = om_variable_write_scalar_size(UInt16(name.count), 0, DATA_TYPE_INT8)
+            XCTAssertEqual(sizeScalar, 13)
+            
+            var data = [UInt8](repeating: 255, count: sizeScalar)
+            var value = UInt8(177)
+            let pos = om_variable_write_scalar(&data, 150, UInt16(name.count), 0, nil, name.baseAddress, DATA_TYPE_INT8, &value)
+            XCTAssertEqual(pos.size, 13)
+            XCTAssertEqual(pos.offset, 150)
+            XCTAssertEqual(data, [1, 4, 4, 0, 0, 0, 0, 0, 177, 110, 97, 109, 101])
+            
+            let omvariable = om_variable_init(data)
+            XCTAssertEqual(om_variable_get_type(omvariable), DATA_TYPE_INT8)
+            XCTAssertEqual(om_variable_get_number_of_children(omvariable), 0)
+            var valueOut = UInt8(255)
+            XCTAssertEqual(om_variable_get_scalar(omvariable, &valueOut), ERROR_OK)
+            XCTAssertEqual(valueOut, 177)
+        })
+    }
+    
     func testInMemory() throws {
         let data: [Float] = [0.0, 5.0, 2.0, 3.0, 2.0, 5.0, 6.0, 2.0, 8.0, 3.0, 10.0, 14.0, 12.0, 15.0, 14.0, 15.0, 66.0, 17.0, 12.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         let compressed = try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: 10).writeInMemory(compressionType: .p4nzdec256, scalefactor: 1, all: data)
