@@ -57,7 +57,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public var dataType: DataType {
-        return DataType(rawValue: UInt8(om_variable_get_type(variable).rawValue))!
+        return DataType(rawValue: UInt8(om_variable_type(variable).rawValue))!
     }
     
     public var compression: CompressionType {
@@ -83,7 +83,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public func getName() -> String? {
-        let name = om_read_variable_name(variable);
+        let name = om_variable_get_name(variable);
         guard name.size > 0 else {
             return nil
         }
@@ -113,7 +113,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
             return nil
         }
         var value = OmType()
-        guard withUnsafeMutablePointer(to: &value, { om_variable_read_scalar(variable, $0) }) == ERROR_OK else {
+        guard withUnsafeMutablePointer(to: &value, { om_variable_get_scalar(variable, $0) }) == ERROR_OK else {
             return nil
         }
         return value

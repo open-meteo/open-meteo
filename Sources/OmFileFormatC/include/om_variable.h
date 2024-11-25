@@ -95,7 +95,7 @@ typedef struct {
 const OmVariable_t* om_variable_init(const void* src);
 
 /// Get the name of of a given variable. No guarantee for zero termination!
-OmString_t om_read_variable_name(const OmVariable_t* variable);
+OmString_t om_variable_get_name(const OmVariable_t* variable);
 
 /// Get the type of the current variable
 OmDataType_t om_variable_get_type(const OmVariable_t* variable);
@@ -120,7 +120,7 @@ uint32_t om_variable_get_number_of_children(const OmVariable_t* variable);
 OmOffsetSize_t om_variable_get_child(const OmVariable_t* variable, int nChild);
 
 /// Read a variable as a scalar
-OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value);
+OmError_t om_variable_get_scalar(const OmVariable_t* variable, void* value);
 
 
 

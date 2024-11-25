@@ -14,7 +14,7 @@ const OmVariable_t* om_variable_init(const void* src) {
     return src;
 }
 
-OmString_t om_read_variable_name(const OmVariable_t* variable) {
+OmString_t om_variable_get_name(const OmVariable_t* variable) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY: {
             // Legacy files to not have a name field
@@ -51,7 +51,7 @@ OmString_t om_read_variable_name(const OmVariable_t* variable) {
     }
 }
 
-OmDataType_t om_variable_get_type(const OmVariable_t* variable) {
+OmDataType_t om_variable_type(const OmVariable_t* variable) {
     switch (_om_variable_memory_layout(variable)) {
         case OM_MEMORY_LAYOUT_LEGACY:
             return DATA_TYPE_FLOAT_ARRAY;
@@ -176,7 +176,7 @@ OmOffsetSize_t om_variable_get_child(const OmVariable_t* variable, int nChild) {
     return (OmOffsetSize_t){.offset = 0, .size = 0};
 }
 
-OmError_t om_variable_read_scalar(const OmVariable_t* variable, void* value) {
+OmError_t om_variable_get_scalar(const OmVariable_t* variable, void* value) {
     if (_om_variable_memory_layout(variable) != OM_MEMORY_LAYOUT_SCALAR) {
         return ERROR_INVALID_DATA_TYPE;
     }
