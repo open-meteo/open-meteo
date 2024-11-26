@@ -360,6 +360,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
     case shortwave_radiation
     case precipitation
     case direct_radiation
+    case albedo
     
     var storePreviousForecast: Bool {
         return false
@@ -405,6 +406,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
             return .backwards_sum
         case .direct_radiation:
             return .solar_backwards_averaged
+        case .albedo:
+            return .linear
         }
     }
     
@@ -430,6 +433,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .wind_direction_10m: return "10m_wind_direction"
         case .wind_speed_100m: return "wind_speed"
         case .wind_direction_100m: return "wind_direction"
+        case .albedo: return "albedo"
         }
     }
     
@@ -484,6 +488,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .shortwave_radiation: return ["ssrd"]
         case .precipitation: return ["tp"]
         case .direct_radiation: return ["tidirswrf"]
+        case .albedo: return ["al"]
         }
     }
     
@@ -505,6 +510,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .wind_direction_10m: return 0.5
         case .wind_speed_100m: return 10
         case .wind_direction_100m: return 0.5
+        case .albedo: return 1
         }
     }
     
@@ -525,6 +531,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .shortwave_radiation: return .wattPerSquareMetre
         case .precipitation: return .millimetre
         case .direct_radiation: return .wattPerSquareMetre
+        case .albedo: return .percentage
         }
     }
 }

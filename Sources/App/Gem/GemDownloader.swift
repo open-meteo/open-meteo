@@ -85,7 +85,7 @@ struct GemDownload: AsyncCommand {
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
                 
-        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server)
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -99,7 +99,7 @@ struct GemDownload: AsyncCommand {
     }
     
     // download seamask and height
-    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?) async throws {
+    func downloadElevation(application: Application, domain: GemDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
@@ -112,34 +112,18 @@ struct GemDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
-        var height: [Float]
-        if domain == .gem_hrdps_continental {
-            // HRDPS has no HGT_SFC_0 file
-            // Download temperature, pressure and calculate it manually
-            try grib2d.load(message: try await curl.downloadGrib(url: domain.getUrl(run: run, hour: 0, gribName: "TMP_AGL-2m", server: server), bzip2Decode: false)[0])
-            grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
-            let temperature_2m = grib2d.array.data
-            try grib2d.load(message: try await curl.downloadGrib(url: domain.getUrl(run: run, hour: 0, gribName: "PRES_Sfc", server: server), bzip2Decode: false)[0])
-            grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
-            let surfacePressure = grib2d.array.data
-            try grib2d.load(message: try await curl.downloadGrib(url: domain.getUrl(run: run, hour: 0, gribName: "PRMSL_MSL", server: server), bzip2Decode: false)[0])
-            grib2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
-            let sealevelPressure = grib2d.array.data
-            height = zip(zip(surfacePressure, sealevelPressure), temperature_2m).map {
-                let ((surfacePressure, sealevelPressure), temperature_2m) = $0
-                return Meteorology.elevation(sealevelPressure: sealevelPressure, surfacePressure: surfacePressure, temperature_2m: temperature_2m)
-            }
-        } else {
-            let terrainUrl = domain.getUrl(run: run, hour: 0, gribName: "HGT_SFC_0", server: server)
-            let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
-            try grib2d.load(message: message)
-            if domain == .gem_global_ensemble {
-                // Only ensemble model is shifted by 180° and uses geopotential
-                grib2d.array.shift180Longitudee()
-                grib2d.array.data.multiplyAdd(multiply: 9.80665, add: 0)
-            }
-            height = grib2d.array.data
+        let terrainGribName = domain == .gem_hrdps_continental ? "HGT_Sfc" : "LAND_SFC_0"
+        /// HGT file is not available for analysis in HRDPS
+        let hour: Int = domain == .gem_hrdps_continental ? 1 : 0
+        let terrainUrl = domain.getUrl(run: run, hour: hour, gribName: terrainGribName, server: server)
+        let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
+        try grib2d.load(message: message)
+        if domain == .gem_global_ensemble {
+            // Only ensemble model is shifted by 180° and uses geopotential
+            grib2d.array.shift180Longitudee()
+            grib2d.array.data.multiplyAdd(multiply: 9.80665, add: 0)
         }
+        var height = grib2d.array.data
         
         if domain != .gem_global_ensemble {
             let gribName = domain == .gem_hrdps_continental ? "LAND_Sfc" : "LAND_SFC_0"
@@ -155,6 +139,10 @@ struct GemDownload: AsyncCommand {
                     height[i] = landmask.data[i] >= 0.5 ? height[i] : -999
                 }
             }
+        }
+        
+        if createNetcdf {
+            try Array2D(data: height, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         }
         
         try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height)

@@ -377,7 +377,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .icePelletsProbability, previousDay: previousDay)
         case .snowfall_probability:
             return .init(variable: .snowfallProbability, previousDay: previousDay)
-        case .hail:
+        case .hail, .albedo:
             // TODO register hail in SDK
             return .init(variable: .precipitation, previousDay: previousDay)
         }
