@@ -61,6 +61,7 @@ Apps:
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
+- [Distance Cities](https://distance-cities.com) Routing website with weather info at your route destination.
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
