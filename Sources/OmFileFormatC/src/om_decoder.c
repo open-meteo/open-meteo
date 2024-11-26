@@ -366,7 +366,7 @@ bool om_decoder_next_data_read(const OmDecoder_t *decoder, OmDecoder_dataRead_t*
         const uint64_t startOffset = isOffset0 ? 1 : 0;
         
         
-        uint64_t readPos = data_read->indexRange.lowerBound - chunkIndex - startOffset;
+        uint64_t readPos = chunkIndex - data_read->indexRange.lowerBound - startOffset;
         if (readPos < 0 || (readPos + 1) * sizeof(int64_t) > index_data_size) {
             (*error) = ERROR_OUT_OF_BOUND_READ;
             return false;
