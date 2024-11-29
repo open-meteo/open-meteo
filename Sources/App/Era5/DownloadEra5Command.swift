@@ -723,6 +723,9 @@ struct DownloadEra5Command: AsyncCommand {
         }
         
         func downloadAndConvert(datasetName: String, productType: [String], variables: [CerraVariable], height_level: String?, level_type: String?, year: Int, month: Int, day: Int?, leadtime_hours: [Int]) async throws {
+            if variables.isEmpty {
+                return
+            }
             let lastDayInMonth = Timestamp(year, month % 12 + 1, 1).add(-86400).toComponents().day
             let days = day.map{[$0.zeroPadded(len: 2)]} ?? (1...lastDayInMonth).map{$0.zeroPadded(len: 2)}
             

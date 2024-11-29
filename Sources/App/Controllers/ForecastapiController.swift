@@ -467,9 +467,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let arpegeProbabilities: (any GenericReaderProtocol)? = try ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             return ([arpegeProbabilities] + (try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])).compactMap({$0})
         case .meteofrance_arome_france, .arome_france:
-            return try MeteoFranceMixer(domains: [.arome_france, .arome_france_15min,], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            // Note: AROME PI 15min is not used for consistency here
+            return try MeteoFranceMixer(domains: [.arome_france], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_arome_france_hd, .arome_france_hd:
-            return try MeteoFranceMixer(domains: [.arome_france_hd, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+            // Note: AROME PI 15min is not used for consistency here
+            return try MeteoFranceMixer(domains: [.arome_france_hd], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .jma_mix, .jma_seamless:
             return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .jma_msm:
