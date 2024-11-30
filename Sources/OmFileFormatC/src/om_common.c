@@ -25,6 +25,9 @@ const char* om_error_string(OmError_t error) {
             return "Corrupted data with potential out-of-bound read";
         case ERROR_NOT_AN_OM_FILE:
             return "Not an OM file";
+        case ERROR_DEFLATED_SIZE_MISSMATCH:
+            return "Corrupted data: Deflated size does not match";
+            break;
     }
     return "";
 }

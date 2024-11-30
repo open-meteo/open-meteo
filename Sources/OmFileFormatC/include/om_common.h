@@ -29,7 +29,8 @@ typedef enum {
     ERROR_INVALID_DATA_TYPE = 2,
     ERROR_INVALID_LUT_CHUNK_LENGTH = 3,
     ERROR_OUT_OF_BOUND_READ = 4,
-    ERROR_NOT_AN_OM_FILE = 5
+    ERROR_NOT_AN_OM_FILE = 5,
+    ERROR_DEFLATED_SIZE_MISSMATCH = 6,
 } OmError_t;
 
 const char* om_error_string(OmError_t error);
