@@ -107,7 +107,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
     
-    /// Numer of avaialble forecast steps differs from run
+    /// Number of available forecast steps differs from run
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
     func getDownloadForecastSteps(run: Int) -> [Int] {
         switch self {
@@ -204,4 +204,3 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// ICON uses 1.5°C melting point temperature: https://gitlab.dkrz.de/icon/icon-model/-/blob/release-2024.01-public/src/atm_phy_nwp/mo_nh_interface_nwp.f90?ref_type=heads#L2232
     static let tMelt = Float(1.5)
 }
-

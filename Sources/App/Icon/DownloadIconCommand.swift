@@ -339,6 +339,11 @@ struct DownloadIconCommand: AsyncCommand {
                     return
                 }
                 
+                if v.variable == .convective_cloud_top || v.variable == .convective_cloud_base {
+                    // Icon sets points where no convective clouds are present to -500
+                    data.data = data.data.map { $0 < -450 ? .nan : $0 }
+                }
+                
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
                 let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: v.variable.scalefactor, all: data.data)
                 await handles.append(GenericVariableHandle(
