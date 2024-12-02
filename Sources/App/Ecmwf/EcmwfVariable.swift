@@ -203,6 +203,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     case specific_humidity_100hPa
     case specific_humidity_50hPa
     case temperature_2m
+    case temperature_2m_min
+    case temperature_2m_max
     case relative_vorticity_1000hPa
     case relative_vorticity_925hPa
     case relative_vorticity_850hPa
@@ -328,7 +330,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         switch self {
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
             fallthrough
-        case .temperature_2m, .surface_pressure:
+        case .temperature_2m, .temperature_2m_max, .temperature_2m_min, .surface_pressure:
             return true
         default:
             return false
@@ -445,7 +447,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_200hPa: fallthrough
         case .specific_humidity_100hPa: fallthrough
         case .specific_humidity_50hPa: return .gramPerKilogram
-        case .temperature_2m: return .celsius
+        case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return .celsius
         case .relative_vorticity_1000hPa: fallthrough
         case .relative_vorticity_925hPa: fallthrough
         case .relative_vorticity_850hPa: fallthrough
@@ -596,7 +598,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_200hPa: return 200
         case .specific_humidity_100hPa: return 100
         case .specific_humidity_50hPa: return 50
-        case .temperature_2m: return 2
+        case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return 2
         case .relative_vorticity_1000hPa: return 1000
         case .relative_vorticity_925hPa: return 925
         case .relative_vorticity_850hPa: return 850
@@ -751,6 +753,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_100hPa: return "q"
         case .specific_humidity_50hPa: return "q"
         case .temperature_2m: return "2t"
+        case .temperature_2m_min: return "mn2t3"
+        case .temperature_2m_max: return "mx2t3"
         case .relative_vorticity_1000hPa: return "vo"
         case .relative_vorticity_925hPa: return "vo"
         case .relative_vorticity_850hPa: return "vo"
@@ -900,7 +904,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_200hPa: fallthrough
         case .specific_humidity_100hPa: fallthrough
         case .specific_humidity_50hPa: return 100
-        case .temperature_2m: return 20
+        case .temperature_2m, .temperature_2m_min, .temperature_2m_max: return 20
         case .relative_vorticity_1000hPa: fallthrough
         case .relative_vorticity_925hPa: fallthrough
         case .relative_vorticity_850hPa: fallthrough
@@ -964,7 +968,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .temperature_200hPa: fallthrough
         case .temperature_100hPa: fallthrough
         case .temperature_50hPa: fallthrough
-        case .temperature_2m, .dew_point_2m:
+        case .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
             return (1, -273.15)
         case .pressure_msl:
             return (1/100, 0)
@@ -1015,6 +1019,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .relative_humidity_50hPa: return .hermite(bounds: 0...100)
         case .shortwave_radiation: return .solar_backwards_averaged
         case .wind_gusts_10m: return .hermite(bounds: 0...1000)
+        case .temperature_2m_min, .temperature_2m_max: return .backwards
         default: return .hermite(bounds: nil)
         }
     }
