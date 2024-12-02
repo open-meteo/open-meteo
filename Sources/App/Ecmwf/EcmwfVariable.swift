@@ -1019,6 +1019,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .relative_humidity_50hPa: return .hermite(bounds: 0...100)
         case .shortwave_radiation: return .solar_backwards_averaged
         case .wind_gusts_10m: return .hermite(bounds: 0...1000)
+        case .temperature_2m_min, .temperature_2m_max: return .backwards
         default: return .hermite(bounds: nil)
         }
     }
