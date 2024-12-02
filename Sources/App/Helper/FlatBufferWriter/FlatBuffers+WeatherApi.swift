@@ -380,6 +380,10 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .hail, .albedo:
             // TODO register hail in SDK
             return .init(variable: .precipitation, previousDay: previousDay)
+        case .temperature_2m_max:
+            return .init(variable: .temperature, aggregation: .max, altitude: 2, previousDay: previousDay)
+        case .temperature_2m_min:
+            return .init(variable: .temperature, aggregation: .min, altitude: 2, previousDay: previousDay)
         }
     }
 }

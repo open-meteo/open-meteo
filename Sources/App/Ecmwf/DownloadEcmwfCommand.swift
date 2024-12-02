@@ -276,7 +276,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 }
                 
                 /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
-                if variable == .wind_gusts_10m && hour == 0 {
+                if [EcmwfVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min, .shortwave_radiation, .precipitation, .runoff].contains(variable) && hour == 0 {
                     return nil
                 }
                 
