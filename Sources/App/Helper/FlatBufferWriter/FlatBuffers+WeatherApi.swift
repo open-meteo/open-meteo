@@ -377,8 +377,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .icePelletsProbability, previousDay: previousDay)
         case .snowfall_probability:
             return .init(variable: .snowfallProbability, previousDay: previousDay)
-        case .hail, .albedo:
-            // TODO register hail in SDK
+        case .hail, .albedo, .precipitation_type:
+            // TODO register hail, albedo, precipitation_type in SDK. Followed by convective cloud top/bottom shortly
             return .init(variable: .precipitation, previousDay: previousDay)
         case .temperature_2m_max:
             return .init(variable: .temperature, aggregation: .max, altitude: 2, previousDay: previousDay)

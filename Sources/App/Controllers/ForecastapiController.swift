@@ -762,6 +762,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case mass_density_8m
     case precipitation
     case precipitation_probability
+    case precipitation_type
     case pressure_msl
     case rain
     case relativehumidity_2m
