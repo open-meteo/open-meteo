@@ -274,6 +274,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     fatalError("Got unknown variable \(shortName) \(levelhPa)")
                 }
+                
+                /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
+                if variable == .wind_gusts_10m && hour == 0 {
+                    return nil
+                }
+                
                 //logger.info("Processing \(variable)")
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
