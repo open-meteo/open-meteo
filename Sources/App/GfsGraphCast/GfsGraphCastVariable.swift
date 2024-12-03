@@ -25,6 +25,7 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
         case .precipitation: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
+        case .wind_u_component_10m, .wind_v_component_10m: return true
         default: return false
         }
     }
