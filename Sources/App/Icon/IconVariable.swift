@@ -222,8 +222,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .cloud_cover_low: return 1
         case .cloud_cover_mid: return 1
         case .cloud_cover_high: return 1
-        case .convective_cloud_top: return 1
-        case .convective_cloud_base: return 1
+        case .convective_cloud_top: return 0.1
+        case .convective_cloud_base: return 0.1
         case .precipitation: return 10
         case .weather_code: return 1
         case .wind_v_component_10m: return 10
