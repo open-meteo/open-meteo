@@ -193,9 +193,9 @@ extension TimerangeDt {
     /// Expand the time range for interpolation
     func forAggregationTo(modelDt: Int, interpolation: ReaderInterpolation) -> TimerangeDt {
         switch interpolation {
-        case .linear, .linearDegrees, .hermite(_), .backwards:
+        case .linear, .linearDegrees, .hermite(_):
             return self.with(dtSeconds: modelDt)
-        case .solar_backwards_averaged, .backwards_sum:
+        case .solar_backwards_averaged, .backwards_sum, .backwards:
             // Need to read previous timesteps to sum/average the correct value
             let steps = dtSeconds / modelDt
             let backSeconds = -1 * modelDt * (steps - 1)

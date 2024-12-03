@@ -5,8 +5,6 @@ extension Array where Element == Float {
     /// bounds: Apply min and max after interpolation
     func interpolate(type: ReaderInterpolation, timeOld: TimerangeDt, timeNew: TimerangeDt, latitude: Float, longitude: Float, scalefactor: Float) -> [Float] {
         switch type {
-        case .backwards:
-            return interpolateNearest(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .linear:
             return interpolateLinear(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .linearDegrees:
@@ -17,16 +15,8 @@ extension Array where Element == Float {
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
         case .backwards_sum:
             return backwardsSum(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
-        }
-    }
-    
-    func interpolateNearest(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
-        return time.map { t in
-            let index = t.timeIntervalSince1970 / timeLow.dtSeconds - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds
-            let fraction = Float(t.timeIntervalSince1970 % timeLow.dtSeconds) / Float(timeLow.dtSeconds)
-            let A = self[index]
-            let B = index+1 >= self.count ? A : self[index+1]
-            return fraction < 0.5 ? A : B
+        case .backwards:
+            return backwards(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         }
     }
     
@@ -111,6 +101,15 @@ extension Array where Element == Float {
             let index = Swift.min((t.timeIntervalSince1970 - time.dtSeconds) / timeLow.dtSeconds + 1 - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds, self.count-1)
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
             return roundf(self[index] * multiply * scalefactor) / scalefactor
+        }
+    }
+    
+    func backwards(timeOld timeLow: TimerangeDt, timeNew time: TimerangeDt, scalefactor: Float) -> [Float] {
+        return time.map { t in
+            /// Take the next array element, except it it is the same timestamp
+            let index = Swift.min((t.timeIntervalSince1970 - time.dtSeconds) / timeLow.dtSeconds + 1 - timeLow.range.lowerBound.timeIntervalSince1970 / timeLow.dtSeconds, self.count-1)
+            /// adjust it to scalefactor, otherwise interpolated values show more level of detail
+            return roundf(self[index] * scalefactor) / scalefactor
         }
     }
     
