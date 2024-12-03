@@ -341,7 +341,8 @@ struct DownloadIconCommand: AsyncCommand {
                 
                 if v.variable == .convective_cloud_top || v.variable == .convective_cloud_base {
                     // Icon sets points where no convective clouds are present to -500
-                    data.data = data.data.map { $0 < -450 ? .nan : $0 }
+                    // We set them to 0 to be consistent with cloud_top and cloud_base in DMI Harmonie model
+                    data.data = data.data.map { $0 < -499 ? 0 : $0 }
                 }
                 
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
