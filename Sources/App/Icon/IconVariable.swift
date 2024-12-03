@@ -366,9 +366,9 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .cloud_cover_high:
             return .linear
         case .convective_cloud_top:
-            return .linear
+            return .hermite(bounds: 0...10e9)
         case .convective_cloud_base:
-            return .linear
+            return .hermite(bounds: 0...10e9)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .precipitation:
