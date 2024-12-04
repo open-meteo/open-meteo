@@ -127,9 +127,9 @@ public final class OmFileWriterState<Backend: OmFileWriterBackend> {
     public var chunkOffsetBytes = [Int]()
     
     /**
-     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
+     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remaining elements at once.
      
-     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not usefull!
+     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not useful!
      
      Note: `chunk0` can be a uneven multiple of `dim0`. E.g. for 10 location, we can use chunks of 3, so the last chunk will only cover 1 location.
      */
@@ -377,9 +377,9 @@ public final class OmFileWriter {
     }
     
     /**
-     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remainig elements at once.
+     Write new or overwrite new compressed file. Data must be supplied with a closure which supplies the current position in dimension 0. Typically this is the location offset. The closure must return either an even number of elements of `chunk0 * dim1` elements or all remaining elements at once.
      
-     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not usefull!
+     One chunk should be around 2'000 to 16'000 elements. Fewer or more are not useful!
      
      If `fsync` is true, data will be flushed every 32MB
      
@@ -570,7 +570,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     /// Read data into existing buffers. Can only work with sequential ranges. Reading random offsets, requires external loop.
     ///
     /// This code could be moved to C/Rust for better performance. The 2D delta and scaling code is not yet using vector instructions yet
-    /// Future implemtations could use async io via lib uring
+    /// Future implementations could use async io via lib uring
     ///
     /// `into` is a 2d flat array with `arrayDim1Length` count elements in the fast dimension
     /// `chunkBuffer` is used to temporary decompress chunks of data

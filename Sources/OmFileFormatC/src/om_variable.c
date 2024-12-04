@@ -247,7 +247,7 @@ OmOffsetSize_t om_variable_write_scalar(void* dst, uint64_t offset, uint16_t len
         .number_of_children = number_of_children
     };
     
-    /// Set childen
+    /// Set children
     _om_variable_write_children(dst + SIZE_VARIABLEV3, number_of_children, children);
     
     /// Set value
@@ -311,7 +311,7 @@ OmOffsetSize_t om_variable_write_numeric_array(void* dst, uint64_t offset, uint1
         .lut_offset = lut_offset
     };
     
-    /// Set childen
+    /// Set children
     _om_variable_write_children(dst + sizeof(OmVariableArrayV3_t), number_of_children, children);
     
     /// Set dimensions
@@ -331,4 +331,3 @@ OmOffsetSize_t om_variable_write_numeric_array(void* dst, uint64_t offset, uint1
         .offset = offset
     };
 }
-

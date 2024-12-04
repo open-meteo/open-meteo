@@ -36,11 +36,11 @@ extension FileHandle {
             throw OmFileFormatSwiftError.posixFallocateFailed(error: error)
         }
         #else
-        /// Try to allocate continous space first
+        // Try to allocate continuous space first
         var store = fstore(fst_flags: UInt32(F_ALLOCATECONTIG), fst_posmode: F_PEOFPOSMODE, fst_offset: 0, fst_length: off_t(size), fst_bytesalloc: 0)
         var error = fcntl(fileDescriptor, F_PREALLOCATE, &store)
         if error == -1 {
-            // Try non-continous
+            // Try non-continuous
             store.fst_flags = UInt32(F_PREALLOCATE)
             error = fcntl(fileDescriptor, F_PREALLOCATE, &store)
         }

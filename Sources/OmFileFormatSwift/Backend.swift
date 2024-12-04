@@ -82,7 +82,7 @@ extension MmapFile: OmFileReaderBackend {
 /// Make `Data` work as reader
 extension DataAsClass: OmFileReaderBackend {
     public func getData(offset: Int, count: Int) -> UnsafeRawPointer {
-        // NOTE: Probaly a bad idea to expose a pointer
+        // NOTE: Probably a bad idea to expose a pointer
         return data.withUnsafeBytes({
             $0.baseAddress!.advanced(by: offset)
         })

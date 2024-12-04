@@ -5,8 +5,6 @@
 //  Created by Patrick Zippenfenig on 22.10.2024.
 //
 
-#include <stdlib.h>
-//#include <assert.h>
 #include "vp4.h"
 #include "fp.h"
 #include "delta2d.h"
@@ -169,9 +167,9 @@ OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, ui
             }
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
-            decoder->decompress_callback = (om_compress_callback_t)p4nzdec128v16;
-            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode;
             decoder->decompress_copy_callback = om_common_copy_int16_to_float_log10;
+            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode;
+            decoder->decompress_callback = (om_compress_callback_t)p4nzdec128v16;
             break;
             
         default:
@@ -653,7 +651,7 @@ bool om_decoder_decode_chunks(const OmDecoder_t *decoder, OmRange_t chunk, const
     for (uint64_t chunkNum = chunk.lowerBound; chunkNum < chunk.upperBound; ++chunkNum) {
         //printf("chunkIndex %d pos=%d dataCount=%d \n",chunkNum, pos, dataCount);
         if (pos >= data_size) {
-            (*error) = ERROR_DEFLATED_SIZE_MISSMATCH;
+            (*error) = ERROR_DEFLATED_SIZE_MISMATCH;
             return false;
         }
         uint64_t uncompressedBytes = _om_decoder_decode_chunk(decoder, chunkNum, (const uint8_t *)data + pos, into, chunkBuffer);
@@ -662,7 +660,7 @@ bool om_decoder_decode_chunks(const OmDecoder_t *decoder, OmRange_t chunk, const
     //printf("%d %d \n", pos, dataCount);
     
     if (pos != data_size) {
-        (*error) = ERROR_DEFLATED_SIZE_MISSMATCH;
+        (*error) = ERROR_DEFLATED_SIZE_MISMATCH;
         return false;
     }
     return pos;
