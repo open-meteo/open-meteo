@@ -25,7 +25,7 @@ const char* om_error_string(OmError_t error) {
             return "Corrupted data with potential out-of-bound read";
         case ERROR_NOT_AN_OM_FILE:
             return "Not an OM file";
-        case ERROR_DEFLATED_SIZE_MISSMATCH:
+        case ERROR_DEFLATED_SIZE_MISMATCH:
             return "Corrupted data: Deflated size does not match";
             break;
     }
@@ -109,4 +109,3 @@ uint64_t om_common_decompress_fpxdec32(const void* src, uint64_t length, void* d
 uint64_t om_common_decompress_fpxdec64(const void* src, uint64_t length, void* dst) {
     return fpxdec64((unsigned char *)src, length, (uint64_t *)dst, 0);
 }
-

@@ -86,10 +86,10 @@ typedef struct {
     /// An offset to convert floats to integers while scaling
     float add_offset;
 
-    /// Numer of bytes for a single element of the data type
+    /// Number of bytes for a single element of the data type
     int8_t bytes_per_element;
     
-    /// Numer of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
+    /// Number of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
     int8_t bytes_per_element_compressed;
 } OmDecoder_t;
 
@@ -113,8 +113,8 @@ typedef struct {
  * @param read_offset A pointer to an array specifying the offsets for reading data in each dimension. This array sets the starting points for data reads.
  * @param read_count A pointer to an array specifying the number of elements to read along each dimension. It defines how much data to read starting from `read_offset`.
  * @param cube_offset A pointer to an array specifying the offset of the target cube in each dimension. This is used when reading data into a larger array.
- * @param cube_dimensions A pointer to an array specifying the dimensions of the target cube being writen to.It can be the same as `read_count` but allows writing into larger arrays..
- * @param lut_size  The length (in bytes) of the compressed Look-Up Table (LUT). Ignored for Verion 1/2 files if lut_chunk_element_count == 1.
+ * @param cube_dimensions A pointer to an array specifying the dimensions of the target cube being written to.It can be the same as `read_count` but allows writing into larger arrays..
+ * @param lut_size  The length (in bytes) of the compressed Look-Up Table (LUT). Ignored for Version 1/2 files if lut_chunk_element_count == 1.
  * @param lut_chunk_element_count The number of elements in each LUT chunk. Default is 256. A value  of 1 indicates that the LUT is not compressed (Version 1/2 files).
  * @param lut_start  The starting byte position of the LUT in the file.
  * @param io_size_merge The maximum size (in bytes) for merging consecutive IO operations. It helps to optimize read performance by merging small reads.
@@ -261,7 +261,7 @@ uint64_t om_decoder_read_buffer_size(const OmDecoder_t* decoder);
  *                          Must be sized according to `om_decoder_read_buffer_size`
  * @param[out] error  May return an out-of-bounds read error on corrupted data.
  *
- * @returns `false` if an erorr occured.
+ * @returns `false` if an error occurred.
  */
 bool om_decoder_decode_chunks(const OmDecoder_t *decoder, OmRange_t chunkIndex, const void *data, uint64_t dataCount, void *into, void *chunkBuffer, OmError_t* error);
 

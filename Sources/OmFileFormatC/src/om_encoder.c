@@ -6,7 +6,6 @@
 //
 
 #include "om_encoder.h"
-#include <stdlib.h>
 #include <assert.h>
 #include "vp4.h"
 #include "fp.h"
@@ -93,9 +92,9 @@ OmError_t om_encoder_init(OmEncoder_t* encoder, float scale_factor, float add_of
             }
             encoder->bytes_per_element = 4;
             encoder->bytes_per_element_compressed = 2;
-            encoder->compress_callback = (om_compress_callback_t)p4nzenc128v16;
-            encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode;
             encoder->compress_copy_callback = om_common_copy_float_to_int16_log10;
+            encoder->compress_filter_callback = (om_compress_filter_callback_t)delta2d_encode;
+            encoder->compress_callback = (om_compress_callback_t)p4nzenc128v16;
             break;
             
         default:
@@ -168,10 +167,20 @@ uint64_t om_encoder_compress_lut(const OmEncoder_t* encoder, const uint64_t* loo
     return lutSize;
 }
 
-uint64_t om_encoder_compress_chunk(const OmEncoder_t* encoder, const void* array, const uint64_t* arrayDimensions, const uint64_t* arrayOffset, const uint64_t* arrayCount, uint64_t chunkIndex, uint64_t chunkIndexOffsetInThisArray, uint8_t* out, uint8_t* chunkBuffer) {
+uint64_t om_encoder_compress_chunk(
+    const OmEncoder_t* encoder,
+    const void* array,
+    const uint64_t* arrayDimensions,
+    const uint64_t* arrayOffset,
+    const uint64_t* arrayCount,
+    uint64_t chunkIndex,
+    uint64_t chunkIndexOffsetInThisArray,
+    uint8_t* out,
+    uint8_t* chunkBuffer
+) {
     
     const uint64_t dimension_count = encoder->dimension_count;
-    /// The total size of `arrayDimensions`. Only used to check for out of bound reads
+    // The total size of `arrayDimensions`. Only used to check for out of bound reads
     uint64_t arrayTotalCount = 1;
     for (uint64_t i = 0; i < dimension_count; i++) {
         arrayTotalCount *= arrayDimensions[i];
@@ -223,7 +232,13 @@ uint64_t om_encoder_compress_chunk(const OmEncoder_t* encoder, const void* array
     while (true) {
         assert(readCoordinate + linearReadCount <= arrayTotalCount);
         assert(writeCoordinate + linearReadCount <= lengthInChunk);
-        (*encoder->compress_copy_callback)(linearReadCount, encoder->scale_factor, encoder->add_offset, &array[encoder->bytes_per_element * readCoordinate], &chunkBuffer[encoder->bytes_per_element_compressed * writeCoordinate]);
+        (*encoder->compress_copy_callback)(
+            linearReadCount,
+            encoder->scale_factor,
+            encoder->add_offset,
+            &array[encoder->bytes_per_element * readCoordinate],
+            &chunkBuffer[encoder->bytes_per_element_compressed * writeCoordinate]
+        );
 
         readCoordinate += linearReadCount - 1;
         writeCoordinate += linearReadCount - 1;

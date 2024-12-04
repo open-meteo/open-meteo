@@ -61,7 +61,7 @@ public func P4NENC256_BOUND(n: Int, bytesPerElement: Int) -> Int {
 }
 /// For Decoding: compression lib read and write more data to buffers https://github.com/powturbo/TurboPFor-Integer-Compression/issues/59
 public func P4NDEC256_BOUND(n: Int, bytesPerElement: Int) -> Int {
-    // Note: padding for output buffer should noe be required anymore
+    // Note: padding for output buffer should not be required anymore
     return n * bytesPerElement + 32*4
 }
 

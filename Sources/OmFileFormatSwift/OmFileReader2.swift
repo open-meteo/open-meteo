@@ -13,7 +13,7 @@ import Foundation
 /// Handles actual file reads. The current implementation just uses MMAP or plain memory.
 /// Later implementations may use async read operations
 public struct OmFileReader2<Backend: OmFileReaderBackend> {
-    /// Points to the underlaying memory. Needs to remain in scrope to keep memory accessible
+    /// Points to the underlying memory. Needs to remain in scope to keep memory accessible
     public let fn: Backend
     
     let variable: UnsafePointer<OmVariable_t?>?

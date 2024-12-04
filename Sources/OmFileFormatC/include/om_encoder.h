@@ -32,10 +32,10 @@ typedef struct {
     /// An offset to convert floats to integers while scaling
     float add_offset;
     
-    /// Numer of bytes for a single element of the data type
+    /// Number of bytes for a single element of the data type
     int8_t bytes_per_element;
     
-    /// Numer of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
+    /// Number of bytes for a single element in the compressed stream. E.g. Int16 could be used to scale down floats
     int8_t bytes_per_element_compressed;
 } OmEncoder_t;
 
@@ -43,7 +43,7 @@ typedef struct {
 /// May return an error on invalid compression or data types
 OmError_t om_encoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) ;
 
-/// Get the number of chunks that is caluclated from dimensions and chunks
+/// Get the number of chunks that is calculated from dimensions and chunks
 uint64_t om_encoder_count_chunks(const OmEncoder_t* encoder);
 
 /// Calculate how many chunks can be filled from a given input

@@ -86,7 +86,7 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
     }
 }
 
-/// Compress a single variable inside an om file. A om file may contain mutliple variables
+/// Compress a single variable inside an om file. A om file may contain multiple variables
 public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHandle: OmFileWriterBackend> {
     /// Store all byte offsets where our compressed chunks start. Later, we want to decompress chunk 1234 and know it starts at byte offset 5346545
     private var lookUpTable: [UInt64]
@@ -115,7 +115,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
     
     let chunkBuffer: UnsafeMutableRawBufferPointer
     
-    /// Temporaly write data here. Keeps als track of `totalBytesWritten`
+    /// Temporarily write data here. Keeps also track of `totalBytesWritten`
     let buffer: OmBufferedWriter<FileHandle>
     
     
@@ -156,7 +156,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         self.buffer = buffer
     }
     
-    /// Compress data and write it to file. Can be all, a single or multiple chunks. If mutliple chunks are given at once, they must align with chunks.
+    /// Compress data and write it to file. Can be all, a single or multiple chunks. If multiple chunks are given at once, they must align with chunks.
     /// `arrayDimensions` specify the total dimensions of the input array
     /// `arrayRead` specify which parts of this array should be read
     /// It is important that this function can write data out to a FileHandle to empty the buffer. Otherwise the buffer could grow to multiple gigabytes
@@ -187,7 +187,17 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
             try buffer.reallocate(minimumCapacity: Int(compressedChunkBufferSize))
             
             let bytes_written = array.withUnsafeBytes { array in
-                return om_encoder_compress_chunk(&encoder, array.baseAddress, arrayDimensions, arrayOffset, arrayCount, UInt64(chunkIndex), chunkIndexOffsetInThisArray, buffer.bufferAtWritePosition, chunkBuffer.baseAddress)
+                return om_encoder_compress_chunk(
+                    &encoder,
+                    array.baseAddress,
+                    arrayDimensions,
+                    arrayOffset,
+                    arrayCount,
+                    UInt64(chunkIndex),
+                    chunkIndexOffsetInThisArray,
+                    buffer.bufferAtWritePosition,
+                    chunkBuffer.baseAddress
+                )
             }
 
             buffer.incrementWritePosition(by: Int(bytes_written))
