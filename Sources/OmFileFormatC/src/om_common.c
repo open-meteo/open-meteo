@@ -6,7 +6,6 @@
 //
 
 #include "om_common.h"
-#include <stdlib.h>
 #include <math.h>
 #include "vp4.h"
 #include "fp.h"
@@ -48,10 +47,10 @@ void om_common_copy_float_to_int16_log10(uint64_t length, float scale_factor, fl
     for (uint64_t i = 0; i < length; ++i) {
         float val = ((float *)src)[i];
         if (isnan(val)) {
-            ((float *)dst)[i] = INT16_MAX;
+            ((int16_t *)dst)[i] = INT16_MAX;
         } else {
             float scaled = log10f(1 + val) * scale_factor;
-            ((float *)dst)[i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
+            ((int16_t *)dst)[i] = (int16_t)fmaxf(INT16_MIN, fminf(INT16_MAX, roundf(scaled)));
         }
     }
 }
@@ -109,4 +108,3 @@ uint64_t om_common_decompress_fpxdec32(const void* src, uint64_t length, void* d
 uint64_t om_common_decompress_fpxdec64(const void* src, uint64_t length, void* dst) {
     return fpxdec64((unsigned char *)src, length, (uint64_t *)dst, 0);
 }
-

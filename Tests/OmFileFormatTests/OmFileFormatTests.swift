@@ -177,7 +177,7 @@ final class OmFileFormatTests: XCTestCase {
         
         XCTAssertEqual(readFn.count, 144)
         let bytes = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: readFn.getData(offset: 0, count: readFn.count)), count: readFn.count, deallocator: .none).map{UInt8($0)}
-        // difference on x86 and ARM cause by the underlaying compression
+        // difference on x86 and ARM cause by the underlying compression
         //XCTAssertTrue(bytes == [79, 77, 3, 0, 4, 130, 0, 2, 3, 34, 0, 4, 194, 2, 10, 4, 178, 0, 12, 4, 242, 0, 14, 197, 17, 20, 194, 2, 22, 194, 2, 24, 3, 3, 228, 200, 109, 1, 0, 0, 20, 0, 4, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97, 0, 0, 0, 0, 79, 77, 3, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0] || bytes == [79, 77, 3, 0, 4, 130, 64, 2, 3, 34, 16, 4, 194, 2, 10, 4, 178, 64, 12, 4, 242, 64, 14, 197, 17, 20, 194, 2, 22, 194, 2, 24, 3, 3, 228, 200, 109, 1, 0, 0, 20, 0, 4, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97, 0, 0, 0, 0, 79, 77, 3, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0])
     }
     
@@ -263,7 +263,7 @@ final class OmFileFormatTests: XCTestCase {
         let bytes = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: readFn.getData(offset: 0, count: readFn.count)), count: readFn.count, deallocator: .none).map{UInt8($0)}
         XCTAssertEqual(bytes[0..<3], [79, 77, 3])
         XCTAssertEqual(bytes[3..<8], [0, 3, 34, 140, 2]) // chunk
-        XCTAssertTrue(bytes[8..<12] == [2, 3, 114, 1] || bytes[8..<12] == [2, 3, 114, 141]) // difference on x86 and ARM cause by the underlaying compression
+        XCTAssertTrue(bytes[8..<12] == [2, 3, 114, 1] || bytes[8..<12] == [2, 3, 114, 141]) // difference on x86 and ARM cause by the underlying compression
         XCTAssertTrue(bytes[12..<16] == [6, 3, 34, 0] || bytes[12..<16] == [6, 3, 34, 140]) // chunk
         XCTAssertEqual(bytes[16..<19], [8, 194, 2]) // chunk
         XCTAssertEqual(bytes[19..<23], [18, 5, 226, 3]) // chunk
@@ -709,6 +709,26 @@ final class OmFileFormatTests: XCTestCase {
         print(data2)
         XCTAssertTrue(try read.read(dim0Slow: 1..<2, dim1: 1..<2)[0].isNaN)
         try FileManager.default.removeItem(atPath: file)
+    }
+    
+    func testCopyLog10Roundtrip() {
+        let ints: [Int16] = [100, 200, 300, 400, 500]
+        var floats = [Float](repeating: 0, count: ints.count)
+        var intsRoundtrip = [Int16](repeating: 0, count: ints.count)
+
+        ints.withUnsafeBufferPointer { srcPtr in
+            floats.withUnsafeMutableBufferPointer { dstPtr in
+                om_common_copy_int16_to_float_log10(UInt64(ints.count), 1000.0, 0.0, srcPtr.baseAddress, dstPtr.baseAddress)
+            }
+        }
+
+        floats.withUnsafeBufferPointer { srcPtr in
+            intsRoundtrip.withUnsafeMutableBufferPointer { dstPtr in
+                om_common_copy_float_to_int16_log10(UInt64(floats.count), 1000.0, 0.0, srcPtr.baseAddress, dstPtr.baseAddress)
+            }
+        }
+
+        XCTAssertEqual(ints, intsRoundtrip)
     }
 }
 
