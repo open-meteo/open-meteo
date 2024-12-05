@@ -1,4 +1,4 @@
-// swift-tools-version:5.6
+// swift-tools-version:5.7
 
 import PackageDescription
 import Foundation
@@ -62,6 +62,13 @@ let package = Package(
             ] : []),
             cSettings: cFlags,
             swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
+        ),
+        .executableTarget(
+            name: "reformat",
+            dependencies: [
+                "OmFileFormatSwift",
+            ],
+            path: "SwiftScripts/reformat"
         ),
         .systemLibrary(
             name: "CZlib",
