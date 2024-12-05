@@ -75,10 +75,13 @@ struct GenericVariableHandle {
             logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
 
-        logger.info("Convert previous day database if required")
-        let startTimePreviousDays = Date()
-        try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent)
-        logger.info("Previous day convert in \(startTimePreviousDays)")
+        if let run {
+            // if run is nil, do not attempt to generate previous days files
+            logger.info("Convert previous day database if required")
+            let startTimePreviousDays = Date()
+            try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent)
+            logger.info("Previous day convert in \(startTimePreviousDays)")
+        }
     }
     
     static private func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int) async throws {
