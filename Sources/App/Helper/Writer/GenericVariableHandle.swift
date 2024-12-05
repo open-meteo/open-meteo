@@ -23,17 +23,11 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool) async throws {
-        let startTime = Date()
-        if concurrent > 1 {
-            try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
-                try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values})
-            })
-        } else {
-            try convert(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles)
-        }
-        let timeElapsed = Date().timeIntervalSince(startTime).asSecondsPrettyPrint
-        logger.info("Conversion completed in \(timeElapsed)")
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool) async throws {
+        
+        let startTime = DispatchTime.now()
+        try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent)
+        logger.info("Convert completed in \(startTime.timeElapsedPretty())")
         
         /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
         if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane"].contains($0.variable.omFileName.file)}) {
@@ -65,10 +59,44 @@ struct GenericVariableHandle {
             try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
             try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
         }
+        
+        if let uploadS3Bucket = uploadS3Bucket {
+            logger.info("AWS upload to bucket \(uploadS3Bucket)")
+            let startTimeAws = DispatchTime.now()
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
+            do {
+                try domain.domainRegistry.syncToS3(
+                    bucket: uploadS3Bucket,
+                    variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+                )
+            } catch {
+                logger.error("Sync to AWS failed: \(error)")
+            }
+            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
+        }
+
+        logger.info("Convert previous day database if required")
+        let startTimePreviousDays = Date()
+        try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent)
+        logger.info("Previous day convert in \(startTimePreviousDays)")
+    }
+    
+    static private func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int) async throws {
+        if concurrent > 1 {
+            try await handles
+                .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
+                .groupedPreservedOrder(by: {"\($0.variable)"})
+                .evenlyChunked(in: concurrent)
+                .foreachConcurrent(nConcurrent: concurrent, body: {
+                    try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays)
+            })
+        } else {
+            try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays)
+        }
     }
     
     /// Process each variable and update time-series optimised files
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], storePreviousForecastOverwrite: Bool? = nil) throws {
+    static private func convertSerial(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool) throws {
         let grid = domain.grid
         let nLocations = grid.count
         
@@ -87,6 +115,12 @@ struct GenericVariableHandle {
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
             let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
             
+            let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
+            if onlyGeneratePreviousDays && !storePreviousForecast {
+                // No need to generate previous day forecast
+                continue
+            }
+            
             let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
                 return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
@@ -104,7 +138,7 @@ struct GenericVariableHandle {
             var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
             
             // Create netcdf file for debugging
-            if createNetcdf {
+            if createNetcdf && !onlyGeneratePreviousDays {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
                 let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
                 try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
@@ -121,10 +155,8 @@ struct GenericVariableHandle {
                     }
                 }
             }
-            
-            let storePreviousForecast = (storePreviousForecastOverwrite ?? variable.storePreviousForecast) && nMembers <= 1
-            
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, storePreviousForecast: storePreviousForecast) { offset in
+                        
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { offset in
                 let d0offset = offset / nMembers
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
