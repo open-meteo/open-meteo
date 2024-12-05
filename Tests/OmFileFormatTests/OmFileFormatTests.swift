@@ -43,9 +43,7 @@ final class OmFileFormatTests: XCTestCase {
             
             var data = [UInt8](repeating: 255, count: sizeScalar)
             var value = UInt8(177)
-            let pos = om_variable_write_scalar(&data, 150, UInt16(name.count), 0, nil, name.baseAddress, DATA_TYPE_INT8, &value)
-            XCTAssertEqual(pos.size, 13)
-            XCTAssertEqual(pos.offset, 150)
+            om_variable_write_scalar(&data, UInt16(name.count), 0, nil, name.baseAddress, DATA_TYPE_INT8, &value)
             XCTAssertEqual(data, [1, 4, 4, 0, 0, 0, 0, 0, 177, 110, 97, 109, 101])
             
             let omvariable = om_variable_init(data)

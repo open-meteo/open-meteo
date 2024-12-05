@@ -138,13 +138,13 @@ uint64_t om_encoder_compressed_chunk_buffer_size(const OmEncoder_t* encoder) {
 }
 
 uint64_t om_encoder_lut_buffer_size(const OmEncoder_t* encoder, const uint64_t* lookUpTable, uint64_t lookUpTableCount) {
-    unsigned char buffer[MAX_LUT_ELEMENTS+32] = {0};
+    uint64_t buffer[MAX_LUT_ELEMENTS+32] = {0};
     const uint64_t nLutChunks = divide_rounded_up(lookUpTableCount, encoder->lut_chunk_element_count);
     uint64_t maxLength = 0;
     for (int i = 0; i < nLutChunks; i++) {
         const uint64_t rangeStart = i * encoder->lut_chunk_element_count;
         const uint64_t rangeEnd = min(rangeStart + encoder->lut_chunk_element_count, lookUpTableCount);
-        const uint64_t len = p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, buffer);
+        const uint64_t len = p4ndenc64((uint64_t*)&lookUpTable[rangeStart], rangeEnd - rangeStart, (unsigned char *)buffer);
         if (len > maxLength) maxLength = len;
     }
     /// Compression function can write 32 integers more

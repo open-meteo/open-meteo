@@ -131,13 +131,13 @@ OmError_t om_variable_get_scalar(const OmVariable_t* variable, void* value);
 size_t om_variable_write_scalar_size(uint16_t length_of_name, uint32_t number_of_children, OmDataType_t data_type);
 
 /// Write a scalar variable with name and children variables
-OmOffsetSize_t om_variable_write_scalar(void* dst, uint64_t offset, uint16_t length_of_name, uint32_t number_of_children, const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, const void* value);
+void om_variable_write_scalar(void* dst, uint16_t length_of_name, uint32_t number_of_children, const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, const void* value);
 
 /// Get the size of meta attributes of a numeric array if written to a file. Does not contain any data. Only offsets for the actual data.
 size_t om_variable_write_numeric_array_size(uint16_t length_of_name, uint32_t number_of_children, uint64_t dimension_count);
 
 /// Write meta data for a numeric array to file
-OmOffsetSize_t om_variable_write_numeric_array(void* dst, uint64_t offset, uint16_t length_of_name, uint32_t number_of_children,  const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset);
+void om_variable_write_numeric_array(void* dst, uint16_t length_of_name, uint32_t number_of_children,  const OmOffsetSize_t* children, const char* name, OmDataType_t data_type, OmCompression_t compression_type, float scale_factor, float add_offset, uint64_t dimension_count, const uint64_t *dimensions, const uint64_t *chunks, uint64_t lut_size, uint64_t lut_offset);
 
 
 
