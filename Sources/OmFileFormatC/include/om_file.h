@@ -46,7 +46,8 @@ typedef struct {
     uint8_t version;
     uint8_t reserved;
     uint32_t reserved2; // can later be used for a 32 bit hash. E.g. xxhash
-    OmOffsetSize_t root; // 2x 64 bit
+    uint64_t root_offset;
+    uint64_t root_size;
 } OmTrailer_t;
 
 
@@ -64,12 +65,12 @@ size_t om_header_write_size();
 OmHeaderType_t om_header_type(const void* src);
 
 /// Read the trailer of an OM file to get the root variable. Size is set to 0 if this is not an OM file.
-OmOffsetSize_t om_trailer_read(const void* src);
+bool om_trailer_read(const void* src, uint64_t* offset, uint64_t* size);
 
 /// Write an header for newer OM files
 void om_header_write(void* dest);
 
 /// Write an trailer for newer OM files including the root variable
-void om_trailer_write(void* dest, const OmOffsetSize_t root);
+void om_trailer_write(void* dest, uint64_t offset, uint64_t size);
 
 #endif // OM_FILE_H

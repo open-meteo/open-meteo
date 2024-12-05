@@ -27,12 +27,16 @@ OmHeaderType_t om_header_type(const void* src) {
     return meta->version == 3 ? OM_HEADER_READ_TRAILER : OM_HEADER_LEGACY;
 }
 
-OmOffsetSize_t om_trailer_read(const void* src) {
+bool om_trailer_read(const void* src, uint64_t* offset, uint64_t* size) {
     const OmTrailer_t* meta = (const OmTrailer_t*)src;
     if (meta->magic_number1 != 'O' || meta->magic_number2 != 'M' || meta->version != 3) {
-        return (OmOffsetSize_t){.offset = 0, .size = 0};
+        *offset = 0;
+        *size = 0;
+        return false;
     }
-    return (OmOffsetSize_t){.offset = meta->root.offset, .size = meta->root.size};
+    *offset = meta->root_offset;
+    *size = meta->root_size;
+    return true;
 }
 
 void om_header_write(void* dest) {
@@ -43,13 +47,14 @@ void om_header_write(void* dest) {
     };
 }
 
-void om_trailer_write(void* dest, const OmOffsetSize_t root) {
+void om_trailer_write(void* dest, uint64_t offset, uint64_t size) {
     *(OmTrailer_t*)dest = (OmTrailer_t){
         .magic_number1 = 'O',
         .magic_number2 = 'M',
         .version = 3,
         .reserved = 0,
         .reserved2 = 0,
-        .root = root
+        .root_size = size,
+        .root_offset = offset
     };
 }

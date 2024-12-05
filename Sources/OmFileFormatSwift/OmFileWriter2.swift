@@ -41,8 +41,9 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
             try buffer.reallocate(minimumCapacity: Int(size))
             var value = value
             withUnsafePointer(to: &value, { value in
-                let children = children.map {OmOffsetSize_t(offset: $0.offset, size: $0.size)}
-                om_variable_write_scalar(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), children, name.baseAddress, type, value)
+                let childrenOffsets = children.map {$0.offset}
+                let childrenSizes = children.map {$0.size}
+                om_variable_write_scalar(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenOffsets, childrenSizes, name.baseAddress, type, value)
             })
             buffer.incrementWritePosition(by: size)
             return OmOffsetSize(offset: offset, size: UInt64(size))
@@ -66,8 +67,9 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
             let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(array.dimensions.count))
             let offset = UInt64(buffer.totalBytesWritten)
             try buffer.reallocate(minimumCapacity: Int(size))
-            let children = children.map {OmOffsetSize_t(offset: $0.offset, size: $0.size)}
-            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), children, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(array.dimensions.count), array.dimensions, array.chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
+            let childrenOffsets = children.map {$0.offset}
+            let childrenSizes = children.map {$0.size}
+            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), childrenOffsets, childrenSizes, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(array.dimensions.count), array.dimensions, array.chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
             buffer.incrementWritePosition(by: size)
             return OmOffsetSize(offset: offset, size: UInt64(size))
         }
@@ -80,7 +82,7 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         // write length of JSON
         let size = om_trailer_size()
         try buffer.reallocate(minimumCapacity: size)
-        om_trailer_write(buffer.bufferAtWritePosition, OmOffsetSize_t(offset: rootVariable.offset, size: rootVariable.size))
+        om_trailer_write(buffer.bufferAtWritePosition, rootVariable.offset, rootVariable.size)
         buffer.incrementWritePosition(by: size)
         
         // Flush
