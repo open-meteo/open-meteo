@@ -41,7 +41,7 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             return ":WDIR:10 m above ground:\(timestep) hour fcst:"
         case .wind_direction_80m:
             return ":WDIR:80 m above ground:\(timestep) hour fcst:"
-        case .snowfall_water_equivalent:
+        case .snowfall:
             if timestep > 36 {
                 return relTime % 6 != 0 ? nil : ":ASNOW:surface:\(timestep-6)-\(timestep) hour acc fcst:"
             }
@@ -76,6 +76,8 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
         switch self {
         case .temperature_2m, .surface_temperature:
             return (1, -273.15)
+        case .snowfall:
+            return (100, 0)
         default:
             return nil
         }
