@@ -103,7 +103,7 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             let concurrent = signature.concurrent ?? 1
             let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent)
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
         }
         
         if let uploadS3Bucket = signature.uploadS3Bucket {

@@ -23,7 +23,7 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool) async throws {
         let startTime = Date()
         if concurrent > 1 {
             try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
@@ -64,6 +64,14 @@ struct GenericVariableHandle {
             let storePreviousForecast = handles.first(where: {$0.variable.storePreviousForecast}) != nil
             try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
             try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
+        }
+        
+        if let uploadS3Bucket = uploadS3Bucket {
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
         }
     }
     

@@ -103,15 +103,8 @@ struct NbmDownload: AsyncCommand {
         let handles = try await downloadNbm(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour)
         
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
-        
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         logger.info("Finished in \(start.timeElapsedPretty())")
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(
-                bucket: uploadS3Bucket,
-                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
-            )
-        }
     }
     
     func downloadNbm(application: Application, domain: NbmDomain, run: Timestamp, variables: [any NbmVariableDownloadable], maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
