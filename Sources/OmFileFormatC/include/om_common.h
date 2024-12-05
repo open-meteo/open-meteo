@@ -70,10 +70,6 @@ typedef enum {
     COMPRESSION_NONE = 4
 } OmCompression_t;
 
-typedef struct {
-    uint64_t offset;
-    uint64_t size;
-} OmOffsetSize_t;
 
 
 /// Divide and round up

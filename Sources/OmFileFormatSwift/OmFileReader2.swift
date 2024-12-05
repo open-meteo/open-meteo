@@ -36,12 +36,13 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
             let fileSize = fn.count
             let trailerSize = om_trailer_size()
             let trailerData = fn.getData(offset: fileSize - trailerSize, count: trailerSize)
-            let position = om_trailer_read(trailerData)
-            guard position.size > 0 else {
+            var offset: UInt64 = 0
+            var size: UInt64 = 0
+            guard om_trailer_read(trailerData, &offset, &size) else {
                 fatalError("Not an OM file")
             }
             /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
-            let dataVariable = fn.getData(offset: Int(position.offset), count: Int(position.size))
+            let dataVariable = fn.getData(offset: Int(offset), count: Int(size))
             self.variable = om_variable_init(dataVariable)
         case OM_HEADER_INVALID:
             fallthrough
@@ -92,16 +93,17 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     }
     
     public var numberOfChildren: UInt32 {
-        return om_variable_get_number_of_children(variable)
+        return om_variable_get_children_count(variable)
     }
     
-    public func getChild(_ index: Int32) -> OmFileReader2<Backend>? {
-        let child = om_variable_get_child(variable, index)
-        guard child.size > 0 else {
+    public func getChild(_ index: UInt32) -> OmFileReader2<Backend>? {
+        var size: UInt64 = 0
+        var offset: UInt64 = 0
+        guard om_variable_get_children(variable, index, 1, &offset, &size) else {
             return nil
         }
         /// Read data from child.offset by child.size
-        let dataChild = fn.getData(offset: Int(child.offset), count: Int(child.size))
+        let dataChild = fn.getData(offset: Int(offset), count: Int(size))
         guard let childVariable = om_variable_init(dataChild) else {
             fatalError()
         }
