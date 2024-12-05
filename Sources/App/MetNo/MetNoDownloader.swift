@@ -140,10 +140,7 @@ struct MetNoDownloader: AsyncCommand {
             /// 1GB spatial oriented file. In total 2.7 GB memory used while running
             let spatial = Array2DFastSpace(data: data, nLocations: nx*ny, nTime: nTime)
             
-            /// Create chunked time-series arrays instead of transposing the entire array
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, storePreviousForecast: variable.storePreviousForecast) { d0offset in
-                
+            func readChunk(_ d0offset: Int) throws -> ArraySlice<Float> {
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
                 var data2d = Array2DFastTime(nLocations: locationRange.count, nTime: nTime)
                 for (i,l) in locationRange.enumerated() {
@@ -164,6 +161,13 @@ struct MetNoDownloader: AsyncCommand {
                 }
                 progress.add(locationRange.count)
                 return data2d.data[0..<locationRange.count * nTime]
+            }
+            
+            /// Create chunked time-series arrays instead of transposing the entire array
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)")
+            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, onlyGeneratePreviousDays: false, supplyChunk: readChunk)
+            if variable.storePreviousForecast {
+                try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, onlyGeneratePreviousDays: true, supplyChunk: readChunk)
             }
             progress.finish()
             
@@ -193,7 +197,7 @@ extension DomainRegistry {
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }
-                try Process.spawn(
+                try Process.spawnRetried(
                     cmd: "aws",
                     args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
                 )
@@ -201,7 +205,7 @@ extension DomainRegistry {
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             let dest = "s3://\(bucket)/data/\(dir)"
-            try Process.spawn(
+            try Process.spawnRetried(
                 cmd: "aws",
                 args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
             )

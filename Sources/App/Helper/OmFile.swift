@@ -244,12 +244,12 @@ struct OmFileSplitter {
      Write new data to the archived storage and combine it with existint data.
      Updates are done in chunks to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256, storePreviousForecast: Bool) throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
         
         precondition(array2d.nTime == time.count)
         
         // Process at most 8 MB at once
-        try updateFromTimeOrientedStreaming(variable: variable, time: time, scalefactor: scalefactor, compression: compression, storePreviousForecast: storePreviousForecast) { d0offset in
+        try updateFromTimeOrientedStreaming(variable: variable, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { d0offset in
             
             let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
             let dataRange = locationRange.multiply(array2d.nTime)
@@ -261,13 +261,18 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
      */
-    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256, storePreviousForecast: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256, onlyGeneratePreviousDays: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
         let indexTime = time.toIndexTime()
         let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)
         
-        // Number of previous days of forecast to keep. Max 7 past days
-        let nPreviousDays = storePreviousForecast ? max(1, min(8, time.range.count / 86400)) : 1
+        /// Previous days of forecast to keep. Max 7 past days
+        /// `0..<1` if previous days are not generated
+        /// `1..<n` for all previous days
+        let previousDaysRange: Range<Int> = onlyGeneratePreviousDays ? (1..<max(1, min(8, time.range.count / 86400))) : (0..<1)
+        if previousDaysRange.isEmpty {
+            return
+        }
         
         struct WriterPerStep {
             let read: OmFileReader<MmapFile>?
@@ -284,8 +289,8 @@ struct OmFileSplitter {
                 return []
             }
             
-            return try (0..<nPreviousDays).map { previousDay -> WriterPerStep in
-                let skip = previousDay > 0 ? previousDay * 86400 / time.dtSeconds : 0
+            return try previousDaysRange.map { previousDay -> WriterPerStep in
+                let skip =  previousDay * 86400 / time.dtSeconds
                 let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
                 let tempFile = readFile.getFilePath() + "~"
