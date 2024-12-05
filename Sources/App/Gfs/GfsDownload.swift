@@ -232,6 +232,9 @@ struct GfsDownload: AsyncCommand {
             for forecastHour in 0...(maxForecastHour ?? 18) {
                 logger.info("Downloading forecastHour \(forecastHour)")
                 
+                /// Keep variables in memory. Precip + Frozen percent to calculate snowfall
+                let inMemory = VariablePerMemberStorage<GfsSurfaceVariable>()
+                
                 let variables: [GfsVariableAndDomain] = (variables.flatMap({ v in
                     return forecastHour == 0 ? [GfsVariableAndDomain(variable: v, domain: domain, timestep: 0)] : (0..<4).map {
                         GfsVariableAndDomain(variable: v, domain: domain, timestep: (forecastHour-1) * 60 + ($0+1) * 15)
@@ -247,6 +250,15 @@ struct GfsDownload: AsyncCommand {
                     let timestamp = run.add(timestep * 60)
                     if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    if let surface = variable.variable as? GfsSurfaceVariable {
+                        if [GfsSurfaceVariable.precipitation, .frozen_precipitation_percent].contains(surface) {
+                            await inMemory.set(variable: surface, timestamp: timestamp, member: 0, data: grib2d.array)
+                        }
+                        if surface == .frozen_precipitation_percent {
+                            continue // do not store frozen precip on disk
+                        }
                     }
                     
                     // HRRR_15min data has backwards averaged radiation, but diffuse radiation is still instantanous
@@ -267,6 +279,7 @@ struct GfsDownload: AsyncCommand {
                         fn: fn
                     ))
                 }
+                handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
             await curl.printStatistics()
             return handles
@@ -302,6 +315,8 @@ struct GfsDownload: AsyncCommand {
                 /// Keep data from previous timestep in memory to deaverage the next timestep
                 var inMemorySurface = [GfsSurfaceVariable: [Float]]()
                 var inMemoryPressure = [GfsPressureVariable: [Float]]()
+                /// Keep variables in memory. Precip + Frozen percent to calculate snowfall
+                let inMemory = VariablePerMemberStorage<GfsSurfaceVariable>()
                 
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
                     if skipMissing {
@@ -398,6 +413,15 @@ struct GfsDownload: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
+                    if let surface = variable.variable as? GfsSurfaceVariable {
+                        if [GfsSurfaceVariable.precipitation, .frozen_precipitation_percent].contains(surface) {
+                            await inMemory.set(variable: surface, timestamp: timestamp, member: member, data: grib2d.array)
+                        }
+                        if surface == .frozen_precipitation_percent {
+                            continue // do not store frozen precip on disk
+                        }
+                    }
+                    
                     // Keep temperature and pressure in memory to relative humidity conversion
                     if let variable = variable.variable as? GfsSurfaceVariable,
                         keepVariableInMemory.contains(variable) {
@@ -423,6 +447,7 @@ struct GfsDownload: AsyncCommand {
                         time: timestamp,
                         member: member, fn: fn                    ))
                 }
+                handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
             if domain.ensembleMembers > 1 {
                 if let handle = try await storePrecipMembers.calculatePrecipitationProbability(
@@ -453,5 +478,30 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
     
     var gribIndexName: String? {
         return variable.gribIndexName(for: domain, timestep: timestep)
+    }
+}
+
+extension VariablePerMemberStorage {
+    /// Snowfall is given in percent. Multiply with precipitation to get the amonut. Note: For whatever reason it can be `-50%`.
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+        return try self.data
+            .groupedPreservedOrder(by: {$0.key.timestampAndMember})
+            .compactMap({ (t, handles) -> GenericVariableHandle? in
+                guard
+                    let precipitation = handles.first(where: {$0.key.variable == precipitation}),
+                    let frozen_precipitation_percent = handles.first(where: {$0.key.variable == frozen_precipitation_percent}) else {
+                    return nil
+                }
+                let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
+                    max($0/100 * $1 * 0.7, 0)
+                })
+                return GenericVariableHandle(
+                    variable: outVariable,
+                    time: t.timestamp,
+                    member: t.member,
+                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: snowfall)
+                )
+            }
+        )
     }
 }

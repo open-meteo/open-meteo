@@ -47,10 +47,13 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case showers
     
     /// CPOFP Percent frozen precipitation [%]
+    /// Download only to calculate `snowfall_water_equivalent` on the fly
     case frozen_precipitation_percent
     
     /// CFRZR Categorical Freezing Rain (0 or 1)
     case categorical_freezing_rain
+    
+    case snowfall_water_equivalent
     
     /// :CIN:surface: convective inhibition
     case convective_inhibition
@@ -84,7 +87,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .showers, .precipitation, .frozen_precipitation_percent: return true
+        case .showers, .precipitation, .snowfall_water_equivalent: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation, .diffuse_radiation: return true
@@ -124,7 +127,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .cloud_cover_mid: return 1
         case .cloud_cover_high: return 1
         case .relative_humidity_2m: return 1
-        case .precipitation: return 10
+        case .precipitation, .snowfall_water_equivalent: return 10
         case .wind_v_component_10m: return 10
         case .wind_u_component_10m: return 10
         case .wind_v_component_80m: return 10
@@ -183,7 +186,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .precipitation:
+        case .precipitation, .snowfall_water_equivalent:
             return .backwards_sum
         case .wind_v_component_10m:
             return .hermite(bounds: nil)
@@ -266,7 +269,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .cloud_cover_mid: return .percentage
         case .cloud_cover_high: return .percentage
         case .relative_humidity_2m: return .percentage
-        case .precipitation: return .millimetre
+        case .precipitation, .snowfall_water_equivalent: return .millimetre
         case .wind_v_component_10m: return .metrePerSecond
         case .wind_u_component_10m: return .metrePerSecond
         case .wind_v_component_80m: return .metrePerSecond
