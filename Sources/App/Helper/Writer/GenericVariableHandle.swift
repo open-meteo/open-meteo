@@ -83,8 +83,12 @@ struct GenericVariableHandle {
     
     static private func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int) async throws {
         if concurrent > 1 {
-            try await handles.groupedPreservedOrder(by: {"\($0.variable)"}).evenlyChunked(in: concurrent).foreachConcurrent(nConcurrent: concurrent, body: {
-                try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays)
+            try await handles
+                .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
+                .groupedPreservedOrder(by: {"\($0.variable)"})
+                .evenlyChunked(in: concurrent)
+                .foreachConcurrent(nConcurrent: concurrent, body: {
+                    try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays)
             })
         } else {
             try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays)
