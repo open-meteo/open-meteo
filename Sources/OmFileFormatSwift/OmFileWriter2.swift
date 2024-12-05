@@ -35,16 +35,17 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
             guard name.count <= UInt16.max else { fatalError() }
             guard children.count <= UInt32.max else { fatalError() }
             let type = OmType.dataTypeScalar.toC()
-            let size = om_variable_write_scalar_size(UInt16(name.count), UInt32(children.count), type)
             try buffer.alignTo64Bytes()
+            let size = om_variable_write_scalar_size(UInt16(name.count), UInt32(children.count), type)
+            let offset = UInt64(buffer.totalBytesWritten)
             try buffer.reallocate(minimumCapacity: Int(size))
             var value = value
-            let variable = withUnsafePointer(to: &value, { value in
-                let children = children.map {$0.offset}
-                return om_variable_write_scalar(buffer.bufferAtWritePosition, UInt64(buffer.totalBytesWritten), UInt16(name.count), UInt32(children.count), children, name.baseAddress, type, value)
+            withUnsafePointer(to: &value, { value in
+                let children = children.map {OmOffsetSize_t(offset: $0.offset, size: $0.size)}
+                om_variable_write_scalar(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), children, name.baseAddress, type, value)
             })
             buffer.incrementWritePosition(by: size)
-            return OmOffsetSize(offset: variable)
+            return OmOffsetSize(offset: offset, size: UInt64(size))
         }
     }
     
@@ -61,13 +62,14 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         var name = name
         return try name.withUTF8{ name in
             guard name.count <= UInt16.max else { fatalError() }
-            let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(array.dimensions.count))
             try buffer.alignTo64Bytes()
+            let size = om_variable_write_numeric_array_size(UInt16(name.count), UInt32(children.count), UInt64(array.dimensions.count))
+            let offset = UInt64(buffer.totalBytesWritten)
             try buffer.reallocate(minimumCapacity: Int(size))
-            let children = children.map {$0.offset}
-            let variable = om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt64(buffer.totalBytesWritten), UInt16(name.count), UInt32(children.count), children, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(array.dimensions.count), array.dimensions, array.chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
+            let children = children.map {OmOffsetSize_t(offset: $0.offset, size: $0.size)}
+            om_variable_write_numeric_array(buffer.bufferAtWritePosition, UInt16(name.count), UInt32(children.count), children, name.baseAddress, array.datatype.toC(), array.compression.toC(), array.scale_factor, array.add_offset, UInt64(array.dimensions.count), array.dimensions, array.chunks, UInt64(array.lutSize), UInt64(array.lutOffset))
             buffer.incrementWritePosition(by: size)
-            return OmOffsetSize(offset: variable)
+            return OmOffsetSize(offset: offset, size: UInt64(size))
         }
     }
     
@@ -78,7 +80,7 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         // write length of JSON
         let size = om_trailer_size()
         try buffer.reallocate(minimumCapacity: size)
-        om_trailer_write(buffer.bufferAtWritePosition, rootVariable.offset)
+        om_trailer_write(buffer.bufferAtWritePosition, OmOffsetSize_t(offset: rootVariable.offset, size: rootVariable.size))
         buffer.incrementWritePosition(by: size)
         
         // Flush
@@ -262,5 +264,11 @@ public struct OmFileWriterArrayFinalisd {
 
 /// Wrapper for the internal C structure to keep offset and size
 public struct OmOffsetSize {
-    let offset: OmOffsetSize_t
+    let offset: UInt64
+    let size: UInt64
+    
+    init(offset: UInt64, size: UInt64) {
+        self.offset = offset
+        self.size = size
+    }
 }
