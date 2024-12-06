@@ -78,9 +78,9 @@ struct GenericVariableHandle {
         if let run {
             // if run is nil, do not attempt to generate previous days files
             logger.info("Convert previous day database if required")
-            let startTimePreviousDays = Date()
+            let startTimePreviousDays = DispatchTime.now()
             try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent)
-            logger.info("Previous day convert in \(startTimePreviousDays)")
+            logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty())")
         }
     }
     
