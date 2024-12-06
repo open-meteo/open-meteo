@@ -14,7 +14,7 @@ enum ModelTimeVariable: String, GenericVariable {
     }
     
     var interpolation: ReaderInterpolation {
-        return .backwards
+        return .linear
     }
     
     var unit: SiUnit {

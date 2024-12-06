@@ -108,7 +108,7 @@ enum ReaderInterpolation {
     /// Take the next hour, and devide by `dt` to preserve sums like precipitation
     case backwards_sum
     
-    /// Take the next hour. E.g. used in weathercode, frozen precipitation percent
+    /// Replicate value backwards. E.g. min/max of previous hours
     case backwards
     
     /// How many timesteps on the left and right side are used for interpolation
@@ -120,9 +120,7 @@ enum ReaderInterpolation {
             return 2
         case .solar_backwards_averaged:
             return 2
-        case .backwards_sum:
-            return 1
-        case .backwards:
+        case .backwards_sum, .backwards:
             return 1
         }
     }

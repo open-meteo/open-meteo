@@ -45,7 +45,7 @@ struct CdoHelper {
         guard let cdo else {
             return try await curl.downloadGrib(url: url, bzip2Decode: true)
         }
-        // Multiple messages might be present in each grib fle
+        // Multiple messages might be present in each grib file
         // DWD produces non-standard GRIB2 files for 15 minutes ensemble data
         // GRIB messages need to be reordered by timestep
         // Otherwise CDO does not work

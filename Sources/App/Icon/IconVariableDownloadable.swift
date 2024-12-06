@@ -192,6 +192,12 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .cloud_cover_low: return ("clcl", "single-level", nil)
         case .cloud_cover_mid: return ("clcm", "single-level", nil)
         case .cloud_cover_high: return ("clch", "single-level", nil)
+        case .convective_cloud_top: 
+            let shallowOrDeepConvectionTop = domain == .iconD2 ? "htop_sc" : "htop_con"
+            return (shallowOrDeepConvectionTop, "single-level", nil)
+        case .convective_cloud_base: 
+            let shallowOrDeepConvectionBase = domain == .iconD2 ? "hbas_sc" : "hbas_con"
+            return (shallowOrDeepConvectionBase, "single-level", nil)
         case .precipitation: return ("tot_prec", "single-level", nil)
         case .weather_code: return ("ww", "single-level", nil)
         case .wind_v_component_10m: return ("v_10m", "single-level", nil)

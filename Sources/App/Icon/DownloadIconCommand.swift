@@ -24,7 +24,7 @@ struct DownloadIconCommand: AsyncCommand {
         @Option(name: "run")
         var run: String?
 
-        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
         var concurrent: Int?
         
         @Flag(name: "create-netcdf")
@@ -258,7 +258,7 @@ struct DownloadIconCommand: AsyncCommand {
                 if [.iconEps, .iconEuEps].contains(domain) && v.variable == .pressure_msl, 
                     let t2m = await storage.get(v.with(variable: .temperature_2m)) {
                     // ICON EPC is actually downloading surface level pressure
-                    // calculate sea level presure using temperature and elevation
+                    // calculate sea level pressure using temperature and elevation
                     data.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: data.data, elevation: domainElevation)
                 }
                 if domain == .iconEps && v.variable == .relative_humidity_2m,
@@ -287,7 +287,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 
                 /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
-                /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
+                /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
                 /// Note: snowfall height is NaN if snowfall height is at ground level
                 if v.variable == .freezing_level_height || v.variable == .snowfall_height,
@@ -337,6 +337,12 @@ struct DownloadIconCommand: AsyncCommand {
                 if v.variable == .snowfall_convective_water_equivalent {
                     // Do not write snowfall_convective_water_equivalent to disk anymore
                     return
+                }
+                
+                if v.variable == .convective_cloud_top || v.variable == .convective_cloud_base {
+                    // Icon sets points where no convective clouds are present to -500
+                    // We set them to 0 to be consistent with cloud_top and cloud_base in DMI Harmonie model
+                    data.data = data.data.map { $0 < -499 ? 0 : $0 }
                 }
                 
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
@@ -390,7 +396,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 
                 /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
-                /// Use temperature to esimate freezing level height below ground. This is consistent with GFS
+                /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
                 if v.variable == .freezing_level_height || v.variable == .snowfall_height {
                     /// Take temperature from 1-hourly data
@@ -495,24 +501,14 @@ struct DownloadIconCommand: AsyncCommand {
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
         
         let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true)
-            
+        
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
-            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true)
+            try await GenericVariableHandle.convert(logger: logger, domain: IconDomains.iconD2_15min, createNetcdf: signature.createNetcdf, run: run, handles: handles15minIconD2, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         }
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         
         logger.info("Finished in \(start.timeElapsedPretty())")
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(
-                bucket: uploadS3Bucket,
-                variables: signature.uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
-            )
-            if domain == .iconD2 {
-                try DomainRegistry.dwd_icon_d2_15min.syncToS3(bucket: uploadS3Bucket, variables: variables)
-            }
-        }
     }
 }
 

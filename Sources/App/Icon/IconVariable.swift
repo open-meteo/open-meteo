@@ -97,6 +97,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
+    case convective_cloud_top
+    case convective_cloud_base
     
     /// pressure reduced to sea level
     case pressure_msl
@@ -220,6 +222,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .cloud_cover_low: return 1
         case .cloud_cover_mid: return 1
         case .cloud_cover_high: return 1
+        case .convective_cloud_top: return 0.1
+        case .convective_cloud_base: return 0.1
         case .precipitation: return 10
         case .weather_code: return 1
         case .wind_v_component_10m: return 10
@@ -278,6 +282,8 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .cloud_cover_low: return .percentage
         case .cloud_cover_mid: return .percentage
         case .cloud_cover_high: return .percentage
+        case .convective_cloud_top: return .metre
+        case .convective_cloud_base: return .metre
         case .precipitation: return .millimetre
         case .weather_code: return .wmoCode
         case .wind_v_component_10m: return .metrePerSecond
@@ -329,7 +335,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         }
     }
     
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
+    /// Soil moisture or snow depth are cumulative processes and have offsets if multiple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
         case .soil_moisture_0_to_1cm: return true
@@ -359,6 +365,10 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
             return .linear
         case .cloud_cover_high:
             return .linear
+        case .convective_cloud_top:
+            return .hermite(bounds: 0...10e9)
+        case .convective_cloud_base:
+            return .hermite(bounds: 0...10e9)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .precipitation:
