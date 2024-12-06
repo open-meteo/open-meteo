@@ -182,6 +182,7 @@ extension OmFileReaderBackend {
         
         /// Loop over index blocks and read index data
         while om_decoder_next_index_read(decoder, &indexRead) {
+            //print("Read index \(indexRead)")
             let indexData = self.getData(offset: Int(indexRead.offset), count: Int(indexRead.count))
             
             var dataRead = OmDecoder_dataRead_t()
@@ -190,6 +191,7 @@ extension OmFileReaderBackend {
             var error: OmError_t = ERROR_OK
             /// Loop over data blocks and read compressed data chunks
             while om_decoder_next_data_read(decoder, &dataRead, indexData, indexRead.count, &error) {
+                //print("Read data \(dataRead) for chunk index \(dataRead.chunkIndex)")
                 let dataData = self.getData(offset: Int(dataRead.offset), count: Int(dataRead.count))
                 guard om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
                     fatalError("OmDecoder: \(String(cString: om_error_string(error)))")

@@ -13,7 +13,7 @@ import Foundation
 public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
     let buffer: OmBufferedWriter<FileHandle>
     
-    init(fn: FileHandle, initialCapacity: Int) {
+    public init(fn: FileHandle, initialCapacity: Int) {
         self.buffer = OmBufferedWriter(backend: fn, initialCapacity: initialCapacity)
     }
     
