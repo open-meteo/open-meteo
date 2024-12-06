@@ -371,7 +371,7 @@ bool om_decoder_next_data_read(const OmDecoder_t *decoder, OmDecoder_dataRead_t*
             return false;
         }
         
-        const uint64_t startPos = isOffset0 ? 0 : data[readPos];
+        const uint64_t startPos = isOffset0 && chunkIndex == 0 ? 0 : data[readPos];
         uint64_t endPos = startPos;
         
         // Loop to the next chunk until the end is reached
@@ -647,9 +647,9 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
 
 bool om_decoder_decode_chunks(const OmDecoder_t *decoder, OmRange_t chunk, const void *data, uint64_t data_size, void *into, void *chunkBuffer, OmError_t* error) {
     uint64_t pos = 0;
-    //printf("chunkIndex.lowerBound %d %d\n",chunkIndex.lowerBound,chunkIndex.upperBound);
+    //printf("chunkIndex.lowerBound %llu %llu\n",chunk.lowerBound,chunk.upperBound);
     for (uint64_t chunkNum = chunk.lowerBound; chunkNum < chunk.upperBound; ++chunkNum) {
-        //printf("chunkIndex %d pos=%d dataCount=%d \n",chunkNum, pos, dataCount);
+        //printf("chunkIndex %llu pos=%llu dataCount=%llu \n",chunkNum, pos, data_size);
         if (pos >= data_size) {
             (*error) = ERROR_DEFLATED_SIZE_MISMATCH;
             return false;
@@ -657,7 +657,7 @@ bool om_decoder_decode_chunks(const OmDecoder_t *decoder, OmRange_t chunk, const
         uint64_t uncompressedBytes = _om_decoder_decode_chunk(decoder, chunkNum, (const uint8_t *)data + pos, into, chunkBuffer);
         pos += uncompressedBytes;
     }
-    //printf("%d %d \n", pos, dataCount);
+    //printf("%llu %llu \n", pos, data_size);
     
     if (pos != data_size) {
         (*error) = ERROR_DEFLATED_SIZE_MISMATCH;
