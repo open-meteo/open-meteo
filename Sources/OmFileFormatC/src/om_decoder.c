@@ -313,29 +313,32 @@ bool om_decoder_next_index_read(const OmDecoder_t* decoder, OmDecoder_indexRead_
     
     while (1) {
         const uint64_t maxRead = io_size_max / lut_chunk_length * lut_chunk_element_count;
-        uint64_t nextChunkCount = index_read->nextChunk.upperBound - index_read->nextChunk.lowerBound;
-        const uint64_t nextIncrement = max(1, min(maxRead, nextChunkCount - 1));
+        const uint64_t nextChunkCount = index_read->nextChunk.upperBound - index_read->nextChunk.lowerBound;
+        const uint64_t nextIncrement = max(1, min(maxRead-1, nextChunkCount - 1));
         
         if (index_read->nextChunk.lowerBound + nextIncrement >= index_read->nextChunk.upperBound) {
             if (!_om_decoder_next_chunk_position(decoder, &index_read->nextChunk)) {
                 break;
             }
-            const uint64_t readStartNext = (index_read->nextChunk.lowerBound + endAlignOffset) / lut_chunk_element_count * lut_chunk_length - lut_chunk_length;
+            const uint64_t readEndNext = (index_read->nextChunk.lowerBound + endAlignOffset) / lut_chunk_element_count * lut_chunk_length;
+            const uint64_t readStartNext = readEndNext - lut_chunk_length;
             const uint64_t readEndPrevious = chunkIndex / lut_chunk_element_count * lut_chunk_length;
             
+            if (readEndNext - readStart > io_size_max) {
+                break;
+            }
             if (readStartNext - readEndPrevious > decoder->io_size_merge) {
                 break;
             }
         } else {
+            const uint64_t readEndNext = (index_read->nextChunk.lowerBound + nextIncrement + endAlignOffset) / lut_chunk_element_count * lut_chunk_length;
+            
+            if (readEndNext - readStart > io_size_max) {
+                index_read->nextChunk.lowerBound += 1;
+                break;
+            }
             index_read->nextChunk.lowerBound += nextIncrement;
         }
-        
-        const uint64_t readEndNext = (index_read->nextChunk.lowerBound + endAlignOffset) / lut_chunk_element_count * lut_chunk_length;
-        
-        if (readEndNext - readStart > io_size_max) {
-            break;
-        }
-        
         chunkIndex = index_read->nextChunk.lowerBound;
     }
     
