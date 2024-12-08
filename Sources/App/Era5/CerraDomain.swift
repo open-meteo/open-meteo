@@ -361,6 +361,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
     case precipitation
     case direct_radiation
     case albedo
+    case snow_depth
+    case snow_depth_water_equivalent
     
     var storePreviousForecast: Bool {
         return false
@@ -408,6 +410,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
             return .solar_backwards_averaged
         case .albedo:
             return .linear
+        case .snow_depth, .snow_depth_water_equivalent:
+            return .linear
         }
     }
     
@@ -434,6 +438,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .wind_speed_100m: return "wind_speed"
         case .wind_direction_100m: return "wind_direction"
         case .albedo: return "albedo"
+        case .snow_depth: return "snow_depth"
+        case .snow_depth_water_equivalent: return "snow_depth_water_equivalent"
         }
     }
     
@@ -466,6 +472,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
         case .shortwave_radiation: fallthrough // joules to watt
         case .direct_radiation: return (0, 1/3600)
+        case .albedo: return (0, 100)
         default: return nil
         }
     }
@@ -489,6 +496,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .precipitation: return ["tp"]
         case .direct_radiation: return ["tidirswrf"]
         case .albedo: return ["al"]
+        case .snow_depth: return ["sd"]
+        case .snow_depth_water_equivalent: return ["sde"]
         }
     }
     
@@ -511,6 +520,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .wind_speed_100m: return 10
         case .wind_direction_100m: return 0.5
         case .albedo: return 1
+        case .snow_depth: return 100 // 1cm res
+        case .snow_depth_water_equivalent: return 10 // 0.1mm res
         }
     }
     
@@ -532,6 +543,8 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .precipitation: return .millimetre
         case .direct_radiation: return .wattPerSquareMetre
         case .albedo: return .percentage
+        case .snow_depth: return .metre
+        case .snow_depth_water_equivalent: return .millimetre
         }
     }
 }
