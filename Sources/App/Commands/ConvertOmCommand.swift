@@ -106,7 +106,7 @@ struct ConvertOmCommand: Command {
         }
         
         let dimensionsOut = [ny, nx, nt]
-        let chunksOut = [5,5,chunks[1]]
+        let chunksOut = [1,16,chunks[1]]
         // TODO somehow 5x5 is larger than 1x25....
         
         let dataRaw = reader.read([0..<ny*nx, 0..<nt], io_size_merge: .max)

@@ -140,7 +140,7 @@ OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, ui
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_copy_callback = om_common_copy_int16_to_float;
-            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode;
+            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta_nd_decode16;
             decoder->decompress_callback = (om_compress_callback_t)p4nzdec128v16;
             break;
             
@@ -148,12 +148,12 @@ OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, ui
             switch (data_type) {
                 case DATA_TYPE_FLOAT_ARRAY:
                     decoder->decompress_callback = om_common_decompress_fpxdec32;
-                    decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode_xor;
+                    decoder->decompress_filter_callback = (om_compress_filter_callback_t)xor_nd_decode_float;
                     break;
                     
                 case DATA_TYPE_DOUBLE_ARRAY:
                     decoder->decompress_callback = om_common_decompress_fpxdec64;
-                    decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode_xor_double;
+                    decoder->decompress_filter_callback = (om_compress_filter_callback_t)xor_nd_decode_double;
                     break;
                     
                 default:
@@ -168,7 +168,7 @@ OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, ui
             decoder->bytes_per_element = 4;
             decoder->bytes_per_element_compressed = 2;
             decoder->decompress_copy_callback = om_common_copy_int16_to_float_log10;
-            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta2d_decode;
+            decoder->decompress_filter_callback = (om_compress_filter_callback_t)delta_nd_decode16;
             decoder->decompress_callback = (om_compress_callback_t)p4nzdec128v16;
             break;
             
@@ -502,6 +502,9 @@ bool om_decoder_next_data_read(const OmDecoder_t *decoder, OmDecoder_dataRead_t*
     return true;
 }
 
+
+
+
 // Internal function to decode a single chunk.
 uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkIndex, const void *data, void *into, void *chunk_buffer) {
     uint64_t rollingMultiply = 1;
@@ -512,7 +515,6 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
     int64_t q = 0; // Write coordinate.
     int64_t linearReadCount = 1;
     bool linearRead = true;
-    int64_t lengthLast = 0;
     bool no_data = false;
     
     const uint64_t dimensions_count = decoder->dimensions_count;
@@ -540,10 +542,6 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
         
         if (read_offset + read_count <= chunkGlobal0Start || read_offset >= chunkGlobal0End) {
             no_data = true;
-        }
-        
-        if (i == dimensions_count - 1) {
-            lengthLast = length0;
         }
         
         const uint64_t d0 = clampedLocal0Start;
@@ -581,7 +579,7 @@ uint64_t _om_decoder_decode_chunk(const OmDecoder_t *decoder, uint64_t chunkInde
     }
     
     /// Perform 2D decoding
-    (*decoder->decompress_filter_callback)(lengthInChunk / lengthLast, lengthLast, chunk_buffer);
+    (*decoder->decompress_filter_callback)(chunk_buffer, chunkIndex, decoder->dimensions, decoder->chunks, decoder->dimensions_count);
     
     // Copy data from the chunk buffer to the output buffer.
     while (true) {

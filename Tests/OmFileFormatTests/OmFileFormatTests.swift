@@ -4,6 +4,32 @@ import XCTest
 @_implementationOnly import OmFileFormatC
 
 final class OmFileFormatTests: XCTestCase {
+    
+    func testdelta() {
+        var dims = [UInt64(3), 5]
+        var data = (0..<dims.reduce(1, *)).map({Int16($0)})
+        
+        //delta2d_encode(3, 5, &data)
+        delta_nd_encode16(&data, 0, &dims, &dims, UInt64(dims.count))
+        XCTAssertEqual(data, [0, 1, 2, 3, 4, 5, 5, 5, 5, 5, 5, 5, 5, 5, 5])
+        
+        delta_nd_decode16(&data, 0, &dims, &dims, UInt64(dims.count))
+        XCTAssertEqual(data, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14])
+    }
+    
+    func testdelta2() {
+        var chunks = [UInt64(2), 2]
+        var dims = [UInt64(5), 5]
+        var data = [Int16(4), 9]
+        
+        //delta2d_encode(3, 5, &data)
+        delta_nd_encode16(&data, 2, &dims, &chunks, UInt64(dims.count))
+        XCTAssertEqual(data, [4, 5])
+        
+        delta_nd_decode16(&data, 2, &dims, &chunks, UInt64(dims.count))
+        XCTAssertEqual(data, [4, 9])
+    }
+    
     func testHeaderAndTrailer() {
         XCTAssertEqual(om_header_size(), 40)
         XCTAssertEqual(om_trailer_size(), 24)
@@ -272,7 +298,7 @@ final class OmFileFormatTests: XCTestCase {
         XCTAssertEqual(bytes[35..<40], [0, 0, 0, 0, 0]) // zero padding
         XCTAssertEqual(bytes[40..<40+17], [5, 4, 5, 0, 0, 0, 0, 0, 82, 9, 188, 0, 105, 110, 116, 51, 50]) // scalar int32
         XCTAssertEqual(bytes[65..<65+22], [4, 6, 0, 0, 0, 0, 0, 0, 0, 0, 64, 42, 129, 103, 65, 100, 111, 117, 98, 108, 101, 0]) // scalar double
-        XCTAssertEqual(bytes[88..<88+124], [20, 0, 4, 0, 2, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 30, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97]) // array meta
+        XCTAssertEqual(bytes[88..<88+124], [20, 0, 4, 0, 2, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 17, 0, 0, 0, 0, 0, 0, 0, 22, 0, 0, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 64, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97]) // array meta
         XCTAssertEqual(bytes[216..<240], [79, 77, 3, 0, 0, 0, 0, 0, 88, 0, 0, 0, 0, 0, 0, 0, 124, 0, 0, 0, 0, 0, 0, 0]) // trailer
     }
     
