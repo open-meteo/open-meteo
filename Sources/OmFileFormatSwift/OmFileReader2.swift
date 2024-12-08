@@ -147,30 +147,37 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         }
         assert(intoCubeOffset.count == nDimensions)
         assert(intoCubeDimension.count == nDimensions)
-        
         let readOffset = dimRead.map({$0.lowerBound})
         let readCount = dimRead.map({UInt64($0.count)})
         
-        var decoder = OmDecoder_t()
-        let error = om_decoder_init(
-            &decoder,
-            variable,
-            UInt64(nDimensions),
-            readOffset,
-            readCount,
-            intoCubeOffset,
-            intoCubeDimension,
-            lutChunkElementCount,
-            io_size_merge,
-            io_size_max
-        )
-        guard error == ERROR_OK else {
-            fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
-        }
-        let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
-        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
-        fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
-        chunkBuffer.deallocate()
+        readOffset.withUnsafeBufferPointer({ readOffset in
+            readCount.withUnsafeBufferPointer({ readCount in
+                intoCubeOffset.withUnsafeBufferPointer({ intoCubeOffset in
+                    intoCubeDimension.withUnsafeBufferPointer({ intoCubeDimension in
+                        var decoder = OmDecoder_t()
+                        let error = om_decoder_init(
+                            &decoder,
+                            variable,
+                            UInt64(nDimensions),
+                            readOffset.baseAddress,
+                            readCount.baseAddress,
+                            intoCubeOffset.baseAddress,
+                            intoCubeDimension.baseAddress,
+                            lutChunkElementCount,
+                            io_size_merge,
+                            io_size_max
+                        )
+                        guard error == ERROR_OK else {
+                            fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                        }
+                        let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
+                        let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
+                        fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
+                        chunkBuffer.deallocate()
+                    })
+                })
+            })
+        })
     }
 }
 

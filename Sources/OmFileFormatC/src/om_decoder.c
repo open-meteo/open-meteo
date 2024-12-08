@@ -187,6 +187,7 @@ void om_decoder_init_index_read(const OmDecoder_t* decoder, OmDecoder_indexRead_
         const uint64_t chunk = decoder->chunks[i];
         const uint64_t read_offset = decoder->read_offset[i];
         const uint64_t read_count = decoder->read_count[i];
+        //printf("dimension=%llu chunk=%llu read_offset=%llu read_count=%llu\n", dimension,chunk,read_offset,read_count);
         
         // Calculate lower and upper chunk indices for the current dimension
         const uint64_t chunkInThisDimensionLower = read_offset / chunk;
