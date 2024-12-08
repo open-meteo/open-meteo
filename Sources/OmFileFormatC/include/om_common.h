@@ -19,7 +19,7 @@ typedef void(*om_compress_copy_callback_t)(uint64_t length, float scale_factor, 
 typedef uint64_t(*om_compress_callback_t)(const void* src, uint64_t length, void* dest);
 
 /// Perform a 2d filter operation
-typedef void(*om_compress_filter_callback_t)(const uint64_t length0, const uint64_t length1, void* buffer);
+typedef void(*om_compress_filter_callback_t)(void *chunkbuffer, uint64_t chunkIndex, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count);
 
 #define MAX_LUT_ELEMENTS 256
 
