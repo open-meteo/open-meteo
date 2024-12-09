@@ -66,7 +66,7 @@ extension Zensun {
     }
     
     /// Calculate DNI based on zenith angle
-    public static func calculateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt) -> [Float] {
+    public static func calculateBackwardsDNI(directRadiation: [Float], latitude: Float, longitude: Float, timerange: TimerangeDt, convertToInstant: Bool = false) -> [Float] {
         //return calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: latitude, longitude: longitude, timerange: timerange)
         
         return zip(directRadiation, timerange).map { (dhi, timestamp) in
@@ -125,12 +125,16 @@ extension Zensun {
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
             let zzBackwards = (left-right) / (p1_l - p10_l)
             let dni = dhi / zzBackwards
+            
             // Prevent possible division by zero
             // See https://github.com/open-meteo/open-meteo/discussions/395
             if zzBackwards <= 0.0001 {
                 return dhi
             }
-            return dni
+            
+            /// Instant sun elevation
+            let zzInstant = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1-p0)
+            return convertToInstant ? dni * max(zzInstant, 0) / zzBackwards : dni
         }
     }
 }

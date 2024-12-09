@@ -277,8 +277,8 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
         case .direct_normal_irradiance_instant:
-            let direct = try get(derived: .direct_radiation_instant, time: time)
-            let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            let direct = try get(raw: .direct_radiation, time: time)
+            let dni = Zensun.calculateBackwardsDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertToInstant: true)
             return DataAndUnit(dni, direct.unit)
         case .direct_radiation_instant:
             let direct = try get(raw: .direct_radiation, time: time)
