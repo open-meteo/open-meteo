@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import SwiftNetCDF
-import SwiftPFor2D
+import OmFileFormatSwift
 
 /// Download CAMS Europe and Global air quality forecasts
 struct DownloadCamsCommand: AsyncCommand {
