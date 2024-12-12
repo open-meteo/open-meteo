@@ -73,17 +73,9 @@ struct OmFileSplitter {
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)),
-                omFile.dim0 % nLocations == 0 {
-                let nLevels = omFile.dim0 / nLocations
-                if nLevels > 1 && location.count > 1 {
-                    fatalError("Multi level and mutli location not supported")
-                }
-                if level < nLevels {
-                    let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-                    try omFile.willNeed(dim0Slow: dim0, dim1: offsets.file)
-                    start = fileTime.upperBound
-                }
+               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) {
+                try omFile.willNeed(location: location, dim1: offsets.file, level: level, nLocations: nLocations)
+                start = fileTime.upperBound
             }
         }
         if start >= indexTime.upperBound {
@@ -104,18 +96,7 @@ struct OmFileSplitter {
                 guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                     continue
                 }
-                guard omFile.dim0 % nLocations == 0 else {
-                    continue
-                }
-                let nLevels = omFile.dim0 / nLocations
-                if nLevels > 1 && location.count > 1 {
-                    fatalError("Multi level and mutli location not supported")
-                }
-                guard level < nLevels else {
-                    continue
-                }
-                let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-                try omFile.willNeed(dim0Slow: dim0, dim1: offsets.file)
+                try omFile.willNeed(location: location, dim1: offsets.file, level: level, nLocations: nLocations)
                 start = fileTime.upperBound
             }
         }
@@ -131,18 +112,7 @@ struct OmFileSplitter {
             guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                 continue
             }
-            guard omFile.dim0 % nLocations == 0 else {
-                continue
-            }
-            let nLevels = omFile.dim0 / nLocations
-            if nLevels > 1 && location.count > 1 {
-                fatalError("Multi level and mutli location not supported")
-            }
-            guard level < nLevels else {
-                continue
-            }
-            let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try omFile.willNeed(dim0Slow: dim0, dim1: offsets.file)
+            try omFile.willNeed(location: location, dim1: offsets.file, level: level, nLocations: nLocations)
         }
     }
     
@@ -151,10 +121,6 @@ struct OmFileSplitter {
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
     
-    /**
-     TODO:
-     - `level` implementation could be moved to a 3D file level
-     */
     func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         var start = indexTime.lowerBound
@@ -164,17 +130,10 @@ struct OmFileSplitter {
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)),
-                omFile.dim0 % nLocations == 0 {
-                let nLevels = omFile.dim0 / nLocations
-                if nLevels > 1 && location.count > 1 {
-                    fatalError("Multi level and mutli location not supported")
-                }
-                if level < nLevels {
-                    let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-                    try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.time.count, dim0Slow: dim0, dim1: offsets.file)
-                    start = fileTime.upperBound
-                }
+               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) {
+                
+                try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.time.count, location: location, dim1: offsets.file, level: level, nLocations: nLocations)
+                start = fileTime.upperBound
             }
         }
         
@@ -192,20 +151,7 @@ struct OmFileSplitter {
                 guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                     continue
                 }
-                guard omFile.dim0 % nLocations == 0 else {
-                    continue
-                }
-                //assert(omFile.chunk0 == nLocations)
-                //assert(omFile.chunk1 == nTimePerFile)
-                let nLevels = omFile.dim0 / nLocations
-                if nLevels > 1 && location.count > 1 {
-                    fatalError("Multi level and mutli location not supported")
-                }
-                guard level < nLevels else {
-                    continue
-                }
-                let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-                try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: offsets.file.count, dim0Slow: dim0, dim1: offsets.file)
+                try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.time.count, location: location, dim1: offsets.file, level: level, nLocations: nLocations)
                 start = fileTime.upperBound
             }
         }
@@ -222,20 +168,7 @@ struct OmFileSplitter {
             guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
                 continue
             }
-            guard omFile.dim0 % nLocations == 0 else {
-                continue
-            }
-            //assert(omFile.chunk0 == nLocations)
-            //assert(omFile.chunk1 == nTimePerFile)
-            let nLevels = omFile.dim0 / nLocations
-            if nLevels > 1 && location.count > 1 {
-                fatalError("Multi level and mutli location not supported")
-            }
-            guard level < nLevels else {
-                continue
-            }
-            let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try omFile.read(into: &out, arrayDim1Range: offsets.array.add(delta), arrayDim1Length: time.time.count, dim0Slow: dim0, dim1: offsets.file)
+            try omFile.read(into: &out, arrayDim1Range: offsets.array, arrayDim1Length: time.time.count, location: location, dim1: offsets.file, level: level, nLocations: nLocations)
         }
         return out
     }
@@ -275,7 +208,7 @@ struct OmFileSplitter {
         }
         
         struct WriterPerStep {
-            let read: OmFileReader<MmapFile>?
+            let read: OmFileReader2<MmapFile>?
             let write: OmFileWriterState<FileHandle>
             let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
             let fileName: String
@@ -326,8 +259,11 @@ struct OmFileSplitter {
             
             for writer in writers {
                 // Read existing data for a chunk of locations
-                if let omRead = writer.read, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
-                    try omRead.read(into: &fileData, arrayDim1Range: 0..<locationRange.count * nTimePerFile, arrayDim1Length: nTimePerFile, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
+                if let omRead = writer.read, omRead.getDimensions().count == 2, omRead.getDimensions()[0] == nLocations, omRead.getDimensions()[1] == nTimePerFile {
+                    try omRead.read(
+                        into: &fileData,
+                        dimRead: [UInt64(locationRange.lowerBound)..<UInt64(locationRange.upperBound), 0..<UInt64(nTimePerFile)]
+                    )
                 } else {
                     /// If the old file does not exist, just make sure it is filled with NaNs
                     for i in fileData.indices {

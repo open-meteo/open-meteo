@@ -62,7 +62,7 @@ extension Gridable {
         return nx * ny
     }
     
-    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader<MmapFileCached>?, mode: GridSelectionMode) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+    func findPoint(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader2<MmapFile>?, mode: GridSelectionMode) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let elevationFile = elevationFile else {
             guard let point = findPoint(lat: lat, lon: lon) else {
                 return nil
@@ -82,7 +82,7 @@ extension Gridable {
     }
     
     /// Read elevation for a single grid point
-    func readElevation(gridpoint: Int, elevationFile: OmFileReader<MmapFileCached>) throws -> ElevationOrSea {
+    func readElevation(gridpoint: Int, elevationFile: OmFileReader2<MmapFile>) throws -> ElevationOrSea {
         let elevation = try readFromStaticFile(gridpoint: gridpoint, file: elevationFile)
         if elevation.isNaN {
             return .noData
@@ -95,7 +95,7 @@ extension Gridable {
     }
     
     /// Read elevation for a single grid point. Interpolates linearly between grid-cells. Should only be used for linear interpolated reads afterwards
-    func readElevationInterpolated(gridpoint: GridPoint2DFraction, elevationFile: OmFileReader<MmapFileCached>) throws -> ElevationOrSea {
+    /*func readElevationInterpolated(gridpoint: GridPoint2DFraction, elevationFile: OmFileReader<MmapFile>) throws -> ElevationOrSea {
         let elevation = try elevationFile.readInterpolated(pos: gridpoint)
         if elevation.isNaN {
             return .noData
@@ -106,19 +106,19 @@ extension Gridable {
             return .sea
         }
         return .elevation(elevation)
-    }
+    }*/
     
     /// Read static information e.g. elevation or soil type
-    func readFromStaticFile(gridpoint: Int, file: OmFileReader<MmapFileCached>) throws -> Float {
+    func readFromStaticFile(gridpoint: Int, file: OmFileReader2<MmapFile>) throws -> Float {
         let x = gridpoint % nx
         let y = gridpoint / nx
         var value = Float.nan
-        try file.read(into: &value, arrayDim1Range: 0..<1, arrayDim1Length: 1, dim0Slow: y..<y+1, dim1: x..<x+1)
+        try file.read(into: &value, offset: [UInt64(y), UInt64(x)], count: [1, 1])
         return value
     }
     
     /// Get nearest grid point
-    func findPointNearest(lat: Float, lon: Float, elevationFile: OmFileReader<MmapFileCached>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+    func findPointNearest(lat: Float, lon: Float, elevationFile: OmFileReader2<MmapFile>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
@@ -131,7 +131,7 @@ extension Gridable {
     }
     
     /// Find point, perferably in sea
-    func findPointInSea(lat: Float, lon: Float, elevationFile: OmFileReader<MmapFileCached>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+    func findPointInSea(lat: Float, lon: Float, elevationFile: OmFileReader2<MmapFile>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
@@ -143,7 +143,7 @@ extension Gridable {
         
         // TODO find a solution to reuse buffers inside read... maybe allocate buffers in a pool per eventloop?
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
-        let elevationSurrounding = try elevationFile.read(dim0Slow: yrange, dim1: xrange)
+        let elevationSurrounding = try elevationFile.read([UInt64(xrange.lowerBound) ..< UInt64(xrange.upperBound), UInt64(yrange.lowerBound) ..< UInt64(yrange.upperBound)])
         
         if elevationSurrounding[elevationSurrounding.count / 2] <= -999 {
             return (center, .sea)
@@ -169,7 +169,7 @@ extension Gridable {
     }
     
     /// Analyse 3x3 locations around the desired coordinate and return the best elevation match
-    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader<MmapFileCached>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: OmFileReader2<MmapFile>) throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         guard let center = findPoint(lat: lat, lon: lon) else {
             return nil
         }
@@ -180,7 +180,7 @@ extension Gridable {
         let yrange = (y-searchRadius..<y+searchRadius+1).clamped(to: 0..<ny)
         
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
-        let elevationSurrounding = try elevationFile.read(dim0Slow: yrange, dim1: xrange)
+        let elevationSurrounding = try elevationFile.read([UInt64(xrange.lowerBound) ..< UInt64(xrange.upperBound), UInt64(yrange.lowerBound) ..< UInt64(yrange.upperBound)])
         
         if abs(elevationSurrounding[elevationSurrounding.count / 2] - elevation ) <= 100 {
             return (center, .elevation(elevationSurrounding[elevationSurrounding.count / 2]))

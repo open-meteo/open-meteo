@@ -162,7 +162,7 @@ struct GloFasDownloader: AsyncCommand {
                     try await withThrowingTaskGroup(of: Void.self) { group in
                         let counter = Counter()
                         let tracker = TransferAmountTracker(logger: logger, totalSize: try response.contentLength())
-                        var dataPerTimestep = [OmFileReader<DataAsClass>]()
+                        var dataPerTimestep = [OmFileReader2<DataAsClass>]()
                         dataPerTimestep.reserveCapacity(nTime)
                         for try await message in response.body.tracker(tracker).decodeGrib() {
                             let date = message.get(attribute: "validityDate")!
@@ -192,7 +192,7 @@ struct GloFasDownloader: AsyncCommand {
                             
                             /// Use compressed memory to store each downloaded step
                             /// Roughly 2.5 MB memory per step (uncompressed 20.6 MB)
-                            dataPerTimestep.append(try OmFileReader(fn: DataAsClass(data: try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))))
+                            dataPerTimestep.append(try OmFileReader2(fn: DataAsClass(data: try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))))
                             
                             guard forecastDate == nTime-1 else {
                                 continue
@@ -215,7 +215,8 @@ struct GloFasDownloader: AsyncCommand {
                                     
                                     let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nx*ny)
                                     for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
-                                        try data.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                                        //try data.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
+                                        try data.read(into: &readTemp, dimRead: [0..<UInt64(locationRange.count), 0..<1])
                                         data2d[0..<data2d.nLocations, forecastDate] = readTemp
                                     }
                                     
@@ -324,8 +325,8 @@ struct GloFasDownloader: AsyncCommand {
             guard FileManager.default.fileExists(atPath: file) else {
                 continue
             }
-            let dailyFile = try OmFileReader(file: file)
-            data2d[0..<nx*ny, i] = try dailyFile.readAll()
+            let dailyFile = try OmFileReader2(file: file)
+            data2d[0..<nx*ny, i] = try dailyFile.read()
         }
         logger.info("Update om database")
         try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .p4nzdec256logarithmic)
@@ -390,9 +391,9 @@ struct GloFasDownloader: AsyncCommand {
         let nt = time.count
         let yearlyFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "river_discharge", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
         
-        let omFiles = try time.map { time -> OmFileReader in
+        let omFiles = try time.map { time -> OmFileReader2 in
             let omFile = "\(downloadDir)glofas_\(time.format_YYYYMMdd).om"
-            return try OmFileReader(file: omFile)
+            return try OmFileReader2(file: omFile)
         }
         
         let ny = domain.grid.ny
@@ -419,8 +420,8 @@ struct GloFasDownloader: AsyncCommand {
             var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
             
             for (i, omfile) in omFiles.enumerated() {
-                try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<1)
-                let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<1)
+                try omfile.willNeed()
+                let read = try omfile.read()
                 let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: 1)
                 for l in 0..<locationRange.count {
                     fasttime[l, i ..< (i+1)] = read2d[l, 0..<1]
