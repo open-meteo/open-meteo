@@ -112,7 +112,7 @@ struct GfsDownload: AsyncCommand {
             }
             let surfaceVariables = GfsSurfaceVariable.allCases
             
-            variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
+            variables = (onlyVariables ?? []) + (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
             
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws)
             
@@ -244,7 +244,7 @@ struct GfsDownload: AsyncCommand {
                     }
                 }))
                 
-                let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0, useAws: <#Bool#>)
+                let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0, useAws: downloadFromAws)
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
                     try grib2d.load(message: message)
                     guard let timestep = variable.timestep else {
