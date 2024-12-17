@@ -112,7 +112,8 @@ struct GfsDownload: AsyncCommand {
             }
             let surfaceVariables = GfsSurfaceVariable.allCases
             
-            variables = (onlyVariables ?? []) + (signature.surfaceLevel ? surfaceVariables : []) + (signature.upperLevel ? pressureVariables : [])
+            variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables+pressureVariables : pressureVariables) : surfaceVariables)
+            
             
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws)
             
