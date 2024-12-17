@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormatSwift
 
 enum ModelTimeVariable: String, GenericVariable {
     case initialisation_time
