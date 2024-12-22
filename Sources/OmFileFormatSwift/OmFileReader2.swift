@@ -17,13 +17,9 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     public let fn: Backend
     
     let variable: UnsafePointer<OmVariable_t?>?
-    
-    /// Number of elements in index LUT chunk. Assumed to 256 in production files. Only used for testing!
-    let lutChunkElementCount: UInt64
         
     /// Open a file and decode om file meta data. In this case  fn is typically mmap or just plain memory
-    public init(fn: Backend, lutChunkElementCount: UInt64 = 256) throws {
-        self.lutChunkElementCount = lutChunkElementCount
+    public init(fn: Backend) throws {
         self.fn = fn
         
         let headerSize = om_header_size()
@@ -51,10 +47,9 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         }
     }
     
-    init(fn: Backend, variable: UnsafePointer<OmVariable_t?>?, lutChunkElementCount: UInt64) {
+    init(fn: Backend, variable: UnsafePointer<OmVariable_t?>?) {
         self.fn = fn
         self.variable = variable
-        self.lutChunkElementCount = lutChunkElementCount
     }
     
     public var dataType: DataType {
@@ -83,7 +78,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         /// Read data from child.offset by child.size
         let dataChild = fn.getData(offset: Int(offset), count: Int(size))
         let childVariable = om_variable_init(dataChild)
-        return OmFileReader2(fn: fn, variable: childVariable, lutChunkElementCount: lutChunkElementCount)
+        return OmFileReader2(fn: fn, variable: childVariable)
     }
     
     public func readScalar<OmType: OmFileScalarDataTypeProtocol>() -> OmType? {
@@ -107,7 +102,6 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         return OmFileReader2Array(
             fn: fn,
             variable: variable,
-            lutChunkElementCount: lutChunkElementCount,
             io_size_max: io_size_max,
             io_size_merge: io_size_merge
         )
@@ -131,9 +125,6 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
     public let fn: Backend
     
     let variable: UnsafePointer<OmVariable_t?>?
-    
-    /// Number of elements in index LUT chunk. Assumed to 256 in production files. Only used for testing!
-    let lutChunkElementCount: UInt64
     
     let io_size_max: UInt64
         
@@ -222,7 +213,6 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
                             readCount.baseAddress,
                             intoCubeOffset.baseAddress,
                             intoCubeDimension.baseAddress,
-                            lutChunkElementCount,
                             io_size_merge,
                             io_size_max
                         )
@@ -263,7 +253,6 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
                     readCount.baseAddress,
                     nil,
                     nil,
-                    lutChunkElementCount,
                     io_size_merge,
                     io_size_max
                 )

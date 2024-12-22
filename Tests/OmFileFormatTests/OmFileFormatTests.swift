@@ -139,7 +139,7 @@ final class OmFileFormatTests: XCTestCase {
         let a = try read.read(range: [0..<100, 0..<100, 0..<10])
         XCTAssertEqual(a, data)
         
-        XCTAssertEqual(readFn.count, 153632)
+        XCTAssertEqual(readFn.count, 154176)
         //let hex = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: readFn.getData(offset: 0, count: readFn.count)), count: readFn.count, deallocator: .none)
         //XCTAssertEqual(hex, "awfawf")
     }
@@ -286,7 +286,7 @@ final class OmFileFormatTests: XCTestCase {
         let fn = try FileHandle.createNewFile(file: file)
         let fileWriter = OmFileWriter2(fn: fn, initialCapacity: 8)
         
-        let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
+        let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         try writer.writeData(array: data)
@@ -295,7 +295,7 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2).asArray(of: Float.self)!
+        let read = try OmFileReader2(fn: readFn).asArray(of: Float.self)!
         
 
         let a = try read.read(range: [0..<5, 0..<5])
@@ -356,9 +356,9 @@ final class OmFileFormatTests: XCTestCase {
             XCTAssertEqual(try read.read(range: [0..<5, x..<x+1]), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
         }
         
-        XCTAssertEqual(readFn.count, 152)
+        XCTAssertEqual(readFn.count, 144)
         let bytes = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: readFn.getData(offset: 0, count: readFn.count)), count: readFn.count, deallocator: .none).map{UInt8($0)}
-        XCTAssertEqual(bytes, [79, 77, 3, 0, 4, 130, 0, 2, 3, 34, 0, 4, 194, 2, 10, 4, 178, 0, 12, 4, 242, 0, 14, 197, 17, 20, 194, 2, 22, 194, 2, 24, 3, 195, 4, 11, 194, 3, 18, 195, 4, 25, 194, 3, 31, 193, 1, 0, 20, 0, 4, 0, 0, 0, 0, 0, 15, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97, 0, 0, 0, 0, 79, 77, 3, 0, 0, 0, 0, 0, 48, 0, 0, 0, 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0])
+        XCTAssertEqual(bytes, [79, 77, 3, 0, 4, 130, 0, 2, 3, 34, 0, 4, 194, 2, 10, 4, 178, 0, 12, 4, 242, 0, 14, 197, 17, 20, 194, 2, 22, 194, 2, 24, 3, 3, 228, 200, 109, 1, 0, 0, 20, 0, 4, 0, 0, 0, 0, 0, 6, 0, 0, 0, 0, 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 128, 63, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 100, 97, 116, 97, 0, 0, 0, 0, 79, 77, 3, 0, 0, 0, 0, 0, 40, 0, 0, 0, 0, 0, 0, 0, 76, 0, 0, 0, 0, 0, 0, 0])
         
         /*// test interpolation
         XCTAssertEqualArray(try read.readInterpolated(dim0X: 0, dim0XFraction: 0.5, dim0Y: 0, dim0YFraction: 0.5, dim0Nx: 2, dim1: 0..<5), [7.5, 8.5, 9.5, 10.5, 11.5], accuracy: 0.001)
@@ -377,7 +377,7 @@ final class OmFileFormatTests: XCTestCase {
         let fn = try FileHandle.createNewFile(file: file)
         let fileWriter = OmFileWriter2(fn: fn, initialCapacity: 8)
         
-        let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0, lutChunkElementCount: 2)
+        let writer = try fileWriter.prepareArray(type: Float.self, dimensions: dims, chunkDimensions: [2,2], compression: .p4nzdec256, scale_factor: 1, add_offset: 0)
         
         let data = [Float(0.0), 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0]
         try writer.writeData(array: data)
@@ -386,7 +386,7 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2).asArray(of: Float.self, io_size_max: 0, io_size_merge: 0)!
+        let read = try OmFileReader2(fn: readFn).asArray(of: Float.self, io_size_max: 0, io_size_merge: 0)!
         
 
         let a = try read.read(range: [0..<5, 0..<5])

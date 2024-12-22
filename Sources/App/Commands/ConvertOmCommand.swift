@@ -107,10 +107,10 @@ struct ConvertOmCommand: Command {
         }
         
         let dimensionsOut = [ny, nx, nt]
-        let chunksOut = [5,5,chunks[1]]
+        let chunksOut = [1,chunks[0],chunks[1]]
         // TODO somehow 5x5 is larger than 1x25....
         
-        let dataRaw = try reader.read(range: [0..<ny*nx, 0..<nt])
+        /*let dataRaw = try reader.read(range: [0..<ny*nx, 0..<nt])
         print("data read")
         if false {
             let ncFile = try NetCDF.create(path: "\(dest).nc", overwriteExisting: true)
@@ -126,7 +126,7 @@ struct ConvertOmCommand: Command {
             try ncVariable.write(data2.data)
             print("nc wwrite done")
             return
-        }
+        }*/
         
         try FileManager.default.removeItemIfExists(at: dest)
         let fileHandle = try FileHandle.createNewFile(file: dest)
@@ -183,7 +183,7 @@ struct ConvertOmCommand: Command {
 
         print("Finished writing")
         
-        // Verify the output
+        /*// Verify the output
         guard let verificationFile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
             let verificationReader = verificationFile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(dest)")
@@ -200,6 +200,6 @@ struct ConvertOmCommand: Command {
             }
             print("verify failed")
             fatalError()
-        }
+        }*/
     }
 }

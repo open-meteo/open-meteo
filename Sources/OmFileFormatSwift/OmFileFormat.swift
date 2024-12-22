@@ -559,7 +559,6 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 2),
                 ptr.baseAddress?.advanced(by: 4),
                 ptr.baseAddress?.advanced(by: 6),
-                reader.lutChunkElementCount,
                 4096, // merge
                 65536*4 // io amax
             )
@@ -617,7 +616,6 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 2),
                 ptr.baseAddress?.advanced(by: 4),
                 ptr.baseAddress?.advanced(by: 6),
-                reader.lutChunkElementCount,
                 4096, // merge
                 65536*4 // io amax
             )

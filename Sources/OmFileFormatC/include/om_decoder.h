@@ -41,11 +41,8 @@ typedef struct {
     /// The maximum IO size before IO operations are split up. Default 64k. If data is in memory, this can be set higher.
     uint64_t io_size_max;
 
-    /// Each 256 LUT entries are compressed into a LUT chunk. The LUT chunk length returns the size in byte how large a maximum compressed size for a LUT chunk is.
+    /// Each 64 LUT entries are compressed into a LUT chunk. The LUT chunk length returns the size in byte how large a maximum compressed size for a LUT chunk is. 0 for version 1/2 files that do not compress LUT.
     uint64_t lut_chunk_length;
-
-    /// How many elements in the look up table LUT should be compressed. Default 256. A value of 1 assumes that the LUT is not compressed and assumes a om version 1/2 file.
-    uint64_t lut_chunk_element_count;
 
     /// The offset position where the LUT should start
     uint64_t lut_start;
@@ -101,28 +98,18 @@ typedef struct {
  * decoder for reading and processing compressed data, managing the scaling and decompression callbacks.
  * 
  * @param decoder A pointer to an `om_decoder_t` structure that will be initialized.
- * @param scale_factor A floating-point value used to scale the decompressed data.
- * @param add_offset A floating-point value used to offset the decompressed data.
- * @param compression Specifies the type of compression applied to the data.
- *                    Possible values include `COMPRESSION_PFOR_16BIT_DELTA2D`, `COMPRESSION_FPX_XOR2D`, 
- *                    and `COMPRESSION_PFOR_16BIT_DELTA2D_LOGARITHMIC`.
- * @param data_type Specifies the type of data, such as `DATA_TYPE_FLOAT` or `DATA_TYPE_DOUBLE`. This affects the decompression and copy methods used.
+ * @param variable A pointer to the data region of the variable to read
  * @param dimension_count The number of dimensions of the data (e.g., 3 for 3D data). All following array must have the some dimension count.
- * @param dimensions A pointer to an array containing the size of each dimension. This defines the shape of the data being read.
- * @param chunks A pointer to an array specifying the chunk sizes for each dimension and indicates how data is partitioned into chunks.
  * @param read_offset A pointer to an array specifying the offsets for reading data in each dimension. This array sets the starting points for data reads.
  * @param read_count A pointer to an array specifying the number of elements to read along each dimension. It defines how much data to read starting from `read_offset`.
  * @param cube_offset A pointer to an array specifying the offset of the target cube in each dimension. This is used when reading data into a larger array.
  * @param cube_dimensions A pointer to an array specifying the dimensions of the target cube being written to.It can be the same as `read_count` but allows writing into larger arrays..
- * @param lut_size  The length (in bytes) of the compressed Look-Up Table (LUT). Ignored for Version 1/2 files if lut_chunk_element_count == 1.
- * @param lut_chunk_element_count The number of elements in each LUT chunk. Default is 256. A value  of 1 indicates that the LUT is not compressed (Version 1/2 files).
- * @param lut_start  The starting byte position of the LUT in the file.
  * @param io_size_merge The maximum size (in bytes) for merging consecutive IO operations. It helps to optimize read performance by merging small reads.
  * @param io_size_max The maximum size (in bytes) for a single IO operation before it is split. It defines the threshold for splitting large reads.
  * 
  * @returns Return an om_error_t if the compression or dimension is invalid
  */
-OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uint64_t dimension_count, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_chunk_element_count, uint64_t io_size_merge, uint64_t io_size_max);
+OmError_t om_decoder_init(OmDecoder_t* decoder, const OmVariable_t* variable, uint64_t dimension_count, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t io_size_merge, uint64_t io_size_max);
 
 //OmError_t OmDecoder_init(OmDecoder_t* decoder, float scalefactor, float add_offset, const OmCompression_t compression, const OmDataType_t data_type, uint64_t dimension_count, const uint64_t* dimensions, const uint64_t* chunks, const uint64_t* read_offset, const uint64_t* read_count, const uint64_t* cube_offset, const uint64_t* cube_dimensions, uint64_t lut_size, uint64_t lut_chunk_element_count, uint64_t lut_start, uint64_t io_size_merge, uint64_t io_size_max);
 

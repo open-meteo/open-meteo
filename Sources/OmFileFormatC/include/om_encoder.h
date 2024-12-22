@@ -16,7 +16,6 @@ typedef struct {
     const uint64_t *dimensions;
     const uint64_t *chunks;
     uint64_t dimension_count;
-    uint64_t lut_chunk_element_count;
     
     /// The callback to decompress data
     om_compress_callback_t compress_callback;
@@ -41,7 +40,7 @@ typedef struct {
 
 /// Initialise the OmEncoder structure with information about the shape of data
 /// May return an error on invalid compression or data types
-OmError_t om_encoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count, uint64_t lut_chunk_element_count) ;
+OmError_t om_encoder_init(OmEncoder_t* encoder, float scale_factor, float add_offset, OmCompression_t compression, OmDataType_t data_type, const uint64_t* dimensions, const uint64_t* chunks, uint64_t dimension_count);
 
 /// Get the number of chunks that is calculated from dimensions and chunks
 uint64_t om_encoder_count_chunks(const OmEncoder_t* encoder);

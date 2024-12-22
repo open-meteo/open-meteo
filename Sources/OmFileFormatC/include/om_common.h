@@ -21,16 +21,18 @@ typedef uint64_t(*om_compress_callback_t)(const void* src, uint64_t length, void
 /// Perform a 2d filter operation
 typedef void(*om_compress_filter_callback_t)(const uint64_t length0, const uint64_t length1, void* buffer);
 
-#define MAX_LUT_ELEMENTS 256
+/// Number of look-up-table addresses to individual data chunks that will be compressed.
+/// Effectively only the first address will be stored and the next addresses are delta and fixed-bytes-encoded.
+/// A larger number reduces file size marginally if a lot of chunks are used. However, read performance decreases.
+#define LUT_CHUNK_COUNT 64
 
 typedef enum {
     ERROR_OK = 0, // not an error
     ERROR_INVALID_COMPRESSION_TYPE = 1,
     ERROR_INVALID_DATA_TYPE = 2,
-    ERROR_INVALID_LUT_CHUNK_LENGTH = 3,
-    ERROR_OUT_OF_BOUND_READ = 4,
-    ERROR_NOT_AN_OM_FILE = 5,
-    ERROR_DEFLATED_SIZE_MISMATCH = 6,
+    ERROR_OUT_OF_BOUND_READ = 3,
+    ERROR_NOT_AN_OM_FILE = 4,
+    ERROR_DEFLATED_SIZE_MISMATCH = 5,
 } OmError_t;
 
 const char* om_error_string(OmError_t error);
