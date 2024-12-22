@@ -484,7 +484,7 @@ struct OmHeader {
 
 /// This is a wrapper for legay 2D reads using the new multi-dimensional reader
 public final class OmFileReader<Backend: OmFileReaderBackend> {
-    public let reader: OmFileReader2<Backend>
+    public let reader: OmFileReader2Array<Backend, Float>
     
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
@@ -510,7 +510,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     }
     
     public init(fn: Backend) throws {
-        reader = try OmFileReader2(fn: fn)
+        reader = try OmFileReader2(fn: fn).asArray(of: Float.self)!
         
         let dimensions = reader.getDimensions()
         let chunks = reader.getChunkDimensions()

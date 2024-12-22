@@ -131,7 +131,7 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn)
+        let read = try OmFileReader2(fn: readFn).asArray(of: Float.self)!
         
         let a1 = try read.read(range: [50..<51, 20..<21, 1..<2])
         XCTAssertEqual(a1, [201.0])
@@ -168,7 +168,7 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn)
+        let read = try OmFileReader2(fn: readFn).asArray(of: Float.self)!
         
         let a = try read.read(range: [0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
@@ -197,8 +197,9 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn)
-        XCTAssertEqual(read.dataType, .float_array)
+        let readFile = try OmFileReader2(fn: readFn)
+        let read = readFile.asArray(of: Float.self)!
+        XCTAssertEqual(readFile.dataType, .float_array)
         XCTAssertEqual(read.compression, .p4nzdec256)
         XCTAssertEqual(read.scaleFactor, 1)
         XCTAssertEqual(read.addOffset, 0)
@@ -233,16 +234,17 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn)
+        let readFile = try OmFileReader2(fn: readFn)
+        let read = readFile.asArray(of: Float.self)!
         
-        XCTAssertEqual(read.numberOfChildren, 2)
-        let child = read.getChild(0)!
+        XCTAssertEqual(readFile.numberOfChildren, 2)
+        let child = readFile.getChild(0)!
         XCTAssertEqual(child.readScalar(), Int32(12323154))
         XCTAssertEqual(child.getName(), "int32")
-        let child2 = read.getChild(1)!
+        let child2 = readFile.getChild(1)!
         XCTAssertEqual(child2.readScalar(), Double(12323154))
         XCTAssertEqual(child2.getName(), "double")
-        XCTAssertNil(read.getChild(2))
+        XCTAssertNil(readFile.getChild(2))
         
         let a = try read.read(range: [0..<3, 0..<3, 0..<3])
         XCTAssertEqual(a, data)
@@ -293,7 +295,7 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2)
+        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2).asArray(of: Float.self)!
         
 
         let a = try read.read(range: [0..<5, 0..<5])
@@ -384,16 +386,16 @@ final class OmFileFormatTests: XCTestCase {
         try fileWriter.writeTrailer(rootVariable: variable)
         
         let readFn = try MmapFile(fn: FileHandle.openFileReading(file: file))
-        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2)
+        let read = try OmFileReader2(fn: readFn, lutChunkElementCount: 2).asArray(of: Float.self, io_size_max: 0, io_size_merge: 0)!
         
 
-        let a = try read.read(range: [0..<5, 0..<5], io_size_max: 0, io_size_merge: 0)
+        let a = try read.read(range: [0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
         
         // single index
         for x in 0..<dims[0] {
             for y in 0..<dims[1] {
-                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+1], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y)])
+                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+1]), [Float(x*5 + y)])
             }
         }
         
@@ -402,7 +404,7 @@ final class OmFileFormatTests: XCTestCase {
             for y in 0..<dims[1] {
                 var r = [Float](repeating: .nan, count: 9)
                 try r.withUnsafeMutableBufferPointer({
-                    try read.read(into: $0.baseAddress!, range: [x..<x+1, y..<y+1], intoCubeOffset: [1,1], intoCubeDimension: [3,3], io_size_max: 0, io_size_merge: 0)
+                    try read.read(into: $0.baseAddress!, range: [x..<x+1, y..<y+1], intoCubeOffset: [1,1], intoCubeDimension: [3,3])
                 })
                 XCTAssertEqualArray(r, [.nan, .nan, .nan, .nan, Float(x*5 + y), .nan, .nan, .nan, .nan], accuracy: 0.001)
             }
@@ -411,38 +413,38 @@ final class OmFileFormatTests: XCTestCase {
         // 2x in fast dim
         for x in 0..<dims[0] {
             for y in 0..<dims[1]-1 {
-                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+2], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float(x*5 + y + 1)])
+                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1)])
             }
         }
         
         // 2x in slow dim
         for x in 0..<dims[0]-1 {
             for y in 0..<dims[1] {
-                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+1], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float((x+1)*5 + y)])
+                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+1]), [Float(x*5 + y), Float((x+1)*5 + y)])
             }
         }
         
         // 2x2
         for x in 0..<dims[0]-1 {
             for y in 0..<dims[1]-1 {
-                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+2], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
+                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
             }
         }
         // 3x3
         for x in 0..<dims[0]-2 {
             for y in 0..<dims[1]-2 {
-                XCTAssertEqual(try read.read(range: [x..<x+3, y..<y+3], io_size_max: 0, io_size_merge: 0), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
+                XCTAssertEqual(try read.read(range: [x..<x+3, y..<y+3]), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
             }
         }
         
         // 1x5
         for x in 0..<dims[1] {
-            XCTAssertEqual(try read.read(range: [x..<x+1, 0..<5], io_size_max: 0, io_size_merge: 0), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
+            XCTAssertEqual(try read.read(range: [x..<x+1, 0..<5]), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
         }
         
         // 5x1
         for x in 0..<dims[0] {
-            XCTAssertEqual(try read.read(range: [0..<5, x..<x+1], io_size_max: 0, io_size_merge: 0), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
+            XCTAssertEqual(try read.read(range: [0..<5, x..<x+1]), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
         }
         
         /*// test interpolation
@@ -475,15 +477,15 @@ final class OmFileFormatTests: XCTestCase {
         let io_size_max: UInt64 = 1000000
         let io_size_merge: UInt64 = 100000
         
-        let read = try OmFileReader2(fn: try MmapFile(fn: fn))
+        let read = try OmFileReader2(fn: try MmapFile(fn: fn)).asArray(of: Float.self, io_size_max: io_size_max, io_size_merge: io_size_merge)!
         let dims = read.getDimensions()
-        let a = try read.read(range: [0..<5, 0..<5], io_size_max: io_size_max, io_size_merge: io_size_merge)
+        let a = try read.read(range: [0..<5, 0..<5])
         XCTAssertEqual(a, [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0, 23.0, 24.0])
         
         // single index
         for x in 0..<dims[0] {
             for y in 0..<dims[1] {
-                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+1], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x*5 + y)])
+                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+1]), [Float(x*5 + y)])
             }
         }
         
@@ -492,7 +494,7 @@ final class OmFileFormatTests: XCTestCase {
             for y in 0..<dims[1] {
                 var r = [Float](repeating: .nan, count: 9)
                 try r.withUnsafeMutableBufferPointer({
-                    try read.read(into: $0.baseAddress!, range: [x..<x+1, y..<y+1], intoCubeOffset: [1,1], intoCubeDimension: [3,3], io_size_max: io_size_max, io_size_merge: io_size_merge)
+                    try read.read(into: $0.baseAddress!, range: [x..<x+1, y..<y+1], intoCubeOffset: [1,1], intoCubeDimension: [3,3])
                 })
                 XCTAssertEqualArray(r, [.nan, .nan, .nan, .nan, Float(x*5 + y), .nan, .nan, .nan, .nan], accuracy: 0.001)
             }
@@ -501,38 +503,38 @@ final class OmFileFormatTests: XCTestCase {
         // 2x in fast dim
         for x in 0..<dims[0] {
             for y in 0..<dims[1]-1 {
-                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+2], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x*5 + y), Float(x*5 + y + 1)])
+                XCTAssertEqual(try read.read(range: [x..<x+1, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1)])
             }
         }
         
         // 2x in slow dim
         for x in 0..<dims[0]-1 {
             for y in 0..<dims[1] {
-                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+1], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x*5 + y), Float((x+1)*5 + y)])
+                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+1]), [Float(x*5 + y), Float((x+1)*5 + y)])
             }
         }
         
         // 2x2
         for x in 0..<dims[0]-1 {
             for y in 0..<dims[1]-1 {
-                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+2], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
+                XCTAssertEqual(try read.read(range: [x..<x+2, y..<y+2]), [Float(x*5 + y), Float(x*5 + y + 1), Float((x+1)*5 + y), Float((x+1)*5 + y + 1)])
             }
         }
         // 3x3
         for x in 0..<dims[0]-2 {
             for y in 0..<dims[1]-2 {
-                XCTAssertEqual(try read.read(range: [x..<x+3, y..<y+3], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
+                XCTAssertEqual(try read.read(range: [x..<x+3, y..<y+3]), [Float(x*5 + y), Float(x*5 + y + 1), Float(x*5 + y + 2), Float((x+1)*5 + y), Float((x+1)*5 + y + 1),  Float((x+1)*5 + y + 2), Float((x+2)*5 + y), Float((x+2)*5 + y + 1),  Float((x+2)*5 + y + 2)])
             }
         }
         
         // 1x5
         for x in 0..<dims[1] {
-            XCTAssertEqual(try read.read(range: [x..<x+1, 0..<5], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
+            XCTAssertEqual(try read.read(range: [x..<x+1, 0..<5]), [Float(x*5), Float(x*5+1), Float(x*5+2), Float(x*5+3), Float(x*5+4)])
         }
         
         // 5x1
         for x in 0..<dims[0] {
-            XCTAssertEqual(try read.read(range: [0..<5, x..<x+1], io_size_max: io_size_max, io_size_merge: io_size_merge), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
+            XCTAssertEqual(try read.read(range: [0..<5, x..<x+1]), [Float(x), Float(x+5), Float(x+10), Float(x+15), Float(x+20)])
         }
         try FileManager.default.removeItem(atPath: file)
     }

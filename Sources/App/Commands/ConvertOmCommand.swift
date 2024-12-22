@@ -84,7 +84,8 @@ struct ConvertOmCommand: Command {
     /// Read om file and write it as version 3 and reshape data to proper 3d files
     func convertOmv3(src: String, dest: String, grid: Gridable) throws {
         // Read data from the input OM file
-        guard let reader = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))) else {
+        guard let readfile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
+              let reader = readfile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(src)")
         }
 
@@ -109,7 +110,7 @@ struct ConvertOmCommand: Command {
         let chunksOut = [5,5,chunks[1]]
         // TODO somehow 5x5 is larger than 1x25....
         
-        let dataRaw = try reader.read(range: [0..<ny*nx, 0..<nt], io_size_merge: .max)
+        let dataRaw = try reader.read(range: [0..<ny*nx, 0..<nt])
         print("data read")
         if false {
             let ncFile = try NetCDF.create(path: "\(dest).nc", overwriteExisting: true)
@@ -183,11 +184,12 @@ struct ConvertOmCommand: Command {
         print("Finished writing")
         
         // Verify the output
-        guard let verificationReader = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))) else {
+        guard let verificationFile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
+            let verificationReader = verificationFile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(dest)")
         }
 
-        let dataVerify = try verificationReader.read(range: [0..<ny, 0..<nx, 0..<nt], io_size_max: .max, io_size_merge: .max)
+        let dataVerify = try verificationReader.read(range: [0..<ny, 0..<nx, 0..<nt])
         
         
         guard dataVerify == dataRaw else {
