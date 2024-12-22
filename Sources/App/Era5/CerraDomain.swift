@@ -473,6 +473,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .shortwave_radiation: fallthrough // joules to watt
         case .direct_radiation: return (0, 1/3600)
         case .albedo: return (0, 100)
+        case .snow_depth: return (0, 1/100) // cm to metre. GRIB files show metre, but it is cm
         default: return nil
         }
     }
