@@ -117,6 +117,14 @@ extension GribMessage {
             }
         }
     }
+    
+    /// Read data as 2D grid assuming given `nx` and `ny`. Error is dimensions to not agree
+    /// if `shift180LongitudeAndFlipLatitudeIfRequired` is set, automatically check the first and last grid points to see if the grid needs to be shifted to alwys start at -90/-180.
+    func to2D(nx: Int, ny: Int, shift180LongitudeAndFlipLatitudeIfRequired: Bool) throws -> GribArray2D {
+        var array2D = GribArray2D(nx: nx, ny: ny)
+        try array2D.load(message: self, shift180LongitudeAndFlipLatitudeIfRequired: shift180LongitudeAndFlipLatitudeIfRequired)
+        return array2D
+    }
 }
 
 struct GribArray2D {
@@ -130,7 +138,9 @@ struct GribArray2D {
         double = .init(repeating: .nan, count: nx*ny)
     }
     
-    public mutating func load(message: GribMessage) throws {
+    /// Read data as 2D grid assuming given `nx` and `ny`. Error is dimensions to not agree
+    /// if `shift180LongitudeAndFlipLatitudeIfRequired` is set, automatically check the first and last grid points to see if the grid needs to be shifted to alwys start at -90/-180.
+    public mutating func load(message: GribMessage, shift180LongitudeAndFlipLatitudeIfRequired: Bool = false) throws {
         guard let gridType = message.get(attribute: "gridType") else {
             fatalError("Could not get gridType")
         }
@@ -161,6 +171,26 @@ struct GribArray2D {
                 if bitmap[i] == 0 {
                     array.data[i] = .nan
                 }
+            }
+        }
+        
+        /// Some global grids start at latitude 90 and longitude 0. As a convention we always use -90 and -180.
+        if shift180LongitudeAndFlipLatitudeIfRequired, gridType == "regular_ll" {
+            guard let latitudeFirst = message.get(attribute: "latitudeOfFirstGridPointInDegrees").flatMap(Float.init),
+                  let longitudeFirst = message.get(attribute: "longitudeOfFirstGridPointInDegrees").flatMap(Float.init) else {
+                fatalError("Could not read first grid point coordinates")
+            }
+            guard let latitudeLast = message.get(attribute: "latitudeOfLastGridPointInDegrees").flatMap(Float.init),
+                  let longitudeLast = message.get(attribute: "longitudeOfLastGridPointInDegrees").flatMap(Float.init) else {
+                fatalError("Could not read last grid point coordinates")
+            }
+            let flipLatitude = latitudeFirst > latitudeLast
+            let shiftLongitude = (-2...2).contains(longitudeFirst) && (358...362).contains(longitudeLast)
+            if shiftLongitude {
+                array.shift180Longitudee()
+            }
+            if flipLatitude {
+                array.flipLatitude()
             }
         }
     }

@@ -88,7 +88,7 @@ struct DownloadEra5Command: AsyncCommand {
             fatalError("cds key is required")
         }
         /// Make sure elevation information is present. Otherwise download it
-        try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain)
+        try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
         
         let concurrent = signature.concurrent ?? System.coreCount
         
@@ -189,7 +189,7 @@ struct DownloadEra5Command: AsyncCommand {
     /**
      Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
      */
-    func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain) async throws {
+    func downloadElevation(application: Application, cdskey: String, email: String?, domain: CdsDomain, createNetCdf: Bool) async throws {
         let logger = application.logger
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
@@ -284,7 +284,7 @@ struct DownloadEra5Command: AsyncCommand {
             try await client.shutdown()
         }
         
-        try Self.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted().map{$0}, createNetCdf: false, shift180LongitudeAndFlipLatitude: domain.isGlobal && domain != .ecmwf_ifs)
+        try Self.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted().map{$0}, createNetCdf: createNetCdf)
         
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {
@@ -295,11 +295,13 @@ struct DownloadEra5Command: AsyncCommand {
         }
     }
     
-    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool, shift180LongitudeAndFlipLatitude: Bool) throws {
+    static func processElevationLsmGrib(domain: GenericDomain, files: [String], createNetCdf: Bool) throws {
         if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             return
         }
         try domain.surfaceElevationFileOm.createDirectory()
+        let nx = domain.grid.nx
+        let ny = domain.grid.ny
         
         var landmask: [Float]? = nil
         var elevation: [Float]? = nil
@@ -307,7 +309,7 @@ struct DownloadEra5Command: AsyncCommand {
         for file in files {
             try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
                 let shortName = message.get(attribute: "shortName")!
-                var data = try message.getDouble().map(Float.init)
+                var data = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: true).array.data
                 switch shortName {
                 case "orog", "mterh", "h":
                     elevation = data
@@ -486,11 +488,10 @@ struct DownloadEra5Command: AsyncCommand {
                         logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
                         
                         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                        try grib2d.load(message: message)
+                        try grib2d.load(message: message, shift180LongitudeAndFlipLatitudeIfRequired: true)
                         if let scaling = variable.netCdfScaling(domain: domain) {
                             grib2d.array.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                         }
-                        grib2d.array.shift180LongitudeAndFlipLatitude()
                         
                         //let fastTime = Array2DFastSpace(data: grib2d.array.data, nLocations: domain.grid.count, nTime: nt).transpose()
                         /*guard !fastTime[0, 0..<nt].contains(.nan) else {
