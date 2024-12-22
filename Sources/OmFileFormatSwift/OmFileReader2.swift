@@ -39,7 +39,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
             var offset: UInt64 = 0
             var size: UInt64 = 0
             guard om_trailer_read(trailerData, &offset, &size) else {
-                fatalError("Not an OM file")
+                throw OmFileFormatSwiftError.notAnOpenMeteoFile
             }
             /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
             let dataVariable = fn.getData(offset: Int(offset), count: Int(size))
@@ -47,7 +47,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         case OM_HEADER_INVALID:
             fallthrough
         default:
-            fatalError("Not an OM file")
+            throw OmFileFormatSwiftError.notAnOpenMeteoFile
         }
     }
     
@@ -211,10 +211,10 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
         assert(intoCubeDimension.count == nDimensions)
         assert(offset.count == nDimensions)
         
-        offset.withUnsafeBufferPointer({ readOffset in
-            count.withUnsafeBufferPointer({ readCount in
-                intoCubeOffset.withUnsafeBufferPointer({ intoCubeOffset in
-                    intoCubeDimension.withUnsafeBufferPointer({ intoCubeDimension in
+        try offset.withUnsafeBufferPointer({ readOffset in
+            try count.withUnsafeBufferPointer({ readCount in
+                try intoCubeOffset.withUnsafeBufferPointer({ intoCubeOffset in
+                    try intoCubeDimension.withUnsafeBufferPointer({ intoCubeDimension in
                         var decoder = OmDecoder_t()
                         let error = om_decoder_init(
                             &decoder,
@@ -229,11 +229,11 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
                             io_size_max
                         )
                         guard error == ERROR_OK else {
-                            fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                            throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
                         }
                         let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
                         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
-                        fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
+                        try fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
                         chunkBuffer.deallocate()
                     })
                 })
@@ -254,8 +254,8 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
         let nDimensions = count.count
         assert(offset.count == nDimensions)
         
-        offset.withUnsafeBufferPointer({ readOffset in
-            count.withUnsafeBufferPointer({ readCount in
+        try offset.withUnsafeBufferPointer({ readOffset in
+            try count.withUnsafeBufferPointer({ readCount in
                 var decoder = OmDecoder_t()
                 let error = om_decoder_init(
                     &decoder,
@@ -270,7 +270,7 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
                     io_size_max
                 )
                 guard error == ERROR_OK else {
-                    fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                    throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
                 }
                 fn.decodePrefetch(decoder: &decoder)
             })
@@ -280,7 +280,7 @@ public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArr
 
 extension OmFileReaderBackend {
     /// Read and decode
-    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) throws {
         var indexRead = OmDecoder_indexRead_t()
         om_decoder_init_index_read(decoder, &indexRead)
         
@@ -298,11 +298,11 @@ extension OmFileReaderBackend {
                 //print("Read data \(dataRead) for chunk index \(dataRead.chunkIndex)")
                 let dataData = self.getData(offset: Int(dataRead.offset), count: Int(dataRead.count))
                 guard om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
-                    fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                    throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
                 }
             }
             guard error == ERROR_OK else {
-                fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
             }
         }
     }

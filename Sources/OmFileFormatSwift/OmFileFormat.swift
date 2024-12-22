@@ -16,6 +16,8 @@ public enum OmFileFormatSwiftError: Error {
     case fileExistsAlready(filename: String)
     case posixFallocateFailed(error: Int32)
     case ftruncateFailed(error: Int32)
+    case omDecoder(error: String)
+    case notAnOpenMeteoFile
 }
 
 
@@ -533,7 +535,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         let dim0Read = dim0Read ?? 0..<dim0
         let dim1Read = dim1Read ?? 0..<dim1
         
-        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
+        try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
             // read offset
             ptr[0] = UInt64(dim0Read.lowerBound)
             ptr[1] = UInt64(dim1Read.lowerBound)
@@ -561,7 +563,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 65536*4 // io amax
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+                throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
             }
             reader.fn.decodePrefetch(decoder: &decoder)
         }
@@ -577,7 +579,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     /// `arrayDim1Range` defines the offset in dimension 1 what is applied to the read into array
     /// `arrayDim1Length` if dim0Slow.count is greater than 1, the arrayDim1Length will be used as a stride. Like `nTime` in a 2d fast time array
     /// `dim0Slow` the slow dimension to read. Typically a location range
-    /// `dim1Read` the fast dimension to read. Tpyicall a time range
+    /// `dim1Read` the fast dimension to read. Typical a time range
     public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
         
         //assert(arrayDim1Range.count == dim1Read.count)
@@ -591,7 +593,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         
         // This function is only used for legacy 2D read functions
         
-        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
+        try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
             // read offset
             ptr[0] = UInt64(dim0Read.lowerBound)
             ptr[1] = UInt64(dim1Read.lowerBound)
@@ -619,9 +621,9 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 65536*4 // io amax
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+                throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
             }
-            reader.fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
+            try reader.fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
     }
 }
