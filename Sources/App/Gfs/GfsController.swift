@@ -518,8 +518,8 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(dni, .wattPerSquareMetre)
             case .direct_normal_irradiance_instant:
-                let direct = try get(derived: .surface(.direct_radiation_instant), time: time)
-                let dni = Zensun.calculateInstantDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                let direct = try get(derived: .surface(.direct_radiation), time: time)
+                let dni = Zensun.calculateBackwardsDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertToInstant: true)
                 return DataAndUnit(dni, direct.unit)
             case .direct_radiation:
                 let diffuse = try get(raw: .surface(.diffuse_radiation), time: time)

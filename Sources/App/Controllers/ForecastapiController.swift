@@ -777,6 +777,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case showers
     case skin_temperature
     case snow_depth
+    case snow_depth_water_equivalent
     case snow_height
     case hail
     case snowfall
