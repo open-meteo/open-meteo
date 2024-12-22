@@ -17,6 +17,7 @@ public enum OmFileFormatSwiftError: Error {
     case posixFallocateFailed(error: Int32)
     case ftruncateFailed(error: Int32)
     case omDecoder(error: String)
+    case omEncoder(error: String)
     case notAnOpenMeteoFile
 }
 

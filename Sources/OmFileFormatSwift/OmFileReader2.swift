@@ -82,9 +82,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         }
         /// Read data from child.offset by child.size
         let dataChild = fn.getData(offset: Int(offset), count: Int(size))
-        guard let childVariable = om_variable_init(dataChild) else {
-            fatalError()
-        }
+        let childVariable = om_variable_init(dataChild)
         return OmFileReader2(fn: fn, variable: childVariable, lutChunkElementCount: lutChunkElementCount)
     }
     
