@@ -45,7 +45,7 @@ struct ConvertOmCommand: Command {
         let om = try OmFileReader(file: signature.infile)
         logger.info("dim0=\(om.dim0) dim1=\(om.dim1) chunk0=\(om.chunk0) chunk1=\(om.chunk1)")
         
-        let data = try om.reader.read()
+        let data = try om.readAll()
         
         let oufile = signature.outfile ?? "\(signature.infile).nc"
         let ncFile = try NetCDF.create(path: oufile, overwriteExisting: true)
@@ -109,7 +109,7 @@ struct ConvertOmCommand: Command {
         let chunksOut = [5,5,chunks[1]]
         // TODO somehow 5x5 is larger than 1x25....
         
-        let dataRaw = try reader.read([0..<ny*nx, 0..<nt], io_size_merge: .max)
+        let dataRaw = reader.read([0..<ny*nx, 0..<nt], io_size_merge: .max)
         print("data read")
         if false {
             let ncFile = try NetCDF.create(path: "\(dest).nc", overwriteExisting: true)
@@ -156,7 +156,7 @@ struct ConvertOmCommand: Command {
                     
                     var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for (row, y) in yRange.enumerated() {
-                        try reader.read(
+                        reader.read(
                             into: &chunk,
                             dimRead: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, tRange],
                             intoCubeOffset: [UInt64(row * xRange.count), 0],
@@ -187,7 +187,7 @@ struct ConvertOmCommand: Command {
             fatalError("Failed to open file: \(dest)")
         }
 
-        let dataVerify = try verificationReader.read([0..<ny, 0..<nx, 0..<nt], io_size_max: .max, io_size_merge: .max)
+        let dataVerify = verificationReader.read([0..<ny, 0..<nx, 0..<nt], io_size_max: .max, io_size_merge: .max)
         
         
         guard dataVerify == dataRaw else {

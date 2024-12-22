@@ -58,7 +58,7 @@ struct Dem90: GenericDomain {
         let latrow = Int(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
         let lonrow = Int((lon + 180) * Float(px))
-        return try om.read(offset: [UInt64(latrow), UInt64(lonrow)], count: [1,1])[0]
+        return try om.read(dim0Slow: latrow..<latrow+1, dim1: lonrow..<lonrow+1)[0]
     }
 
     /// Get the longitude resolution on a given latitude

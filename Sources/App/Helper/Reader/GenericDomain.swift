@@ -39,7 +39,7 @@ extension GenericDomain {
     }
     
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader2<MmapFile>? {
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFileCached>? {
         guard let domainRegistryStatic else {
             return nil
         }

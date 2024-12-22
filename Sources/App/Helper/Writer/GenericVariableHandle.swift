@@ -18,8 +18,8 @@ struct GenericVariableHandle {
         self.fn = fn
     }
     
-    public func makeReader() throws -> OmFileReader2<MmapFile> {
-        try OmFileReader2(fn: MmapFile(fn: fn))
+    public func makeReader() throws -> OmFileReader<MmapFile> {
+        try OmFileReader(fn: fn)
     }
     
     /// Process concurrently
@@ -124,12 +124,12 @@ struct GenericVariableHandle {
                 continue
             }
             
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReader2<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
                 return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
             
             /// If only one value is set, this could be the model initialisation or modifcation time
-            let isSingleValueVariable = readers.first?.reader.first?.fn.getDimensions().reduce(1, *) == 1
+            let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
             
             let om = OmFileSplitter(domain,
                                     nLocations: isSingleValueVariable ? 1 : nil,
@@ -153,7 +153,7 @@ struct GenericVariableHandle {
                 ])
                 for reader in readers {
                     for r in reader.reader {
-                        let data = try r.fn.read()
+                        let data = try r.fn.readAll()
                         try ncVariable.write(data, offset: [time.index(of: reader.time)!, r.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
                     }
                 }
@@ -163,13 +163,12 @@ struct GenericVariableHandle {
                 let d0offset = offset / nMembers
                 
                 let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                let locationRangeUInt64 = UInt64(locationRange.lowerBound) ..< UInt64(locationRange.upperBound)
                 let nLoc = locationRange.count
                 data3d.data.fillWithNaNs()
                 for reader in readers {
                     precondition(reader.reader.count == nMembers, "nMember count wrong")
                     for r in reader.reader {
-                        try r.fn.read(into: &readTemp, dimRead: [0..<1, locationRangeUInt64])
+                        try r.fn.read(into: &readTemp, arrayDim1Range: 0..<nLoc, arrayDim1Length: nLoc, dim0Slow: 0..<1, dim1: locationRange)
                         data3d[0..<nLoc, r.member, time.index(of: reader.time)!] = readTemp[0..<nLoc]
                     }
                 }

@@ -50,12 +50,12 @@ enum OmFileManagerReadable: Hashable {
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
     
-    func openRead() throws -> OmFileReader2<MmapFile>? {
+    func openRead() throws -> OmFileReader<MmapFile>? {
         let file = getFilePath()
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
         }
-        return try OmFileReader2(file: file)
+        return try OmFileReader(file: file)
     }
     
     func exists() -> Bool {
@@ -63,7 +63,7 @@ enum OmFileManagerReadable: Hashable {
         return FileManager.default.fileExists(atPath: file)
     }
     
-    /*func openReadCached() throws -> OmFileReader2<MmapFileCached>? {
+    func openReadCached() throws -> OmFileReader<MmapFileCached>? {
         let fileRel = getRelativeFilePath()
         let file = "\(OpenMeteo.dataDirectory)\(fileRel)"
         guard FileManager.default.fileExists(atPath: file) else {
@@ -75,29 +75,25 @@ enum OmFileManagerReadable: Hashable {
             return try OmFileReader(file: file, cacheFile: cacheFile)
         }
         return try OmFileReader(file: file, cacheFile: nil)
-    }*/
+    }
 }
 
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 struct OmFileManager {
-    public static var instance = GenericFileManager<OmFileReader2<MmapFile>>()
+    public static var instance = GenericFileManager<OmFileReader<MmapFileCached>>()
     
     private init() {}
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader2<MmapFile>? {
+    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
         try instance.get(file)
     }
 }
 
-extension OmFileReader2: GenericFileManagable where Backend == MmapFile {
-    func wasDeleted() -> Bool {
-        return fn.wasDeleted()
-    }
-    
-    static func open(from path: OmFileManagerReadable) throws -> OmFileReader2<MmapFile>? {
-        return try path.openRead()
+extension OmFileReader: GenericFileManagable where Backend == MmapFileCached {
+    static func open(from path: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
+        return try path.openReadCached()
     }
 }
 
@@ -105,11 +101,11 @@ extension OmFileReader2: GenericFileManagable where Backend == MmapFile {
 fileprivate var buffers = [Thread: UnsafeMutableRawBufferPointer]()
 
 /// Thread safe access to buffers
-//fileprivate let lockBuffers = NIOLock()
+fileprivate let lockBuffers = NIOLock()
 
-extension OmFileReader2 {
+extension OmFileReader {    
     /// Thread safe buffer provider that automatically reallocates buffers
-    /*public static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
+    public static func getBuffer(minBytes: Int) -> UnsafeMutableRawBufferPointer {
         return lockBuffers.withLock {
             if let buffer = buffers[Thread.current] {
                 if buffer.count < minBytes {
@@ -123,81 +119,24 @@ extension OmFileReader2 {
             buffers[Thread.current] = buffer
             return buffer
         }
-    }*/
-    /// Read data into existing output float buffer
-    public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, location: Range<Int>, dim1 dim1Read: Range<Int>, level: Int, nLocations: Int) throws {
-        
-        let dim = self.getDimensions()
-        let dim1Read = UInt64(dim1Read.lowerBound) ..< UInt64(dim1Read.upperBound)
-        
-        // Old files
-        if dim.count == 2 {
-            guard Int(dim[0] * dim[1]) % nLocations == 0 else {
-                return
-            }
-            let nLevels = Int(dim[0]) / nLocations
-            if nLevels > 1 && location.count > 1 {
-                fatalError("Multi level and mutli location not supported")
-            }
-            guard level < nLevels else {
-                return
-            }
-            let dim0 = UInt64(location.lowerBound * nLevels + level) ..< UInt64(location.lowerBound * nLevels + level + location.count)
-            try self.read(into: into, dimRead: [dim0, dim1Read], intoCubeOffset: [0, UInt64(arrayDim1Range.lowerBound)], intoCubeDimension: [UInt64(dim0.count), UInt64(arrayDim1Length)])
-        }
-        
-        /// y,x,time files
-        if dim.count == 3 {
-            
-        }
-        
-        /// level,y,x,time files
-        if dim.count == 4 {
-            
-        }
     }
-    
-    public func willNeed(location: Range<Int>, dim1 dim1Read: Range<Int>, level: Int, nLocations: Int) throws {
-        
-        let dim = self.getDimensions()
-        let dim1Read = UInt64(dim1Read.lowerBound) ..< UInt64(dim1Read.upperBound)
-        
-        // Old files
-        if dim.count == 2 {
-            guard Int(dim[0] * dim[1]) % nLocations == 0 else {
-                return
-            }
-            let nLevels = Int(dim[0]) / nLocations
-            if nLevels > 1 && location.count > 1 {
-                fatalError("Multi level and mutli location not supported")
-            }
-            guard level < nLevels else {
-                return
-            }
-            let dim0 = UInt64(location.lowerBound * nLevels + level) ..< UInt64(location.lowerBound * nLevels + level + location.count)
-            try self.willNeed(dimRead: [dim0, dim1Read])
-        }
-        
-        /// y,x,time files
-        if dim.count == 3 {
-            
-        }
-        
-        /// level,y,x,time files
-        if dim.count == 4 {
-            
-        }
+    /// Read data into existing output float buffer
+    public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+        //assert(arrayDim1Range.count == dim1Read.count)
+        let chunkBuffer = OmFileReader.getBuffer(minBytes: P4NDEC256_BOUND(n: chunk0*chunk1, bytesPerElement: compression.bytesPerElement)).baseAddress!
+        try read(into: into, arrayDim1Range: arrayDim1Range, arrayDim1Length: arrayDim1Length, chunkBuffer: chunkBuffer, dim0Slow: dim0Read, dim1: dim1Read)
     }
     
     /// Read data into existing output float buffer
-    /*public func read(into: inout [Float], arrayRange: Range<Int>, arrayDim1Length: Int, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
+    public func read(into: inout [Float], arrayRange: Range<Int>, arrayDim1Length: Int, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
         try into.withUnsafeMutableBufferPointer {
-            try read(into: $0.baseAddress!, arrayDim1Range: arrayRange, arrayDim1Length: arrayDim1Length, dim0Slow: dim0Read, dim1: dim1Read)
+            let chunkBuffer = OmFileReader.getBuffer(minBytes: P4NDEC256_BOUND(n: chunk0*chunk1, bytesPerElement: compression.bytesPerElement)).baseAddress!
+            try read(into: $0.baseAddress!, arrayDim1Range: arrayRange, arrayDim1Length: arrayDim1Length, chunkBuffer: chunkBuffer, dim0Slow: dim0Read, dim1: dim1Read)
         }
-    }*/
+    }
     
     /// Read data. This version is a bit slower, because it is allocating the output buffer
-    /*public func read(dim0Slow dim0Read: Range<Int>?, dim1 dim1Read: Range<Int>?) throws -> [Float] {
+    public func read(dim0Slow dim0Read: Range<Int>?, dim1 dim1Read: Range<Int>?) throws -> [Float] {
         let dim0Read = dim0Read ?? 0..<dim0
         let dim1Read = dim1Read ?? 0..<dim1
         let count = dim0Read.count * dim1Read.count
@@ -208,7 +147,7 @@ extension OmFileReader2 {
     }
     
     /// Read interpolated between 4 points. Assuming dim0 is used for lcations and dim1 is a time series
-    /*public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+    public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
         let gridpoint = dim0.gridpoint
         return try readInterpolated(
             dim0X: gridpoint % dim0Nx,
@@ -288,7 +227,7 @@ extension OmFileReader2 {
                points[1] * (dim0Fraction) * (1-dim1Fraction) +
                points[2] * (1-dim0Fraction) * (dim1Fraction) +
                points[3] * (dim0Fraction) * (dim1Fraction)
-    }*/
+    }
     
     /// Read interpolated between 4 points. If one point is NaN, ignore it.
     /*public func readInterpolatedIgnoreNaN(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
@@ -332,5 +271,5 @@ extension OmFileReader2 {
     // prefect and read all
     public func readAll2D() throws -> Array2DFastTime {
         return Array2DFastTime(data: try readAll(), nLocations: dim0, nTime: dim1)
-    }*/
+    }
 }
