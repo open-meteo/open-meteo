@@ -17,13 +17,9 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
     public let fn: Backend
     
     let variable: UnsafePointer<OmVariable_t?>?
-    
-    /// Number of elements in index LUT chunk. Assumed to 256 in production files. Only used for testing!
-    let lutChunkElementCount: UInt64
         
-    /// Open a file and decode om file meta data. In this casem fn is typically mmap or just plain memory
-    public init(fn: Backend, lutChunkElementCount: UInt64 = 256) throws {
-        self.lutChunkElementCount = lutChunkElementCount
+    /// Open a file and decode om file meta data. In this case  fn is typically mmap or just plain memory
+    public init(fn: Backend) throws {
         self.fn = fn
         
         let headerSize = om_header_size()
@@ -39,7 +35,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
             var offset: UInt64 = 0
             var size: UInt64 = 0
             guard om_trailer_read(trailerData, &offset, &size) else {
-                fatalError("Not an OM file")
+                throw OmFileFormatSwiftError.notAnOpenMeteoFile
             }
             /// Read data from root.offset by root.size. Important: data must remain accessible throughout the use of this variable!!
             let dataVariable = fn.getData(offset: Int(offset), count: Int(size))
@@ -47,40 +43,17 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         case OM_HEADER_INVALID:
             fallthrough
         default:
-            fatalError("Not an OM file")
+            throw OmFileFormatSwiftError.notAnOpenMeteoFile
         }
     }
     
-    init(fn: Backend, variable: UnsafePointer<OmVariable_t?>?, lutChunkElementCount: UInt64) {
+    init(fn: Backend, variable: UnsafePointer<OmVariable_t?>?) {
         self.fn = fn
         self.variable = variable
-        self.lutChunkElementCount = lutChunkElementCount
     }
     
     public var dataType: DataType {
         return DataType(rawValue: UInt8(om_variable_get_type(variable).rawValue))!
-    }
-    
-    public var compression: CompressionType {
-        return CompressionType(rawValue: UInt8(om_variable_get_compression(variable).rawValue))!
-    }
-    
-    public var scaleFactor: Float {
-        return om_variable_get_scale_factor(variable)
-    }
-    
-    public var addOffset: Float {
-        return om_variable_get_add_offset(variable)
-    }
-    
-    public func getDimensions() -> UnsafeBufferPointer<UInt64> {
-        let dimensions = om_variable_get_dimensions(variable);
-        return UnsafeBufferPointer<UInt64>(start: dimensions.values, count: Int(dimensions.count))
-    }
-    
-    public func getChunkDimensions() -> UnsafeBufferPointer<UInt64> {
-        let dimensions = om_variable_get_chunks(variable);
-        return UnsafeBufferPointer<UInt64>(start: dimensions.values, count: Int(dimensions.count))
     }
     
     public func getName() -> String? {
@@ -104,10 +77,8 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         }
         /// Read data from child.offset by child.size
         let dataChild = fn.getData(offset: Int(offset), count: Int(size))
-        guard let childVariable = om_variable_init(dataChild) else {
-            fatalError()
-        }
-        return OmFileReader2(fn: fn, variable: childVariable, lutChunkElementCount: lutChunkElementCount)
+        let childVariable = om_variable_init(dataChild)
+        return OmFileReader2(fn: fn, variable: childVariable)
     }
     
     public func readScalar<OmType: OmFileScalarDataTypeProtocol>() -> OmType? {
@@ -121,39 +92,118 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
         return value
     }
     
+    /// If it is an array of specified type. Return a type safe reader for this type
+    /// `io_size_merge` The maximum size (in bytes) for merging consecutive IO operations. It helps to optimise read performance by merging small reads.
+    /// `io_size_max` The maximum size (in bytes) for a single IO operation before it is split. It defines the threshold for splitting large reads.
+    public func asArray<OmType: OmFileArrayDataTypeProtocol>(of: OmType.Type, io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) -> OmFileReader2Array<Backend, OmType>? {
+        guard OmType.dataTypeArray == self.dataType else {
+            return nil
+        }
+        return OmFileReader2Array(
+            fn: fn,
+            variable: variable,
+            io_size_max: io_size_max,
+            io_size_merge: io_size_merge
+        )
+    }
+}
+
+extension OmFileReader2 where Backend == MmapFile {
+    public init(file: String) throws {
+        let fn = try FileHandle.openFileReading(file: file)
+        let mmap = try MmapFile(fn: fn)
+        try self.init(fn: mmap)
+    }
+}
+
+
+
+/// Represents a variable that is an array of a given type.
+/// The previous function `asArray(of: T)` instantiates this struct and ensures it is the correct type (e.g. a float array)
+public struct OmFileReader2Array<Backend: OmFileReaderBackend, OmType: OmFileArrayDataTypeProtocol> {
+    /// Points to the underlying memory. Needs to remain in scope to keep memory accessible
+    public let fn: Backend
+    
+    let variable: UnsafePointer<OmVariable_t?>?
+    
+    let io_size_max: UInt64
+        
+    let io_size_merge: UInt64
+    
+    public var compression: CompressionType {
+        return CompressionType(rawValue: UInt8(om_variable_get_compression(variable).rawValue))!
+    }
+    
+    public var scaleFactor: Float {
+        return om_variable_get_scale_factor(variable)
+    }
+    
+    public var addOffset: Float {
+        return om_variable_get_add_offset(variable)
+    }
+    
+    public func getDimensions() -> UnsafeBufferPointer<UInt64> {
+        let dimensions = om_variable_get_dimensions(variable);
+        return UnsafeBufferPointer<UInt64>(start: dimensions.values, count: Int(dimensions.count))
+    }
+    
+    public func getChunkDimensions() -> UnsafeBufferPointer<UInt64> {
+        let dimensions = om_variable_get_chunks(variable);
+        return UnsafeBufferPointer<UInt64>(start: dimensions.values, count: Int(dimensions.count))
+    }
+    
     /// Read variable as float array
-    public func read(_ dimRead: [Range<UInt64>], io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) -> [Float] {
-        let outDims = dimRead.map({UInt64($0.count)})
-        let n = outDims.reduce(1, *)
-        var out = [Float](repeating: .nan, count: Int(n))
-        out.withUnsafeMutableBufferPointer({
-            read(
+    public func read(offset: [UInt64], count: [UInt64]) throws -> [OmType] {
+        let n = count.reduce(1, *)
+        let out = try [OmType].init(unsafeUninitializedCapacity: Int(n)) {
+            try read(
                 into: $0.baseAddress!,
-                dimRead: dimRead,
-                intoCubeOffset: .init(repeating: 0, count: dimRead.count),
-                intoCubeDimension: outDims,
-                io_size_max: io_size_max,
-                io_size_merge: io_size_merge
+                offset: offset,
+                count: count,
+                intoCubeOffset: .init(repeating: 0, count: count.count),
+                intoCubeDimension: count
             )
-        })
+            $1 += Int(n)
+        }
+        return out
+    }
+    
+    /// Read variable as float array
+    public func read(range: [Range<UInt64>]? = nil) throws -> [OmType] {
+        let range = range ?? self.getDimensions().map({ 0..<$0 })
+        let outDims = range.map({UInt64($0.count)})
+        let n = outDims.reduce(1, *)
+        let out = try [OmType].init(unsafeUninitializedCapacity: Int(n)) {
+            try read(
+                into: $0.baseAddress!,
+                range: range
+            )
+            $1 += Int(n)
+        }
         return out
     }
     
     /// Read a variable as an array of dynamic type.
-    public func read<OmType: OmFileArrayDataTypeProtocol>(into: UnsafeMutablePointer<OmType>, dimRead: [Range<UInt64>], intoCubeOffset: [UInt64], intoCubeDimension: [UInt64], io_size_max: UInt64 = 65536, io_size_merge: UInt64 = 512) {
-        let nDimensions = dimRead.count
-        guard OmType.dataTypeArray == self.dataType else {
-            fatalError()
-        }
+    public func read(into: UnsafeMutablePointer<OmType>, range: [Range<UInt64>], intoCubeOffset: [UInt64]? = nil, intoCubeDimension: [UInt64]? = nil) throws {
+        
+        let offset = range.map({$0.lowerBound})
+        let count = range.map({UInt64($0.count)})
+        try self.read(into: into, offset: offset, count: count, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
+    }
+    
+    /// Read data by offset and count
+    public func read(into: UnsafeMutablePointer<OmType>, offset: [UInt64], count: [UInt64], intoCubeOffset: [UInt64]? = nil, intoCubeDimension: [UInt64]? = nil) throws {
+        let nDimensions = count.count
+        let intoCubeOffset = intoCubeOffset ?? .init(repeating: 0, count: nDimensions)
+        let intoCubeDimension = intoCubeDimension ?? count
         assert(intoCubeOffset.count == nDimensions)
         assert(intoCubeDimension.count == nDimensions)
-        let readOffset = dimRead.map({$0.lowerBound})
-        let readCount = dimRead.map({UInt64($0.count)})
+        assert(offset.count == nDimensions)
         
-        readOffset.withUnsafeBufferPointer({ readOffset in
-            readCount.withUnsafeBufferPointer({ readCount in
-                intoCubeOffset.withUnsafeBufferPointer({ intoCubeOffset in
-                    intoCubeDimension.withUnsafeBufferPointer({ intoCubeDimension in
+        try offset.withUnsafeBufferPointer({ readOffset in
+            try count.withUnsafeBufferPointer({ readCount in
+                try intoCubeOffset.withUnsafeBufferPointer({ intoCubeOffset in
+                    try intoCubeDimension.withUnsafeBufferPointer({ intoCubeDimension in
                         var decoder = OmDecoder_t()
                         let error = om_decoder_init(
                             &decoder,
@@ -163,19 +213,53 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
                             readCount.baseAddress,
                             intoCubeOffset.baseAddress,
                             intoCubeDimension.baseAddress,
-                            lutChunkElementCount,
                             io_size_merge,
                             io_size_max
                         )
                         guard error == ERROR_OK else {
-                            fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                            throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
                         }
                         let chunkBufferSize = om_decoder_read_buffer_size(&decoder)
                         let chunkBuffer = UnsafeMutableRawBufferPointer.allocate(byteCount: Int(chunkBufferSize), alignment: 1)
-                        fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
+                        try fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer.baseAddress!)
                         chunkBuffer.deallocate()
                     })
                 })
+            })
+        })
+    }
+    
+    /// Prefetch data
+    public func willNeed(dimRead: [Range<UInt64>]? = nil) throws {
+        let dimRead = dimRead ?? self.getDimensions().map({ 0..<$0 })
+        let offset = dimRead.map({$0.lowerBound})
+        let count = dimRead.map({UInt64($0.count)})
+        try self.willNeed(offset: offset, count: count)
+    }
+    
+    /// Prefetch data
+    public func willNeed(offset: [UInt64], count: [UInt64]) throws {
+        let nDimensions = count.count
+        assert(offset.count == nDimensions)
+        
+        try offset.withUnsafeBufferPointer({ readOffset in
+            try count.withUnsafeBufferPointer({ readCount in
+                var decoder = OmDecoder_t()
+                let error = om_decoder_init(
+                    &decoder,
+                    variable,
+                    UInt64(nDimensions),
+                    readOffset.baseAddress,
+                    readCount.baseAddress,
+                    nil,
+                    nil,
+                    io_size_merge,
+                    io_size_max
+                )
+                guard error == ERROR_OK else {
+                    throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
+                }
+                fn.decodePrefetch(decoder: &decoder)
             })
         })
     }
@@ -183,7 +267,7 @@ public struct OmFileReader2<Backend: OmFileReaderBackend> {
 
 extension OmFileReaderBackend {
     /// Read and decode
-    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) {
+    func decode(decoder: UnsafePointer<OmDecoder_t>, into: UnsafeMutableRawPointer, chunkBuffer: UnsafeMutableRawPointer) throws {
         var indexRead = OmDecoder_indexRead_t()
         om_decoder_init_index_read(decoder, &indexRead)
         
@@ -201,11 +285,11 @@ extension OmFileReaderBackend {
                 //print("Read data \(dataRead) for chunk index \(dataRead.chunkIndex)")
                 let dataData = self.getData(offset: Int(dataRead.offset), count: Int(dataRead.count))
                 guard om_decoder_decode_chunks(decoder, dataRead.chunkIndex, dataData, dataRead.count, into, chunkBuffer, &error) else {
-                    fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                    throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
                 }
             }
             guard error == ERROR_OK else {
-                fatalError("OmDecoder: \(String(cString: om_error_string(error)))")
+                throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
             }
         }
     }

@@ -50,12 +50,12 @@ public struct OmFileWriter2<FileHandle: OmFileWriterBackend> {
         }
     }
     
-    public func prepareArray<OmType: OmFileArrayDataTypeProtocol>(type: OmType.Type, dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, scale_factor: Float, add_offset: Float, lutChunkElementCount: UInt64 = 256) throws -> OmFileWriterArray<OmType, FileHandle> {
+    public func prepareArray<OmType: OmFileArrayDataTypeProtocol>(type: OmType.Type, dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, scale_factor: Float, add_offset: Float) throws -> OmFileWriterArray<OmType, FileHandle> {
         try writeHeaderIfRequired()
-        return .init(dimensions: dimensions, chunkDimensions: chunkDimensions, compression: compression, scale_factor: scale_factor, add_offset: add_offset, buffer: buffer,  lutChunkElementCount: lutChunkElementCount)
+        return try .init(dimensions: dimensions, chunkDimensions: chunkDimensions, compression: compression, scale_factor: scale_factor, add_offset: add_offset, buffer: buffer)
     }
     
-    public func write(array: OmFileWriterArrayFinalisd, name: String, children: [OmOffsetSize]) throws -> OmOffsetSize {
+    public func write(array: OmFileWriterArrayFinalised, name: String, children: [OmOffsetSize]) throws -> OmOffsetSize {
         try writeHeaderIfRequired()
         guard array.dimensions.count == array.chunks.count else {
             fatalError()
@@ -123,8 +123,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
     let buffer: OmBufferedWriter<FileHandle>
     
     
-    /// `lutChunkElementCount` should be 256 for production files. Only for testing a lower number can be used.
-    public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, scale_factor: Float, add_offset: Float, buffer: OmBufferedWriter<FileHandle>, lutChunkElementCount: UInt64 = 256) {
+    public init(dimensions: [UInt64], chunkDimensions: [UInt64], compression: CompressionType, scale_factor: Float, add_offset: Float, buffer: OmBufferedWriter<FileHandle>) throws {
 
         assert(dimensions.count == chunkDimensions.count)
         
@@ -136,10 +135,10 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         
         // Note: The encoder keeps the pointer to `&self.dimensions`. It is important that this array is not deallocated!
         self.encoder = OmEncoder_t()
-        let error = om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), OmType.dataTypeArray.toC(), &self.dimensions, &self.chunks, UInt64(dimensions.count), lutChunkElementCount)
+        let error = om_encoder_init(&encoder, scale_factor, add_offset, compression.toC(), OmType.dataTypeArray.toC(), &self.dimensions, &self.chunks, UInt64(dimensions.count))
         
         guard error == ERROR_OK else {
-            fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+            throw OmFileFormatSwiftError.omEncoder(error: String(cString: om_error_string(error)))
         }
 
         /// Number of total chunks in the compressed files
@@ -213,7 +212,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
     }
     
     /// Compress the lookup table and write it to the output buffer
-    public func finalise() throws -> OmFileWriterArrayFinalisd {
+    public func finalise() throws -> OmFileWriterArrayFinalised {
         let lut_offset = buffer.totalBytesWritten
         
         /// The size of the total compressed LUT including some padding
@@ -223,7 +222,7 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
         /// Compress the LUT and return the actual compressed LUT size
         let compressed_lut_size = om_encoder_compress_lut(&encoder, lookUpTable, UInt64(lookUpTable.count), buffer.bufferAtWritePosition, buffer_size)
         buffer.incrementWritePosition(by: Int(compressed_lut_size))
-        return OmFileWriterArrayFinalisd(
+        return OmFileWriterArrayFinalised(
             scale_factor: scale_factor,
             add_offset: add_offset,
             compression: compression,
@@ -241,8 +240,8 @@ public final class OmFileWriterArray<OmType: OmFileArrayDataTypeProtocol, FileHa
 }
 
 /// Attributes of an compressed array that had been written and now contains LUT size and offset
-public struct OmFileWriterArrayFinalisd {
-    /// The scalefactor that is applied to all write data
+public struct OmFileWriterArrayFinalised {
+    /// The scale-factor that is applied to all write data
     let scale_factor: Float
     
     /// The offset that is applied to all write data

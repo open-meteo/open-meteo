@@ -18,8 +18,6 @@ const char* om_error_string(OmError_t error) {
             return "Invalid compression type";
         case ERROR_INVALID_DATA_TYPE:
             return "Invalid data type";
-        case ERROR_INVALID_LUT_CHUNK_LENGTH:
-            return "Invalid LUT chunk length. Max 256.";
         case ERROR_OUT_OF_BOUND_READ:
             return "Corrupted data with potential out-of-bound read";
         case ERROR_NOT_AN_OM_FILE:

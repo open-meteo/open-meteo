@@ -16,6 +16,9 @@ public enum OmFileFormatSwiftError: Error {
     case fileExistsAlready(filename: String)
     case posixFallocateFailed(error: Int32)
     case ftruncateFailed(error: Int32)
+    case omDecoder(error: String)
+    case omEncoder(error: String)
+    case notAnOpenMeteoFile
 }
 
 
@@ -484,7 +487,7 @@ struct OmHeader {
 
 /// This is a wrapper for legay 2D reads using the new multi-dimensional reader
 public final class OmFileReader<Backend: OmFileReaderBackend> {
-    public let reader: OmFileReader2<Backend>
+    public let reader: OmFileReader2Array<Backend, Float>
     
     /// The scalefactor that is applied to all write data
     public let scalefactor: Float
@@ -510,7 +513,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     }
     
     public init(fn: Backend) throws {
-        reader = try OmFileReader2(fn: fn)
+        reader = try OmFileReader2(fn: fn).asArray(of: Float.self)!
         
         let dimensions = reader.getDimensions()
         let chunks = reader.getChunkDimensions()
@@ -533,7 +536,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         let dim0Read = dim0Read ?? 0..<dim0
         let dim1Read = dim1Read ?? 0..<dim1
         
-        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
+        try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
             // read offset
             ptr[0] = UInt64(dim0Read.lowerBound)
             ptr[1] = UInt64(dim1Read.lowerBound)
@@ -556,12 +559,11 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 2),
                 ptr.baseAddress?.advanced(by: 4),
                 ptr.baseAddress?.advanced(by: 6),
-                reader.lutChunkElementCount,
                 4096, // merge
                 65536*4 // io amax
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+                throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
             }
             reader.fn.decodePrefetch(decoder: &decoder)
         }
@@ -577,7 +579,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
     /// `arrayDim1Range` defines the offset in dimension 1 what is applied to the read into array
     /// `arrayDim1Length` if dim0Slow.count is greater than 1, the arrayDim1Length will be used as a stride. Like `nTime` in a 2d fast time array
     /// `dim0Slow` the slow dimension to read. Typically a location range
-    /// `dim1Read` the fast dimension to read. Tpyicall a time range
+    /// `dim1Read` the fast dimension to read. Typical a time range
     public func read(into: UnsafeMutablePointer<Float>, arrayDim1Range: Range<Int>, arrayDim1Length: Int, chunkBuffer: UnsafeMutableRawPointer, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
         
         //assert(arrayDim1Range.count == dim1Read.count)
@@ -591,7 +593,7 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
         
         // This function is only used for legacy 2D read functions
         
-        withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
+        try withUnsafeTemporaryAllocation(of: UInt64.self, capacity: 2*4) { ptr in
             // read offset
             ptr[0] = UInt64(dim0Read.lowerBound)
             ptr[1] = UInt64(dim1Read.lowerBound)
@@ -614,14 +616,13 @@ public final class OmFileReader<Backend: OmFileReaderBackend> {
                 ptr.baseAddress?.advanced(by: 2),
                 ptr.baseAddress?.advanced(by: 4),
                 ptr.baseAddress?.advanced(by: 6),
-                reader.lutChunkElementCount,
                 4096, // merge
                 65536*4 // io amax
             )
             guard error == ERROR_OK else {
-                fatalError("Om encoder: \(String(cString: om_error_string(error)))")
+                throw OmFileFormatSwiftError.omDecoder(error: String(cString: om_error_string(error)))
             }
-            reader.fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
+            try reader.fn.decode(decoder: &decoder, into: into, chunkBuffer: chunkBuffer)
         }
     }
 }
@@ -641,38 +642,6 @@ extension OmFileReader where Backend == MmapFile {
     
     public convenience init(fn: FileHandle) throws {
         let mmap = try MmapFile(fn: fn)
-        try self.init(fn: mmap)
-    }
-    
-    /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
-    public func wasDeleted() -> Bool {
-        reader.fn.wasDeleted()
-    }
-}
-
-extension OmFileReader where Backend == MmapFileCached {
-    public convenience init(file: String, cacheFile: String?) throws {
-        let fn = try FileHandle.openFileReading(file: file)
-        
-        guard let cacheFile else {
-            try self.init(fn: try MmapFileCached(backend: fn, frontend: nil, cacheFile: nil))
-            return
-        }
-        
-        let backendStats = fn.fileSizeAndModificationTime()
-        
-        if let cacheFn = try? FileHandle.openFileReadWrite(file: cacheFile) {
-            let cacheStats = cacheFn.fileSizeAndModificationTime()
-            if cacheStats.size == backendStats.size
-                && cacheStats.modificationTime >= backendStats.modificationTime
-                && cacheStats.creationTime >= backendStats.creationTime {
-                // cache file exists and usable
-                try self.init(fn: MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile))
-                return
-            }
-        }
-        let cacheFn = try FileHandle.createNewFile(file: cacheFile, sparseSize: backendStats.size)
-        let mmap = try MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile)
         try self.init(fn: mmap)
     }
     
