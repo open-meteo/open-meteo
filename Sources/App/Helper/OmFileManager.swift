@@ -63,36 +63,31 @@ enum OmFileManagerReadable: Hashable {
         return FileManager.default.fileExists(atPath: file)
     }
     
-    func openReadCached() throws -> OmFileReader<MmapFileCached>? {
+    func openReadCached() throws -> OmFileReader<MmapFile>? {
         let fileRel = getRelativeFilePath()
         let file = "\(OpenMeteo.dataDirectory)\(fileRel)"
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
         }
-        if let cacheDir = OpenMeteo.cacheDirectory {
-            let cacheFile = "\(cacheDir)\(fileRel)"
-            try createDirectory(dataDirectory: cacheDir)
-            return try OmFileReader(file: file, cacheFile: cacheFile)
-        }
-        return try OmFileReader(file: file, cacheFile: nil)
+        return try OmFileReader(file: file)
     }
 }
 
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 struct OmFileManager {
-    public static var instance = GenericFileManager<OmFileReader<MmapFileCached>>()
+    public static var instance = GenericFileManager<OmFileReader<MmapFile>>()
     
     private init() {}
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
+    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
         try instance.get(file)
     }
 }
 
-extension OmFileReader: GenericFileManagable where Backend == MmapFileCached {
-    static func open(from path: OmFileManagerReadable) throws -> OmFileReader<MmapFileCached>? {
+extension OmFileReader: GenericFileManagable where Backend == MmapFile {
+    static func open(from path: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
         return try path.openReadCached()
     }
 }

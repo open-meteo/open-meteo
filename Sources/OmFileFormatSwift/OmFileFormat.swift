@@ -651,35 +651,3 @@ extension OmFileReader where Backend == MmapFile {
         reader.fn.wasDeleted()
     }
 }
-
-extension OmFileReader where Backend == MmapFileCached {
-    public convenience init(file: String, cacheFile: String?) throws {
-        let fn = try FileHandle.openFileReading(file: file)
-        
-        guard let cacheFile else {
-            try self.init(fn: try MmapFileCached(backend: fn, frontend: nil, cacheFile: nil))
-            return
-        }
-        
-        let backendStats = fn.fileSizeAndModificationTime()
-        
-        if let cacheFn = try? FileHandle.openFileReadWrite(file: cacheFile) {
-            let cacheStats = cacheFn.fileSizeAndModificationTime()
-            if cacheStats.size == backendStats.size
-                && cacheStats.modificationTime >= backendStats.modificationTime
-                && cacheStats.creationTime >= backendStats.creationTime {
-                // cache file exists and usable
-                try self.init(fn: MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile))
-                return
-            }
-        }
-        let cacheFn = try FileHandle.createNewFile(file: cacheFile, sparseSize: backendStats.size)
-        let mmap = try MmapFileCached(backend: fn, frontend: cacheFn, cacheFile: cacheFile)
-        try self.init(fn: mmap)
-    }
-    
-    /// Check if the file was deleted on the file system. Linux keep the file alive, as long as some processes have it open.
-    public func wasDeleted() -> Bool {
-        reader.fn.wasDeleted()
-    }
-}
