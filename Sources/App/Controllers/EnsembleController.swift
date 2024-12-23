@@ -13,7 +13,7 @@ public struct EnsembleApiController {
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try await req.ensureApiKey("ensemble-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 35)
+        let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 36)
         
         let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
         let prepared = try GenericReaderMulti<EnsembleVariable, EnsembleMultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 7, forecastDaysMax: 35, pastDaysMax: 92, allowedRange: allowedRange)
