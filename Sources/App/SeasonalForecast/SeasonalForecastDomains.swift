@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormatSwift
 
 enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case ecmwf

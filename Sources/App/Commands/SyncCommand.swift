@@ -197,11 +197,11 @@ struct SyncCommand: AsyncCommand {
                         } else {
                             try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
                         }
-                        if let cacheDirectory = OpenMeteo.cacheDirectory {
+                        /*if let cacheDirectory = OpenMeteo.cacheDirectory {
                             // Delete cached file, in case cache is active
                             let cacheFile = "\(cacheDirectory)/\(pathNoData)"
                             try FileManager.default.removeItemIfExists(at: cacheFile)
-                        }
+                        }*/
                         await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
                     }
                     await progress.finish()
@@ -213,9 +213,9 @@ struct SyncCommand: AsyncCommand {
                     if let dataDirectoryMaxSize = signature.dataDirectoryMaxSize, dataDirectoryMaxSize > 0 {
                         try cacheDirectoryCleanup(logger: logger, cacheDirectory: OpenMeteo.dataDirectory, maxSize: dataDirectoryMaxSize * 1<<30, execute: signature.execute)
                     }
-                    if let cacheDirectoryMaxSize = signature.cacheDirectoryMaxSize, cacheDirectoryMaxSize > 0, let cacheDirectory = OpenMeteo.cacheDirectory {
+                    /*if let cacheDirectoryMaxSize = signature.cacheDirectoryMaxSize, cacheDirectoryMaxSize > 0, let cacheDirectory = OpenMeteo.cacheDirectory {
                         try cacheDirectoryCleanup(logger: logger, cacheDirectory: cacheDirectory, maxSize: cacheDirectoryMaxSize * 1<<30, execute: signature.execute)
-                    }
+                    }*/
                     
                     logger.info("Repeat in \(repeatInterval) minutes")
                     try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
