@@ -1,4 +1,4 @@
-import OmFileFormatSwift
+import OmFileFormat
 import SwiftNetCDF
 import Foundation
 import Logging

@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 import NIOConcurrencyHelpers
 import Vapor
 import NIO

@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import OmFileFormatSwift
+import OmFileFormat
 import Dispatch
 
 /**

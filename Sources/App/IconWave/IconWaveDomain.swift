@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 /**
  Domain definition for ICON wave models

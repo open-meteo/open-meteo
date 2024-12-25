@@ -1,6 +1,6 @@
 import Foundation
 import NIOConcurrencyHelpers
-import OmFileFormatSwift
+import OmFileFormat
 
 /**
  ICON Domains including ensemble

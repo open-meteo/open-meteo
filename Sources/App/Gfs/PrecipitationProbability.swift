@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 /**
  Group all probabilities variables for all domains in one enum

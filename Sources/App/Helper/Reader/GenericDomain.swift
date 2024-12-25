@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 /**
  Generic domain that is required for the reader

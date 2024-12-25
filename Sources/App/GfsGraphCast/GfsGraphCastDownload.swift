@@ -1,6 +1,6 @@
 
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 import Vapor
 import SwiftEccodes
 

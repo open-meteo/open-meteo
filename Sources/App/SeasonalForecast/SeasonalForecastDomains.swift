@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
     case ecmwf

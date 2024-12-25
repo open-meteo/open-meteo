@@ -18,7 +18,7 @@
      "data_format": "grib"
  */
 import Vapor
-import OmFileFormatSwift
+import OmFileFormat
 
 extension DownloadCamsCommand {
     /**

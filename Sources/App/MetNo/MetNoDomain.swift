@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp

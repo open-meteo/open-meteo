@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 enum ModelTimeVariable: String, GenericVariable {
     case initialisation_time

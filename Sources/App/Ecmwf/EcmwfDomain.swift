@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 
 enum EcmwfDomain: String, GenericDomain {

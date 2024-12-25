@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormatSwift
+import OmFileFormat
 
 
 /// CAMS Air quality domain definitions for Europe and global domains

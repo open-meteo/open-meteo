@@ -1,7 +1,7 @@
 import Foundation
 import SwiftEccodes
 import Vapor
-import OmFileFormatSwift
+import OmFileFormat
 
 
 

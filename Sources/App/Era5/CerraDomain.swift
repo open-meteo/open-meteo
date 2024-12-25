@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import SwiftEccodes
-import OmFileFormatSwift
+import OmFileFormat
 
 
 typealias CerraHourlyVariable = VariableOrDerived<CerraVariable, CerraVariableDerived>
