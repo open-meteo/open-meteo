@@ -192,7 +192,7 @@ struct GloFasDownloader: AsyncCommand {
                             
                             /// Use compressed memory to store each downloaded step
                             /// Roughly 2.5 MB memory per step (uncompressed 20.6 MB)
-                            dataPerTimestep.append(try OmFileReader(fn: DataAsClass(data: try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))))
+                            dataPerTimestep.append(try OmFileReader(fn: DataAsClass(data: try writer.writeInMemory(compressionType: .pfor_delta2d_16bit_logarithmic, scalefactor: 1000, all: grib2d.array.data))))
                             
                             guard forecastDate == nTime-1 else {
                                 continue
@@ -209,7 +209,7 @@ struct GloFasDownloader: AsyncCommand {
                                 var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
                                 /// Reused read buffer
                                 var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-                                try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, scalefactor: 1000, compression: .p4nzdec256logarithmic, onlyGeneratePreviousDays: false) { d0offset in
+                                try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, scalefactor: 1000, compression: .pfor_delta2d_16bit_logarithmic, onlyGeneratePreviousDays: false) { d0offset in
                                     
                                     try Task.checkCancellation()
                                     
@@ -328,7 +328,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
         logger.info("Update om database")
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_16bit_logarithmic)
     }
     
     /// Convert a single file
@@ -351,7 +351,7 @@ struct GloFasDownloader: AsyncCommand {
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
            
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .pfor_delta2d_16bit_logarithmic, scalefactor: 1000, all: grib2d.array.data)
         }
     }
     
@@ -403,7 +403,7 @@ struct GloFasDownloader: AsyncCommand {
         var looptime = DispatchTime.now()
         // Scale logarithmic. Max discharge around 400_000 m3/s
         // Note: delta 2d coding (chunk0=6) save around 15% space
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .p4nzdec256logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .pfor_delta2d_16bit_logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {

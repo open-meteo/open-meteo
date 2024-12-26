@@ -244,7 +244,7 @@ struct OmFileSplitter {
      Write new data to the archived storage and combine it with existint data.
      Updates are done in chunks to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256) throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_16bit) throws {
         
         precondition(array2d.nTime == time.count)
         
@@ -261,7 +261,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
      */
-    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .p4nzdec256, onlyGeneratePreviousDays: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
+    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_16bit, onlyGeneratePreviousDays: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
         
         let indexTime = time.toIndexTime()
         let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)

@@ -105,12 +105,12 @@ struct DownloadIconWaveCommand: AsyncCommand {
                     //let data2d = Array2DFastSpace(data: elevation, nLocations: elevation.count, nTime: 1)
                     //try data2d.writeNetcdf(filename: "\(downloadDirectory)elevation.nc", nx: nx, ny: ny)
                     try domain.surfaceElevationFileOm.createDirectory()
-                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: elevation)
                 }
                 
                 // Save temporarily as compressed om files
                 try FileManager.default.removeItemIfExists(at: fileDest)
-                try writer.write(file: fileDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                try writer.write(file: fileDest, compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
             }
         }
         await curl.printStatistics()

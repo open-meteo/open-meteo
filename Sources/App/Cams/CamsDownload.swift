@@ -173,7 +173,7 @@ struct DownloadCamsCommand: AsyncCommand {
                 //try data2d.writeNetcdf(filename: "\(domain.downloadDirectory)/\(variable).nc", nx: nx, ny: ny)
                 try FileManager.default.removeItemIfExists(at: filenameDest)
                 // Store as compressed float array
-                try writer.write(file: filenameDest, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                try writer.write(file: filenameDest, compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: data)
             }
         }
         await curl.printStatistics()

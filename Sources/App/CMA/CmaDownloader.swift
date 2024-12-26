@@ -201,7 +201,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
         //try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: orog.array.data)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: orog.array.data)
     }
     
     /// Download CMA data.
@@ -267,7 +267,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
                     
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
             }

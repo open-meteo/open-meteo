@@ -112,7 +112,7 @@ struct DownloadBomCommand: AsyncCommand {
         }
         
         elevation.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: elevation)
     }
     
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
@@ -624,7 +624,7 @@ extension OmFileWriter {
         if let fma = variable.multiplyAdd {
             data.multiplyAdd(multiply: fma.multiply, add: fma.add)
         }
-        let fn = try writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+        let fn = try writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: data)
         return fn
     }
     

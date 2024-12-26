@@ -141,7 +141,7 @@ extension VariablePerMemberStorage {
         /// Do not set `chunknLocations` because only 1 member is stored
         let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
         let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: precipitationProbability01)
+        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: precipitationProbability01)
         return GenericVariableHandle(
             variable: variable,
             time: timestamp,
@@ -184,7 +184,7 @@ extension Array where Element == GenericVariableHandle {
                 /// Do not set `chunknLocations` because only 1 member is stored
                 let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: precipitationProbability01)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: precipitationProbability01)
                 return GenericVariableHandle(
                     variable: variable,
                     time: timestamp,

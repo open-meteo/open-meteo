@@ -125,7 +125,7 @@ struct MeteoFranceDownload: AsyncCommand {
         //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         //message.dumpAttributes()
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: grib2d.array.data)
     }
     
     /// Temporarily keep those varibles to derive others
@@ -247,7 +247,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     let variable = ProbabilityVariable.precipitation_probability
                     
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect()
             }
@@ -385,7 +385,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
                         
                         logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect()
                     
@@ -563,7 +563,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 handles.append(GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
@@ -596,7 +596,7 @@ extension VariablePerMemberStorage {
                     variable: outVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: precip)
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: outVariable.scalefactor, all: precip)
                 )
             }
         )

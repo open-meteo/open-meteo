@@ -162,7 +162,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
             let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
+            try writer.write(file: biasFile, compressionType: .fpx_xor2d, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+nLocationChunks, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 
@@ -337,7 +337,7 @@ struct DownloadEra5Command: AsyncCommand {
         let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
         
         if let soilType {
-            try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: soilType)
+            try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: soilType)
         }
         
         // Set all sea grid points to -999
@@ -354,7 +354,7 @@ struct DownloadEra5Command: AsyncCommand {
             try elevation.writeNetcdf(filename: file)
         }
 
-        try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: elevation)
     }
     
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
@@ -503,7 +503,7 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
-                        let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect().compactMap({$0})
                 }
@@ -669,7 +669,7 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
-                        let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect().compactMap({$0})
                 }
@@ -781,7 +781,7 @@ struct DownloadEra5Command: AsyncCommand {
                         try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(date)", withIntermediateDirectories: true)
                         let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
-                        let fn = try writer.write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect().compactMap({$0})
                 }
@@ -855,7 +855,7 @@ struct DownloadEra5Command: AsyncCommand {
             try FileManager.default.removeItemIfExists(at: writeFile.getFilePath())
             
             // chunk 6 locations and 21 days of data
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile.getFilePath(), compressionType: .p4nzdec256, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
+            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, nx*ny)
                 
                 var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)

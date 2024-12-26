@@ -96,7 +96,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: hsurf)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: hsurf)
     }
     
     
@@ -188,7 +188,7 @@ struct DownloadIconCommand: AsyncCommand {
                                 continue
                             }
                         }
-                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         await handles15minIconD2.append(GenericVariableHandle(
                             variable: variable,
                             time: timestamp,
@@ -230,7 +230,7 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                     }
                     //logger.info("Compressing and writing data to \(filenameDest)")
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     await handles.append(GenericVariableHandle(
                         variable: variable,
                         time: timestamp,
@@ -346,7 +346,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: v.variable.scalefactor, all: data.data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: v.variable.scalefactor, all: data.data)
                 await handles.append(GenericVariableHandle(
                     variable: v.variable,
                     time: v.timestamp,
@@ -419,7 +419,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 
                 let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: v.variable.scalefactor, all: data.data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: v.variable.scalefactor, all: data.data)
                 await handles15minIconD2.append(GenericVariableHandle(
                     variable: v.variable,
                     time: v.timestamp,
