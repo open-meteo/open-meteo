@@ -112,10 +112,6 @@ struct GloFasDownloader: AsyncCommand {
             let logger = context.application.logger
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_16bit_logarithmic)
         }
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: nil)
-        }
     }
     
     /// Download the single GRIB file containing 30 days with 50 members and update the database
