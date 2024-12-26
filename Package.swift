@@ -16,9 +16,6 @@ let swiftFlags: [PackageDescription.SwiftSetting] = [
 ]
 
 let cFlags = [PackageDescription.CSetting.unsafeFlags(["-O3", "-Wall", "-Werror", "-fno-math-errno", "-fno-trapping-math", "-freciprocal-math", "-ffp-contract=fast"] + mArch)]
-// Note: Fast math flags reduce performance for compression
-let cFlagsPFor2D = [PackageDescription.CSetting.unsafeFlags(["-O3"] + mArch)]
-let cFlagsPFor = [PackageDescription.CSetting.unsafeFlags(["-O3", "-Wall", "-Werror"] + mArch)]
 
 /// Conditional support for Apache Arrow Parquet files
 let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TRUE"
