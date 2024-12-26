@@ -129,10 +129,11 @@ struct GenericVariableHandle {
             }
             
             /// If only one value is set, this could be the model initialisation or modifcation time
-            let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
+            /// TODO: check if single value mode is still required
+            //let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
             
             let om = OmFileSplitter(domain,
-                                    nLocations: isSingleValueVariable ? 1 : nil,
+                                    //nLocations: isSingleValueVariable ? 1 : nil,
                                     nMembers: nMembers,
                                     chunknLocations: nMembers > 1 ? nMembers : nil
             )
