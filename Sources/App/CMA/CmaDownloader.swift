@@ -216,7 +216,6 @@ struct DownloadCmaCommand: AsyncCommand {
         let nForecastHours = domain.forecastHours(run: run.hour)
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
         
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let previous = GribDeaverager()
         
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
@@ -250,7 +249,7 @@ struct DownloadCmaCommand: AsyncCommand {
                         }
                     }
                     
-                    let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     //message.dumpAttributes()
                     try grib2d.load(message: message)

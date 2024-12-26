@@ -224,9 +224,7 @@ struct GfsDownload: AsyncCommand {
             forecastHours = forecastHours.filter({$0 <= maxForecastHour})
         }
         
-        let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
@@ -312,7 +310,7 @@ struct GfsDownload: AsyncCommand {
             
             let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
             
-            for member in 0..<nMembers {
+            for member in 0..<domain.ensembleMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member, useAws: downloadFromAws)
                                

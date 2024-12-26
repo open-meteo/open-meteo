@@ -421,3 +421,30 @@ extension OmFileReader {
         }
     }
 }
+
+
+extension OmFileSplitter {
+    /// Prepare a write to store individual timesteps as spatial encoded files
+    /// This makes it easier to migrate to the new file format writer
+    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriter {
+        /// TODO: Not sure if chunklocations needs to be dependend on nMembers....
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        return OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+    }
+}
+
+
+extension OmFileWriter {
+    /// Write all data at once without any streaming
+    /// Creates a temporary file and returns only a file handle
+    public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
+        let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
+        try FileManager.default.removeItemIfExists(at: file)
+        let fn = try FileHandle.createNewFile(file: file, exclusive: true)
+        try FileManager.default.removeItem(atPath: file)
+        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, fsync: false, supplyChunk: { range in
+            return ArraySlice(all)
+        })
+        return fn
+    }
+}

@@ -66,11 +66,10 @@ struct DownloadIconWaveCommand: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
@@ -117,7 +116,8 @@ struct DownloadIconWaveCommand: AsyncCommand {
     }
     
     /// Process each variable and update time-series optimised files
-    func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {        
+    /// TODO use generic conversion routines
+    func convert(logger: Logger, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable]) throws {
         let nLocations = domain.grid.count
         let om = OmFileSplitter(domain)
         let nLocationsPerChunk = om.nLocationsPerChunk

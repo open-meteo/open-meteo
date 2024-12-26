@@ -138,9 +138,7 @@ extension VariablePerMemberStorage {
         }
         precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
         let variable = ProbabilityVariable.precipitation_probability
-        /// Do not set `chunknLocations` because only 1 member is stored
-        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
         let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: precipitationProbability01)
         return GenericVariableHandle(
             variable: variable,
@@ -181,9 +179,7 @@ extension Array where Element == GenericVariableHandle {
                 previousTimesamp = timestamp
                 precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
                 let variable = ProbabilityVariable.precipitation_probability
-                /// Do not set `chunknLocations` because only 1 member is stored
-                let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
-                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: precipitationProbability01)
                 return GenericVariableHandle(
                     variable: variable,

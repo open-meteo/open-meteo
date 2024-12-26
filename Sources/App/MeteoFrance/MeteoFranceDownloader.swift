@@ -206,7 +206,6 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
@@ -234,8 +233,8 @@ struct MeteoFranceDownload: AsyncCommand {
                         return nil
                     }
                     
-                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     //message.dumpAttributes()
                     try grib2d.load(message: message)
                     if domain.isGlobal {
@@ -273,7 +272,6 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
         var previous = GribDeaverager()
         let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
@@ -364,7 +362,7 @@ struct MeteoFranceDownload: AsyncCommand {
                             return nil
                         }
                         
-                        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                         //message.dumpAttributes()
                         try grib2d.load(message: message)
@@ -389,7 +387,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect()
                     
-                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
                     let precip = try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
                     
@@ -521,8 +519,7 @@ struct MeteoFranceDownload: AsyncCommand {
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let subsetGrid = domain.mfSubsetGrid
         
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         var handles = [GenericVariableHandle]()
         
         for seconds in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true) {

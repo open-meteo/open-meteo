@@ -136,12 +136,11 @@ struct GloFasDownloader: AsyncCommand {
             
             // forecast day 0 is valid for the next day
             let timerange = TimerangeDt(start: run.add(24*3600), nTime: nTime, dtSeconds: 24*3600)
-            let nLocationsPerChunk = om.nLocationsPerChunk
-            let writer = OmFileWriter(dim0: 1, dim1: nx*ny, chunk0: 1, chunk1: nLocationsPerChunk)
+            let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
             
             // Read all GRIB messages and directly update OM file database
             // Database update is done in a second thread
-            logger.info("Starting grib streaming. nLocationsPerChunk=\(nLocationsPerChunk) nTime=\(nTime)")
+            logger.info("Starting grib streaming. nTime=\(nTime)")
             let timeout = TimeoutTracker(logger: logger, deadline: curl.deadline)
             
             actor Counter {
@@ -206,14 +205,14 @@ struct GloFasDownloader: AsyncCommand {
                                 logger.info("Starting om file update for member \(member)")
                                 let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Conversion member \(member)")
                                 let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
-                                var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
+                                var data2d = Array2DFastTime(nLocations: om.nLocationsPerChunk, nTime: nTime)
                                 /// Reused read buffer
-                                var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
+                                var readTemp = [Float](repeating: .nan, count: om.nLocationsPerChunk)
                                 try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, scalefactor: 1000, compression: .pfor_delta2d_16bit_logarithmic, onlyGeneratePreviousDays: false) { d0offset in
                                     
                                     try Task.checkCancellation()
                                     
-                                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nx*ny)
+                                    let locationRange = d0offset ..< min(d0offset+om.nLocationsPerChunk, nx*ny)
                                     for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
                                         try data.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
                                         data2d[0..<data2d.nLocations, forecastDate] = readTemp
