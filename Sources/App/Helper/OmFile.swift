@@ -402,7 +402,7 @@ extension OmFileReader {
             let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             try reader.willNeed(
-                dimRead: [y, x, fileTime]
+                range: [y, x, fileTime]
             )
         case 4:
             // File uses dimensions [ny,nx,nLevel,ntime]
@@ -414,7 +414,7 @@ extension OmFileReader {
             let l = UInt64(level) ..< UInt64(level+1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             try reader.willNeed(
-                dimRead: [y, x, l, fileTime]
+                range: [y, x, l, fileTime]
             )
         default:
             fatalError("ndims not implemented")
