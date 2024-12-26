@@ -76,8 +76,12 @@ struct GribAttributes {
 }
 
 
-fileprivate extension GribMessage {
-    func getOrThrow(attribute: String) throws -> String {
+extension GribMessage {
+    func getAttributes() throws -> GribAttributes {
+        return try GribAttributes(message: self)
+    }
+    
+    fileprivate func getOrThrow(attribute: String) throws -> String {
         guard let value = get(attribute: attribute) else {
             throw GribAttributeError.couldNotGetAttribute(attribute: attribute)
         }
