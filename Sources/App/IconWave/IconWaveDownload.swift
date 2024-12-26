@@ -27,7 +27,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
         
-        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
         var concurrent: Int?
     }
 

@@ -119,9 +119,6 @@ struct GloFasDownloader: AsyncCommand {
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        
-        let nx = domain.grid.nx
-        let ny = domain.grid.ny
                 
         let downloadTimeHours: Double = domain.isForecast ? 5 : 14
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: Int(3600*downloadTimeHours))
@@ -590,6 +587,6 @@ fileprivate struct GloFasVariableAndMember: GenericVariable {
     }
     
     var rawValue: String {
-        fatalError()
+        return omFileName.file
     }
 }
