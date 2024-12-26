@@ -118,7 +118,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             }
             return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: 168, by: 6)).map({run.add(hours: $0)})
         case .uk_deterministic_2km:
-            return TimerangeDt(start: run, nTime: 55, dtSeconds: 3600).map({$0})
+            // every 3 hours, 55 hours otherwise 13 hours
+            return TimerangeDt(start: run, nTime: run.hour % 3 == 0 ? 55 : 13, dtSeconds: 3600).map({$0})
         }
     }
     

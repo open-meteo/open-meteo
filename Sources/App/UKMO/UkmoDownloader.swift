@@ -256,22 +256,7 @@ struct UkmoDownload: AsyncCommand {
                     }
                     
                     let url = "\(baseUrl)\(timestamp.iso8601_YYYYMMddTHHmm)Z-PT\(forecastHour.zeroPadded(len: 4))H\(timestamp.minute.zeroPadded(len: 2))M-\(fileName).nc"
-                    /// UKV 2km sometimes only has 12 forecast hours. Terminte download and convert the already downloaded data
-                    let ignoreMissingTimestepsPastHour12 = forecastHour > 12 && domain == .uk_deterministic_2km
-                    let memory: ByteBuffer
-                    do {
-                        let deadline = ignoreMissingTimestepsPastHour12 ? 0.1 : nil
-                        memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024, deadLineHours: deadline)
-                    } catch {
-                        if skipMissing {
-                            // Ignore download error and continue with next file
-                            return []
-                        }
-                        if ignoreMissingTimestepsPastHour12 {
-                            throw UkmoDownloadError.is12HoursShortRun
-                        }
-                        throw error
-                    }
+                    let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
                     let data = try memory.readUkmoNetCDF()
                     logger.info("Processing \(data.name) [\(data.unit)]")
                     return try data.data.compactMap { (level, data) -> GenericVariableHandle? in
