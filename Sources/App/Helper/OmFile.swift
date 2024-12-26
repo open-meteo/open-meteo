@@ -353,6 +353,21 @@ extension OmFileReader {
                 intoCubeOffset: [0, 0, UInt64(timeOffsets.array.lowerBound)],
                 intoCubeDimension: [UInt64(y.count), UInt64(x.count), UInt64(nTime)]
             )
+        case 4:
+            // File uses dimensions [ny,nx,nLevel,ntime]
+            guard ny == dimensions[0], nx == dimensions[1], nMembers == dimensions[2] else {
+                return
+            }
+            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let l = UInt64(level) ..< UInt64(level+1)
+            let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
+            try reader.read(
+                into: &into,
+                range: [y, x, l, fileTime],
+                intoCubeOffset: [0, 0, 0, UInt64(timeOffsets.array.lowerBound)],
+                intoCubeDimension: [UInt64(y.count), UInt64(x.count), 1, UInt64(nTime)]
+            )
         default:
             fatalError("ndims not implemented")
         }
@@ -388,6 +403,18 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             try reader.willNeed(
                 dimRead: [y, x, fileTime]
+            )
+        case 4:
+            // File uses dimensions [ny,nx,nLevel,ntime]
+            guard ny == dimensions[0], nx == dimensions[1], nMembers == dimensions[2] else {
+                return
+            }
+            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let l = UInt64(level) ..< UInt64(level+1)
+            let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
+            try reader.willNeed(
+                dimRead: [y, x, l, fileTime]
             )
         default:
             fatalError("ndims not implemented")
