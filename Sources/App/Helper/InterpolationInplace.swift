@@ -8,7 +8,7 @@ extension Array3DFastTime {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
@@ -20,7 +20,7 @@ extension Array2DFastTime {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
@@ -34,7 +34,7 @@ extension Array where Element == Float {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
         switch type {
         case .linear:
             interpolateInplaceLinear(nTime: time.count)
@@ -242,7 +242,7 @@ extension Array where Element == Float {
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
     ///
     /// Automatically detects data spacing. e.g. `--D--D--D` and correctly backfills
-    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: Range<Int>) {
+    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
         let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)

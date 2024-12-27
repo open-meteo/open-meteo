@@ -286,13 +286,12 @@ struct GenericVariableHandle {
                 }
                 
                 // Interpolate all missing values
-                // TODO 3D interpolate
-                /*data3d.interpolateInplace(
+                data3d.interpolateInplace(
                     type: variable.interpolation,
                     time: time,
                     grid: domain.grid,
-                    locationRange: locationRange
-                )*/
+                    locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
+                )
                 
                 progress.add(nLoc)
                 return data3d.data[0..<nLoc * memberRange.count * time.count]
