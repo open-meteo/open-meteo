@@ -380,7 +380,7 @@ struct OmFileSplitter {
         
         /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
         let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain.getDomain(), nMembers: nMembers)
-        var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nTimePerFile)
+        var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nTimePerFile * nMembers)
         
         for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(spatialChunks.y)) {
             for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(spatialChunks.x)) {
@@ -442,7 +442,7 @@ struct OmFileSplitter {
                     // Write data
                     /// TODO support for array slices
                     try writer.write.writeData(
-                        array: Array(fileData[0..<yRange.count * xRange.count * nTimePerFile]),
+                        array: Array(fileData[0..<yRange.count * xRange.count * nMembers * nTimePerFile]),
                         arrayDimensions: nMembers <= 1 ?
                         [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTimePerFile)] :
                             [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(nTimePerFile)]

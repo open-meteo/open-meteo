@@ -280,7 +280,7 @@ struct GenericVariableHandle {
                 for reader in readers {
                     precondition(reader.reader.count == nMembers, "nMember count wrong")
                     for (i,member) in memberRange.enumerated() {
-                        let r = reader.reader[Int(member)]
+                        let r = reader.reader.first(where: {$0.member == Int(member)})!
                         try r.fn.reader.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, i, time.index(of: reader.time)!] = readTemp[0..<nLoc]
                     }
