@@ -100,7 +100,7 @@ struct GenericVariableHandle {
             })
         } else {
             if version3 {
-                try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+                try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
             } else {
                 try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
             }
@@ -244,8 +244,8 @@ struct GenericVariableHandle {
             
             let om = OmFileSplitter(domain,
                                     //nLocations: isSingleValueVariable ? 1 : nil,
-                                    nMembers: nMembers,
-                                    chunknLocations: nMembers > 1 ? nMembers : nil
+                                    nMembers: nMembers/*,
+                                    chunknLocations: nMembers > 1 ? nMembers : nil*/
             )
             //let nLocationsPerChunk = om.nLocationsPerChunk
             
@@ -273,6 +273,7 @@ struct GenericVariableHandle {
             }
                         
             try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { (yRange, xRange, memberRange) in
+                
                 
                 let nLoc = yRange.count * xRange.count
                 data3d.data.fillWithNaNs()

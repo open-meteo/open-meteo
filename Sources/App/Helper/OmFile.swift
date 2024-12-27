@@ -356,12 +356,12 @@ struct OmFileSplitter {
                 let skip =  previousDay * 86400 / time.dtSeconds
                 let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
-                var omRead = try? OmFileReader2(file: readFile.getFilePath())
                 let tempFile = readFile.getFilePath() + "~"
                 // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
                 FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
                 try FileManager.default.removeItemIfExists(at: tempFile)
                 let fn = try FileHandle.createNewFile(file: tempFile)
+                let omRead = try? OmFileReader2(file: readFile.getFilePath())
                 
                 let writeFile = OmFileWriter2(fn: fn, initialCapacity: 1024*1024)
                 let writer = try writeFile.prepareArray(
@@ -574,10 +574,15 @@ extension OmFileReader {
 extension OmFileSplitter {
     /// Prepare a write to store individual timesteps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
-    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriter {
+    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1, version3: Bool = false) -> OmFileWriter {
+        if version3 {
+            /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
+            let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
+            return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
+        }
         /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
-        let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
-        return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
+        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
+        return OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
     }
     
     static func calculateSpatialXYChunk(domain: GenericDomain, nMembers: Int) -> (y: Int, x: Int) {
@@ -589,7 +594,7 @@ extension OmFileSplitter {
         // TODO: Divide by nMembers also?
         let xchunks = max(1, min(nx, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations))
         let ychunks = max(1, min(ny, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / xchunks / chunknLocations * chunknLocations))
-        //print("Chunks [\(ychunks),\(xchunks),\(nTimePerFile)]")
+        print("Chunks [\(ychunks),\(xchunks),\(nTimePerFile)]")
         return (ychunks, xchunks)
     }
 }
