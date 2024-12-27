@@ -110,7 +110,7 @@ struct GloFasDownloader: AsyncCommand {
             let nConcurrent = signature.concurrent ?? 1
             let handles = try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword, concurrent: nConcurrent)
             let logger = context.application.logger
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_16bit_logarithmic)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_int16_logarithmic)
         }
     }
     
@@ -139,7 +139,7 @@ struct GloFasDownloader: AsyncCommand {
                     grib2d.array.flipLatitude()
                     
                     let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit_logarithmic, scalefactor: 1000, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
                     let variable = GloFasVariableAndMember(member: member)
                     return GenericVariableHandle(variable: variable, time: attributes.timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
@@ -239,7 +239,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
         logger.info("Update om database")
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_16bit_logarithmic)
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
     }
     
     /// Convert a single file
@@ -262,7 +262,7 @@ struct GloFasDownloader: AsyncCommand {
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
            
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .pfor_delta2d_16bit_logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
         }
     }
     
@@ -314,7 +314,7 @@ struct GloFasDownloader: AsyncCommand {
         var looptime = DispatchTime.now()
         // Scale logarithmic. Max discharge around 400_000 m3/s
         // Note: delta 2d coding (chunk0=6) save around 15% space
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .pfor_delta2d_16bit_logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {

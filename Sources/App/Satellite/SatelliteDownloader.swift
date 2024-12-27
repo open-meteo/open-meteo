@@ -65,7 +65,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
                 return try OmFileReader(file: omFile)
             }
             try OmFileWriter(dim0: domain.grid.count, dim1: masterTime.count, chunk0: 8, chunk1: 512)
-                .write(logger: logger, file: masterFile.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
+                .write(logger: logger, file: masterFile.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
         }
         
         if !FileManager.default.fileExists(atPath: domain.getBiasCorrectionFile(for: SatelliteVariable.precipitation_sum.omFileName.file).getFilePath()) {
@@ -147,7 +147,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
             //fatalError()
             
             try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
-                .write(file: destination, compressionType: .pfor_delta2d_16bit, scalefactor: 10, all: transposed)
+                .write(file: destination, compressionType: .pfor_delta2d_int16, scalefactor: 10, all: transposed)
             progress.add(1)
         }
         progress.finish()

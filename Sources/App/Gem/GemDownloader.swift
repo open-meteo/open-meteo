@@ -138,7 +138,7 @@ struct GemDownload: AsyncCommand {
             try Array2D(data: height, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         }
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: height)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height)
     }
     
     /// Download data and store as compressed files for each timestep
@@ -230,7 +230,7 @@ struct GemDownload: AsyncCommand {
                                     fatalError("Wind speed calculation requires \(windspeedVariable) to download")
                                 }
                                 let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: windspeedVariable.scalefactor, all: windspeed)
+                                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: windspeedVariable.scalefactor, all: windspeed)
                                 handles.append(GenericVariableHandle(
                                     variable: windspeedVariable,
                                     time: run.add(hours: hour),
@@ -241,7 +241,7 @@ struct GemDownload: AsyncCommand {
                             }
                         }
                         
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         handles.append(GenericVariableHandle(
                             variable: variable,
                             time: run.add(hours: hour),

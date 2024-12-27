@@ -23,7 +23,7 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: CompressionType = .pfor_delta2d_16bit) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: CompressionType = .pfor_delta2d_int16) async throws {
         
         let startTime = DispatchTime.now()
         try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
@@ -45,13 +45,13 @@ struct GenericVariableHandle {
                         variable: ModelTimeVariable.initialisation_time,
                         time: $0,
                         member: 0,
-                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: [Float($0.timeIntervalSince1970)])
+                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: [Float($0.timeIntervalSince1970)])
                     ),
                     GenericVariableHandle(
                         variable: ModelTimeVariable.modification_time,
                         time: $0,
                         member: 0,
-                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: [Float(current.timeIntervalSince1970)])
+                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: [Float(current.timeIntervalSince1970)])
                     )
                 ]
             }
@@ -276,7 +276,7 @@ extension VariablePerMemberStorage {
                     variable: outSpeedVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: outSpeedVariable.scalefactor, all: speed)
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outSpeedVariable.scalefactor, all: speed)
                 )
                 
                 if let outDirectionVariable {
@@ -288,7 +288,7 @@ extension VariablePerMemberStorage {
                         variable: outDirectionVariable,
                         time: t.timestamp,
                         member: t.member,
-                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: outDirectionVariable.scalefactor, all: direction)
+                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outDirectionVariable.scalefactor, all: direction)
                     )
                     return [speedHandle, directionHandle]
                 }
@@ -324,7 +324,7 @@ extension VariablePerMemberStorage {
         try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         #endif
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: elevationFile.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: elevation)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: elevationFile.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
     }
 }
 

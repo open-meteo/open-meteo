@@ -239,7 +239,7 @@ struct DmiDownload: AsyncCommand {
                         return nil
                     }
                     
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn)
                 }.collect().compactMap({$0})
                 

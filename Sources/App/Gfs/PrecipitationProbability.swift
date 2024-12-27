@@ -139,7 +139,7 @@ extension VariablePerMemberStorage {
         precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
         let variable = ProbabilityVariable.precipitation_probability
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
-        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: precipitationProbability01)
+        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: precipitationProbability01)
         return GenericVariableHandle(
             variable: variable,
             time: timestamp,
@@ -180,7 +180,7 @@ extension Array where Element == GenericVariableHandle {
                 precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
                 let variable = ProbabilityVariable.precipitation_probability
                 let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: precipitationProbability01)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: precipitationProbability01)
                 return GenericVariableHandle(
                     variable: variable,
                     time: timestamp,

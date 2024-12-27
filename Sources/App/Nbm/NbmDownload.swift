@@ -178,7 +178,7 @@ struct NbmDownload: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                 handles.append(GenericVariableHandle(
                     variable: variable.variable,
                     time: timestamp,

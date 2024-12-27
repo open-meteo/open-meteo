@@ -98,7 +98,7 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
             logger.info("Writing elevation file")
-            try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: altitude)
+            try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: altitude)
         }
         
         /// Verify projection and grid coordinates
@@ -151,7 +151,7 @@ struct MetNoDownloader: AsyncCommand {
             return try (0..<nTime).map { t in
                 let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                 let data = Array(spatial[t, 0..<spatial.nLocations])
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.scalefactor, all: data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
                 return GenericVariableHandle(
                     variable: variable,
                     time: run.add(hours: t),

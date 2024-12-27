@@ -185,7 +185,7 @@ struct GfsDownload: AsyncCommand {
         
         //try height.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
         
-        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: height.data)
+        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height.data)
     }
     
     /// download GFS025 and NAM CONUS
@@ -273,7 +273,7 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
@@ -350,7 +350,7 @@ struct GfsDownload: AsyncCommand {
                     if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                         let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
                         //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
-                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_16bit, scalefactor: 1, all: height.data)
+                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height.data)
                     }
                     
                     // Deaccumulate precipitation
@@ -443,7 +443,7 @@ struct GfsDownload: AsyncCommand {
                         continue
                     }
                     
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
@@ -501,7 +501,7 @@ extension VariablePerMemberStorage {
                     variable: outVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_16bit, scalefactor: outVariable.scalefactor, all: snowfall)
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
                 )
             }
         )
