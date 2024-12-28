@@ -50,8 +50,8 @@ struct UkmoDownload: AsyncCommand {
         @Flag(name: "skip-missing", help: "Ignore missing files while downloading")
         var skipMissing: Bool
         
-        @Flag(name: "fix-solar", help: "Fix old solar files")
-        var fixSolar: Bool
+        //@Flag(name: "fix-solar", help: "Fix old solar files")
+        //var fixSolar: Bool
     }
 
     var help: String {
@@ -87,12 +87,12 @@ struct UkmoDownload: AsyncCommand {
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
             
-            if signature.fixSolar {
+            /*if signature.fixSolar {
                 // timeinterval devided by chunk time range
                 let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
                 try self.fixSolarFiles(application: context.application, domain: domain, timerange: time)
                 return
-            }
+            }*/
             
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
@@ -111,7 +111,7 @@ struct UkmoDownload: AsyncCommand {
     }
     
     /// read each file in chunks, apply shortwave correction and write again
-    func fixSolarFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
+    /*func fixSolarFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
         let nTimePerFile = domain.omFileLength
         let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
         
@@ -153,7 +153,7 @@ struct UkmoDownload: AsyncCommand {
                 }
             }
         }
-    }
+    }*/
     
     func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
         
