@@ -591,9 +591,8 @@ extension OmFileSplitter {
         let ny = domain.grid.ny
         let nTimePerFile = splitter.nTimePerFile // domain.omFileLength
         let chunknLocations = splitter.chunknLocations // max(6, 3072 / nTimePerFile)
-        // TODO: Divide by nMembers also?
-        let xchunks = max(1, min(nx, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / chunknLocations * chunknLocations))
-        let ychunks = max(1, min(ny, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / xchunks / chunknLocations * chunknLocations))
+        let xchunks = max(1, min(nx, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / nMembers / chunknLocations * chunknLocations))
+        let ychunks = max(1, min(ny, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / nMembers / xchunks))
         print("Chunks [\(ychunks),\(xchunks)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         return (ychunks, xchunks)
     }
