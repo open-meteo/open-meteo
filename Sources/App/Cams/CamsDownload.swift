@@ -336,16 +336,17 @@ struct DownloadCamsCommand: AsyncCommand {
                     }
                     logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
                     
-                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    var grib2d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
+                    if attributes.unit == "kg m**-3" {
+                        /// kilogram to microgram
+                        grib2d.array.data.multiplyAdd(multiply: 1e9, add: 0)
+                    }
                     //try grib2d.load(message: message, shift180LongitudeAndFlipLatitudeIfRequired: true)
                     /*if let scaling = variable.netCdfScaling(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                     }*/
                     
-                    try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
-                    let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
-                    try FileManager.default.removeItemIfExists(at: omFile)
-                    let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
             }
