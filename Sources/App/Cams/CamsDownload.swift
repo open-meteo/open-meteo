@@ -80,9 +80,9 @@ struct DownloadCamsCommand: AsyncCommand {
             guard let ftppassword = signature.ftppassword else {
                 fatalError("ftppassword is required")
             }
-            try await downloadCamsGlobal(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, user: ftpuser, password: ftppassword)
-            try convertCamsGlobal(logger: logger, domain: domain, run: run, variables: variables)
-            try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
+            let handles = try await downloadCamsGlobal(application: context.application, domain: domain, run: run, variables: variables, user: ftpuser, password: ftppassword)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            return
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
@@ -113,7 +113,7 @@ struct DownloadCamsCommand: AsyncCommand {
     
     /// Download from the ECMWF CAMS ftp/http server
     /// This data is also available via the ADC API, but queue times are 4 hours!
-    func downloadCamsGlobal(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], user: String, password: String) async throws {
+    func downloadCamsGlobal(application: Application, domain: CamsDomain, run: Timestamp, variables: [CamsVariable], user: String, password: String) async throws -> [GenericVariableHandle] {
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let logger = application.logger
@@ -121,7 +121,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let writer = OmFileWriter(dim0: nx, dim1: ny, chunk0: nx, chunk1: ny)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
@@ -132,19 +132,15 @@ struct DownloadCamsCommand: AsyncCommand {
         /// The surface level of multi-level files is available in the `CAMS_GLOBAL_ADDITIONAL` directory
         let remoteDirAdditional = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CAMS_GLOBAL_ADDITIONAL/\(dateRun)/"
         
-        for hour in 0..<domain.forecastHours {
+        let handles = try await (0..<domain.forecastHours).asyncFlatMap { hour in
             logger.info("Downloading hour \(hour)")
             
-            for variable in variables {
-                guard let meta = variable.getCamsGlobalMeta()else {
-                    continue
+            return try await variables.asyncCompactMap { variable -> GenericVariableHandle? in
+                guard let meta = variable.getCamsGlobalMeta() else {
+                    return nil
                 }
                 if meta.isMultiLevel && hour % 3 != 0 {
-                    continue // multi level variables are only 3 hour
-                }
-                let filenameDest = "\(domain.downloadDirectory)\(variable)_\(hour).om"
-                if skipFilesIfExisting && FileManager.default.fileExists(atPath: filenameDest) {
-                    continue
+                    return nil // multi level variables are only 3 hour
                 }
                 
                 /// Multi level name `z_cams_c_ecmf_20220811120000_prod_fc_ml137_000_aermr03.nc`
@@ -168,51 +164,17 @@ struct DownloadCamsCommand: AsyncCommand {
                 for i in data.indices {
                     data[i] *= meta.scalefactor
                 }
-                
-                //let data2d = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: 1)
-                //try data2d.writeNetcdf(filename: "\(domain.downloadDirectory)/\(variable).nc", nx: nx, ny: ny)
-                try FileManager.default.removeItemIfExists(at: filenameDest)
-                // Store as compressed float array
-                try writer.write(file: filenameDest, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
+
+                return GenericVariableHandle(
+                    variable: variable,
+                    time: run.add(hours: hour),
+                    member: 0,
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
+                )
             }
         }
         await curl.printStatistics()
-    }
-    
-    /// Assemble a time-series and update operational files
-    func convertCamsGlobal(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
-        let om = OmFileSplitter(domain)
-        
-        for variable in variables {
-            guard let meta = variable.getCamsGlobalMeta()else {
-                continue
-            }
-            logger.info("Converting \(variable)")
-            
-            /// Prepare data as time series optimisied array. It is wrapped in a closure to release memory.
-            var data2d = Array2DFastTime(nLocations: domain.grid.count, nTime: domain.forecastHours)
-                
-            for hour in 0..<domain.forecastHours {
-                if meta.isMultiLevel && hour % 3 != 0 {
-                    continue // multi level variables are only 3 hour
-                }
-                let d = try OmFileReader(file: "\(domain.downloadDirectory)\(variable)_\(hour).om").readAll()
-                data2d[0..<data2d.nLocations, hour / domain.dtHours] = d
-            }
-            
-            // Multi level has only 3h data, interpolate to 1h using hermite interpolation
-            if meta.isMultiLevel {
-                data2d.data.interpolateInplaceHermite(nTime: domain.forecastHours, bounds: 0...Float.infinity)
-            }
-            
-            logger.info("Create om file")
-            let startOm = DispatchTime.now()
-            let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
-            //try data2d.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-        }
-        
+        return handles
     }
     
     struct CamsEuropeQuery: Encodable {
