@@ -89,25 +89,22 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             if let timeinterval = signature.timeinterval {
                 for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400) {
-                    try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, forecastHours: 24)
-                    try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
+                    let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: 24, concurrent: signature.concurrent ?? 1)
+                    try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
                 }
                 return
             }
-            try await downloadCamsEurope(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, forecastHours: nil)
-            try convertCamsEurope(logger: logger, domain: domain, run: run, variables: variables)
-            try ModelUpdateMetaJson.update(domain: domain, run: run, end: run.add(hours: domain.forecastHours))
+            let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: nil, concurrent: signature.concurrent ?? 1)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            return
         case .cams_global_greenhouse_gases:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
             let concurrent = signature.concurrent ?? 1
             let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent)
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
-        }
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: variables)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            return
         }
     }
     
@@ -301,23 +298,20 @@ struct DownloadCamsCommand: AsyncCommand {
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, skipFilesIfExisting: Bool, variables: [CamsVariable], cdskey: String, forecastHours: Int?) async throws {
+    func downloadCamsEurope(application: Application, domain: CamsDomain, run: Timestamp, variables: [CamsVariable], cdskey: String, forecastHours: Int?, concurrent: Int) async throws -> [GenericVariableHandle] {
         
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let downloadFile = "\(domain.downloadDirectory)download.nc"
         
-        if skipFilesIfExisting && FileManager.default.fileExists(atPath: downloadFile) {
-            return
-        }
         let forecastHours = forecastHours ?? domain.forecastHours
         let date = run.iso8601_YYYY_MM_dd
         let query = CamsEuropeQuery(
             model: ["ensemble"],
             date: "\(date)/\(date)",
             type: ["forecast"],
-            data_format: "netcdf",
+            data_format: "grib",
             variable: variables.compactMap { $0.getCamsEuMeta()?.apiName },
             level: ["0"],
             time: "\(run.hour.zeroPadded(len: 2)):00",
@@ -328,59 +322,38 @@ struct DownloadCamsCommand: AsyncCommand {
         )
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+        var handles = [GenericVariableHandle]()
         
         do {
-            try await curl.downloadCdsApi(
-                dataset: "cams-europe-air-quality-forecasts",
-                query: query,
-                apikey: cdskey,
-                server: "https://ads.atmosphere.copernicus.eu/api",
-                destinationFile: downloadFile
-            )
-        } catch SpawnError.commandFailed(cmd: let cmd, returnCode: let code, args: let args) {
-            if code == 70 {
-                logger.info("Timestep \(run.iso8601_YYYY_MM_dd) seems to be unavailable")
-                fatalError()
-            } else {
-                throw SpawnError.commandFailed(cmd: cmd, returnCode: code, args: args)
+            let h = try await curl.withCdsApi(dataset: "cams-europe-air-quality-forecasts", query: query, apikey: cdskey, server: "https://ads.atmosphere.copernicus.eu/api") { messages in
+                return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    let attributes = try GribAttributes(message: message)
+                    let timestamp = attributes.timestamp
+                    guard let variable = CamsVariable.camsEuropeFromGrib(attributes: attributes) else {
+                        logger.warning("Could not find \(attributes) in grib")
+                        return nil
+                    }
+                    logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
+                    
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    //try grib2d.load(message: message, shift180LongitudeAndFlipLatitudeIfRequired: true)
+                    /*if let scaling = variable.netCdfScaling(domain: domain) {
+                        grib2d.array.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
+                    }*/
+                    
+                    try FileManager.default.createDirectory(atPath: "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)", withIntermediateDirectories: true)
+                    let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
+                    try FileManager.default.removeItemIfExists(at: omFile)
+                    let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                }.collect().compactMap({$0})
             }
+            handles.append(contentsOf: h)
+        } catch CdsApiError.restrictedAccessToValidData {
+            logger.info("Timestep \(run.iso8601_YYYY_MM_dd) seems to be unavailable. Skipping downloading now.")
         }
-    }
-    
-    /// Process each variable and update time-series optimised files
-    func convertCamsEurope(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
-        let om = OmFileSplitter(domain)
-        
-        guard let ncFile = try NetCDF.open(path: "\(domain.downloadDirectory)download.nc", allowUpdate: false) else {
-            fatalError("Could not open '\(domain.downloadDirectory)download.nc'")
-        }
-        
-        for variable in variables {
-            guard let meta = variable.getCamsEuMeta() else {
-                continue
-            }
-            logger.info("Converting \(variable)")
-            guard let ncVar = ncFile.getVariable(name: meta.gribName) else {
-                logger.warning("Could not open variable '\(meta.gribName)'")
-                continue
-            }
-            guard let ncFloat = ncVar.asType(Float.self) else {
-                fatalError("Could not open float variable \(meta.gribName)")
-            }
-            let nTime = ncVar.dimensions.first!.length
-            var data2d = Array2DFastSpace(data: try ncFloat.read(), nLocations: domain.grid.count, nTime: nTime).transpose()
-            for i in data2d.data.indices {
-                if data2d.data[i] <= -999 {
-                    data2d.data[i] = .nan
-                }
-            }
-            
-            logger.info("Create om file")
-            let startOm = DispatchTime.now()
-            let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, scalefactor: variable.scalefactor)
-            logger.info("Update om finished in \(startOm.timeElapsedPretty())")
-        }
+        return handles
     }
 }
 
