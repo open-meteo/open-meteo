@@ -32,10 +32,6 @@ struct DownloadIconWaveCommand: AsyncCommand {
         
         @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
         var maxForecastHour: Int?
-        
-        @Flag(name: "version3", help: "Generate experimental multi-dimensional files")
-        var version3: Bool
-        
     }
 
     var help: String {
@@ -59,13 +55,13 @@ struct DownloadIconWaveCommand: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
         let variables = onlyVariables ?? IconWaveVariable.allCases
-        let handles = try await download(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour, version3: signature.version3)
+        let handles = try await download(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour)
         let nConcurrent = signature.concurrent ?? 1
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, version3: signature.version3)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func download(application: Application, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable], maxForecastHour: Int?, version3: Bool) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable], maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
@@ -76,7 +72,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, version3: version3)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         var grib2d = GribArray2D(nx: nx, ny: ny)
         

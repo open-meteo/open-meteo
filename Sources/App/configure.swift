@@ -24,6 +24,11 @@ struct OpenMeteo {
         return dataDirectory
     }()
     
+    /// True if version 3 Om files should be generated. This is incompatible with older version.
+    static var generteOmFilesVersion3: Bool {
+        return Environment.get("VERSION3") == "TRUE"
+    }
+    
     /// Cache all data access using spare files in this directory
     /*static var cacheDirectory = {
         return Environment.get("CACHE_DIRECTORY")

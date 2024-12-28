@@ -574,8 +574,8 @@ extension OmFileReader {
 extension OmFileSplitter {
     /// Prepare a write to store individual timesteps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
-    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1, version3: Bool = false) -> OmFileWriter {
-        if version3 {
+    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriter {
+        if OpenMeteo.generteOmFilesVersion3 {
             /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
             let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
             return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
