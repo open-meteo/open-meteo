@@ -38,11 +38,11 @@ struct MigrationCommand: Command {
                 continue
             }
             
-            guard let domain = DomainRegistry(rawValue: name), domain != .copernicus_dem90 else {
+            guard let domain = DomainRegistry(rawValue: name) else {
                 logger.warning("Skipping \(name)")
                 continue
             }
-            let grid = domain.getDomain().grid
+            let grid = domain == .copernicus_dem90 ? nil : domain.getDomain().grid
             guard let directoryEnumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: "\(OpenMeteo.dataDirectory)\(name)", isDirectory: true), includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
                 logger.warning("No files at \(OpenMeteo.dataDirectory)\(name)")
                 continue
@@ -56,8 +56,6 @@ struct MigrationCommand: Command {
                 else {
                     continue
                 }
-                
-                logger.info("Processing \(domain) variable \(variable)")
                 let path = "\(OpenMeteo.dataDirectory)\(name)/\(variable)"
                 
                 guard let directoryEnumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: path, isDirectory: true), includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
@@ -74,7 +72,7 @@ struct MigrationCommand: Command {
                     else {
                         continue
                     }
-                    logger.info("Processing \(domain)/\(variable)/\(file)")
+                    //logger.info("Processing \(domain)/\(variable)/\(file)")
                     try convertToNewFormat(logger: logger, file: "\(path)/\(file)", grid: grid, execute: execute)
                 }
             }
@@ -82,25 +80,63 @@ struct MigrationCommand: Command {
     }
     
     /// Read om file and write it as version 3 and reshape data to proper 3d files
-    func convertToNewFormat(logger: Logger, file: String, grid: Gridable, execute: Bool) throws {
+    /// If no grid is given, assume that files are converted 1:1. This is the case for the DEM model
+    func convertToNewFormat(logger: Logger, file: String, grid: Gridable?, execute: Bool) throws {
         let temporary = "\(file)~"
+        try FileManager.default.removeItemIfExists(at: temporary)
         // Read data from the input OM file
-        guard let readfile = try? OmFileReader2(file: file),
-              let reader = readfile.asArray(of: Float.self) else {
+        guard let readfile = try? OmFileReader2(file: file) else {
             logger.warning("Failed to open file: \(file)")
+            return
+        }
+        guard let reader = readfile.asArray(of: Float.self), readfile.isLegacyFormat() else {
+            logger.info("File already in new format \(file)")
             return
         }
         let dimensions = Array(reader.getDimensions())
         let chunks = Array(reader.getChunkDimensions())
-        let ny = UInt64(grid.ny)
-        let nx = UInt64(grid.nx)
-        let nt = dimensions[1]
-        
-        // TODO check for legacy files. static files stay the same
-        guard dimensions.count == 2, nx * ny == dimensions[0] else {
-            logger.warning("Dimensions do not agree \(file)")
+        guard dimensions.count == 2 else {
+            logger.warning("Invalid dimension count \(file)")
             return
         }
+        let ny = UInt64(grid?.ny ?? Int(dimensions[0]))
+        let nx = UInt64(grid?.nx ?? Int(dimensions[1]))
+        
+        
+        // Simple file like surface elevation
+        // No need to re-chunk data. Just 1:1 migration
+        if dimensions.count == 2 && ny == dimensions[0] && nx == dimensions[1] {
+            logger.info("Migrate simple \(file) dimensions=\(dimensions) chunks=\(chunks)")
+            guard execute else {
+                return
+            }
+            let writeFn = try FileHandle.createNewFile(file: temporary)
+            let fileWriter = OmFileWriter2(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
+            let writer = try fileWriter.prepareArray(
+                type: Float.self,
+                dimensions: dimensions,
+                chunkDimensions: chunks,
+                compression: reader.compression,
+                scale_factor: reader.scaleFactor,
+                add_offset: reader.addOffset
+            )
+            try writer.writeData(array: try reader.read())
+            let variable = try fileWriter.write(
+                array: try writer.finalise(),
+                name: "",
+                children: []
+            )
+            try fileWriter.writeTrailer(rootVariable: variable)
+            try writeFn.close()
+            try FileManager.default.moveFileOverwrite(from: temporary, to: file)
+            return
+        }
+        
+        guard dimensions.count == 2, nx * ny == dimensions[0] else {
+            logger.warning("Dimensions do not agree \(file). E.g. no support for ensemble files")
+            return
+        }
+        let nt = dimensions[1]
         let dimensionsOut = [ny, nx, nt]
         let chunksOut = [1,chunks[0],chunks[1]]
         logger.info("Migrate \(file) new dimensions=\(dimensionsOut) chunks=\(chunksOut)")
@@ -109,15 +145,11 @@ struct MigrationCommand: Command {
             return
         }
         
-        // TODO migrate small issues like pressure in era5 files?
+        // TODO fix small issues like pressure in era5 files?
         
         
-        try FileManager.default.removeItemIfExists(at: temporary)
         let writeFn = try FileHandle.createNewFile(file: temporary)
-
-        // Write the compressed data to the output OM file
-        let fileWriter = OmFileWriter2(fn: writeFn, initialCapacity: 1024 * 1024 * 10) // Initial capacity of 10MB
-
+        let fileWriter = OmFileWriter2(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
         let writer = try fileWriter.prepareArray(
             type: Float.self,
             dimensions: dimensionsOut,
@@ -127,7 +159,7 @@ struct MigrationCommand: Command {
             add_offset: reader.addOffset
         )
 
-        /// Reshape data from flated 2D to 3D context
+        /// Reshape data from flattened 2D to 3D context
         for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
             for xStart in stride(from: 0, to: nx, by: UInt64.Stride(chunksOut[1])) {
                 for tStart in stride(from: 0, to: nt, by: UInt64.Stride(chunksOut[2])) {
@@ -154,15 +186,12 @@ struct MigrationCommand: Command {
                 }
             }
         }
-       
-
         let variable = try fileWriter.write(
             array: try writer.finalise(),
             name: "",
             children: []
         )
         try fileWriter.writeTrailer(rootVariable: variable)
-
         try writeFn.close()
         try FileManager.default.moveFileOverwrite(from: temporary, to: file)
     }
