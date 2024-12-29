@@ -421,7 +421,7 @@ struct DownloadEra5Command: AsyncCommand {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        let writer = OpenMeteo.generteOmFilesVersion3 ? OmFileSplitter.makeSpatialWriter(domain: domain) : OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
         
         var handles = [GenericVariableHandle]()
         
@@ -535,7 +535,7 @@ struct DownloadEra5Command: AsyncCommand {
         let curl = Curl(logger: logger, client: client, deadLineHours: 99999)
         var handles = [GenericVariableHandle]()
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        let writer = OpenMeteo.generteOmFilesVersion3 ? OmFileSplitter.makeSpatialWriter(domain: domain) : OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
         
         
         struct EcmwfQuery: Encodable {
@@ -699,7 +699,7 @@ struct DownloadEra5Command: AsyncCommand {
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 99999)
         
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        let writer = OpenMeteo.generteOmFilesVersion3 ? OmFileSplitter.makeSpatialWriter(domain: domain) : OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
         var handles = [GenericVariableHandle]()
         
         

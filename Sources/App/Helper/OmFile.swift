@@ -401,9 +401,11 @@ struct OmFileSplitter {
                         case 2: // Old legacy file
                             if dimensions[0] == UInt64(ny * nx) {
                                 // Dimensions are ok, read data. Ignores legacy ensemble files
+                                let start = yRange.lowerBound * UInt64(nx) + xRange.lowerBound
+                                let count = UInt64(yRange.count * xRange.count)
                                 try omRead.read(
                                     into: &fileData,
-                                    range: [yRange.lowerBound * UInt64(nx) + xRange.lowerBound ..< (yRange.lowerBound-1) * UInt64(nx) + xRange.upperBound, 0..<UInt64(nTimePerFile)]
+                                    range: [start ..< start + count, 0..<UInt64(nTimePerFile)]
                                 )
                             }
                         case 3:
