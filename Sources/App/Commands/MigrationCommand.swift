@@ -5,7 +5,7 @@ import OmFileFormat
 /**
 Upgrade legacy om-files to new version. Transposes data to proper 3d context.
  */
-struct MigrationCommand: Command {
+struct MigrationCommand: AsyncCommand {
     struct Signature: CommandSignature {
         @Flag(name: "execute", help: "Perform file moves")
         var execute: Bool
@@ -15,7 +15,7 @@ struct MigrationCommand: Command {
         "Perform database migration"
     }
     
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         // loop over data directory
         let execute = signature.execute
@@ -73,7 +73,7 @@ struct MigrationCommand: Command {
                         continue
                     }
                     //logger.info("Processing \(domain)/\(variable)/\(file)")
-                    try convertToNewFormat(logger: logger, file: "\(path)/\(file)", grid: grid, execute: execute)
+                    try await convertToNewFormat(logger: logger, file: "\(path)/\(file)", grid: grid, execute: execute)
                 }
             }
         }
@@ -81,8 +81,9 @@ struct MigrationCommand: Command {
     
     /// Read om file and write it as version 3 and reshape data to proper 3d files
     /// If no grid is given, assume that files are converted 1:1. This is the case for the DEM model
-    func convertToNewFormat(logger: Logger, file: String, grid: Gridable?, execute: Bool) throws {
+    func convertToNewFormat(logger: Logger, file: String, grid: Gridable?, execute: Bool) async throws {
         let temporary = "\(file)~"
+        FileManager.default.waitIfFileWasRecentlyModified(at: temporary)
         try FileManager.default.removeItemIfExists(at: temporary)
         // Read data from the input OM file
         guard let readfile = try? OmFileReader2(file: file) else {
@@ -145,9 +146,6 @@ struct MigrationCommand: Command {
             return
         }
         
-        // TODO fix small issues like pressure in era5 files?
-        
-        
         let writeFn = try FileHandle.createNewFile(file: temporary)
         let fileWriter = OmFileWriter2(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
         let writer = try fileWriter.prepareArray(
@@ -158,6 +156,8 @@ struct MigrationCommand: Command {
             scale_factor: reader.scaleFactor,
             add_offset: reader.addOffset
         )
+        
+        let progress = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)))
 
         /// Reshape data from flattened 2D to 3D context
         for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
@@ -183,9 +183,11 @@ struct MigrationCommand: Command {
                         arrayOffset: nil,
                         arrayCount: nil
                     )
+                    await progress.add(chunk.count * 4)
                 }
             }
         }
+        await progress.finish()
         let variable = try fileWriter.write(
             array: try writer.finalise(),
             name: "",
