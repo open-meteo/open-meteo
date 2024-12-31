@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftNetCDF
 
 
@@ -282,7 +282,7 @@ extension GenericDomain {
         return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil, ensembleMember: 0, previousDay: 0)
     }
     
-    func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFileCached>? {
+    func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
         return try OmFileManager.get(getBiasCorrectionFile(for: variable))
     }
 }
@@ -936,7 +936,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 }
             }
             //try altitude.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: altitude.data)
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: altitude.data)
             
             if deleteNetCDF {
                 try FileManager.default.removeItem(atPath: ncFileAltitude)
@@ -996,7 +996,7 @@ struct DownloadCmipCommand: AsyncCommand {
                             }
                             let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
-                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .pfor_delta2d_int16, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
                         }
                     }
                     
@@ -1014,7 +1014,7 @@ struct DownloadCmipCommand: AsyncCommand {
                             return try OmFileReader(file: monthlyOmFile)
                         }
                         let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
-                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (surfacePressure6h, locationRange) in
+                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (surfacePressure6h, locationRange) in
                             
                             let temperature = try monthlyTemperature.combine(locationRange: locationRange)
                             surfacePressure6h.data = Meteorology.sealevelPressure(temperature2m: temperature, surfacePressure: surfacePressure6h, elevation: Array(elevation[locationRange]))
@@ -1036,7 +1036,7 @@ struct DownloadCmipCommand: AsyncCommand {
                         let elevation = try domain.getStaticFile(type: .elevation)!.readAll()
                         
                         let progress = ProgressTracker(logger: logger, total: domain.grid.count, label: "Convert \(omFile)")
-                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
+                        try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
                             let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, domain.grid.count)
 
                             var specificHumidity = try monthlyReader.combine(locationRange: locationRange)
@@ -1057,7 +1057,7 @@ struct DownloadCmipCommand: AsyncCommand {
                     }
                     
                     // Interpolate and afterwards aggregate to get min/max values
-                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (data6h, locationRange) in
+                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: { (data6h, locationRange) in
                         data6h.interpolateAndAggregate(dt6h: dt, variable: variable, aggregate: aggregate)
                     })
                     
@@ -1077,7 +1077,7 @@ struct DownloadCmipCommand: AsyncCommand {
                             let duplicateTimeStep = (domain.needsLeapYearFix && isLeapMonth) ? 27..<28 : nil
                             let array = try NetCDF.read(path: ncFile, short: short, fma: variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
-                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array.data)
                         }
                     }
 
@@ -1088,7 +1088,7 @@ struct DownloadCmipCommand: AsyncCommand {
                     let nt = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds).count
 
                     /// Process around 200 MB memory at once
-                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: nil)
+                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader, dataCallback: nil)
                     
                     if deleteNetCDF {
                         for month in 1...12 {
@@ -1110,21 +1110,21 @@ struct DownloadCmipCommand: AsyncCommand {
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile)
                         let array = try NetCDF.read(path: ncFile, short: short, fma: variable.multiplyAdd)
                         try FileManager.default.removeItem(atPath: ncFile)
-                        try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                        try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array.data)
                     }
                     if !FileManager.default.fileExists(atPath: monthlyOmFile2) {
                         let uri = "HighResMIP/\(domain.institute)/\(source)/\(experimentId)/r1i1p1f1/day/\(short)/\(grid)/v\(version)/\(short)_day_\(source)_\(experimentId)_r1i1p1f1_\(grid)_\(year)0701-\(year)1230.nc"
                         try await curl.download(servers: servers, uri: uri, toFile: ncFile2)
                         let array = try NetCDF.read(path: ncFile2, short: short, fma: variable.multiplyAdd)
                         try FileManager.default.removeItem(atPath: ncFile2)
-                        try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile2, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                        try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile2, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array.data)
                     }
 
                     let monthlyReader = [try OmFileReader(file: monthlyOmFile), try OmFileReader(file: monthlyOmFile2)]
                     let nt = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds).count
                     
                     /// Process around 200 MB memory at once
-                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader)
+                    try OmFileWriter(dim0: domain.grid.count, dim1: nt, chunk0: 6, chunk1: 183).write(logger: logger, file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: monthlyReader)
                     
                     if deleteNetCDF {
                         try FileManager.default.removeItem(atPath: monthlyOmFile)
@@ -1160,7 +1160,7 @@ struct DownloadCmipCommand: AsyncCommand {
                         //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)rh.nc", nx: domain.grid.nx, ny: domain.grid.ny)
                     }
                     //try array.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.rawValue)_\(year).nc", nx: domain.grid.nx, ny: domain.grid.ny)
-                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: array.data)
+                    try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: 6, chunk1: 183).write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array.data)
                     if deleteNetCDF {
                         try FileManager.default.removeItem(atPath: ncFile)
                     }
@@ -1205,7 +1205,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 continue
             }
             try OmFileWriter(dim0: domain.grid.count, dim1: TimerangeDt(range: domain.masterTimeRange!, dtSeconds: domain.dtSeconds).count, chunk0: 8, chunk1: 512)
-                .write(logger: logger, file: masterFile, compressionType: .p4nzdec256, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
+                .write(logger: logger, file: masterFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
         }
         
         try generateBiasCorrectionFields(logger: logger, domain: domain, variables: variables)
@@ -1226,7 +1226,7 @@ struct DownloadCmipCommand: AsyncCommand {
                 continue
             }
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
+            try writer.write(file: biasFile, compressionType: .fpx_xor2d, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 for (l,gridpoint) in locationRange.enumerated() {

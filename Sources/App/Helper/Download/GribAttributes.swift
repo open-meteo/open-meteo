@@ -23,6 +23,8 @@ struct GribAttributes {
     let unit: String
     let paramId: Int
     let perturbationNumber: Int?
+    let parameterNumber: Int?
+    let constituentType: Int?
     
     /// For ERA5 ensemble, `em` mean and `es` spread
     let dataType: String?
@@ -72,12 +74,18 @@ struct GribAttributes {
         paramId = message.getLong(attribute: "paramId") ?? 0
         perturbationNumber = message.getLong(attribute: "perturbationNumber")
         dataType = try message.getOrThrow(attribute: "dataType")
+        parameterNumber =  message.getLong(attribute: "parameterNumber")
+        constituentType =  message.getLong(attribute: "constituentType")
     }
 }
 
 
-fileprivate extension GribMessage {
-    func getOrThrow(attribute: String) throws -> String {
+extension GribMessage {
+    func getAttributes() throws -> GribAttributes {
+        return try GribAttributes(message: self)
+    }
+    
+    fileprivate func getOrThrow(attribute: String) throws -> String {
         guard let value = get(attribute: attribute) else {
             throw GribAttributeError.couldNotGetAttribute(attribute: attribute)
         }

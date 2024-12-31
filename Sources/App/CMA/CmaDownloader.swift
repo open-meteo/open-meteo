@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormat
 import Vapor
 import SwiftEccodes
 import NIOConcurrencyHelpers
@@ -201,7 +201,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
         //try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: orog.array.data)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: orog.array.data)
     }
     
     /// Download CMA data.
@@ -216,7 +216,6 @@ struct DownloadCmaCommand: AsyncCommand {
         let nForecastHours = domain.forecastHours(run: run.hour)
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
         
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let previous = GribDeaverager()
         
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
@@ -250,7 +249,7 @@ struct DownloadCmaCommand: AsyncCommand {
                         }
                     }
                     
-                    let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     //message.dumpAttributes()
                     try grib2d.load(message: message)
@@ -267,7 +266,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
                     
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
             }

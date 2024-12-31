@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftEccodes
 
 struct GloFasDownloader: AsyncCommand {
@@ -34,6 +34,9 @@ struct GloFasDownloader: AsyncCommand {
         
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
+        var concurrent: Int?
         
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() throws -> TimerangeDt {
@@ -104,138 +107,46 @@ struct GloFasDownloader: AsyncCommand {
                 fatalError("ftppassword is required")
             }
             
-            try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword)
-        }
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: nil)
+            let nConcurrent = signature.concurrent ?? 1
+            let handles = try await downloadEnsembleForecast(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, createNetcdf: signature.createNetcdf, user: ftpuser, password: ftppassword, concurrent: nConcurrent)
+            let logger = context.application.logger
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, compression: .pfor_delta2d_int16_logarithmic)
         }
     }
     
     /// Download the single GRIB file containing 30 days with 50 members and update the database
-    func downloadEnsembleForecast(application: Application, domain: GloFasDomain, run: Timestamp, skipFilesIfExisting: Bool, createNetcdf: Bool, user: String, password: String) async throws {
+    func downloadEnsembleForecast(application: Application, domain: GloFasDomain, run: Timestamp, skipFilesIfExisting: Bool, createNetcdf: Bool, user: String, password: String, concurrent: Int) async throws -> [GenericVariableHandle]{
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        
-        let nx = domain.grid.nx
-        let ny = domain.grid.ny
-        
-        let om = OmFileSplitter(domain)
-        var grib2d = GribArray2D(nx: nx, ny: ny)
-        
+                
         let downloadTimeHours: Double = domain.isForecast ? 5 : 14
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: Int(3600*downloadTimeHours))
         let directory = domain.isForecast ? "fc_grib" : "seasonal_fc_grib"
         let nMembers = domain.isForecast ? 1 : 51
-        for member in 0..<nMembers {
+        let handles = try await (0..<nMembers).asyncFlatMap { member -> [GenericVariableHandle] in
             let memberUrlStr = nMembers <= 1 ? "" : "_\(member)"
             let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH)\(memberUrlStr).grib"
             
-            let nTime = domain.isForecast ? 30 : 215
-            
-            // forecast day 0 is valid for the next day
-            let timerange = TimerangeDt(start: run.add(24*3600), nTime: nTime, dtSeconds: 24*3600)
-            let nLocationsPerChunk = om.nLocationsPerChunk
-            let writer = OmFileWriter(dim0: 1, dim1: nx*ny, chunk0: 1, chunk1: nLocationsPerChunk)
-            
-            // Read all GRIB messages and directly update OM file database
-            // Database update is done in a second thread
-            logger.info("Starting grib streaming. nLocationsPerChunk=\(nLocationsPerChunk) nTime=\(nTime)")
-            let timeout = TimeoutTracker(logger: logger, deadline: curl.deadline)
-            
-            actor Counter {
-                var count = 0
-                
-                func inc() {
-                    count += 1
-                }
-                
-                func dec() {
-                    count -= 1
-                }
-            }
-            
-            while true {
-                let response = try await curl.initiateDownload(url: remote, range: nil, minSize: nil, deadline: Date().addingTimeInterval(TimeInterval(downloadTimeHours * 3600)), nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
-                do {
-                    try await withThrowingTaskGroup(of: Void.self) { group in
-                        let counter = Counter()
-                        let tracker = TransferAmountTracker(logger: logger, totalSize: try response.contentLength())
-                        var dataPerTimestep = [OmFileReader<DataAsClass>]()
-                        dataPerTimestep.reserveCapacity(nTime)
-                        for try await message in response.body.tracker(tracker).decodeGrib() {
-                            let date = message.get(attribute: "validityDate")!
-                            /// 0 = control
-                            let member = Int(message.get(attribute: "number")!)!
-                            /// Which forecast date... range from 0 to 29 or 214
-                            let forecastDate = Int(message.get(attribute: "startStep")!)!/24
-                            guard message.get(attribute: "shortName") == "dis24" else {
-                                fatalError("Unknown variable")
-                            }
-                            
-                            logger.info("Converting day \(date) Member \(member) forecastDate \(forecastDate)")
-                            let dailyFile = "\(domain.downloadDirectory)river_discharge_member\(member.zeroPadded(len: 2))_\(date).om"
-                            try FileManager.default.removeItemIfExists(at: dailyFile)
-                            try grib2d.load(message: message)
-                            grib2d.array.flipLatitude()
-                            
-                            // iterates from 0 to 29 forecast date and then updates om file
-                            guard forecastDate <= nTime else {
-                                fatalError("Got more data than expected \(forecastDate)")
-                            }
-                            
-                            // If conversion is running, reduce download speed
-                            if await counter.count > 0 {
-                                try await Task.sleep(nanoseconds: 5_000_000_000)
-                            }
-                            
-                            /// Use compressed memory to store each downloaded step
-                            /// Roughly 2.5 MB memory per step (uncompressed 20.6 MB)
-                            dataPerTimestep.append(try OmFileReader(fn: DataAsClass(data: try writer.writeInMemory(compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data))))
-                            
-                            guard forecastDate == nTime-1 else {
-                                continue
-                            }
-                            // Process om file update in separat thread, otherwise the download stalls
-                            let dataPerTimestepCopy = dataPerTimestep
-                            dataPerTimestep.removeAll()
-                            
-                            group.addTask {
-                                await counter.inc()
-                                logger.info("Starting om file update for member \(member)")
-                                let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Conversion member \(member)")
-                                let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
-                                var data2d = Array2DFastTime(nLocations: nLocationsPerChunk, nTime: nTime)
-                                /// Reused read buffer
-                                var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-                                try om.updateFromTimeOrientedStreaming(variable: name, time: timerange, scalefactor: 1000, compression: .p4nzdec256logarithmic, onlyGeneratePreviousDays: false) { d0offset in
-                                    
-                                    try Task.checkCancellation()
-                                    
-                                    let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nx*ny)
-                                    for (forecastDate, data) in dataPerTimestepCopy.enumerated() {
-                                        try data.read(into: &readTemp, arrayDim1Range: 0..<locationRange.count, arrayDim1Length: locationRange.count, dim0Slow: 0..<1, dim1: locationRange)
-                                        data2d[0..<data2d.nLocations, forecastDate] = readTemp
-                                    }
-                                    
-                                    progress.add(locationRange.count)
-                                    
-                                    return data2d.data[0..<locationRange.count * nTime]
-                                }
-                                progress.finish()
-                                await counter.dec()
-                            }
-                        }
-                        await curl.totalBytesTransfered.add(tracker.transfered)
-                    }
-                    break
-                } catch {
-                    try await timeout.check(error: error)
-                }
+            return try await curl.withGribStream(url: remote, bzip2Decode: false, nConcurrent: concurrent) { messages in
+                return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                    let attributes = try message.getAttributes()
+                    let member = Int(message.get(attribute: "number")!)!
+                    logger.info("Processing \(attributes.timestamp.format_YYYYMMddHH) member \(member)")
+                  
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    try grib2d.load(message: message)
+                    grib2d.array.flipLatitude()
+                    
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
+                    let variable = GloFasVariableAndMember(member: member)
+                    return GenericVariableHandle(variable: variable, time: attributes.timestamp, member: 0, fn: fn)
+                }.collect().compactMap({$0})
             }
         }
         await curl.printStatistics()
+        return handles
     }
     
     struct GlofasQuery: Encodable {
@@ -328,7 +239,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx*ny, i] = try dailyFile.readAll()
         }
         logger.info("Update om database")
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .p4nzdec256logarithmic)
+        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
     }
     
     /// Convert a single file
@@ -351,7 +262,7 @@ struct GloFasDownloader: AsyncCommand {
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
            
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .p4nzdec256logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
         }
     }
     
@@ -403,7 +314,7 @@ struct GloFasDownloader: AsyncCommand {
         var looptime = DispatchTime.now()
         // Scale logarithmic. Max discharge around 400_000 m3/s
         // Note: delta 2d coding (chunk0=6) save around 15% space
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .p4nzdec256logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
+        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
             
             let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
             if percent != ratio {
@@ -631,5 +542,51 @@ enum GloFasVariable: String, GenericVariable {
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
+    }
+}
+
+/// Variable to store each member in its own file
+fileprivate struct GloFasVariableAndMember: GenericVariable {
+    let member: Int
+    
+    init(member: Int) {
+        self.member = member
+    }
+    
+    var omFileName: (file: String, level: Int) {
+        let name = member == 0 ? "river_discharge" : "river_discharge_member\(member.zeroPadded(len: 2))"
+        return (name, 0)
+    }
+    
+    var scalefactor: Float {
+        return 1000
+    }
+    
+    var interpolation: ReaderInterpolation {
+        return .linear
+    }
+    
+    var unit: SiUnit {
+        return .cubicMetrePerSecond
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    init?(rawValue: String) {
+        fatalError()
+    }
+    
+    var rawValue: String {
+        return omFileName.file
     }
 }

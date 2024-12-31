@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftEccodes
 
 struct KnmiDownload: AsyncCommand {
@@ -136,8 +136,6 @@ struct KnmiDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
@@ -235,7 +233,7 @@ struct KnmiDownload: AsyncCommand {
                 }
                 logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)]")
                 
-                let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                 try grib2d.load(message: message)
                 
@@ -263,7 +261,7 @@ struct KnmiDownload: AsyncCommand {
                     return nil
                 }
                 
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn)
             }.collect().compactMap({$0})
             
@@ -271,7 +269,7 @@ struct KnmiDownload: AsyncCommand {
                 try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
             }
             
-            let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+            let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
             let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
             
             let windHandles = [

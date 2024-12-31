@@ -18,7 +18,7 @@
      "data_format": "grib"
  */
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 
 extension DownloadCamsCommand {
     /**
@@ -44,8 +44,7 @@ extension DownloadCamsCommand {
             model_level: [137]
         )
       
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         return try await curl.withCdsApi(
             dataset: "cams-global-greenhouse-gas-forecasts",
@@ -68,7 +67,7 @@ extension DownloadCamsCommand {
                         grib2d.array.data.multiplyAdd(multiply: scaling, add: 0)
                     }
                     grib2d.array.shift180LongitudeAndFlipLatitude()
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect().compactMap({$0})
             }

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormat
 
 enum MetNoDomain: String, GenericDomain, CaseIterable {
     case nordic_pp

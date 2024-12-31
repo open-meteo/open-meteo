@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormat
 
 /**
  Group all probabilities variables for all domains in one enum
@@ -138,10 +138,8 @@ extension VariablePerMemberStorage {
         }
         precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
         let variable = ProbabilityVariable.precipitation_probability
-        /// Do not set `chunknLocations` because only 1 member is stored
-        let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: precipitationProbability01)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
+        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: precipitationProbability01)
         return GenericVariableHandle(
             variable: variable,
             time: timestamp,
@@ -181,10 +179,8 @@ extension Array where Element == GenericVariableHandle {
                 previousTimesamp = timestamp
                 precipitationProbability01.multiplyAdd(multiply: 100/Float(nMember), add: 0)
                 let variable = ProbabilityVariable.precipitation_probability
-                /// Do not set `chunknLocations` because only 1 member is stored
-                let nLocationsPerChunk = OmFileSplitter(domain, chunknLocations: nil).nLocationsPerChunk
-                let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: precipitationProbability01)
+                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: precipitationProbability01)
                 return GenericVariableHandle(
                     variable: variable,
                     time: timestamp,

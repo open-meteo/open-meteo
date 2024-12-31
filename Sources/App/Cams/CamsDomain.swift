@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormat
 
 
 /// CAMS Air quality domain definitions for Europe and global domains
@@ -373,6 +373,39 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return ("nitrogen_monoxide", "no_conc", "no")
         case .sea_salt_aerosol:
             return ("pm10_sea_salt_dry", "pm10_ss_conc", nil)
+        }
+    }
+
+    static func camsEuropeFromGrib(attributes: GribAttributes) -> Self? {
+        // see https://forum.ecmwf.int/t/how-to-identify-fields-in-european-air-quality-forecast-grib-files/1563
+        switch (attributes.parameterNumber, attributes.constituentType) {
+        case (0, 40008): return .pm10
+        case (0, 40009): return .pm2_5
+        case (0, 62001): return .dust
+        case (0, 4): return .carbon_monoxide
+        case (0, 5): return .nitrogen_dioxide
+        case (0, 9): return .ammonia
+        case (0, 0): return .ozone
+        case (0, 8): return .sulphur_dioxide
+        case (59, 62100): return .alder_pollen
+        case (59, 62101): return .birch_pollen
+        case (59, 62300): return .grass_pollen
+        case (59, 62201): return .mugwort_pollen
+        case (59, 64002): return .olive_pollen
+        case (59, 62200): return .ragweed_pollen
+        case (0, 7): return .formaldehyde
+        case (0, 10038): return .glyoxal
+        case (0, 60013): return .non_methane_volatile_organic_compounds
+        case (0, 62096): return .pm10_wildfires
+        case (0, 60018): return .peroxyacyl_nitrates
+        case (0, 62099): return .secondary_inorganic_aerosol
+        case (0, 62094): return .residential_elementary_carbon
+        case (0, 62095): return .total_elementary_carbon
+        case (0, 62010): return .pm2_5_total_organic_matter
+        case (0, 11): return .nitrogen_monoxide
+        case (0, 62008): return .sea_salt_aerosol
+        default:
+            return nil
         }
     }
     

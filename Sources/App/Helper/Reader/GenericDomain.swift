@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormat
 
 /**
  Generic domain that is required for the reader
@@ -39,7 +39,7 @@ extension GenericDomain {
     }
     
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFileCached>? {
+    func getStaticFile(type: ReaderStaticVariable) -> OmFileReader<MmapFile>? {
         guard let domainRegistryStatic else {
             return nil
         }

@@ -13,7 +13,7 @@ public struct Zensun {
     
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// This function is performance critical for updates. This explains redundant code.
-    public static func calculateRadiationBackwardsAveraged(grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt) -> Array2DFastTime {
+    public static func calculateRadiationBackwardsAveraged(grid: Gridable, locationRange: some RandomAccessCollection<Int>, timerange: TimerangeDt) -> Array2DFastTime {
         var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
                 
         for (t, timestamp) in timerange.enumerated() {

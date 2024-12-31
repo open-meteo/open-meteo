@@ -81,15 +81,44 @@ struct RegularGrid: Gridable {
 /// Represent a subsection of a grid. Similar to an array slice, but using two dimensions
 /// Important: The iterated coordinates are in global coordinates (-> gridpoint index). Array slices would use local indices.
 struct RegularGridSlice {
-    let grid: RegularGrid
+    let nx: Int
+    let ny: Int
     let yRange: Range<Int>
     let xRange: Range<Int>
+    
+    public init<Grid: Gridable>(grid: Grid, yRange: Range<Int>, xRange: Range<Int>) {
+        self.xRange = xRange
+        self.yRange = yRange
+        self.nx = grid.nx
+        self.ny = grid.ny
+    }
 }
 
 extension RegularGridSlice: Sequence {
     func makeIterator() -> GridSliceXyIterator {
-        return GridSliceXyIterator(yRange: yRange, xRange: xRange, nx: grid.nx)
+        return GridSliceXyIterator(yRange: yRange, xRange: xRange, nx: nx)
     }
+}
+
+extension RegularGridSlice: RandomAccessCollection {
+    subscript(position: Int) -> Int {
+        _read {
+            let x = position % xRange.count
+            let y = position / xRange.count
+            let gridpoint = (y + yRange.lowerBound) * nx + x + xRange.lowerBound
+            yield gridpoint
+        }
+    }
+    
+    var startIndex: Int {
+        0
+    }
+    
+    var endIndex: Int {
+        yRange.count * xRange.count
+    }
+    
+    typealias Index = Int
 }
 
 /// Iterate over a subset of a grib following x and y ranges. The element returns the global grid coordinate (grid point index as integer)

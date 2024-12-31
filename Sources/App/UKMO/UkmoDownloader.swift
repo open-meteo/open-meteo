@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftNetCDF
 
 /**
@@ -50,8 +50,8 @@ struct UkmoDownload: AsyncCommand {
         @Flag(name: "skip-missing", help: "Ignore missing files while downloading")
         var skipMissing: Bool
         
-        @Flag(name: "fix-solar", help: "Fix old solar files")
-        var fixSolar: Bool
+        //@Flag(name: "fix-solar", help: "Fix old solar files")
+        //var fixSolar: Bool
     }
 
     var help: String {
@@ -87,12 +87,12 @@ struct UkmoDownload: AsyncCommand {
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
             
-            if signature.fixSolar {
+            /*if signature.fixSolar {
                 // timeinterval devided by chunk time range
                 let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
                 try self.fixSolarFiles(application: context.application, domain: domain, timerange: time)
                 return
-            }
+            }*/
             
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
@@ -111,7 +111,7 @@ struct UkmoDownload: AsyncCommand {
     }
     
     /// read each file in chunks, apply shortwave correction and write again
-    func fixSolarFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
+    /*func fixSolarFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
         let nTimePerFile = domain.omFileLength
         let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
         
@@ -153,7 +153,7 @@ struct UkmoDownload: AsyncCommand {
                 }
             }
         }
-    }
+    }*/
     
     func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
         
@@ -212,7 +212,7 @@ struct UkmoDownload: AsyncCommand {
         if createNetcdf {
             try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         }
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
     }
     
     /**
@@ -230,9 +230,7 @@ struct UkmoDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours+0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing, waitAfterLastModified: TimeInterval(2*60))
         
@@ -284,7 +282,7 @@ struct UkmoDownload: AsyncCommand {
                             }
                         }
                         let variable = variable.withLevel(level: level)
-                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
                         return GenericVariableHandle(
                             variable: variable,
                             time: timestamp,

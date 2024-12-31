@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftEccodes
 
 /**
@@ -138,7 +138,7 @@ struct GemDownload: AsyncCommand {
             try Array2D(data: height, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         }
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: height)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height)
     }
     
     /// Download data and store as compressed files for each timestep
@@ -146,10 +146,7 @@ struct GemDownload: AsyncCommand {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
-        let nMembers = domain.ensembleMembers
-        
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
@@ -233,7 +230,7 @@ struct GemDownload: AsyncCommand {
                                     fatalError("Wind speed calculation requires \(windspeedVariable) to download")
                                 }
                                 let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: windspeedVariable.scalefactor, all: windspeed)
+                                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: windspeedVariable.scalefactor, all: windspeed)
                                 handles.append(GenericVariableHandle(
                                     variable: windspeedVariable,
                                     time: run.add(hours: hour),
@@ -244,7 +241,7 @@ struct GemDownload: AsyncCommand {
                             }
                         }
                         
-                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         handles.append(GenericVariableHandle(
                             variable: variable,
                             time: run.add(hours: hour),

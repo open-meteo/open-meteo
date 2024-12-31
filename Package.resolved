@@ -46,6 +46,14 @@
       }
     },
     {
+      "identity" : "om-file-format",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-meteo/om-file-format.git",
+      "state" : {
+        "revision" : "076b1d02f310fea57bb8015b37f19488e993ecbc"
+      }
+    },
+    {
       "identity" : "routing-kit",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/routing-kit.git",

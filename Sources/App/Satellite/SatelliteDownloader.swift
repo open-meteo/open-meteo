@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import SwiftNetCDF
-import SwiftPFor2D
+import OmFileFormat
 
 /**
  Download satellite datasets like IMERG
@@ -65,7 +65,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
                 return try OmFileReader(file: omFile)
             }
             try OmFileWriter(dim0: domain.grid.count, dim1: masterTime.count, chunk0: 8, chunk1: 512)
-                .write(logger: logger, file: masterFile.getFilePath(), compressionType: .p4nzdec256, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
+                .write(logger: logger, file: masterFile.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 10, nLocationsPerChunk: Self.nLocationsPerChunk, chunkedFiles: readers, dataCallback: nil)
         }
         
         if !FileManager.default.fileExists(atPath: domain.getBiasCorrectionFile(for: SatelliteVariable.precipitation_sum.omFileName.file).getFilePath()) {
@@ -85,7 +85,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
                 continue
             }
             let progress = ProgressTracker(logger: logger, total: writer.dim0, label: "Convert \(biasFile)")
-            try writer.write(file: biasFile, compressionType: .fpxdec32, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
+            try writer.write(file: biasFile, compressionType: .fpx_xor2d, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: time.toSettings())
@@ -147,7 +147,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
             //fatalError()
             
             try OmFileWriter(dim0: 1, dim1: data.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
-                .write(file: destination, compressionType: .p4nzdec256, scalefactor: 10, all: transposed)
+                .write(file: destination, compressionType: .pfor_delta2d_int16, scalefactor: 10, all: transposed)
             progress.add(1)
         }
         progress.finish()

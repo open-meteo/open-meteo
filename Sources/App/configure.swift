@@ -24,10 +24,15 @@ struct OpenMeteo {
         return dataDirectory
     }()
     
+    /// True if version 3 Om files should be generated. This is incompatible with older version.
+    static var generteOmFilesVersion3: Bool {
+        return Environment.get("VERSION3") == "TRUE"
+    }
+    
     /// Cache all data access using spare files in this directory
-    static var cacheDirectory = {
+    /*static var cacheDirectory = {
         return Environment.get("CACHE_DIRECTORY")
-    }()
+    }()*/
 }
 
 extension Application {
@@ -80,7 +85,7 @@ public func configure(_ app: Application) throws {
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory))
 
     app.commands.use(BenchmarkCommand(), as: "benchmark")
-    app.commands.use(MigrationCommand(), as: "migration")
+    app.asyncCommands.use(MigrationCommand(), as: "migration")
     app.asyncCommands.use(DownloadIconCommand(), as: "download")
     app.asyncCommands.use(DownloadCmaCommand(), as: "download-cma")
     app.asyncCommands.use(DownloadBomCommand(), as: "download-bom")

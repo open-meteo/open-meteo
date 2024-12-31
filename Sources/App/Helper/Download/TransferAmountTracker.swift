@@ -17,7 +17,7 @@ final actor TransferAmountTracker {
     let totalSize: Int?
     let name: String
     
-    public init(logger: Logger, totalSize: Int?, name: String = "Transferred") {
+    public init(logger: Logger, totalSize: Int?, name: String = "Transfer") {
         self.logger = logger
         self.totalSize = totalSize
         self.name = name
@@ -55,7 +55,7 @@ final actor TransferAmountTracker {
         }
         let timeElapsed = Date().timeIntervalSince(startTime)
         let rate = Int(Double(transfered) / timeElapsed)
-        logger.info("Completed in \(timeElapsed.asSecondsPrettyPrint). Average speed \(rate.bytesHumanReadable)/s")
+        logger.info("\(name) completed \(transfered.bytesHumanReadable) in \(timeElapsed.asSecondsPrettyPrint). Average speed \(rate.bytesHumanReadable)/s")
     }
 }
 

@@ -1,5 +1,5 @@
 import Foundation
-import SwiftPFor2D
+import OmFileFormat
 
 /// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
 protocol GenericReaderProtocol {

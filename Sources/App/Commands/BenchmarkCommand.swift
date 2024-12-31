@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 
 fileprivate extension String {
     func pad(_ n: Int) -> String {
@@ -43,11 +43,11 @@ final class BenchmarkCommand: Command {
         }
         
         try run.measure("Compression in memory, large chunks", 191) {
-            try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 1024, chunk1: 1024).writeInMemory(compressionType: .p4nzdec256, scalefactor: 20, all: data)
+            try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 1024, chunk1: 1024).writeInMemory(compressionType: .pfor_delta2d_int16, scalefactor: 20, all: data)
         }
         
         let compressed = try run.measure("Compression in memory, small chunks", 199) {
-            try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).writeInMemory(compressionType: .p4nzdec256, scalefactor: 20, all: data)
+            try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).writeInMemory(compressionType: .pfor_delta2d_int16, scalefactor: 20, all: data)
         }
         let sizeMbCompressed = (compressed.count/1024/1024)
         
@@ -60,7 +60,7 @@ final class BenchmarkCommand: Command {
         try FileManager.default.createDirectory(atPath: OpenMeteo.dataDirectory, withIntermediateDirectories: true)
         defer { try? FileManager.default.removeItemIfExists(at: file)}
         try run.measure("Compress to file, small chunks", 202) {
-            try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).write(file: file, compressionType: .p4nzdec256, scalefactor: 20, all: data, overwrite: true)
+            try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).write(file: file, compressionType: .pfor_delta2d_int16, scalefactor: 20, all: data, overwrite: true)
         }
         
         try run.measure("Decompress from file, small chunks", 46) {

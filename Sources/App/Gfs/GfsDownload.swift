@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftNetCDF
 
 /**
@@ -185,7 +185,7 @@ struct GfsDownload: AsyncCommand {
         
         //try height.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
         
-        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
+        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height.data)
     }
     
     /// download GFS025 and NAM CONUS
@@ -224,9 +224,7 @@ struct GfsDownload: AsyncCommand {
             forecastHours = forecastHours.filter({$0 <= maxForecastHour})
         }
         
-        let nMembers = domain.ensembleMembers
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
@@ -275,7 +273,7 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
@@ -312,7 +310,7 @@ struct GfsDownload: AsyncCommand {
             
             let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
             
-            for member in 0..<nMembers {
+            for member in 0..<domain.ensembleMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member, useAws: downloadFromAws)
                                
@@ -352,7 +350,7 @@ struct GfsDownload: AsyncCommand {
                     if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                         let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
                         //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
-                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: height.data)
+                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height.data)
                     }
                     
                     // Deaccumulate precipitation
@@ -445,7 +443,7 @@ struct GfsDownload: AsyncCommand {
                         continue
                     }
                     
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
                     handles.append(GenericVariableHandle(
                         variable: variable.variable,
                         time: timestamp,
@@ -503,7 +501,7 @@ extension VariablePerMemberStorage {
                     variable: outVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: snowfall)
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
                 )
             }
         )

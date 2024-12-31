@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 import SwiftNetCDF
 
 /**
@@ -71,10 +71,9 @@ struct MfWaveDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         let nx = domain.grid.nx
         let ny = domain.grid.ny
-        let writer = OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         /// Only hindcast available after 12 hours
         let isOlderThan12Hours = run.add(hours: 23) < Timestamp.now()
@@ -177,9 +176,9 @@ struct MfWaveDownload: AsyncCommand {
                                     return $0.isNaN ? Float(0) : -999
                                 }
                                 try domain.surfaceElevationFileOm.createDirectory()
-                                try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                                try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
                             }
-                            let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                            let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
                             // Note: skipHour0 needs still to be set for solar interpolation
                             return GenericVariableHandle(
                                 variable: variable,
@@ -214,9 +213,9 @@ struct MfWaveDownload: AsyncCommand {
                                 return $0.isNaN ? Float(0) : -999
                             }
                             try domain.surfaceElevationFileOm.createDirectory()
-                            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .p4nzdec256, scalefactor: 1, all: elevation)
+                            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
                         }
-                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
                         // Note: skipHour0 needs still to be set for solar interpolation
                         return GenericVariableHandle(
                             variable: variable,

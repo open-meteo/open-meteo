@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftPFor2D
+import OmFileFormat
 
 
 /**
@@ -125,7 +125,7 @@ struct MeteoFranceDownload: AsyncCommand {
         //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         //message.dumpAttributes()
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .p4nzdec256, scalefactor: 1, all: grib2d.array.data)
+        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: grib2d.array.data)
     }
     
     /// Temporarily keep those varibles to derive others
@@ -206,7 +206,6 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
@@ -234,8 +233,8 @@ struct MeteoFranceDownload: AsyncCommand {
                         return nil
                     }
                     
-                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
-                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     //message.dumpAttributes()
                     try grib2d.load(message: message)
                     if domain.isGlobal {
@@ -247,7 +246,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     let variable = ProbabilityVariable.precipitation_probability
                     
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                    let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                 }.collect()
             }
@@ -273,7 +272,6 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
         var handles = [GenericVariableHandle]()
         var previous = GribDeaverager()
         let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
@@ -364,7 +362,7 @@ struct MeteoFranceDownload: AsyncCommand {
                             return nil
                         }
                         
-                        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                         //message.dumpAttributes()
                         try grib2d.load(message: message)
@@ -385,11 +383,11 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
                         
                         logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                        let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                         return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
                     }.collect()
                     
-                    let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
                     let precip = try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
                     
@@ -521,8 +519,7 @@ struct MeteoFranceDownload: AsyncCommand {
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let subsetGrid = domain.mfSubsetGrid
         
-        let nLocationsPerChunk = OmFileSplitter(domain).nLocationsPerChunk
-        let writer = OmFileWriter(dim0: 1, dim1: grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         var handles = [GenericVariableHandle]()
         
         for seconds in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true) {
@@ -563,7 +560,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                let fn = try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 handles.append(GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
@@ -596,7 +593,7 @@ extension VariablePerMemberStorage {
                     variable: outVariable,
                     time: t.timestamp,
                     member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .p4nzdec256, scalefactor: outVariable.scalefactor, all: precip)
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: precip)
                 )
             }
         )
