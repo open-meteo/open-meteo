@@ -121,7 +121,8 @@ struct MigrationCommand: AsyncCommand {
                 scale_factor: reader.scaleFactor,
                 add_offset: reader.addOffset
             )
-            try writer.writeData(array: try reader.read())
+            let data = try reader.read()
+            try writer.writeData(array: data)
             let variable = try fileWriter.write(
                 array: try writer.finalise(),
                 name: "",
@@ -129,6 +130,14 @@ struct MigrationCommand: AsyncCommand {
             )
             try fileWriter.writeTrailer(rootVariable: variable)
             try writeFn.close()
+            
+            /// Read data again to ensure the written data matches exactly
+            guard let verify = try OmFileReader2(file: temporary).asArray(of: Float.self)?.read() else {
+                fatalError("Could not read temporary file")
+            }
+            guard data.isSimilar(verify) else {
+                fatalError("Data does not match")
+            }
             try FileManager.default.moveFileOverwrite(from: temporary, to: file)
             return
         }
@@ -157,7 +166,7 @@ struct MigrationCommand: AsyncCommand {
             add_offset: reader.addOffset
         )
         
-        let progress = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)))
+        let progress = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)), name: "Convert")
 
         /// Reshape data from flattened 2D to 3D context
         for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
@@ -195,6 +204,55 @@ struct MigrationCommand: AsyncCommand {
         )
         try fileWriter.writeTrailer(rootVariable: variable)
         try writeFn.close()
+        
+        /// Read data again to ensure the written data matches exactly
+        guard let verify = try OmFileReader2(file: temporary).asArray(of: Float.self) else {
+            fatalError("Could not read temporary file")
+        }
+        let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)), name: "Verify")
+        for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
+            for xStart in stride(from: 0, to: nx, by: UInt64.Stride(chunksOut[1])) {
+                for tStart in stride(from: 0, to: nt, by: UInt64.Stride(chunksOut[2])) {
+                    let yRange = yStart ..< min(yStart + chunksOut[0], ny)
+                    let xRange = xStart ..< min(xStart + chunksOut[1], nx)
+                    let tRange = tStart ..< min(tStart + chunksOut[2], nt)
+                    
+                    var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
+                    for (row, y) in yRange.enumerated() {
+                        try reader.read(
+                            into: &chunk,
+                            range: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, tRange],
+                            intoCubeOffset: [UInt64(row * xRange.count), 0],
+                            intoCubeDimension: [UInt64(yRange.count * xRange.count), UInt64(tRange.count)]
+                        )
+                    }
+                    let verifyData = try verify.read(range: [yRange, xRange, tRange])
+                    guard chunk.isSimilar(verifyData) else {
+                        fatalError("Data does not match \(yRange) \(xRange) \(tRange)")
+                    }
+                    await progressVerify.add(chunk.count * 4)
+                }
+            }
+        }
+        await progressVerify.finish()
         try FileManager.default.moveFileOverwrite(from: temporary, to: file)
+    }
+}
+
+fileprivate extension Array where Element == Float {
+    func isSimilar(_ b: [Float], accuracy: Float = 0.0001) -> Bool {
+        let a = self
+        guard a.count == b.count else {
+            return false
+        }
+        for (a1,b1) in zip(a,b) {
+            if a1.isNaN && b1.isNaN {
+                continue
+            }
+            if a1.isNaN || b1.isNaN || abs(a1 - b1) > accuracy {
+                return false
+            }
+        }
+        return true
     }
 }
