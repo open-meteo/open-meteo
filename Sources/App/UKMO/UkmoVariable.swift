@@ -197,28 +197,52 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         }
     }
     
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km:
             switch self {
             case .showers, .snowfall_water_equivalent, .hail:
                 // Global has only instantanous rates for snow and showers
                 return nil
-            case .shortwave_radiation:
+            //case .shortwave_radiation:
                 // global has only direct radiation, but not diffuse/total
-                return nil
+                //return nil
             case .cloud_base:
                 return nil
             case .uv_index:
                 return nil
             case .freezing_level_height:
                 return nil
-            case .direct_radiation:
-                // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
-                // Data after 54 hours is 3 hourly
-                if forecastHour > 54 {
+            default:
+                break
+            }
+        case .global_ensemble_20km:
+            switch self {
+            case .showers, .hail:
+                // Global has only instantanous rates for snow and showers
+                return nil
+            //case .cloud_base:
+            //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
+            //case .freezing_level_height:
+            //    return "height_ASL_at_freezing_level"
+            case .shortwave_radiation, .direct_radiation:
+                // Radiation is only available until hour 30 for runs 6z and 18z
+                if run.hour % 12 == 6 && forecastHour >= 31 {
                     return nil
                 }
+                break
+            case .precipitation:
+                // precipitation not available for ensemble
+                return nil
+            case .rain, .snowfall_water_equivalent:
+                if forecastHour >= 57 {
+                    /// Only has 1 hourly aggregations, but timeintervals are actually 3 or 6 hourly
+                    return nil
+                }
+                break
+            case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .uv_index:
+                // Actually available, but not processed for ensembles
+                return nil
             default:
                 break
             }
@@ -297,8 +321,16 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .snow_depth_water_equivalent:
             return "snow_depth_water_equivalent"
         case .shortwave_radiation:
+            if forecastHour > 54 {
+                return nil
+            }
             return "radiation_flux_in_shortwave_total_downward_at_surface"
         case .direct_radiation:
+            // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
+            // Data after 54 hours is 3 hourly
+            if forecastHour > 54 {
+                return nil
+            }
             return "radiation_flux_in_shortwave_direct_downward_at_surface"
         case .uv_index:
             return "radiation_flux_in_uv_downward_at_surface"
@@ -454,9 +486,9 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         }
     }
     
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
-        case .global_deterministic_10km:
+        case .global_deterministic_10km, .global_ensemble_20km:
             break
         case .uk_deterministic_2km:
             if variable == .vertical_velocity {
@@ -579,9 +611,9 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
         }
     }
     
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
-        case .global_deterministic_10km:
+        case .global_deterministic_10km, .global_ensemble_20km:
             return nil
         case .uk_deterministic_2km:
             break
@@ -612,6 +644,6 @@ typealias UkmoVariable = SurfacePressureAndHeightVariable<UkmoSurfaceVariable, U
 protocol UkmoVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }
     var multiplyAdd: (offset: Float, scalefactor: Float)? { get }
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String?
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String?
     func withLevel(level: Float) -> Self
 }

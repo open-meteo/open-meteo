@@ -211,7 +211,7 @@ public struct Timestamp: Hashable {
         return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))"
     }
     
-    /// With format `yyyy/MMd/d`
+    /// With format `yyyy/MM/dd`
     var format_directoriesYYYYMMdd: String {
         var time = timeIntervalSince1970
         var t = tm()

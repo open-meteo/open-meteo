@@ -164,6 +164,9 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
             return .gfs025
         case .bom_access_global_ensemble:
             return .bomAccessGlobalEnsemble
+        case .ukmo_global_ensemble_20km:
+            // TODO register UKMO ensemble
+            return .ukmoGlobalDeterministic10km
         }
     }
 }

@@ -111,6 +111,7 @@ enum DomainRegistry: String, CaseIterable {
     case dmi_harmonie_arome_europe
     
     case ukmo_global_deterministic_10km
+    case ukmo_global_ensemble_20km
     case ukmo_uk_deterministic_2km
     
     var directory: String {
@@ -303,6 +304,8 @@ enum DomainRegistry: String, CaseIterable {
             return NbmDomain.nbm_conus
         case .ncep_nbm_alaska:
             return NbmDomain.nbm_alaska
+        case .ukmo_global_ensemble_20km:
+            return UkmoDomain.global_ensemble_20km
         }
     }
 }

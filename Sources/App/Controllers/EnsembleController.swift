@@ -120,6 +120,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     case gfs025
     case gfs05
     
+    case ukmo_global_ensemble_20km
+    
 
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -149,6 +151,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return try GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .bom_access_global_ensemble:
             return try BomReader(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .ukmo_global_ensemble_20km:
+            return try UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         }
     }
     
@@ -177,6 +181,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return GemDomain.gem_global_ensemble.ensembleMembers
         case .bom_access_global_ensemble:
             return BomDomain.access_global_ensemble.ensembleMembers
+        case .ukmo_global_ensemble_20km:
+            return UkmoDomain.global_ensemble_20km.ensembleMembers
         }
     }
     
