@@ -197,7 +197,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         }
     }
     
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km:
             switch self {
@@ -225,6 +225,12 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
             //case .freezing_level_height:
             //    return "height_ASL_at_freezing_level"
+            case .shortwave_radiation, .direct_radiation:
+                // Radiation is only available until hour 30 for runs 6z and 18z
+                if run.hour % 12 == 6 && forecastHour >= 31 {
+                    return nil
+                }
+                break
             case .precipitation:
                 // precipitation not available for ensemble
                 return nil
@@ -480,7 +486,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         }
     }
     
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
             break
@@ -605,7 +611,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
         }
     }
     
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
             return nil
@@ -638,6 +644,6 @@ typealias UkmoVariable = SurfacePressureAndHeightVariable<UkmoSurfaceVariable, U
 protocol UkmoVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }
     var multiplyAdd: (offset: Float, scalefactor: Float)? { get }
-    func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String?
+    func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String?
     func withLevel(level: Float) -> Self
 }

@@ -275,7 +275,7 @@ struct UkmoDownload: AsyncCommand {
                     if variable.skipHour0, timestamp == run {
                         return []
                     }
-                    guard let fileName = variable.getNcFileName(domain: domain, forecastHour: forecastHour) else {
+                    guard let fileName = variable.getNcFileName(domain: domain, forecastHour: forecastHour, run: run) else {
                         return []
                     }
                     
