@@ -199,7 +199,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
         switch domain {
-        case .global_deterministic_10km, .global_ensemble_20km:
+        case .global_deterministic_10km:
             switch self {
             case .showers, .snowfall_water_equivalent, .hail:
                 // Global has only instantanous rates for snow and showers
@@ -213,11 +213,30 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 return nil
             case .freezing_level_height:
                 return nil
+            default:
+                break
+            }
+        case .global_ensemble_20km:
+            switch self {
+            case .showers, .hail:
+                // Global has only instantanous rates for snow and showers
+                return nil
+            //case .cloud_base:
+            //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
+            //case .freezing_level_height:
+            //    return "height_ASL_at_freezing_level"
             case .precipitation:
                 // precipitation not available for ensemble
-                if domain == .global_ensemble_20km {
+                return nil
+            case .rain, .snowfall_water_equivalent:
+                if forecastHour >= 57 {
+                    /// Only has 1 hourly aggregations, but timeintervals are actually 3 or 6 hourly
                     return nil
                 }
+                break
+            case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition:
+                // Actually available, but not processed for ensembles
+                return nil
             default:
                 break
             }
@@ -296,6 +315,9 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .snow_depth_water_equivalent:
             return "snow_depth_water_equivalent"
         case .shortwave_radiation:
+            if forecastHour > 54 {
+                return nil
+            }
             return "radiation_flux_in_shortwave_total_downward_at_surface"
         case .direct_radiation:
             // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
