@@ -176,8 +176,9 @@ struct UkmoDownload: AsyncCommand {
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
-        let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
-        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/\(run.iso8601_YYYYMMddTHHmm)Z"
+        let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
+        let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
+        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/\(run.iso8601_YYYYMMddTHHmm)Z"
         
         let surfacePressureFile = "\(baseUrl)-PT0000H00M-pressure_at_surface.nc"
         let mslPressureFile = "\(baseUrl)-PT0000H00M-pressure_at_mean_sea_level.nc"
@@ -222,7 +223,7 @@ struct UkmoDownload: AsyncCommand {
         let logger = application.logger
         let deadLineHours: Double
         switch domain {
-        case .global_deterministic_10km:
+        case .global_deterministic_10km, .global_ensemble_20km:
             deadLineHours = 5
         case .uk_deterministic_2km:
             deadLineHours = 1
@@ -234,8 +235,9 @@ struct UkmoDownload: AsyncCommand {
                 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing, waitAfterLastModified: TimeInterval(2*60))
         
-        let server = server ?? "https://met-office-atmospheric-model-data.s3-eu-west-2.amazonaws.com/"
-        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(run.iso8601_YYYYMMddTHHmm)Z/"
+        let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
+        let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
+        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
         
         var handles = [GenericVariableHandle]()
         for timestamp in domain.forecastSteps(run: run) {
@@ -257,7 +259,7 @@ struct UkmoDownload: AsyncCommand {
                     let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
                     let data = try memory.readUkmoNetCDF()
                     logger.info("Processing \(data.name) [\(data.unit)]")
-                    return try data.data.compactMap { (level, data) -> GenericVariableHandle? in
+                    return try data.data.compactMap { (level, member, data) -> GenericVariableHandle? in
                         var data = data.data
                         if let scaling = variable.multiplyAdd {
                             data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
@@ -286,7 +288,7 @@ struct UkmoDownload: AsyncCommand {
                         return GenericVariableHandle(
                             variable: variable,
                             time: timestamp,
-                            member: 0,
+                            member: member,
                             fn: fn
                         )
                     }
@@ -319,7 +321,7 @@ fileprivate extension ByteBuffer {
     /**
      Read NetCDF files from UKMO. For muliple levels (pressuse and height files) multiple levels are returned
      */
-    func readUkmoNetCDF() throws -> (name: String, unit: String, data: [(level: Float, data: Array2D)]) {
+    func readUkmoNetCDF() throws -> (name: String, unit: String, data: [(level: Float, member: Int, data: Array2D)]) {
         return try withUnsafeReadableBytes { memory in
             guard let nc = try NetCDF.open(memory: memory) else {
                 fatalError("Could not open netcdf from memory")
@@ -337,11 +339,20 @@ fileprivate extension ByteBuffer {
                 let data = try ncInt32.read()
                 let ny = ncVar.dimensionsFlat[0]
                 let nx = ncVar.dimensionsFlat[1]
-                return (ncVar.name, unit, [(0, Array2D(data: data.map({Float($0)}), nx: nx, ny: ny))])
+                return (ncVar.name, unit, [(0, 0, Array2D(data: data.map({Float($0)}), nx: nx, ny: ny))])
             }
             
             guard let ncFloat = ncVar.asType(Float.self) else {
                 fatalError("Could not open float variable \(ncVar.name)")
+            }
+            /// 3D ensemble files
+            if ncVar.dimensions.count == 3 && ncVar.dimensions[0].name == "realization" {
+                return (ncVar.name, unit, try (0..<ncVar.dimensions[0].length).compactMap({ (member) in
+                    let ny = ncVar.dimensionsFlat[1]
+                    let nx = ncVar.dimensionsFlat[2]
+                    let data = try ncFloat.read(offset: [member, 0, 0], count: [1, ny, nx])
+                    return (0, member, Array2D(data: data, nx: nx, ny: ny))
+                }))
             }
             /// File contains multiple levels on pressure or height
             if ncVar.dimensions.count == 3 {
@@ -360,13 +371,13 @@ fileprivate extension ByteBuffer {
                     let ny = ncVar.dimensionsFlat[1]
                     let nx = ncVar.dimensionsFlat[2]
                     let data = try ncFloat.read(offset: [i, 0, 0], count: [1, ny, nx])
-                    return (level, Array2D(data: data, nx: nx, ny: ny))
+                    return (level, 0, Array2D(data: data, nx: nx, ny: ny))
                 }))
             }
             let data = try ncFloat.read()
             let ny = ncVar.dimensionsFlat[0]
             let nx = ncVar.dimensionsFlat[1]
-            return (ncVar.name, unit, [(0, Array2D(data: data, nx: nx, ny: ny))])
+            return (ncVar.name, unit, [(0, 0, Array2D(data: data, nx: nx, ny: ny))])
         }
     }
 }

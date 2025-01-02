@@ -199,7 +199,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
         switch domain {
-        case .global_deterministic_10km:
+        case .global_deterministic_10km, .global_ensemble_20km:
             switch self {
             case .showers, .snowfall_water_equivalent, .hail:
                 // Global has only instantanous rates for snow and showers
@@ -213,10 +213,9 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 return nil
             case .freezing_level_height:
                 return nil
-            case .direct_radiation:
-                // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
-                // Data after 54 hours is 3 hourly
-                if forecastHour > 54 {
+            case .precipitation:
+                // precipitation not available for ensemble
+                if domain == .global_ensemble_20km {
                     return nil
                 }
             default:
@@ -299,6 +298,11 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .shortwave_radiation:
             return "radiation_flux_in_shortwave_total_downward_at_surface"
         case .direct_radiation:
+            // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
+            // Data after 54 hours is 3 hourly
+            if forecastHour > 54 {
+                return nil
+            }
             return "radiation_flux_in_shortwave_direct_downward_at_surface"
         case .uv_index:
             return "radiation_flux_in_uv_downward_at_surface"
@@ -456,7 +460,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
         switch domain {
-        case .global_deterministic_10km:
+        case .global_deterministic_10km, .global_ensemble_20km:
             break
         case .uk_deterministic_2km:
             if variable == .vertical_velocity {
@@ -581,7 +585,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
     
     func getNcFileName(domain: UkmoDomain, forecastHour: Int) -> String? {
         switch domain {
-        case .global_deterministic_10km:
+        case .global_deterministic_10km, .global_ensemble_20km:
             return nil
         case .uk_deterministic_2km:
             break
