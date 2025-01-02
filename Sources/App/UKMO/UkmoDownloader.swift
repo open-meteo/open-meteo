@@ -163,27 +163,51 @@ struct UkmoDownload: AsyncCommand {
         
         let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
-        if domain != .uk_deterministic_2km {
-            // only UKV 2km domain has the required information to calculate height and land mask
-            return
-        }
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
         try domain.surfaceElevationFileOm.createDirectory()
         
-        logger.info("Downloading height and elevation data")
-        
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
         let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
-        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/\(run.iso8601_YYYYMMddTHHmm)Z"
+        let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/\(run.iso8601_YYYYMMddTHHmm)Z-PT0000H00M-"
         
-        let surfacePressureFile = "\(baseUrl)-PT0000H00M-pressure_at_surface.nc"
-        let mslPressureFile = "\(baseUrl)-PT0000H00M-pressure_at_mean_sea_level.nc"
-        let lsmFile = "\(baseUrl)-PT0000H00M-landsea_mask.nc"
-        let temperatureFile = "\(baseUrl)-PT0000H00M-temperature_at_screen_level.nc"
+        /// Ensemble model has a height_of_orography.nc, but there is no landmask
+        /// Use soil_temperature_on_soil_levels.nc for landmask
+        if domain == .global_ensemble_20km {
+            logger.info("Downloading height and elevation data")
+            let orographyFile = "\(baseUrl)height_of_orography.nc"
+            let soilTemperatureFile = "\(baseUrl)soil_temperature_on_soil_levels.nc"
+            guard var elevation = try await curl.downloadInMemoryAsync(url: orographyFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
+                fatalError("Could not download surface elevation")
+            }
+            guard let soilTemperature = try await curl.downloadInMemoryAsync(url: soilTemperatureFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
+                fatalError("Could not download soil temperature")
+            }
+            for i in elevation.indices {
+                if soilTemperature[i].isNaN {
+                    elevation[i] = -999 // mask sea grid points
+                }
+            }
+            if createNetcdf {
+                try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
+            }
+            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+            return
+        }
+        
+        if domain != .uk_deterministic_2km {
+            // only UKV 2km domain has the required information to calculate height and land mask
+            return
+        }
+        logger.info("Downloading height and elevation data")
+        
+        let surfacePressureFile = "\(baseUrl)pressure_at_surface.nc"
+        let mslPressureFile = "\(baseUrl)pressure_at_mean_sea_level.nc"
+        let lsmFile = "\(baseUrl)landsea_mask.nc"
+        let temperatureFile = "\(baseUrl)temperature_at_screen_level.nc"
         
         guard let surfacePressure = try await curl.downloadInMemoryAsync(url: surfacePressureFile, minSize: nil).readUkmoNetCDF().data.first?.data else {
             fatalError("Could not download surface pressure")
