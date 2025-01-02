@@ -204,9 +204,9 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             case .showers, .snowfall_water_equivalent, .hail:
                 // Global has only instantanous rates for snow and showers
                 return nil
-            case .shortwave_radiation:
+            //case .shortwave_radiation:
                 // global has only direct radiation, but not diffuse/total
-                return nil
+                //return nil
             case .cloud_base:
                 return nil
             case .uv_index:
@@ -234,7 +234,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                     return nil
                 }
                 break
-            case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition:
+            case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .uv_index:
                 // Actually available, but not processed for ensembles
                 return nil
             default:

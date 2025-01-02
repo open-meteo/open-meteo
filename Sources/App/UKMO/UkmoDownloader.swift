@@ -179,15 +179,15 @@ struct UkmoDownload: AsyncCommand {
         if domain == .global_ensemble_20km {
             logger.info("Downloading height and elevation data")
             let orographyFile = "\(baseUrl)height_of_orography.nc"
-            let soilTemperatureFile = "\(baseUrl)soil_temperature_on_soil_levels.nc"
+            let landSeaMaskFile = "\(baseUrl)landsea_mask.nc"
             guard var elevation = try await curl.downloadInMemoryAsync(url: orographyFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
                 fatalError("Could not download surface elevation")
             }
-            guard let soilTemperature = try await curl.downloadInMemoryAsync(url: soilTemperatureFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
+            guard let landmask = try await curl.downloadInMemoryAsync(url: landSeaMaskFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
                 fatalError("Could not download soil temperature")
             }
             for i in elevation.indices {
-                if soilTemperature[i].isNaN {
+                if landmask[i] != 1 {
                     elevation[i] = -999 // mask sea grid points
                 }
             }
