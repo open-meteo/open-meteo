@@ -151,7 +151,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             // every 3 hours, 55 hours otherwise 13 hours
             return TimerangeDt(start: run, nTime: run.hour % 3 == 0 ? 55 : 13, dtSeconds: 3600).map({$0})
         case .global_ensemble_20km:
-            return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: 198, by: 6)).map({run.add(hours: $0)})
+            let through = run.hour % 12 == 6 ? 180 : 198
+            return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: through, by: 6)).map({run.add(hours: $0)})
         }
     }
     
