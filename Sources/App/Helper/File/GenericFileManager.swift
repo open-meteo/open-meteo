@@ -14,8 +14,8 @@ protocol GenericFileManagable {
 struct GenericFileManager<File: GenericFileManagable> {
     /// A file might exist and is open, or it is missing
     enum OmFileState {
-        case exists(file: File)
-        case missing(path: String)
+        case exists(file: File, opened: Timestamp)
+        case missing(path: String, opened: Timestamp)
     }
     
     /// Non existing files are set to nil
@@ -57,21 +57,23 @@ struct GenericFileManager<File: GenericFileManagable> {
         let copy = cached.withLockedValue {
             return $0
         }
+        // Close file handles after 1 hour
+        let ejectionTime = Timestamp.now().subtract(hours: 1)
         
         for e in copy {
             switch e.value {
-            case .exists(file: let file):
+            case .exists(file: let file, opened: let opened):
                 // Remove file from cache, if it was deleted
-                if file.wasDeleted() {
+                if opened < ejectionTime || file.wasDeleted() {
                     cached.withLockedValue({
                         $0.removeValue(forKey: e.key)
                         countEjected += 1
                     })
                 }
                 countExisting += 1
-            case .missing(path: let path):
+            case .missing(path: let path, opened: let opened):
                 // Remove file from cache, if it is now available, so the next open, will make it available
-                if FileManager.default.fileExists(atPath: path) {
+                if opened < ejectionTime || FileManager.default.fileExists(atPath: path) {
                     cached.withLockedValue({
                         let _ = $0.removeValue(forKey: e.key)
                         countEjected += 1
@@ -90,17 +92,17 @@ struct GenericFileManager<File: GenericFileManagable> {
         return try cached.withLockedValue { cached -> File? in
             if let file = cached[key] {
                 switch file {
-                case .exists(file: let file):
+                case .exists(file: let file, opened: _):
                     return file
-                case .missing(path: _):
+                case .missing(path: _, opened: _):
                     return nil
                 }
             }
             guard let file = try File.open(from: file) else {
-                cached[key] = .missing(path: file.getFilePath())
+                cached[key] = .missing(path: file.getFilePath(), opened: .now())
                 return nil
             }
-            cached[key] = .exists(file: file)
+            cached[key] = .exists(file: file, opened: .now())
             return file
         }
     }
