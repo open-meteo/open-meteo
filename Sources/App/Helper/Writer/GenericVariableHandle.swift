@@ -63,7 +63,7 @@ struct GenericVariableHandle {
         if let uploadS3Bucket = uploadS3Bucket {
             logger.info("AWS upload to bucket \(uploadS3Bucket)")
             let startTimeAws = DispatchTime.now()
-            let variables = handles.map { $0.variable }.uniqued(on: { $0.rawValue })
+            let variables = handles.map { $0.variable }.uniqued(on: { $0.omFileName.file })
             do {
                 try domain.domainRegistry.syncToS3(
                     bucket: uploadS3Bucket,
@@ -88,7 +88,7 @@ struct GenericVariableHandle {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
-                .groupedPreservedOrder(by: {"\($0.variable)"})
+                .groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"})
                 .evenlyChunked(in: concurrent)
                 .foreachConcurrent(nConcurrent: concurrent, body: {
                     if OpenMeteo.generteOmFilesVersion3 {
@@ -112,7 +112,7 @@ struct GenericVariableHandle {
         let grid = domain.grid
         let nLocations = grid.count
         
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
+        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
             guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
                 logger.warning("No data to convert")
                 return
@@ -213,7 +213,7 @@ struct GenericVariableHandle {
         let grid = domain.grid
         let nLocations = grid.count
         
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable)"}) {
+        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
             guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
                 logger.warning("No data to convert")
                 return
