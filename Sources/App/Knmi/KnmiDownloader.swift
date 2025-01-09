@@ -197,8 +197,8 @@ struct KnmiDownload: AsyncCommand {
                     return nil
                 }
                 
-                if ["rain", "snowfall_water_equivalent"].contains(shortName) && stepType == "instant" {
-                    // Rain and snow snowall are twice inside the GRIB file.
+                if ["rain", "tsnowp"].contains(shortName) && stepType == "instant" {
+                    // Rain and snow snowfall are twice inside the GRIB file.
                     // One instant and accumulation. Make sure to only use accumulation
                     return nil
                 }
