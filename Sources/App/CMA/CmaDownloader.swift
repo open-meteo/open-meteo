@@ -26,6 +26,12 @@ struct DownloadCmaCommand: AsyncCommand {
         
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        /*@Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        var timeinterval: String?
+
+        @Flag(name: "fix-solar", help: "Fix old solar files")
+        var fixSolar: Bool*/
     }
 
     var help: String {
@@ -41,6 +47,16 @@ struct DownloadCmaCommand: AsyncCommand {
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
+        /*if let timeinterval = signature.timeinterval {
+            if signature.fixSolar {
+                // timeinterval devided by chunk time range
+                let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
+                try self.fixSolarFiles(application: context.application, domain: domain, timerange: time)
+                return
+            }
+            fatalError("Time interval downloads not possible")
+        }*/
+        
         guard let server = signature.server else {
             fatalError("Parameter 'server' is required")
         }
@@ -49,6 +65,49 @@ struct DownloadCmaCommand: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
+    
+    /// read each file in chunks, apply shortwave correction and write again
+    /*func fixSolarFiles(application: Application, domain: CmaDomain, timerange: ClosedRange<Timestamp>) throws {
+        let nTimePerFile = domain.omFileLength
+        let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
+        
+        for variable in [CmaSurfaceVariable.shortwave_radiation, .shortwave_radiation_clear_sky] {
+            for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
+                /// Note make sure to set previous days to 0..<10 next time
+                for previousDay in 0..<10 {
+                    let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
+                    let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                    guard let omRead = try readFile.openRead() else {
+                        continue
+                    }
+                    let fileName = readFile.getFilePath()
+                    application.logger.info("Correcting file \(fileName)")
+                    let tempFile = fileName + "~"
+                    try FileManager.default.removeItemIfExists(at: tempFile)
+                    let fn = try FileHandle.createNewFile(file: tempFile)
+                    
+                    let writer = try OmFileWriterState<FileHandle>(fn: fn, dim0: omRead.dim0, dim1: omRead.dim1, chunk0: omRead.chunk0, chunk1: omRead.chunk1, compression: omRead.compression, scalefactor: omRead.scalefactor, fsync: true)
+                    try writer.writeHeader()
+                    
+                    // loop over data in chunks
+                    for locations in (0..<omRead.dim0).chunks(ofCount: omRead.chunk0) {
+                        var data = try omRead.read(dim0Slow: locations, dim1: nil)
+                        let solfac = Zensun.calculateRadiationBackwardsAveraged(grid: domain.grid, locationRange: locations, timerange: fileTime)
+                        for i in data.indices {
+                            data[i] = min(data[i], solfac.data[i] * Float(1367.7 * 0.85)) // limit to 85% exrad
+                        }
+                        try writer.write(ArraySlice(data))
+                    }
+                    
+                    try writer.writeTail()
+                    try writer.fn.close()
+                    
+                    // Overwrite existing file, with newly created
+                    try FileManager.default.moveFileOverwrite(from: tempFile, to: fileName)
+                }
+            }
+        }
+    }*/
     
     func getCmaVariable(logger: Logger, message: GribMessage) -> CmaVariableDownloadable? {
         guard let shortName = message.get(attribute: "shortName"),
