@@ -94,7 +94,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         case .snowfall:
             return (100, 0)
         case .shortwave_radiation, .shortwave_radiation_clear_sky:
-            return (1/1000, 0)
+            return (1/10000, 0)
         case .pressure_msl:
             return (1/100, 0)
         default:
