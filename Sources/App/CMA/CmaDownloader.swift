@@ -73,7 +73,8 @@ struct DownloadCmaCommand: AsyncCommand {
         
         for variable in [CmaSurfaceVariable.shortwave_radiation, .shortwave_radiation_clear_sky] {
             for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
-                for previousDay in 1..<10 {
+                /// Note make sure to set previous days to 0..<10 next time
+                for previousDay in 0..<1 {
                     let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                     guard let omRead = try readFile.openRead() else {
                         continue
