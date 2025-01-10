@@ -197,6 +197,12 @@ struct KnmiDownload: AsyncCommand {
                     return nil
                 }
                 
+                if ["rain", "tsnowp"].contains(shortName) && stepType == "instant" {
+                    // Rain and snow snowfall are twice inside the GRIB file.
+                    // One instant and accumulation. Make sure to only use accumulation
+                    return nil
+                }
+                
                 /// Keep wind u/v in memory
                 if let temporary = KnmiWindVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                     logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
@@ -231,7 +237,7 @@ struct KnmiDownload: AsyncCommand {
                 if stepType == "accum" && timestamp == run {
                     return nil // skip precipitation at timestep 0
                 }
-                logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)]")
+                logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)")
                 
                 let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
