@@ -71,7 +71,7 @@ struct DownloadCmaCommand: AsyncCommand {
         let nTimePerFile = domain.omFileLength
         let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
         
-        for variable in [CmaSurfaceVariable.shortwave_radiation] {
+        for variable in [CmaSurfaceVariable.shortwave_radiation, .shortwave_radiation_clear_sky] {
             for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
                 for previousDay in 1..<10 {
                     let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
