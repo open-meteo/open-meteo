@@ -27,11 +27,11 @@ struct DownloadCmaCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
         
-        @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
+        /*@Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
 
         @Flag(name: "fix-solar", help: "Fix old solar files")
-        var fixSolar: Bool
+        var fixSolar: Bool*/
     }
 
     var help: String {
@@ -47,7 +47,7 @@ struct DownloadCmaCommand: AsyncCommand {
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        if let timeinterval = signature.timeinterval {
+        /*if let timeinterval = signature.timeinterval {
             if signature.fixSolar {
                 // timeinterval devided by chunk time range
                 let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
@@ -55,7 +55,7 @@ struct DownloadCmaCommand: AsyncCommand {
                 return
             }
             fatalError("Time interval downloads not possible")
-        }
+        }*/
         
         guard let server = signature.server else {
             fatalError("Parameter 'server' is required")
@@ -67,7 +67,7 @@ struct DownloadCmaCommand: AsyncCommand {
     }
     
     /// read each file in chunks, apply shortwave correction and write again
-    func fixSolarFiles(application: Application, domain: CmaDomain, timerange: ClosedRange<Timestamp>) throws {
+    /*func fixSolarFiles(application: Application, domain: CmaDomain, timerange: ClosedRange<Timestamp>) throws {
         let nTimePerFile = domain.omFileLength
         let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
         
@@ -107,7 +107,7 @@ struct DownloadCmaCommand: AsyncCommand {
                 }
             }
         }
-    }
+    }*/
     
     func getCmaVariable(logger: Logger, message: GribMessage) -> CmaVariableDownloadable? {
         guard let shortName = message.get(attribute: "shortName"),
