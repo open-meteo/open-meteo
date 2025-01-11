@@ -10,9 +10,9 @@ User=openmeteo-api
 Group=openmeteo-api
 WorkingDirectory=/var/lib/openmeteo-api/
 ExecStart=/usr/local/bin/openmeteo-api serve -b $API_BIND2 --env $VAPOR_ENV
-ExecStopPost=/bin/bash -c 'if [ "$$EXIT_STATUS" != 0 ]; then /usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %N; fi'
+ExecStopPost=/bin/bash -c 'if [[ "$$EXIT_STATUS" != 0 && -n "$API_BIND2" ]]; then /usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %N; fi'
 Restart=always
-RestartSec=2
+RestartSec=1
 LimitNOFILE=infinity
 ExecCondition=/bin/bash -c '/bin/test -n "$API_BIND2"'
 
