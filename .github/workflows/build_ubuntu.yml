@@ -46,7 +46,7 @@ jobs:
       with:
         fpm_args: './build'
         # -d swiftlang-slim -d libeccodes0
-        fpm_opts: '-s dir -t deb -n openmeteo-api -v 0.0.0 -d libnetcdf19 -d libeccodes0 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service  --deb-systemd build/openmeteo-api2.service  --deb-systemd build/openmeteo-api3.service --deb-systemd build/openmeteo-notify@.service --deb-default build/openmeteo-api.env --before-install build/openmeteo-before-install.sh --before-upgrade build/openmeteo-before-install.sh build/openmeteo-notify.sh=/usr/local/bin/ openmeteo-api=/usr/local/bin/ swift-backtrace=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+        fpm_opts: '-s dir -t deb -n openmeteo-api -v 0.0.0 -d libnetcdf19 -d libeccodes0 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service  --deb-systemd build/openmeteo-api2.service  --deb-systemd build/openmeteo-api3.service --deb-default build/openmeteo-api.env --before-install build/openmeteo-before-install.sh --before-upgrade build/openmeteo-before-install.sh openmeteo-api=/usr/local/bin/ swift-backtrace=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
     - name: Rename deb file
       run: mv openmeteo-api_0.0.0_amd64.deb openmeteo-api_0.0.0_jammy_amd64.deb
     - name: 'Upload Artifact'
