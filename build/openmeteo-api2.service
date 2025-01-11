@@ -13,6 +13,7 @@ ExecStart=/usr/local/bin/openmeteo-api serve -b $API_BIND2 --env $VAPOR_ENV
 ExecStopPost=/bin/bash -c 'if [ "$$EXIT_STATUS" != 0 ]; then /usr/local/bin/openmeteo-notify.sh $NOTIFICATION_EMAIL %N; fi'
 Restart=always
 RestartSec=2
+LimitNOFILE=infinity
 ExecCondition=/bin/bash -c '/bin/test -n "$API_BIND2"'
 
 [Install]
