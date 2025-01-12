@@ -144,7 +144,7 @@ struct MetNoDownloader: AsyncCommand {
             
             if variable.isAccumulatedSinceModelStart {
                 var fastTime = spatial.transpose()
-                fastTime.deavergeOverTime()
+                fastTime.deaccumulateOverTime()
                 spatial = fastTime.transpose()
             }
             
