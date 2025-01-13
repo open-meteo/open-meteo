@@ -11,7 +11,7 @@ let mArch: [String] = []
 #endif
 
 let swiftFlags: [PackageDescription.SwiftSetting] = [
-    .unsafeFlags(["-cross-module-optimization", "-Ounchecked"],
+    .unsafeFlags(["-cross-module-optimization"/*, "-Ounchecked"*/],
     .when(configuration: .release))
 ]
 
