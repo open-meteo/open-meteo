@@ -15,7 +15,8 @@ let swiftFlags: [PackageDescription.SwiftSetting] = [
     .when(configuration: .release))
 ]
 
-let cFlags = [PackageDescription.CSetting.unsafeFlags(["-O3", "-Wall", "-Werror", "-fno-math-errno", "-fno-trapping-math", "-freciprocal-math", "-ffp-contract=fast"] + mArch)]
+/// `no-omit-frame-pointer` is required for back-tracing https://github.com/swiftlang/swift/blob/main/docs/Backtracing.rst#frame-pointers
+let cFlags = [PackageDescription.CSetting.unsafeFlags(["-O3", "-Wall", "-Werror", "-fno-math-errno", "-fno-trapping-math", "-freciprocal-math", "-ffp-contract=fast", "-fno-omit-frame-pointer"] + mArch)]
 
 /// Conditional support for Apache Arrow Parquet files
 let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TRUE"
