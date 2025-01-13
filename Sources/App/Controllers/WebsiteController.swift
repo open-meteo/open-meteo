@@ -12,6 +12,6 @@ struct WebsiteController: RouteCollection {
     
     func testBacktrace(_ req: Request) -> String {
         let array = [0,1,2]
-        return String(array[10])
+        return String(array[100000000000])
     }
 }
