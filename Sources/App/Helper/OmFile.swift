@@ -504,6 +504,7 @@ extension OmFileReader {
                     intoCubeDimension: [UInt64(y.count), UInt64(x.count), UInt64(nTime)]
                 )
             } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
             }
         case 4:
@@ -525,6 +526,7 @@ extension OmFileReader {
                     intoCubeDimension: [UInt64(y.count), UInt64(x.count), 1, UInt64(nTime)]
                 )
             } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
             }
         default:
@@ -565,6 +567,7 @@ extension OmFileReader {
             do {
                 try reader.willNeed(range: range)
             } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
             }
         case 4:
@@ -580,6 +583,7 @@ extension OmFileReader {
             do {
                 try reader.willNeed(range: range)
             } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
             }
         default:
