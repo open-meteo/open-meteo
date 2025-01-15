@@ -50,7 +50,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/om-file-format.git",
       "state" : {
-        "revision" : "5c5ef502fb5b1164b17854f4226a2ed2ad9a1887"
+        "revision" : "7d8e67a7e3fda19605c31be4de8e84010fc5575e"
       }
     },
     {
