@@ -492,8 +492,8 @@ extension OmFileReader {
             guard ny == dimensions[0], nx == dimensions[1] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, fileTime]
             do {
@@ -513,8 +513,8 @@ extension OmFileReader {
             guard ny == dimensions[0], nx == dimensions[1], level < dimensions[2] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let l = UInt64(level) ..< UInt64(level+1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, l, fileTime]
@@ -560,8 +560,8 @@ extension OmFileReader {
             guard ny == dimensions[0], nx == dimensions[1] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, fileTime]
             do {
@@ -575,8 +575,8 @@ extension OmFileReader {
             guard ny == dimensions[0], nx == dimensions[1], level < dimensions[2] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let l = UInt64(level) ..< UInt64(level+1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, l, fileTime]
