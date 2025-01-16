@@ -4,7 +4,7 @@ StartLimitIntervalSec=0
 
 [Service]
 EnvironmentFile=/etc/default/openmeteo-api.env
-PassEnvironment=VAPOR_ENV
+PassEnvironment=VAPOR_ENV SWIFT_BACKTRACE
 Type=simple
 User=openmeteo-api
 Group=openmeteo-api

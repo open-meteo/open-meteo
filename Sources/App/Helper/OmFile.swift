@@ -492,31 +492,43 @@ extension OmFileReader {
             guard ny == dimensions[0], nx == dimensions[1] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
-            try reader.read(
-                into: &into,
-                range: [y, x, fileTime],
-                intoCubeOffset: [0, 0, UInt64(timeOffsets.array.lowerBound)],
-                intoCubeDimension: [UInt64(y.count), UInt64(x.count), UInt64(nTime)]
-            )
+            let range = [y, x, fileTime]
+            do {
+                try reader.read(
+                    into: &into,
+                    range: range,
+                    intoCubeOffset: [0, 0, UInt64(timeOffsets.array.lowerBound)],
+                    intoCubeDimension: [UInt64(y.count), UInt64(x.count), UInt64(nTime)]
+                )
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
         case 4:
             // File uses dimensions [ny,nx,nLevel,ntime]
             //print("4D \(dimensions.map{Int($0)}) ny\(ny) nx\(nx) nMembers\(nMembers) l\(level)")
             guard ny == dimensions[0], nx == dimensions[1], level < dimensions[2] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let l = UInt64(level) ..< UInt64(level+1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
-            try reader.read(
-                into: &into,
-                range: [y, x, l, fileTime],
-                intoCubeOffset: [0, 0, 0, UInt64(timeOffsets.array.lowerBound)],
-                intoCubeDimension: [UInt64(y.count), UInt64(x.count), 1, UInt64(nTime)]
-            )
+            let range = [y, x, l, fileTime]
+            do {
+                try reader.read(
+                    into: &into,
+                    range: range,
+                    intoCubeOffset: [0, 0, 0, UInt64(timeOffsets.array.lowerBound)],
+                    intoCubeDimension: [UInt64(y.count), UInt64(x.count), 1, UInt64(nTime)]
+                )
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
         default:
             fatalError("ndims not implemented")
         }
@@ -548,24 +560,32 @@ extension OmFileReader {
             guard ny == dimensions[0], nx == dimensions[1] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
-            try reader.willNeed(
-                range: [y, x, fileTime]
-            )
+            let range = [y, x, fileTime]
+            do {
+                try reader.willNeed(range: range)
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
         case 4:
             // File uses dimensions [ny,nx,nLevel,ntime]
             guard ny == dimensions[0], nx == dimensions[1], level < dimensions[2] else {
                 return
             }
-            let x = UInt64(location.lowerBound % nx) ..< UInt64(location.upperBound % nx)
-            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.upperBound.divideRoundedUp(divisor: nx))
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound-1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
             let l = UInt64(level) ..< UInt64(level+1)
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
-            try reader.willNeed(
-                range: [y, x, l, fileTime]
-            )
+            let range = [y, x, l, fileTime]
+            do {
+                try reader.willNeed(range: range)
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
         default:
             fatalError("ndims not implemented")
         }
