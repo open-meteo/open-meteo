@@ -110,9 +110,9 @@ struct DmiDownload: AsyncCommand {
      Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
      */
     func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
-        guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
+        /*guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'DMI_API_KEY'")
-        }
+        }*/
         let logger = application.logger
         let deadLineHours = Double(4)
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
@@ -135,9 +135,12 @@ struct DmiDownload: AsyncCommand {
         let timerange = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600)
         
         let handles = try await timerange.asyncFlatMap { t -> [GenericVariableHandle] in
-            let url = "https://dmigw.govcloud.dk/v1/forecastdata/download/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
+            // https://dmigw.govcloud.dk/v1/forecastdata/collections/harmonie_dini_sf/items/HARMONIE_DINI_SF_2025-01-15T090000Z_2025-01-17T210000Z.grib -> assets
+            // https://download.dmi.dk/public/opendata/HARMONIE_DINI_SF_2025-01-15T090000Z_2025-01-17T210000Z.grib
+            //let url = "https://dmigw.govcloud.dk/v1/forecastdata/download/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
+            let url = "https://download.dmi.dk/public/opendata/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
             
-            return try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]) { stream in
+            return try await curl.withGribStream(url: url, bzip2Decode: false/*, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]*/) { stream in
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
