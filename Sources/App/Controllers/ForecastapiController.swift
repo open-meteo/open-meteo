@@ -103,7 +103,7 @@ struct WeatherApiController {
     
     func query(_ req: Request) async throws -> Response {
         let host = try await req.ensureSubdomain(subdomain, alias: alias)
-        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : OpenMeteo.numberOfLocationsMaximum
         /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
         let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
         let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax

@@ -29,6 +29,11 @@ struct OpenMeteo {
         return Environment.get("VERSION3") == "TRUE"
     }
     
+    /// Maximum number of locations for multi point requests
+    static var numberOfLocationsMaximum: Int = {
+        return (Environment.get("LOCATIONS_LIMIT").map(Int.init) ?? 1000) ?? 1000
+    }()
+    
     /// Cache all data access using spare files in this directory
     /*static var cacheDirectory = {
         return Environment.get("CACHE_DIRECTORY")
