@@ -42,7 +42,7 @@ extension CamsMixer: GenericReaderProvider {
 struct CamsController {
     func query(_ req: Request) async throws -> Response {
         let host = try await req.ensureSubdomain("air-quality-api")
-        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : 1_000
+        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : OpenMeteo.numberOfLocationsMaximum
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         try await req.ensureApiKey("air-quality-api", apikey: params.apikey)
         
