@@ -129,6 +129,10 @@ public func configure(_ app: Application) throws {
     // Higher backlog value to handle more connections
     app.http.server.configuration.backlog = 4096
 
+    if let defaultMaxBodySize = Environment.get("MAX_BODY_SIZE") {
+        app.routes.defaultMaxBodySize = ByteCount(stringLiteral: defaultMaxBodySize)
+    }
+    
     //app.logger.logLevel = .debug
 
     //app.views.use(.leaf)
