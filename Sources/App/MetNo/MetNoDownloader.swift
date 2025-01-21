@@ -142,10 +142,12 @@ struct MetNoDownloader: AsyncCommand {
                 spatial.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
             }
             
+            /// Solar radiation is accumulated over time. Timestep 0 contains zero values which should be NaN.
             if variable.isAccumulatedSinceModelStart {
-                var fastTime = spatial.transpose()
-                fastTime.deaccumulateOverTime()
-                spatial = fastTime.transpose()
+                spatial.data.deaccumulateOverTimeSpatial(nTime: nTime)
+                for i in 0..<nx*ny {
+                    spatial.data[i] = .nan
+                }
             }
             
             return try (0..<nTime).map { t in
