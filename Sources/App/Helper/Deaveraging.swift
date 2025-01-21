@@ -83,17 +83,33 @@ extension Array where Element == Float {
     }
     
     /// Deaccumulates a time series by subtracting the previous value from the current value.
-    ///
-    /// - Parameters:
-    ///   - nTime: The number of time intervals in the time series.
-    ///
-    /// - Precondition: `nTime` must be less than or equal to the length of the input array.
-    /// - Precondition: The length of the input array must be divisible by `nTime`.
-    ///
-    /// This function operates on an array of floating-point numbers that represents a time series, where each element in the array corresponds to a measurement at a specific time.
-    /// The function modifies the input array in place, subtracting the previous value from the current value for each element in the sliding window within each location in the array.
-    /// If the previous value is `NaN`, the function replaces it with the value of the element two time steps before or with 0 if it's negative.
-    /// The deaccumulation process ensures that the time series is transformed from a cumulative sum to a series of differences.
+    /// Assumes data is oriented spatially
+    mutating func deaccumulateOverTimeSpatial(nTime: Int) {
+        precondition(nTime <= self.count)
+        precondition(self.count % nTime == 0)
+        let nLocations = self.count / nTime
+        for l in 0..<nLocations {
+            var prev = Float.nan
+            var skipped = 0
+            for hour in 0 ..< nTime {
+                let d = self[hour * nLocations + l]
+                if prev.isNaN {
+                    prev = d
+                    continue
+                }
+                if d.isNaN {
+                    // ignore missing values
+                    skipped += 1
+                    continue
+                }
+                self[hour * nLocations + l] = (d - prev) / Float(skipped + 1)
+                prev = d
+                skipped = 0
+            }
+        }
+    }
+    
+    
     mutating func deaccumulateOverTime(nTime: Int) {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
