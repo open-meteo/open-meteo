@@ -405,7 +405,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .vertical_velocity_250hPa: fallthrough
         case .vertical_velocity_200hPa: fallthrough
         case .vertical_velocity_100hPa: fallthrough
-        case .vertical_velocity_50hPa: return .metrePerSecond
+        case .vertical_velocity_50hPa: return .metrePerSecondNotUnitConverted
         case .temperature_1000hPa: fallthrough
         case .temperature_925hPa: fallthrough
         case .temperature_850hPa: fallthrough
