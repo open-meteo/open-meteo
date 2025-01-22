@@ -232,11 +232,12 @@ struct GloFasDownloader: AsyncCommand {
         for (i, date) in timeinterval.enumerated() {
             logger.info("Reading \(date.format_YYYYMMdd)")
             let file = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
-            guard FileManager.default.fileExists(atPath: file) else {
+            guard FileManager.default.fileExists(atPath: file),
+                    let dailyFile = try OmFileReader2(file: file).asArray(of: Float.self)
+            else {
                 continue
             }
-            let dailyFile = try OmFileReader(file: file)
-            data2d[0..<nx*ny, i] = try dailyFile.readAll()
+            data2d[0..<nx*ny, i] = try dailyFile.read()
         }
         logger.info("Update om database")
         try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
@@ -261,14 +262,17 @@ struct GloFasDownloader: AsyncCommand {
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()
             //try grib2d.array.writeNetcdf(filename: "\(downloadDir)glofas_\(date).nc")
-           
-            try OmFileWriter(dim0: ny*nx, dim1: 1, chunk0: nLocationChunk, chunk1: 1).write(file: dailyFile, compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
+            
+            let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
+            try writer.write(file: dailyFile, compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
         }
     }
     
     /// Download and convert entire year to yearly files
     func downloadYear(application: Application, year: Int, cdskey: String, domain: GloFasDomain) async throws {
-        let logger = application.logger
+        fatalError("yearly GloFas download not implemented anymore")
+        
+        /*let logger = application.logger
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         let gribFile = "\(downloadDir)glofasv4_\(year).grib"
@@ -338,7 +342,7 @@ struct GloFasDownloader: AsyncCommand {
                 }
             }
             return ArraySlice(fasttime.data)
-        })
+        })*/
     }
 }
 
