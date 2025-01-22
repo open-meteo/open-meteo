@@ -58,6 +58,14 @@ enum OmFileManagerReadable: Hashable {
         return try OmFileReader(file: file)
     }
     
+    func openRead2() throws -> OmFileReader2<MmapFile>? {
+        let file = getFilePath()
+        guard FileManager.default.fileExists(atPath: file) else {
+            return nil
+        }
+        return try OmFileReader2(file: file)
+    }
+    
     func exists() -> Bool {
         let file = getFilePath()
         return FileManager.default.fileExists(atPath: file)

@@ -204,7 +204,9 @@ struct OmFileSplitter {
             guard yRange.count == 1 || xRange.count == nx else {
                 fatalError("chunk dimensions need to be either parts of X or a mutliple or X")
             }
-            let locationRange = (Int(yRange.lowerBound) * nx + Int(xRange.lowerBound)) ..< (Int(yRange.upperBound - 1) * nx + Int(xRange.lowerBound))
+            let start = Int(yRange.lowerBound) * nx + Int(xRange.lowerBound)
+            let count = Int(yRange.count * xRange.count)
+            let locationRange = start ..< start+count
             let dataRange = locationRange.multiply(array2d.nTime)
             return array2d.data[dataRange]
         }
@@ -489,14 +491,8 @@ extension OmFileSplitter {
     /// Prepare a write to store individual timesteps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
     static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriter {
-        if OpenMeteo.generteOmFilesVersion3 {
-            /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
-            let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
-            return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
-        }
-        /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
-        return OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+        let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
+        return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
     }
     
     static func calculateSpatialXYChunk(domain: GenericDomain, nMembers: Int) -> (y: Int, x: Int) {
