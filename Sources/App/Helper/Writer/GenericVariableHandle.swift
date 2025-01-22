@@ -320,7 +320,7 @@ extension VariablePerMemberStorage {
         try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         #endif
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: elevationFile.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+        try elevation.writeOmFile2D(file: elevationFile.getFilePath(), grid: domain.grid, createNetCdf: false)
     }
 }
 

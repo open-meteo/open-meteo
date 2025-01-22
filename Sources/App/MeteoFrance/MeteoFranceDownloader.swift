@@ -125,7 +125,7 @@ struct MeteoFranceDownload: AsyncCommand {
         //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         //message.dumpAttributes()
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: grib2d.array.data)
+        try grib2d.array.data.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
     }
     
     /// Temporarily keep those varibles to derive others

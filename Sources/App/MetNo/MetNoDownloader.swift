@@ -98,7 +98,7 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
             logger.info("Writing elevation file")
-            try OmFileWriter(dim0: ny, dim1: nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: altitude)
+            try altitude.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
         }
         
         /// Verify projection and grid coordinates

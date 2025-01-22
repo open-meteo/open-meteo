@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import SwiftNetCDF
 
 
 /// Read any time from multiple files
@@ -521,5 +522,56 @@ extension OmFileWriter {
             return ArraySlice(all)
         })
         return fn
+    }
+}
+
+
+extension Array where Element == Float {
+    /// Write a given array as a 2D om file
+    func writeOmFile(file: String, dimensions: [Int], chunks: [Int], compression: CompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
+        guard !FileManager.default.fileExists(atPath: file) else {
+            fatalError("File exists already \(file)")
+        }
+        
+        guard dimensions.reduce(1, *) == self.count else {
+            fatalError(#function + ": Array size \(self.count) does not match dimensions \(dimensions)")
+        }
+        let tempFile = file + "~"
+        // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
+        FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
+        try FileManager.default.removeItemIfExists(at: tempFile)
+        let writeFn = try FileHandle.createNewFile(file: tempFile)
+        let writeFile = OmFileWriter2(fn: writeFn, initialCapacity: 4*1024)
+        let writer = try writeFile.prepareArray(
+            type: Float.self,
+            dimensions: dimensions.map(UInt64.init),
+            chunkDimensions: chunks.map(UInt64.init),
+            compression: compression,
+            scale_factor: scalefactor,
+            add_offset: 0
+        )
+        try writer.writeData(array: self)
+        let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
+        try writeFile.writeTrailer(rootVariable: root)
+        try writeFn.close()
+        
+        // Overwrite existing file, with newly created
+        try FileManager.default.moveFileOverwrite(from: tempFile, to: file)
+        
+        if createNetCdf {
+            let ncPath = file.replacingOccurrences(of: ".om", with: ".nc")
+            let ncFile = try NetCDF.create(path: ncPath, overwriteExisting: true)
+            let ncDimensions = try dimensions.enumerated().map {
+                try ncFile.createDimension(name: "DIM\($0.offset)", length: $0.element)
+            }
+            var variable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: ncDimensions)
+            try variable.write(self)
+        }
+    }
+    
+    /// Write a spatial om file using grid dimensions and 20x20 chunks. Mostly used to write elevation files
+    func writeOmFile2D(file: String, grid: Gridable, chunk0: Int = 20, chunk1: Int = 20, compression: CompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
+        let chunk0 = Swift.min(grid.ny, 20)
+        try writeOmFile(file: file, dimensions: [grid.ny, grid.nx], chunks: [chunk0, 400/chunk0], compression: compression, scalefactor: scalefactor, createNetCdf: createNetCdf)
     }
 }

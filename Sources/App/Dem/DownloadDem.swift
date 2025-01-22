@@ -175,8 +175,7 @@ struct DownloadDemCommand: AsyncCommand {
                         let data = try readNc(file: ncTemp)
                         try FileManager.default.removeItem(atPath: ncTemp)
 
-
-                        try OmFileWriter(dim0: data.dimensions[0], dim1: data.dimensions[1], chunk0: 20, chunk1: 20).write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data.data)
+                        try data.data.writeOmFile(file: omFile, dimensions: [data.dimensions[0], data.dimensions[1]], chunks: [20, 20])
                     }
                 }
             }
@@ -219,7 +218,7 @@ struct DownloadDemCommand: AsyncCommand {
 
                     //let a2 = Array2DFastSpace(data: line, nLocations: 1200*360*px, nTime: 1)
                     //try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
-                    try OmFileWriter(dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60).write(file: file.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: line)
+                    try line.writeOmFile(file: file.getFilePath(), dimensions: [1200, px*360], chunks: [60, 60])
                 }
             }
 

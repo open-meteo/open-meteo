@@ -303,7 +303,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let logger = application.logger
         
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-        let downloadFile = "\(domain.downloadDirectory)download.nc"
+        //let downloadFile = "\(domain.downloadDirectory)download.nc"
         
         let forecastHours = forecastHours ?? domain.forecastHours
         let date = run.iso8601_YYYY_MM_dd

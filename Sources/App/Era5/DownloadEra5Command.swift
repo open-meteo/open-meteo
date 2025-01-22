@@ -333,11 +333,8 @@ struct DownloadEra5Command: AsyncCommand {
             fatalError("missing elevation in grib")
         }
         
-        let chunk0 = min(domain.grid.ny, 20)
-        let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
-        
         if let soilType {
-            try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: soilType)
+            try soilType.writeOmFile2D(file: domain.soilTypeFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
         }
         
         // Set all sea grid points to -999
@@ -347,14 +344,8 @@ struct DownloadEra5Command: AsyncCommand {
                 elevation[i] = -999
             }
         }
-        
-        if createNetCdf {
-            let file = domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc")
-            let elevation = Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny)
-            try elevation.writeNetcdf(filename: file)
-        }
 
-        try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+        try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
     }
     
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {

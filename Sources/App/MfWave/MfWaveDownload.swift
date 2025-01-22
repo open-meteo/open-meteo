@@ -176,7 +176,7 @@ struct MfWaveDownload: AsyncCommand {
                                     return $0.isNaN ? Float(0) : -999
                                 }
                                 try domain.surfaceElevationFileOm.createDirectory()
-                                try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+                                try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                             }
                             let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
                             // Note: skipHour0 needs still to be set for solar interpolation
@@ -213,7 +213,7 @@ struct MfWaveDownload: AsyncCommand {
                                 return $0.isNaN ? Float(0) : -999
                             }
                             try domain.surfaceElevationFileOm.createDirectory()
-                            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+                            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                         }
                         let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
                         // Note: skipHour0 needs still to be set for solar interpolation

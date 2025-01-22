@@ -260,7 +260,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
         //try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: orog.array.data)
+        try orog.array.data.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
     }
     
     /// Download CMA data.
