@@ -42,11 +42,11 @@ final class BenchmarkCommand: Command {
             })
         }
         
-        try run.measure("Compression in memory, large chunks", 191) {
+        /*try run.measure("Compression in memory, large chunks", 191) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 1024, chunk1: 1024).writeInMemory(compressionType: .pfor_delta2d_int16, scalefactor: 20, all: data)
-        }
+        }*/
         
-        let compressed = try run.measure("Compression in memory, small chunks", 199) {
+        /*let compressed = try run.measure("Compression in memory, small chunks", 199) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 8, chunk1: 128).writeInMemory(compressionType: .pfor_delta2d_int16, scalefactor: 20, all: data)
         }
         let sizeMbCompressed = (compressed.count/1024/1024)
@@ -66,7 +66,7 @@ final class BenchmarkCommand: Command {
         try run.measure("Decompress from file, small chunks", 46) {
             let read = try OmFileReader(file: file)
             return try read.readAll()
-        }
+        }*/
         
         
         let exradTime = TimerangeDt(start: Timestamp(1900,1,1), to: Timestamp(2000,1,1), dtSeconds: 3600)

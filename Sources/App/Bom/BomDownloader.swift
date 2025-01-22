@@ -610,7 +610,7 @@ struct DownloadBomCommand: AsyncCommand {
     }
 }
 
-extension OmFileWriter {
+extension OmFileWriterHelper {
     fileprivate func write(domain: BomDomain, variable: BomVariable, data: [Float]) throws -> FileHandle {
         guard data.count == domain.grid.count else {
             fatalError("invalid data array size")

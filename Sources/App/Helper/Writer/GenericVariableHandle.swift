@@ -260,7 +260,7 @@ actor VariablePerMemberStorage<V: Hashable> {
 extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members an timesteps.
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriter, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriterHelper, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .flatMap({ (t, handles) -> [GenericVariableHandle] in

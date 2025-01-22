@@ -1,6 +1,5 @@
 import Foundation
 import OmFileFormat
-import SwiftNetCDF
 
 
 /// Read any time from multiple files
@@ -134,10 +133,6 @@ struct OmFileSplitter {
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
     
-    /**
-     TODO:
-     - `level` implementation could be moved to a 3D file level
-     */
     func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
@@ -487,13 +482,12 @@ extension OmFileReader {
     }
 }
 
-
 extension OmFileSplitter {
-    /// Prepare a write to store individual timesteps as spatial encoded files
+    /// Prepare a write to store individual time-steps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
-    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriter {
+    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriterHelper {
         let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
-        return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
+        return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [chunks.y, chunks.x])
     }
     
     static func calculateSpatialXYChunk(domain: GenericDomain, nMembers: Int) -> (y: Int, x: Int) {
@@ -506,72 +500,5 @@ extension OmFileSplitter {
         let ychunks = max(1, min(ny, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / nMembers / xchunks))
         print("Chunks [\(ychunks),\(xchunks)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         return (ychunks, xchunks)
-    }
-}
-
-
-extension OmFileWriter {
-    /// Write all data at once without any streaming
-    /// Creates a temporary file and returns only a file handle
-    public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
-        let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
-        try FileManager.default.removeItemIfExists(at: file)
-        let fn = try FileHandle.createNewFile(file: file, exclusive: true)
-        try FileManager.default.removeItem(atPath: file)
-        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, fsync: false, supplyChunk: { range in
-            return ArraySlice(all)
-        })
-        return fn
-    }
-}
-
-
-extension Array where Element == Float {
-    /// Write a given array as a 2D om file
-    func writeOmFile(file: String, dimensions: [Int], chunks: [Int], compression: CompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
-        guard !FileManager.default.fileExists(atPath: file) else {
-            fatalError("File exists already \(file)")
-        }
-        
-        guard dimensions.reduce(1, *) == self.count else {
-            fatalError(#function + ": Array size \(self.count) does not match dimensions \(dimensions)")
-        }
-        let tempFile = file + "~"
-        // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
-        FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
-        try FileManager.default.removeItemIfExists(at: tempFile)
-        let writeFn = try FileHandle.createNewFile(file: tempFile)
-        let writeFile = OmFileWriter2(fn: writeFn, initialCapacity: 4*1024)
-        let writer = try writeFile.prepareArray(
-            type: Float.self,
-            dimensions: dimensions.map(UInt64.init),
-            chunkDimensions: chunks.map(UInt64.init),
-            compression: compression,
-            scale_factor: scalefactor,
-            add_offset: 0
-        )
-        try writer.writeData(array: self)
-        let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
-        try writeFile.writeTrailer(rootVariable: root)
-        try writeFn.close()
-        
-        // Overwrite existing file, with newly created
-        try FileManager.default.moveFileOverwrite(from: tempFile, to: file)
-        
-        if createNetCdf {
-            let ncPath = file.replacingOccurrences(of: ".om", with: ".nc")
-            let ncFile = try NetCDF.create(path: ncPath, overwriteExisting: true)
-            let ncDimensions = try dimensions.enumerated().map {
-                try ncFile.createDimension(name: "DIM\($0.offset)", length: $0.element)
-            }
-            var variable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: ncDimensions)
-            try variable.write(self)
-        }
-    }
-    
-    /// Write a spatial om file using grid dimensions and 20x20 chunks. Mostly used to write elevation files
-    func writeOmFile2D(file: String, grid: Gridable, chunk0: Int = 20, chunk1: Int = 20, compression: CompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
-        let chunk0 = Swift.min(grid.ny, 20)
-        try writeOmFile(file: file, dimensions: [grid.ny, grid.nx], chunks: [chunk0, 400/chunk0], compression: compression, scalefactor: scalefactor, createNetCdf: createNetCdf)
     }
 }

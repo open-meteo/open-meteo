@@ -578,7 +578,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
 extension VariablePerMemberStorage {
     /// Sum up rain, snow and graupel for total precipitation
-    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .compactMap({ (t, handles) -> GenericVariableHandle? in

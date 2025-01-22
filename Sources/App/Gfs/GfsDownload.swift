@@ -481,8 +481,8 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 }
 
 extension VariablePerMemberStorage {
-    /// Snowfall is given in percent. Multiply with precipitation to get the amonut. Note: For whatever reason it can be `-50%`.
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+    /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .compactMap({ (t, handles) -> GenericVariableHandle? in
