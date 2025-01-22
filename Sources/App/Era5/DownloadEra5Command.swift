@@ -81,8 +81,9 @@ struct DownloadEra5Command: AsyncCommand {
         }
         
         if signature.calculateBiasField {
-            try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
-            return
+            fatalError("BIAS correction calculation not available anymore")
+            //try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
+            //return
         }
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
@@ -119,7 +120,7 @@ struct DownloadEra5Command: AsyncCommand {
     
     /// Generate seasonal averages for bias corrections for CMIP climate data
     /// They way how `GenericReaderMulti` is used, is not the cleanest, but otherwise daily calculations need to be implemented manually
-    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int) throws {
+    /*func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int) throws {
         logger.info("Calculating bias correction fields")
         
         let binsPerYear = 6
@@ -184,7 +185,7 @@ struct DownloadEra5Command: AsyncCommand {
             })
             progress.finish()
         }
-    }
+    }*/
     
     /**
      Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle

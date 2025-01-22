@@ -45,11 +45,13 @@ struct SatelliteDownloadCommand: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger  = context.application.logger
-        try createImergMaster(logger: logger, domain: .imerg_daily)
+        fatalError("IMERG downloader not available anymore")
+        
+        //let logger  = context.application.logger
+        //try createImergMaster(logger: logger, domain: .imerg_daily)
     }
     
-    func createImergMaster(logger: Logger, domain: SatelliteDomain) throws {
+    /*func createImergMaster(logger: Logger, domain: SatelliteDomain) throws {
         guard let master = domain.masterTimeRange else {
             fatalError("no master file defined")
         }
@@ -71,10 +73,10 @@ struct SatelliteDownloadCommand: AsyncCommand {
         if !FileManager.default.fileExists(atPath: domain.getBiasCorrectionFile(for: SatelliteVariable.precipitation_sum.omFileName.file).getFilePath()) {
             try generateBiasCorrectionFields(logger: logger, domain: domain, variables: [.precipitation_sum], time: masterTime)
         }
-    }
+    }*/
     
     /// Generate seasonal averages for bias corrections
-    func generateBiasCorrectionFields(logger: Logger, domain: SatelliteDomain, variables: [SatelliteVariable], time: TimerangeDt) throws {
+    /*func generateBiasCorrectionFields(logger: Logger, domain: SatelliteDomain, variables: [SatelliteVariable], time: TimerangeDt) throws {
         logger.info("Calculating bias correction fields")
         let binsPerYear = 6
         let reader = OmFileSplitter(domain)
@@ -151,7 +153,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
             progress.add(1)
         }
         progress.finish()
-    }
+    }*/
 }
 
 enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {

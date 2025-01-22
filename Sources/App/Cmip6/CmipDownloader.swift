@@ -889,7 +889,9 @@ struct DownloadCmipCommand: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
+        fatalError("CMIP downloader not available anymore du to file format changes")
+        
+        /*let logger = context.application.logger
         let deleteNetCDF = !signature.keepNetCdf
         let years = signature.years
         
@@ -1207,11 +1209,11 @@ struct DownloadCmipCommand: AsyncCommand {
                 .write(logger: logger, file: masterFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
         }
         
-        try generateBiasCorrectionFields(logger: logger, domain: domain, variables: variables)
+        try generateBiasCorrectionFields(logger: logger, domain: domain, variables: variables)*/
     }
     
     /// Generate seasonal averages for bias corrections
-    func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
+    /*func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
         logger.info("Calculating bias correction fields")
         let binsPerYear = 6
         let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
@@ -1239,10 +1241,10 @@ struct DownloadCmipCommand: AsyncCommand {
             })
             progress.finish()
         }
-    }
+    }*/
 }
 
-extension Array2DFastTime {
+/*extension Array2DFastTime {
     fileprivate mutating func interpolateAndAggregate(dt6h: Int, variable: Cmip6Variable, aggregate: Cmip6Variable.TimeTypeAggregate) {
         let time6h = TimerangeDt(start: Timestamp(0), to: Timestamp(self.nTime * dt6h), dtSeconds: dt6h)
         let time1h = time6h.with(dtSeconds: 3600)
@@ -1374,4 +1376,4 @@ extension Curl {
             }
         }
     }
-}
+}*/
