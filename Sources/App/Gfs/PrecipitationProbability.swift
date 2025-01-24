@@ -170,7 +170,7 @@ extension Array where Element == GenericVariableHandle {
                 let threshold = Float(0.1) * Float(dt)
                 for d in handles {
                     let reader = try d.makeReader()
-                    for (i, value) in try reader.readAll().enumerated() {
+                    for (i, value) in try reader.read().enumerated() {
                         if value >= threshold {
                             precipitationProbability01[i] += 1
                         }

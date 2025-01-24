@@ -18,8 +18,8 @@ struct GenericVariableHandle {
         self.fn = fn
     }
     
-    public func makeReader() throws -> OmFileReader<MmapFile> {
-        try OmFileReader(fn: fn)
+    public func makeReader() throws -> OmFileReader2Array<MmapFile, Float> {
+        try OmFileReader2(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
     }
     
     /// Process concurrently
@@ -125,7 +125,7 @@ struct GenericVariableHandle {
                 continue
             }
             
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+            let readers: [(time: Timestamp, reader: [(fn: OmFileReader2Array<MmapFile, Float>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
                 return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
             
@@ -157,7 +157,7 @@ struct GenericVariableHandle {
                 ])
                 for reader in readers {
                     for r in reader.reader {
-                        let data = try r.fn.readAll()
+                        let data = try r.fn.read()
                         try ncVariable.write(data, offset: [time.index(of: reader.time)!, r.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
                     }
                 }
@@ -175,7 +175,7 @@ struct GenericVariableHandle {
                             logger.warning("Coult not get reader for member \(member)")
                             continue
                         }
-                        try r.fn.reader.read(into: &readTemp, range: [yRange, xRange])
+                        try r.fn.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, i, time.index(of: reader.time)!] = readTemp[0..<nLoc]
                     }
                 }
