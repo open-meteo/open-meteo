@@ -355,15 +355,17 @@ struct OmFileSplitter {
     }
 }
 
-extension OmFileReader {
+extension OmFileReader2Array where OmType == Float {
     /// Read data from file. Switch between old legacy files and new multi dimensional files.
-    /// Note: `nTime` is the output array nTime. It is now the file nTime!
+    /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// TODO: nMembers variable is wrong if called via API controller. Aways 1
     func read3D(into: inout [Float], ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) throws {
-        let dimensions = reader.getDimensions()
+        let dimensions = self.getDimensions()
         switch dimensions.count {
         case 2:
             // Legacy files use 2 dimensions and flatten XY coordinates
+            let dim0 = Int(dimensions[0])
+            //let dim1 = Int(dimensions[1])
             guard dim0 % (nx*ny) == 0 else {
                 return // in case dimensions got change and do not agree anymore, ignore this file
             }
@@ -375,8 +377,14 @@ extension OmFileReader {
             guard level < nLevels else {
                 return
             }
-            let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try read(into: &into, arrayDim1Range: timeOffsets.array, arrayDim1Length: nTime, dim0Slow: dim0, dim1: timeOffsets.file)
+            let nLocations = UInt64(location.count)
+            let dim0Range = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
+            try read(
+                into: &into,
+                range: [dim0Range.toUInt64(), timeOffsets.file.toUInt64()],
+                intoCubeOffset: [0, UInt64(timeOffsets.array.lowerBound)],
+                intoCubeDimension: [nLocations, UInt64(nTime)]
+            )
         case 3:
             // File uses dimensions [ny,nx,ntime]
             guard ny == dimensions[0], nx == dimensions[1] else {
@@ -387,7 +395,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, fileTime]
             do {
-                try reader.read(
+                try read(
                     into: &into,
                     range: range,
                     intoCubeOffset: [0, 0, UInt64(timeOffsets.array.lowerBound)],
@@ -409,7 +417,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, l, fileTime]
             do {
-                try reader.read(
+                try read(
                     into: &into,
                     range: range,
                     intoCubeOffset: [0, 0, 0, UInt64(timeOffsets.array.lowerBound)],
@@ -425,13 +433,15 @@ extension OmFileReader {
     }
     
     /// Prefetch data for fast access. Switch between old legacy files and new multi dimensional files
-    /// Note: `nTime` is the output array nTime. It is now the file nTime!
+    /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// /// TODO: nMembers variable is wrong if called via API controller. Aways 1
     func willNeed3D(ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) throws {
-        let dimensions = reader.getDimensions()
+        let dimensions = self.getDimensions()
         switch dimensions.count {
         case 2:
             // Legacy files use 2 dimensions and flatten XY coordinates
+            let dim0 = Int(dimensions[0])
+            //let dim1 = Int(dimensions[1])
             guard dim0 % (nx*ny) == 0 else {
                 return // in case dimensions got change and do not agree anymore, ignore this file
             }
@@ -443,8 +453,8 @@ extension OmFileReader {
             guard level < nLevels else {
                 return
             }
-            let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try willNeed(dim0Slow: dim0, dim1: timeOffsets.file)
+            let dim0Range = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
+            try willNeed(range: [dim0Range.toUInt64(), timeOffsets.file.toUInt64()])
         case 3:
             // File uses dimensions [ny,nx,ntime]
             guard ny == dimensions[0], nx == dimensions[1] else {
@@ -455,7 +465,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, fileTime]
             do {
-                try reader.willNeed(range: range)
+                try willNeed(range: range)
             } catch OmFileFormatSwiftError.omDecoder(let error) {
                 print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
@@ -471,7 +481,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, l, fileTime]
             do {
-                try reader.willNeed(range: range)
+                try willNeed(range: range)
             } catch OmFileFormatSwiftError.omDecoder(let error) {
                 print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
@@ -500,5 +510,12 @@ extension OmFileSplitter {
         let ychunks = max(1, min(ny, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / nMembers / xchunks))
         print("Chunks [\(ychunks),\(xchunks)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         return (ychunks, xchunks)
+    }
+}
+
+
+extension Range where Bound == Int {
+    func toUInt64() -> Range<UInt64> {
+        .init(uncheckedBounds: (UInt64(lowerBound), UInt64(upperBound)))
     }
 }

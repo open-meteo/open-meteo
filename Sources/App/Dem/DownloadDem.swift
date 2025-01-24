@@ -55,10 +55,12 @@ struct Dem90: GenericDomain {
             // file not available
             return .nan
         }
-        let latrow = Int(lat * 1200 + 90 * 1200) % 1200
+        let latrow = UInt64(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
-        let lonrow = Int((lon + 180) * Float(px))
-        return try om.read(dim0Slow: latrow..<latrow+1, dim1: lonrow..<lonrow+1)[0]
+        let lonrow = UInt64((lon + 180) * Float(px))
+        var value: Float = .nan
+        try om.read(into: &value, range: [latrow..<latrow+1, lonrow..<lonrow+1])
+        return value
     }
 
     /// Get the longitude resolution on a given latitude

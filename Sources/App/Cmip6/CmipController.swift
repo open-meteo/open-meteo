@@ -254,7 +254,18 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     /// Get Bias correction field from era5-land or era5
     func getEra5BiasCorrectionWeights(for variable: Cmip6VariableOrDerived) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
         if let readerEra5Land, let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue) {
-            let weights = try referenceWeightFile.read(dim0Slow: readerEra5Land.position..<readerEra5Land.position+1, dim1: 0..<referenceWeightFile.dim1)
+            let nTime = Int(referenceWeightFile.getDimensions().last!)
+            var weights = [Float](repeating: .nan, count: nTime)
+            try referenceWeightFile.read3D(
+                into: &weights,
+                ny: readerEra5Land.domain.grid.ny,
+                nx: readerEra5Land.domain.grid.nx,
+                nTime: nTime,
+                nMembers: 1,
+                location: readerEra5Land.position..<readerEra5Land.position+1,
+                level: 0,
+                timeOffsets: (file: 0..<nTime, array: 0..<nTime)
+            )
             if !weights.containsNaN() {
                 return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation.numeric)
             }
@@ -262,7 +273,18 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         guard let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try readerEra5.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(readerEra5.domain)")
         }
-        let weights = try referenceWeightFile.read(dim0Slow: readerEra5.position..<readerEra5.position+1, dim1: 0..<referenceWeightFile.dim1)
+        let nTime = Int(referenceWeightFile.getDimensions().last!)
+        var weights = [Float](repeating: .nan, count: nTime)
+        try referenceWeightFile.read3D(
+            into: &weights,
+            ny: readerEra5.domain.grid.ny,
+            nx: readerEra5.domain.grid.nx,
+            nTime: nTime,
+            nMembers: 1,
+            location: readerEra5.position..<readerEra5.position+1,
+            level: 0,
+            timeOffsets: (file: 0..<nTime, array: 0..<nTime)
+        )
         return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation.numeric)
     }
     
@@ -274,7 +296,19 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
-        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
+        let nTime = Int(controlWeightFile.getDimensions().last!)
+        var weights = [Float](repeating: .nan, count: nTime)
+        try controlWeightFile.read3D(
+            into: &weights,
+            ny: reader.domain.grid.ny,
+            nx: reader.domain.grid.nx,
+            nTime: nTime,
+            nMembers: 1,
+            location: reader.reader.position..<reader.reader.position+1,
+            level: 0,
+            timeOffsets: (file: 0..<nTime, array: 0..<nTime)
+        )
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
         let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
         referenceWeights.weights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
@@ -378,12 +412,24 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
-        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
+        let nTime = Int(controlWeightFile.getDimensions().last!)
+        var weights = [Float](repeating: .nan, count: nTime)
+        try controlWeightFile.read3D(
+            into: &weights,
+            ny: reader.domain.grid.ny,
+            nx: reader.domain.grid.nx,
+            nTime: nTime,
+            nMembers: 1,
+            location: reader.reader.position..<reader.reader.position+1,
+            level: 0,
+            timeOffsets: (file: 0..<nTime, array: 0..<nTime)
+        )
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
         
         guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
         }
-        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<referenceWeightFile.dim1))
+        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<Int(referenceWeightFile.getDimensions().last!)))
         
         referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
@@ -469,12 +515,38 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
-        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: try controlWeightFile.read(dim0Slow: reader.reader.position..<reader.reader.position+1, dim1: 0..<controlWeightFile.dim1))
+        let nTime = Int(controlWeightFile.getDimensions().last!)
+        var weights = [Float](repeating: .nan, count: nTime)
+        try controlWeightFile.read3D(
+            into: &weights,
+            ny: reader.domain.grid.ny,
+            nx: reader.domain.grid.nx,
+            nTime: nTime,
+            nMembers: 1,
+            location: reader.reader.position..<reader.reader.position+1,
+            level: 0,
+            timeOffsets: (file: 0..<nTime, array: 0..<nTime)
+        )
+        let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
+        
+        
         
         guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
         }
-        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.read(dim0Slow: referencePosition..<referencePosition+1, dim1: 0..<referenceWeightFile.dim1))
+        let nTime2 = Int(referenceWeightFile.getDimensions().last!)
+        var weights2 = [Float](repeating: .nan, count: nTime)
+        try referenceWeightFile.read3D(
+            into: &weights2,
+            ny: referenceDomain.grid.ny,
+            nx: referenceDomain.grid.nx,
+            nTime: nTime2,
+            nMembers: 1,
+            location: referencePosition..<referencePosition+1,
+            level: 0,
+            timeOffsets: (file: 0..<nTime2, array: 0..<nTime2)
+        )
+        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights2)
         
         referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {

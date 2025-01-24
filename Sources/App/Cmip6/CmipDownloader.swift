@@ -282,7 +282,7 @@ extension GenericDomain {
         return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil, ensembleMember: 0, previousDay: 0)
     }
     
-    func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
+    func openBiasCorrectionFile(for variable: String) throws -> OmFileReader2Array<MmapFile, Float>? {
         return try OmFileManager.get(getBiasCorrectionFile(for: variable))
     }
 }
