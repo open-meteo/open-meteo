@@ -41,7 +41,7 @@ struct ConvertOmCommand: Command {
             return
         }
         
-        guard let om = try OmFileReader2(file: signature.infile).asArray(of: Float.self) else {
+        guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
             fatalError("Not a float array")
         }
         let dimensions = om.getDimensions()
@@ -94,7 +94,7 @@ struct ConvertOmCommand: Command {
     /// Read om file and write it as version 3 and reshape data to proper 3d files
     func convertOmv3(src: String, dest: String, grid: Gridable) throws {
         // Read data from the input OM file
-        guard let readfile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
+        guard let readfile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
               let reader = readfile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(src)")
         }
@@ -142,7 +142,7 @@ struct ConvertOmCommand: Command {
         let fileHandle = try FileHandle.createNewFile(file: dest)
 
         // Write the compressed data to the output OM file
-        let fileWriter = OmFileWriter2(fn: fileHandle, initialCapacity: 1024 * 1024 * 10) // Initial capacity of 10MB
+        let fileWriter = OmFileWriter(fn: fileHandle, initialCapacity: 1024 * 1024 * 10) // Initial capacity of 10MB
         print("created writer")
 
         let writer = try fileWriter.prepareArray(
@@ -194,7 +194,7 @@ struct ConvertOmCommand: Command {
         print("Finished writing")
         
         /*// Verify the output
-        guard let verificationFile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
+        guard let verificationFile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
             let verificationReader = verificationFile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(dest)")
         }

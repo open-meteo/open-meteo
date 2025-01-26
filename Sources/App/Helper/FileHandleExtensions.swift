@@ -28,13 +28,16 @@ extension FileHandle {
 }
 
 
+public enum FileHandleError: Error {
+    case cannotMoveFile(from: String, to: String, errno: Int32, error: String)
+}
 
 extension FileManager {
     /// Rename file and replace if `to` already exists. https://www.gnu.org/software/libc/manual/html_node/Renaming-Files.html
     public func moveFileOverwrite(from: String, to: String) throws {
         guard rename(from, to) != -1 else {
             let error = String(cString: strerror(errno))
-            throw OmFileFormatSwiftError.cannotMoveFile(from: from, to: to, errno: errno, error: error)
+            throw FileHandleError.cannotMoveFile(from: from, to: to, errno: errno, error: error)
         }
     }
     

@@ -226,8 +226,8 @@ struct OmFileSplitter {
         }
         
         struct WriterPerStep {
-            let read: OmFileReader2<MmapFile>?
-            let writeFile: OmFileWriter2<FileHandle>
+            let read: OmFileReader<MmapFile>?
+            let writeFile: OmFileWriter<FileHandle>
             let write: OmFileWriterArray<Float, FileHandle>
             let writeFn: FileHandle
             let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
@@ -251,9 +251,9 @@ struct OmFileSplitter {
                 FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
                 try FileManager.default.removeItemIfExists(at: tempFile)
                 let fn = try FileHandle.createNewFile(file: tempFile)
-                let omRead = try? OmFileReader2(file: readFile.getFilePath())
+                let omRead = try? OmFileReader(file: readFile.getFilePath())
                 
-                let writeFile = OmFileWriter2(fn: fn, initialCapacity: 1024*1024)
+                let writeFile = OmFileWriter(fn: fn, initialCapacity: 1024*1024)
                 let writer = try writeFile.prepareArray(
                     type: Float.self,
                     dimensions: nMembers <= 1 ? [UInt64(ny), UInt64(nx), UInt64(nTimePerFile)] : [UInt64(ny), UInt64(nx), UInt64(nMembers), UInt64(nTimePerFile)],
@@ -355,7 +355,7 @@ struct OmFileSplitter {
     }
 }
 
-extension OmFileReader2Array where OmType == Float {
+extension OmFileReaderArray where OmType == Float {
     /// Read data from file. Switch between old legacy files and new multi dimensional files.
     /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// TODO: nMembers variable is wrong if called via API controller. Aways 1

@@ -86,7 +86,7 @@ struct MigrationCommand: AsyncCommand {
         FileManager.default.waitIfFileWasRecentlyModified(at: temporary)
         try FileManager.default.removeItemIfExists(at: temporary)
         // Read data from the input OM file
-        guard let readfile = try? OmFileReader2(file: file) else {
+        guard let readfile = try? OmFileReader(file: file) else {
             logger.warning("Failed to open file: \(file)")
             return
         }
@@ -112,7 +112,7 @@ struct MigrationCommand: AsyncCommand {
                 return
             }
             let writeFn = try FileHandle.createNewFile(file: temporary)
-            let fileWriter = OmFileWriter2(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
+            let fileWriter = OmFileWriter(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
             let writer = try fileWriter.prepareArray(
                 type: Float.self,
                 dimensions: dimensions,
@@ -132,7 +132,7 @@ struct MigrationCommand: AsyncCommand {
             try writeFn.close()
             
             /// Read data again to ensure the written data matches exactly
-            guard let verify = try OmFileReader2(file: temporary).asArray(of: Float.self)?.read() else {
+            guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self)?.read() else {
                 fatalError("Could not read temporary file")
             }
             guard data.isSimilar(verify) else {
@@ -156,7 +156,7 @@ struct MigrationCommand: AsyncCommand {
         }
         
         let writeFn = try FileHandle.createNewFile(file: temporary)
-        let fileWriter = OmFileWriter2(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
+        let fileWriter = OmFileWriter(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
         let writer = try fileWriter.prepareArray(
             type: Float.self,
             dimensions: dimensionsOut,
@@ -206,7 +206,7 @@ struct MigrationCommand: AsyncCommand {
         try writeFn.close()
         
         /// Read data again to ensure the written data matches exactly
-        guard let verify = try OmFileReader2(file: temporary).asArray(of: Float.self) else {
+        guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self) else {
             fatalError("Could not read temporary file")
         }
         let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)), name: "Verify")

@@ -50,23 +50,23 @@ enum OmFileManagerReadable: Hashable {
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
     
-    func openRead() throws -> OmFileReader2Array<MmapFile, Float>? {
+    func openRead() throws -> OmFileReaderArray<MmapFile, Float>? {
         let file = getFilePath()
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
         }
-        guard let reader = try OmFileReader2(file: file).asArray(of: Float.self) else {
+        guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
             return nil
         }
         return reader
     }
     
-    func openRead2() throws -> OmFileReader2<MmapFile>? {
+    func openRead2() throws -> OmFileReader<MmapFile>? {
         let file = getFilePath()
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
         }
-        return try OmFileReader2(file: file)
+        return try OmFileReader(file: file)
     }
     
     func exists() -> Bool {
@@ -74,13 +74,13 @@ enum OmFileManagerReadable: Hashable {
         return FileManager.default.fileExists(atPath: file)
     }
     
-    func openReadCached() throws -> OmFileReader2Array<MmapFile, Float>? {
+    func openReadCached() throws -> OmFileReaderArray<MmapFile, Float>? {
         let fileRel = getRelativeFilePath()
         let file = "\(OpenMeteo.dataDirectory)\(fileRel)"
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
         }
-        guard let reader = try OmFileReader2(file: file).asArray(of: Float.self) else {
+        guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
             return nil
         }
         return reader
@@ -90,28 +90,28 @@ enum OmFileManagerReadable: Hashable {
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 struct OmFileManager {
-    public static var instance = GenericFileManager<OmFileReader2Array<MmapFile, Float>>()
+    public static var instance = GenericFileManager<OmFileReaderArray<MmapFile, Float>>()
     
     private init() {}
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader2Array<MmapFile, Float>? {
+    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReaderArray<MmapFile, Float>? {
         try instance.get(file)
     }
 }
 
-extension OmFileReader2Array: GenericFileManagable where Backend == MmapFile, OmType == Float {
+extension OmFileReaderArray: GenericFileManagable where Backend == MmapFile, OmType == Float {
     func wasDeleted() -> Bool {
-        self.fn.wasDeleted()
+        self.fn.file.wasDeleted()
     }
     
-    static func open(from path: OmFileManagerReadable) throws -> OmFileReader2Array<MmapFile, Float>? {
+    static func open(from path: OmFileManagerReadable) throws -> OmFileReaderArray<MmapFile, Float>? {
         return try path.openReadCached()
     }
 }
 
 
-extension OmFileReader2Array where OmType == Float {
+extension OmFileReaderArray where OmType == Float {
     /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
     public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
         let gridpoint = dim0.gridpoint

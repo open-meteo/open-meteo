@@ -40,6 +40,14 @@ extension Int {
         let fraction = Float(self.moduloPositive(devisor)) / Float(devisor)
         return (self / devisor, fraction)
     }
+    
+    @inlinable func ceil(to toNearest: Int) -> Int {
+        return ((self + toNearest - 1) / toNearest) * toNearest
+    }
+    
+    @inlinable func floor(to toNearest: Int) -> Int {
+        return (self / toNearest) * toNearest
+    }
 }
 
 extension Range where Element == Int {

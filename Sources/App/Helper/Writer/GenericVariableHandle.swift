@@ -18,8 +18,8 @@ struct GenericVariableHandle {
         self.fn = fn
     }
     
-    public func makeReader() throws -> OmFileReader2Array<MmapFile, Float> {
-        try OmFileReader2(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
+    public func makeReader() throws -> OmFileReaderArray<MmapFile, Float> {
+        try OmFileReader(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
     }
     
     /// Process concurrently
@@ -125,7 +125,7 @@ struct GenericVariableHandle {
                 continue
             }
             
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReader2Array<MmapFile, Float>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+            let readers: [(time: Timestamp, reader: [(fn: OmFileReaderArray<MmapFile, Float>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
                 return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
             

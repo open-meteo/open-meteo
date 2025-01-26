@@ -205,7 +205,7 @@ struct MeteoFranceDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let grid = domain.grid
+        //let grid = domain.grid
         var handles = [GenericVariableHandle]()
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         

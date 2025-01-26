@@ -34,7 +34,7 @@ final class BenchmarkCommand: Command {
             let _ = SolarPositionAlgorithm.sunPosition(timerange: TimerangeDt(start: Timestamp(1950,1,1), to: Timestamp(2000,1,1), dtSeconds: 3600))
         }
                 
-        let sizeMb = 128
+        /*let sizeMb = 128
         let data = run.measure("Generating dummy temperature timeseries (\(sizeMb) MB)", 272) {
             return (0..<1024*1024/4*sizeMb).map({
                 let x = Float($0)
@@ -42,7 +42,7 @@ final class BenchmarkCommand: Command {
             })
         }
         
-        /*try run.measure("Compression in memory, large chunks", 191) {
+        try run.measure("Compression in memory, large chunks", 191) {
             try OmFileWriter(dim0: data.count / 1024, dim1: 1024, chunk0: 1024, chunk1: 1024).writeInMemory(compressionType: .pfor_delta2d_int16, scalefactor: 20, all: data)
         }*/
         

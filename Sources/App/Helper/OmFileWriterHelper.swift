@@ -31,7 +31,7 @@ public final class OmFileWriterHelper {
     public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
         let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
         try FileManager.default.removeItemIfExists(at: file)
-        let fn = try FileHandle.createNewFile(file: file, exclusive: true)
+        let fn = try FileHandle.createNewFile(file: file)
         try FileManager.default.removeItem(atPath: file)
         try all.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: scalefactor)
         return fn
@@ -72,7 +72,7 @@ extension Array where Element == Float {
         guard dimensions.reduce(1, *) == self.count else {
             fatalError(#function + ": Array size \(self.count) does not match dimensions \(dimensions)")
         }
-        let writeFile = OmFileWriter2(fn: fn, initialCapacity: 4*1024)
+        let writeFile = OmFileWriter(fn: fn, initialCapacity: 4*1024)
         let writer = try writeFile.prepareArray(
             type: Float.self,
             dimensions: dimensions.map(UInt64.init),

@@ -233,7 +233,7 @@ struct GloFasDownloader: AsyncCommand {
             logger.info("Reading \(date.format_YYYYMMdd)")
             let file = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
             guard FileManager.default.fileExists(atPath: file),
-                    let dailyFile = try OmFileReader2(file: file).asArray(of: Float.self)
+                    let dailyFile = try OmFileReader(file: file).asArray(of: Float.self)
             else {
                 continue
             }
@@ -248,7 +248,7 @@ struct GloFasDownloader: AsyncCommand {
         let ny = domain.grid.ny
         let nx = domain.grid.nx
         // 21k locations -> 30MB chunks for 1 year
-        let nLocationChunk = nx * ny / 1000
+        //let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
         
         try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in

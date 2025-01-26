@@ -839,7 +839,7 @@ struct DownloadEra5Command: AsyncCommand {
             FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
             try FileManager.default.removeItemIfExists(at: tempFile)
             let writeFn = try FileHandle.createNewFile(file: tempFile)
-            let writeFile = OmFileWriter2(fn: writeFn, initialCapacity: 1024*1024)
+            let writeFile = OmFileWriter(fn: writeFn, initialCapacity: 1024*1024)
             let writer = try writeFile.prepareArray(
                 type: Float.self,
                 dimensions: [UInt64(ny), UInt64(nx), UInt64(nTimePerFile)],
@@ -850,13 +850,13 @@ struct DownloadEra5Command: AsyncCommand {
             )
             
             let existingFile = forceUpdate ? try writeFilePath.openRead2() : nil
-            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader2<MmapFile>? in
+            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
                 if !FileManager.default.fileExists(atPath: omFile) {
                     return nil
                 }
-                return try OmFileReader2(file: omFile)
+                return try OmFileReader(file: omFile)
             }
             
             /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
