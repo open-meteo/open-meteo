@@ -24,11 +24,6 @@ struct OpenMeteo {
         return dataDirectory
     }()
     
-    /// True if version 3 Om files should be generated. This is incompatible with older version.
-    static var generteOmFilesVersion3: Bool {
-        return Environment.get("VERSION3") == "TRUE"
-    }
-    
     /// Maximum number of locations for multi point requests
     static var numberOfLocationsMaximum: Int = {
         return (Environment.get("LOCATIONS_LIMIT").map(Int.init) ?? 1000) ?? 1000
