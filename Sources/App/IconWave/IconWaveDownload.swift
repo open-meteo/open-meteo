@@ -99,10 +99,8 @@ struct DownloadIconWaveCommand: AsyncCommand {
                         /// `NaN` out of domain, `-999` sea grid point
                         elevation[i] = elevation[i].isNaN ? .nan : -999
                     }
-                    //let data2d = Array2DFastSpace(data: elevation, nLocations: elevation.count, nTime: 1)
-                    //try data2d.writeNetcdf(filename: "\(downloadDirectory)elevation.nc", nx: nx, ny: ny)
                     try domain.surfaceElevationFileOm.createDirectory()
-                    try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+                    try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                 }
                 
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)

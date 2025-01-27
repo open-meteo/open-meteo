@@ -133,10 +133,6 @@ struct OmFileSplitter {
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
     
-    /**
-     TODO:
-     - `level` implementation could be moved to a 3D file level
-     */
     func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
@@ -192,131 +188,25 @@ struct OmFileSplitter {
     /**
      Write new data to the archived storage and combine it with existint data.
      Updates are done in chunks to keep memory size low. Otherwise ICON update would take 4+ GB memory for just this function.
+     
+     TODO: should use Array3DFastTime
      */
     func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16) throws {
-        
         precondition(array2d.nTime == time.count)
+        precondition(array2d.nLocations == nx * ny)
         
         // Process at most 8 MB at once
-        try updateFromTimeOrientedStreaming(variable: variable, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { d0offset in
-            
-            let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
+        try updateFromTimeOrientedStreaming3D(variable: variable, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { (yRange, xRange, memberRange) in
+            guard yRange.count == 1 || xRange.count == nx else {
+                fatalError("chunk dimensions need to be either parts of X or a mutliple or X")
+            }
+            let start = Int(yRange.lowerBound) * nx + Int(xRange.lowerBound)
+            let count = Int(yRange.count * xRange.count)
+            let locationRange = start ..< start+count
             let dataRange = locationRange.multiply(array2d.nTime)
             return array2d.data[dataRange]
         }
     }
-    
-    /**
-     Write new data to archived storage and combine it with existing data.
-     `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
-     */
-    func updateFromTimeOrientedStreaming(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ dim0Offset: Int) throws -> ArraySlice<Float>) throws {
-        
-        let indexTime = time.toIndexTime()
-        let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)
-        
-        /// Previous days of forecast to keep. Max 7 past days
-        /// `0..<1` if previous days are not generated
-        /// `1..<n` for all previous days
-        let previousDaysRange: Range<Int> = onlyGeneratePreviousDays ? (1..<max(1, min(8, time.range.count / 86400))) : (0..<1)
-        if previousDaysRange.isEmpty {
-            return
-        }
-        
-        struct WriterPerStep {
-            let read: OmFileReader<MmapFile>?
-            let write: OmFileWriterState<FileHandle>
-            let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
-            let fileName: String
-            let skip: Int
-        }
-        
-        // open all files for all timeranges and write a header
-        let writers: [WriterPerStep] = try indextimeChunked.flatMap { timeChunk -> [WriterPerStep] in
-            let fileTime = timeChunk * nTimePerFile ..< (timeChunk+1) * nTimePerFile
-            guard let offsets = indexTime.intersect(fileTime: fileTime) else {
-                return []
-            }
-            
-            return try previousDaysRange.map { previousDay -> WriterPerStep in
-                let skip =  previousDay * 86400 / time.dtSeconds
-                let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
-                try readFile.createDirectory()
-                let tempFile = readFile.getFilePath() + "~"
-                // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
-                FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
-                try FileManager.default.removeItemIfExists(at: tempFile)
-                let fn = try FileHandle.createNewFile(file: tempFile)
-                
-                let omRead = try readFile.openRead()
-                try omRead?.willNeed()
-
-                let omWrite = try OmFileWriterState<FileHandle>(fn: fn, dim0: nLocations, dim1: nTimePerFile, chunk0: chunknLocations, chunk1: nTimePerFile, compression: compression, scalefactor: scalefactor, fsync: true)
-
-                try omWrite.writeHeader()
-                
-                return WriterPerStep(read: omRead, write: omWrite, offsets: offsets, fileName: readFile.getFilePath(), skip: skip)
-            }
-        }
-        
-        let nIndexTime = indexTime.count
-        var fileData = [Float]()
-        
-        // loop chunks of locations
-        var dim0Offset = 0
-        while dim0Offset < nLocations {
-            let data = try supplyChunk(dim0Offset)
-            let nLocInChunk = data.count / nIndexTime
-            //print("nLocaInChunk \(nLocInChunk) dim0Offset \(dim0Offset) total \(nLocations) \(Float(dim0Offset)/Float(nLocations))%")
-            if fileData.count < nLocInChunk * nTimePerFile {
-                fileData = [Float](repeating: .nan, count: nLocInChunk * nTimePerFile)
-            }
-            let locationRange = dim0Offset ..< min(dim0Offset+nLocInChunk, nLocations)
-            
-            for writer in writers {
-                // Read existing data for a chunk of locations
-                if let omRead = writer.read, omRead.dim0 == nLocations, omRead.dim1 == nTimePerFile {
-                    try omRead.read(into: &fileData, arrayDim1Range: 0..<locationRange.count * nTimePerFile, arrayDim1Length: nTimePerFile, dim0Slow: locationRange, dim1: 0..<nTimePerFile)
-                } else {
-                    /// If the old file does not exist, just make sure it is filled with NaNs
-                    for i in fileData.indices {
-                        fileData[i] = .nan
-                    }
-                }
-                
-                // write "new" data into existing data
-                for l in 0..<locationRange.count {
-                    for (tFile,tArray) in zip(writer.offsets.file, writer.offsets.array) {
-                        if tArray < writer.skip {
-                            continue
-                        }
-                        /*if nIndexTime - tArray <= skipLast {
-                            continue
-                        }*/
-                        if data[data.startIndex + l * nIndexTime + tArray].isNaN {
-                            continue
-                        }
-                        fileData[nTimePerFile * l + tFile] = data[data.startIndex + l * nIndexTime + tArray]
-                    }
-                }
-                
-                // Write data
-                try writer.write.write(fileData[0..<locationRange.count * nTimePerFile])
-            }
-            
-            dim0Offset += nLocInChunk
-        }
-        
-        /// Write end of file and move it in position
-        for writer in writers {
-            try writer.write.writeTail()
-            try writer.write.fn.close()
-            
-            // Overwrite existing file, with newly created
-            try FileManager.default.moveFileOverwrite(from: "\(writer.fileName)~", to: writer.fileName)
-        }
-    }
-    
     
     /**
      Write new data to archived storage and combine it with existing data.
@@ -336,8 +226,8 @@ struct OmFileSplitter {
         }
         
         struct WriterPerStep {
-            let read: OmFileReader2<MmapFile>?
-            let writeFile: OmFileWriter2<FileHandle>
+            let read: OmFileReader<MmapFile>?
+            let writeFile: OmFileWriter<FileHandle>
             let write: OmFileWriterArray<Float, FileHandle>
             let writeFn: FileHandle
             let offsets: (file: CountableRange<Int>, array: CountableRange<Int>)
@@ -361,9 +251,9 @@ struct OmFileSplitter {
                 FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
                 try FileManager.default.removeItemIfExists(at: tempFile)
                 let fn = try FileHandle.createNewFile(file: tempFile)
-                let omRead = try? OmFileReader2(file: readFile.getFilePath())
+                let omRead = try? OmFileReader(file: readFile.getFilePath())
                 
-                let writeFile = OmFileWriter2(fn: fn, initialCapacity: 1024*1024)
+                let writeFile = OmFileWriter(fn: fn, initialCapacity: 1024*1024)
                 let writer = try writeFile.prepareArray(
                     type: Float.self,
                     dimensions: nMembers <= 1 ? [UInt64(ny), UInt64(nx), UInt64(nTimePerFile)] : [UInt64(ny), UInt64(nx), UInt64(nMembers), UInt64(nTimePerFile)],
@@ -465,15 +355,17 @@ struct OmFileSplitter {
     }
 }
 
-extension OmFileReader {
+extension OmFileReaderArray where OmType == Float {
     /// Read data from file. Switch between old legacy files and new multi dimensional files.
-    /// Note: `nTime` is the output array nTime. It is now the file nTime!
+    /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// TODO: nMembers variable is wrong if called via API controller. Aways 1
     func read3D(into: inout [Float], ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) throws {
-        let dimensions = reader.getDimensions()
+        let dimensions = self.getDimensions()
         switch dimensions.count {
         case 2:
             // Legacy files use 2 dimensions and flatten XY coordinates
+            let dim0 = Int(dimensions[0])
+            //let dim1 = Int(dimensions[1])
             guard dim0 % (nx*ny) == 0 else {
                 return // in case dimensions got change and do not agree anymore, ignore this file
             }
@@ -485,8 +377,14 @@ extension OmFileReader {
             guard level < nLevels else {
                 return
             }
-            let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try read(into: &into, arrayDim1Range: timeOffsets.array, arrayDim1Length: nTime, dim0Slow: dim0, dim1: timeOffsets.file)
+            let nLocations = UInt64(location.count)
+            let dim0Range = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
+            try read(
+                into: &into,
+                range: [dim0Range.toUInt64(), timeOffsets.file.toUInt64()],
+                intoCubeOffset: [0, UInt64(timeOffsets.array.lowerBound)],
+                intoCubeDimension: [nLocations, UInt64(nTime)]
+            )
         case 3:
             // File uses dimensions [ny,nx,ntime]
             guard ny == dimensions[0], nx == dimensions[1] else {
@@ -497,7 +395,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, fileTime]
             do {
-                try reader.read(
+                try read(
                     into: &into,
                     range: range,
                     intoCubeOffset: [0, 0, UInt64(timeOffsets.array.lowerBound)],
@@ -519,7 +417,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, l, fileTime]
             do {
-                try reader.read(
+                try read(
                     into: &into,
                     range: range,
                     intoCubeOffset: [0, 0, 0, UInt64(timeOffsets.array.lowerBound)],
@@ -535,13 +433,15 @@ extension OmFileReader {
     }
     
     /// Prefetch data for fast access. Switch between old legacy files and new multi dimensional files
-    /// Note: `nTime` is the output array nTime. It is now the file nTime!
+    /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// /// TODO: nMembers variable is wrong if called via API controller. Aways 1
     func willNeed3D(ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) throws {
-        let dimensions = reader.getDimensions()
+        let dimensions = self.getDimensions()
         switch dimensions.count {
         case 2:
             // Legacy files use 2 dimensions and flatten XY coordinates
+            let dim0 = Int(dimensions[0])
+            //let dim1 = Int(dimensions[1])
             guard dim0 % (nx*ny) == 0 else {
                 return // in case dimensions got change and do not agree anymore, ignore this file
             }
@@ -553,8 +453,8 @@ extension OmFileReader {
             guard level < nLevels else {
                 return
             }
-            let dim0 = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
-            try willNeed(dim0Slow: dim0, dim1: timeOffsets.file)
+            let dim0Range = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
+            try willNeed(range: [dim0Range.toUInt64(), timeOffsets.file.toUInt64()])
         case 3:
             // File uses dimensions [ny,nx,ntime]
             guard ny == dimensions[0], nx == dimensions[1] else {
@@ -565,7 +465,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, fileTime]
             do {
-                try reader.willNeed(range: range)
+                try willNeed(range: range)
             } catch OmFileFormatSwiftError.omDecoder(let error) {
                 print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
@@ -581,7 +481,7 @@ extension OmFileReader {
             let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
             let range = [y, x, l, fileTime]
             do {
-                try reader.willNeed(range: range)
+                try willNeed(range: range)
             } catch OmFileFormatSwiftError.omDecoder(let error) {
                 print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
                 throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
@@ -592,19 +492,12 @@ extension OmFileReader {
     }
 }
 
-
 extension OmFileSplitter {
-    /// Prepare a write to store individual timesteps as spatial encoded files
+    /// Prepare a write to store individual time-steps as spatial encoded files
     /// This makes it easier to migrate to the new file format writer
-    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriter {
-        if OpenMeteo.generteOmFilesVersion3 {
-            /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
-            let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
-            return OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunks.y, chunk1: chunks.x)
-        }
-        /// TODO: Not sure if chunklocations needs to be dependent on nMembers....
-        let nLocationsPerChunk = OmFileSplitter(domain, nMembers: nMembers, chunknLocations: nMembers > 1 ? nMembers : nil).nLocationsPerChunk
-        return OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: nLocationsPerChunk)
+    static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1) -> OmFileWriterHelper {
+        let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
+        return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [chunks.y, chunks.x])
     }
     
     static func calculateSpatialXYChunk(domain: GenericDomain, nMembers: Int) -> (y: Int, x: Int) {
@@ -615,23 +508,14 @@ extension OmFileSplitter {
         let chunknLocations = splitter.chunknLocations // max(6, 3072 / nTimePerFile)
         let xchunks = max(1, min(nx, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / nMembers / chunknLocations * chunknLocations))
         let ychunks = max(1, min(ny, 8*1024*1024 / MemoryLayout<Float>.stride / nTimePerFile / nMembers / xchunks))
-        print("Chunks [\(ychunks),\(xchunks)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
+        //print("Chunks [\(ychunks),\(xchunks)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
         return (ychunks, xchunks)
     }
 }
 
 
-extension OmFileWriter {
-    /// Write all data at once without any streaming
-    /// Creates a temporary file and returns only a file handle
-    public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
-        let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
-        try FileManager.default.removeItemIfExists(at: file)
-        let fn = try FileHandle.createNewFile(file: file, exclusive: true)
-        try FileManager.default.removeItem(atPath: file)
-        try write(fn: fn, compressionType: compressionType, scalefactor: scalefactor, fsync: false, supplyChunk: { range in
-            return ArraySlice(all)
-        })
-        return fn
+extension Range where Bound == Int {
+    func toUInt64() -> Range<UInt64> {
+        .init(uncheckedBounds: (UInt64(lowerBound), UInt64(upperBound)))
     }
 }

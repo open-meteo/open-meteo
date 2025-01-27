@@ -171,7 +171,7 @@ struct SeasonalForecastDownload: AsyncCommand {
             
             
             /// -999 for sea
-            let elevations = try domain.getStaticFile(type: .elevation)!.readAll()
+            let elevations = try domain.getStaticFile(type: .elevation)!.read()
             
             /// convert surface pressure to mean sea level pressure
             for l in 0..<tmp2m.nLocations {

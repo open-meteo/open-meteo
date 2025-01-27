@@ -18,8 +18,8 @@ struct GenericVariableHandle {
         self.fn = fn
     }
     
-    public func makeReader() throws -> OmFileReader<MmapFile> {
-        try OmFileReader(fn: fn)
+    public func makeReader() throws -> OmFileReaderArray<MmapFile, Float> {
+        try OmFileReader(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
     }
     
     /// Process concurrently
@@ -91,120 +91,11 @@ struct GenericVariableHandle {
                 .groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"})
                 .evenlyChunked(in: concurrent)
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    if OpenMeteo.generteOmFilesVersion3 {
-                        try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
-                    } else {
-                        try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
-                    }
+                    try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
                     
             })
         } else {
-            if OpenMeteo.generteOmFilesVersion3 {
-                try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
-            } else {
-                try convertSerial(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
-            }
-        }
-    }
-    
-    /// Process each variable and update time-series optimised files
-    static private func convertSerial(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
-        let grid = domain.grid
-        let nLocations = grid.count
-        
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
-            guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
-                logger.warning("No data to convert")
-                return
-            }
-            /// `timeMinMax.min.time` has issues with `skip`
-            /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
-            let startTime = min(run ?? timeMinMax.min.time, timeMinMax.min.time)
-            let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
-            
-            let variable = handles[0].variable
-            let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
-            let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
-            let progress = ProgressTracker(logger: logger, total: nLocations * nMembers, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
-            
-            let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
-            if onlyGeneratePreviousDays && !storePreviousForecast {
-                // No need to generate previous day forecast
-                continue
-            }
-            
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
-                return (time, try h.map{(try $0.makeReader(), $0.member)})
-            }
-            
-            /// If only one value is set, this could be the model initialisation or modifcation time
-            /// TODO: check if single value mode is still required
-            //let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
-            
-            let om = OmFileSplitter(domain,
-                                    //nLocations: isSingleValueVariable ? 1 : nil,
-                                    nMembers: nMembers,
-                                    chunknLocations: nMembers > 1 ? nMembers : nil
-            )
-            let nLocationsPerChunk = om.nLocationsPerChunk
-            var data3d = Array3DFastTime(nLocations: nLocationsPerChunk, nLevel: nMembers, nTime: time.count)
-            var readTemp = [Float](repeating: .nan, count: nLocationsPerChunk)
-            
-            // Create netcdf file for debugging
-            if createNetcdf && !onlyGeneratePreviousDays {
-                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-                let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
-                try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
-                var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                    try ncFile.createDimension(name: "time", length: time.count),
-                    try ncFile.createDimension(name: "member", length: nMembers),
-                    try ncFile.createDimension(name: "LAT", length: grid.ny),
-                    try ncFile.createDimension(name: "LON", length: grid.nx)
-                ])
-                for reader in readers {
-                    for r in reader.reader {
-                        let data = try r.fn.readAll()
-                        try ncVariable.write(data, offset: [time.index(of: reader.time)!, r.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
-                    }
-                }
-            }
-                        
-            try om.updateFromTimeOrientedStreaming(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { offset in
-                let d0offset = offset / nMembers
-                
-                let locationRange = d0offset ..< min(d0offset+nLocationsPerChunk, nLocations)
-                let nLoc = locationRange.count
-                data3d.data.fillWithNaNs()
-                for reader in readers {
-                    precondition(reader.reader.count == nMembers, "nMember count wrong")
-                    for r in reader.reader {
-                        try r.fn.read(into: &readTemp, arrayDim1Range: 0..<nLoc, arrayDim1Length: nLoc, dim0Slow: 0..<1, dim1: locationRange)
-                        data3d[0..<nLoc, r.member, time.index(of: reader.time)!] = readTemp[0..<nLoc]
-                    }
-                }
-                
-                // Deaverage radiation. Not really correct for 3h data after 81 hours, but interpolation will correct in the next step.
-                //if isAveragedOverTime {
-                //    data3d.deavergeOverTime()
-                //}
-                
-                // De-accumulate precipitation
-                //if isAccumulatedSinceModelStart {
-                //    data3d.deaccumulateOverTime()
-                //}
-                
-                // Interpolate all missing values
-                data3d.interpolateInplace(
-                    type: variable.interpolation,
-                    time: time,
-                    grid: domain.grid,
-                    locationRange: locationRange
-                )
-                
-                progress.add(nLoc * nMembers)
-                return data3d.data[0..<nLoc * nMembers * time.count]
-            }
-            progress.finish()
+            try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
         }
     }
     
@@ -234,7 +125,7 @@ struct GenericVariableHandle {
                 continue
             }
             
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReader<MmapFile>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
+            let readers: [(time: Timestamp, reader: [(fn: OmFileReaderArray<MmapFile, Float>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
                 return (time, try h.map{(try $0.makeReader(), $0.member)})
             }
             
@@ -266,7 +157,7 @@ struct GenericVariableHandle {
                 ])
                 for reader in readers {
                     for r in reader.reader {
-                        let data = try r.fn.readAll()
+                        let data = try r.fn.read()
                         try ncVariable.write(data, offset: [time.index(of: reader.time)!, r.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
                     }
                 }
@@ -284,7 +175,7 @@ struct GenericVariableHandle {
                             logger.warning("Coult not get reader for member \(member)")
                             continue
                         }
-                        try r.fn.reader.read(into: &readTemp, range: [yRange, xRange])
+                        try r.fn.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, i, time.index(of: reader.time)!] = readTemp[0..<nLoc]
                     }
                 }
@@ -369,7 +260,7 @@ actor VariablePerMemberStorage<V: Hashable> {
 extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members an timesteps.
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriter, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriterHelper, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .flatMap({ (t, handles) -> [GenericVariableHandle] in
@@ -429,7 +320,7 @@ extension VariablePerMemberStorage {
         try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         #endif
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: elevationFile.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+        try elevation.writeOmFile2D(file: elevationFile.getFilePath(), grid: domain.grid, createNetCdf: false)
     }
 }
 

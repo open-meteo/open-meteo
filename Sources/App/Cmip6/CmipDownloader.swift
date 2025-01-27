@@ -282,7 +282,7 @@ extension GenericDomain {
         return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil, ensembleMember: 0, previousDay: 0)
     }
     
-    func openBiasCorrectionFile(for variable: String) throws -> OmFileReader<MmapFile>? {
+    func openBiasCorrectionFile(for variable: String) throws -> OmFileReaderArray<MmapFile, Float>? {
         return try OmFileManager.get(getBiasCorrectionFile(for: variable))
     }
 }
@@ -889,7 +889,9 @@ struct DownloadCmipCommand: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
+        fatalError("CMIP downloader not available anymore du to file format changes")
+        
+        /*let logger = context.application.logger
         let deleteNetCDF = !signature.keepNetCdf
         let years = signature.years
         
@@ -935,8 +937,7 @@ struct DownloadCmipCommand: AsyncCommand {
                     altitude.data[i] = -999
                 }
             }
-            //try altitude.transpose().writeNetcdf(filename: "\(domain.downloadDirectory)elevation.nc", nx: domain.grid.nx, ny: domain.grid.ny)
-            try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: altitude.data)
+            try altitude.data.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid)
             
             if deleteNetCDF {
                 try FileManager.default.removeItem(atPath: ncFileAltitude)
@@ -996,7 +997,7 @@ struct DownloadCmipCommand: AsyncCommand {
                             }
                             let array = try NetCDF.read(path: ncFile, short: short, fma: short == "huss" ? (1000,0) : variable.getMultiplyAdd(domain: domain), duplicateTimeStep: duplicateTimeStep)
                             try FileManager.default.removeItem(atPath: ncFile)
-                            try OmFileWriter(dim0: array.nLocations, dim1: array.nTime, chunk0: Self.nLocationsPerChunk, chunk1: array.nTime).write(file: monthlyOmFile, compressionType: .pfor_delta2d_int16, scalefactor: short == "huss" ? 100 : variable.scalefactor, all: array.data)
+                            try array.data.writeOmFile(file: monthlyOmFile, dimensions: [array.nLocations, array.nTime], chunks: [Self.nLocationsPerChunk, array.nTime], scalefactor: short == "huss" ? 100 : variable.scalefactor)
                         }
                     }
                     
@@ -1208,11 +1209,11 @@ struct DownloadCmipCommand: AsyncCommand {
                 .write(logger: logger, file: masterFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, nLocationsPerChunk: 600, chunkedFiles: yearlyReader, dataCallback: nil)
         }
         
-        try generateBiasCorrectionFields(logger: logger, domain: domain, variables: variables)
+        try generateBiasCorrectionFields(logger: logger, domain: domain, variables: variables)*/
     }
     
     /// Generate seasonal averages for bias corrections
-    func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
+    /*func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
         logger.info("Calculating bias correction fields")
         let binsPerYear = 6
         let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
@@ -1240,10 +1241,10 @@ struct DownloadCmipCommand: AsyncCommand {
             })
             progress.finish()
         }
-    }
+    }*/
 }
 
-extension Array2DFastTime {
+/*extension Array2DFastTime {
     fileprivate mutating func interpolateAndAggregate(dt6h: Int, variable: Cmip6Variable, aggregate: Cmip6Variable.TimeTypeAggregate) {
         let time6h = TimerangeDt(start: Timestamp(0), to: Timestamp(self.nTime * dt6h), dtSeconds: dt6h)
         let time1h = time6h.with(dtSeconds: 3600)
@@ -1375,4 +1376,4 @@ extension Curl {
             }
         }
     }
-}
+}*/

@@ -183,9 +183,7 @@ struct GfsDownload: AsyncCommand {
             height.data[i] = landmask.data[i] == 1 ? height.data[i] : -999
         }
         
-        //try height.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
-        
-        try OmFileWriter(dim0: grid.ny, dim1: grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height.data)
+        try height.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: grid, createNetCdf: false)
     }
     
     /// download GFS025 and NAM CONUS
@@ -349,8 +347,7 @@ struct GfsDownload: AsyncCommand {
                     /// Generate land mask from regular data for GFS Wave013
                     if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                         let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
-                        //try height.writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
-                        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: height.data)
+                        try height.data.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                     }
                     
                     // Deaccumulate precipitation
@@ -484,8 +481,8 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 }
 
 extension VariablePerMemberStorage {
-    /// Snowfall is given in percent. Multiply with precipitation to get the amonut. Note: For whatever reason it can be `-50%`.
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+    /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .compactMap({ (t, handles) -> GenericVariableHandle? in

@@ -50,7 +50,18 @@ enum OmFileManagerReadable: Hashable {
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
     
-    func openRead() throws -> OmFileReader<MmapFile>? {
+    func openRead() throws -> OmFileReaderArray<MmapFile, Float>? {
+        let file = getFilePath()
+        guard FileManager.default.fileExists(atPath: file) else {
+            return nil
+        }
+        guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
+            return nil
+        }
+        return reader
+    }
+    
+    func openRead2() throws -> OmFileReader<MmapFile>? {
         let file = getFilePath()
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
@@ -63,45 +74,45 @@ enum OmFileManagerReadable: Hashable {
         return FileManager.default.fileExists(atPath: file)
     }
     
-    func openReadCached() throws -> OmFileReader<MmapFile>? {
+    func openReadCached() throws -> OmFileReaderArray<MmapFile, Float>? {
         let fileRel = getRelativeFilePath()
         let file = "\(OpenMeteo.dataDirectory)\(fileRel)"
         guard FileManager.default.fileExists(atPath: file) else {
             return nil
         }
-        return try OmFileReader(file: file)
+        guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
+            return nil
+        }
+        return reader
     }
 }
 
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 struct OmFileManager {
-    public static var instance = GenericFileManager<OmFileReader<MmapFile>>()
+    public static var instance = GenericFileManager<OmFileReaderArray<MmapFile, Float>>()
     
     private init() {}
     
     /// Get cached file or return nil, if the files does not exist
-    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
+    public static func get(_ file: OmFileManagerReadable) throws -> OmFileReaderArray<MmapFile, Float>? {
         try instance.get(file)
     }
 }
 
-extension OmFileReader: GenericFileManagable where Backend == MmapFile {
-    static func open(from path: OmFileManagerReadable) throws -> OmFileReader<MmapFile>? {
+extension OmFileReaderArray: GenericFileManagable where Backend == MmapFile, OmType == Float {
+    func wasDeleted() -> Bool {
+        self.fn.file.wasDeleted()
+    }
+    
+    static func open(from path: OmFileManagerReadable) throws -> OmFileReaderArray<MmapFile, Float>? {
         return try path.openReadCached()
     }
 }
 
-extension OmFileReader {
-    /// Read data into existing output float buffer
-    public func read(into: inout [Float], arrayRange: Range<Int>, arrayDim1Length: Int, dim0Slow dim0Read: Range<Int>, dim1 dim1Read: Range<Int>) throws {
-        try into.withUnsafeMutableBufferPointer {
-            try read(into: $0.baseAddress!, arrayDim1Range: arrayRange, arrayDim1Length: arrayDim1Length, dim0Slow: dim0Read, dim1: dim1Read)
-        }
-    }
 
-    
-    /// Read interpolated between 4 points. Assuming dim0 is used for lcations and dim1 is a time series
+extension OmFileReaderArray where OmType == Float {
+    /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
     public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
         let gridpoint = dim0.gridpoint
         return try readInterpolated(
@@ -114,16 +125,99 @@ extension OmFileReader {
         )
     }
     
-    
-    
     /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
     public func readInterpolated(pos: GridPoint2DFraction) throws -> Float {
+        let dims = getDimensions()
+        guard dims.count == 2 else {
+            fatalError("Dimension count must be 2")
+        }
         return try readInterpolated(
-            dim0: pos.gridpoint / self.dim1,
+            dim0: pos.gridpoint / Int(dims[1]),
             dim0Fraction: pos.yFraction,
-            dim1: pos.gridpoint % self.dim1,
+            dim1: pos.gridpoint % Int(dims[1]),
             dim1Fraction: pos.xFraction
         )
+    }
+    
+    /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
+    public func readInterpolated(dim0: Int, dim0Fraction: Float, dim1: Int, dim1Fraction: Float) throws -> Float {
+        let dims = getDimensions()
+        guard dims.count == 2 else {
+            throw ForecastapiError.generic(message: "Dimension count must be 2 in \(#function)")
+        }
+        // bound x and y
+        var dim0 = UInt64(dim0)
+        var dim0Fraction = dim0Fraction
+        if dim0 > dims[0]-2 {
+            dim0 = dims[0]-2
+            dim0Fraction = 1
+        }
+        var dim1 = UInt64(dim1)
+        var dim1Fraction = dim1Fraction
+        if dim1 > dims[1]-2 {
+            dim1 = dims[1]-2
+            dim1Fraction = 1
+        }
+        
+        // reads 4 points at once
+        let points = try read(range: [dim0 ..< dim0 + 2, dim1 ..< dim1 + 2])
+        
+        // interpolate linearly between
+        return points[0] * (1-dim0Fraction) * (1-dim1Fraction) +
+               points[1] * (dim0Fraction) * (1-dim1Fraction) +
+               points[2] * (1-dim0Fraction) * (dim1Fraction) +
+               points[3] * (dim0Fraction) * (dim1Fraction)
+    }
+    
+    /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
+    public func readInterpolated(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+        let dims = getDimensions()
+        guard dims.count == 2 || dims.count == 3 else {
+            throw ForecastapiError.generic(message: "Dimension count must be 2 or 3 in \(#function)")
+        }
+        
+        // bound x and y
+        var dim0X = UInt64(dim0X)
+        let dim0Nx = UInt64(dim0Nx)
+        var dim0XFraction = dim0XFraction
+        if dim0X > dim0Nx-2 {
+            dim0X = dim0Nx-2
+            dim0XFraction = 1
+        }
+        var dim0Y = UInt64(dim0Y)
+        var dim0YFraction = dim0YFraction
+        let dim0Ny = dims[0] / dim0Nx
+        if dim0Y > dim0Ny-2 {
+            dim0Y = dim0Ny-2
+            dim0YFraction = 1
+        }
+        
+        if dims.count == 2 {
+            // reads 4 points. As 2 points are next to each other, we can read a small row of 2 elements at once
+            let top = try read(range: [dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1Read.toUInt64()])
+            let bottom = try read(range: [(dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1Read.toUInt64()])
+            
+            // interpolate linearly between
+            let nt = dim1Read.count
+            return zip(zip(top[0..<nt], top[nt..<2*nt]), zip(bottom[0..<nt], bottom[nt..<2*nt])).map {
+                let ((a,b),(c,d)) = $0
+                return  a * (1-dim0XFraction) * (1-dim0YFraction) +
+                        b * (dim0XFraction) * (1-dim0YFraction) +
+                        c * (1-dim0XFraction) * (dim0YFraction) +
+                        d * (dim0XFraction) * (dim0YFraction)
+            }
+        }
+        
+        // New 3D files use [y,x,time] and are able to read 2x2xT slices directly
+        let data = try read(range: [dim0Y ..< dim0Y+2, dim0X ..< dim0X+2, dim1Read.toUInt64()])
+        let nt = dim1Read.count
+        return zip(zip(data[0..<nt], data[nt..<2*nt]), zip(data[nt*2..<nt*3], data[nt*3..<nt*4])).map {
+            let ((a,b),(c,d)) = $0
+            return  a * (1-dim0XFraction) * (1-dim0YFraction) +
+                    b * (dim0XFraction) * (1-dim0YFraction) +
+                    c * (1-dim0XFraction) * (dim0YFraction) +
+                    d * (dim0XFraction) * (dim0YFraction)
+        }
     }
     
     
@@ -159,9 +253,4 @@ extension OmFileReader {
             return weight > 0.001 ? value / weight : .nan
         }
     }*/
-    
-    // prefect and read all
-    public func readAll2D() throws -> Array2DFastTime {
-        return Array2DFastTime(data: try readAll(), nLocations: dim0, nTime: dim1)
-    }
 }

@@ -439,7 +439,7 @@ struct ExportCommand: AsyncCommand {
             guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
-            try ncElevation.write(elevationFile.readAll())
+            try ncElevation.write(elevationFile.read())
         }
         
         // Calculate daily normals
@@ -544,7 +544,7 @@ struct ExportCommand: AsyncCommand {
 extension Gridable {
     /// Return true if there is no land around a 5x5 box
     /// `searchRadius = 2` for 5x5 search
-    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReader<MmapFile>, searchRadius: Int) throws -> Bool {
+    func onlySeaAround(gridpoint: Int, elevationFile: OmFileReaderArray<MmapFile, Float>, searchRadius: Int) throws -> Bool {
         let yy = gridpoint / nx
         let xx = gridpoint % nx
         for y in min(max(yy-searchRadius,0),ny) ..< min(max(yy+searchRadius+1,0),ny) {

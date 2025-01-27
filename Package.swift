@@ -30,7 +30,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/google/flatbuffers.git", from: "24.3.25"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.18.0"),
-        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "d44c4c337c8c70d8c9f0567c10a5e4a4c198c29c"), // Because unsafe C flags are set, tagged releases cannot be used
+        .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "7c180acfe20018d032ce532569a90e71078ba28b"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.1.2"),

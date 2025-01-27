@@ -55,10 +55,12 @@ struct Dem90: GenericDomain {
             // file not available
             return .nan
         }
-        let latrow = Int(lat * 1200 + 90 * 1200) % 1200
+        let latrow = UInt64(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
-        let lonrow = Int((lon + 180) * Float(px))
-        return try om.read(dim0Slow: latrow..<latrow+1, dim1: lonrow..<lonrow+1)[0]
+        let lonrow = UInt64((lon + 180) * Float(px))
+        var value: Float = .nan
+        try om.read(into: &value, range: [latrow..<latrow+1, lonrow..<lonrow+1])
+        return value
     }
 
     /// Get the longitude resolution on a given latitude
@@ -175,8 +177,7 @@ struct DownloadDemCommand: AsyncCommand {
                         let data = try readNc(file: ncTemp)
                         try FileManager.default.removeItem(atPath: ncTemp)
 
-
-                        try OmFileWriter(dim0: data.dimensions[0], dim1: data.dimensions[1], chunk0: 20, chunk1: 20).write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: data.data)
+                        try data.data.writeOmFile(file: omFile, dimensions: [data.dimensions[0], data.dimensions[1]], chunks: [20, 20])
                     }
                 }
             }
@@ -208,10 +209,13 @@ struct DownloadDemCommand: AsyncCommand {
                             continue
                         }
 
-                        let om = try OmFileReader(file: omFile)
-                        precondition(om.dim0 == 1200)
-                        precondition(om.dim1 == px)
-                        let data = try om.readAll()
+                        guard let om = try OmFileReader(file: omFile).asArray(of: Float.self) else {
+                            fatalError("not a float array")
+                        }
+                        let dimensions = om.getDimensions()
+                        precondition(dimensions[0] == 1200)
+                        precondition(dimensions[1] == px)
+                        let data = try om.read()
                         for i in 0..<1200 {
                             line[i * (px * 360) + (lon+180)*px ..< i * (px * 360) + (lon+180)*px + px] = data[i*px ..< (i+1)*px]
                         }
@@ -219,7 +223,7 @@ struct DownloadDemCommand: AsyncCommand {
 
                     //let a2 = Array2DFastSpace(data: line, nLocations: 1200*360*px, nTime: 1)
                     //try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
-                    try OmFileWriter(dim0: 1200, dim1: px*360, chunk0: 60, chunk1: 60).write(file: file.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: line)
+                    try line.writeOmFile(file: file.getFilePath(), dimensions: [1200, px*360], chunks: [60, 60])
                 }
             }
 

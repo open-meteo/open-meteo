@@ -96,7 +96,7 @@ struct DownloadIconCommand: AsyncCommand {
             }
         }
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: hsurf)
+        try hsurf.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
     }
     
     
@@ -120,7 +120,7 @@ struct DownloadIconCommand: AsyncCommand {
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
 
-        let nMembers = domain.ensembleMembers
+        //let nMembers = domain.ensembleMembers
         
         let handles = GenericVariableHandleStorage()
         let handles15minIconD2 = GenericVariableHandleStorage()
@@ -130,7 +130,7 @@ struct DownloadIconCommand: AsyncCommand {
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = {
-            guard let elevation = try? domain.getStaticFile(type: .elevation)?.readAll() else {
+            guard let elevation = try? domain.getStaticFile(type: .elevation)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

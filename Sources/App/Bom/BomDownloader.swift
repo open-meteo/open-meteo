@@ -112,7 +112,7 @@ struct DownloadBomCommand: AsyncCommand {
         }
         
         elevation.shift180LongitudeAndFlipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+        try elevation.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
     }
     
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
@@ -610,7 +610,7 @@ struct DownloadBomCommand: AsyncCommand {
     }
 }
 
-extension OmFileWriter {
+extension OmFileWriterHelper {
     fileprivate func write(domain: BomDomain, variable: BomVariable, data: [Float]) throws -> FileHandle {
         guard data.count == domain.grid.count else {
             fatalError("invalid data array size")

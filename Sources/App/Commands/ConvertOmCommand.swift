@@ -40,42 +40,52 @@ struct ConvertOmCommand: Command {
             try convertOmv3(src: signature.infile, dest: oufile, grid: domain.getDomain().grid)
             return
         }
-
         
-        let om = try OmFileReader(file: signature.infile)
-        logger.info("dim0=\(om.dim0) dim1=\(om.dim1) chunk0=\(om.chunk0) chunk1=\(om.chunk1)")
+        guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
+            fatalError("Not a float array")
+        }
+        let dimensions = om.getDimensions()
+        let chunks = om.getChunkDimensions()
+        guard dimensions.count == 2 else {
+            fatalError("Not a 2D array")
+        }
+        let dim0 = Int(dimensions[0])
+        let dim1 = Int(dimensions[1])
+        let chunk0 = chunks[0]
+        let chunk1 = chunks[1]
+        logger.info("dim0=\(dim0) dim1=\(dim1) chunk0=\(chunk0) chunk1=\(chunk1)")
         
-        let data = try om.readAll()
+        let data = try om.read()
         
         let oufile = signature.outfile ?? "\(signature.infile).nc"
         let ncFile = try NetCDF.create(path: oufile, overwriteExisting: true)
         try ncFile.setAttribute("TITLE", "open-meteo file convert")
         
         if let nx = signature.nx {
-            let ny = om.dim0 / nx
+            let ny = dim0 / nx
             if signature.transpose {
                 logger.info("Transpose to nx=\(nx) ny=\(ny)")
                 // to fast space
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                    try ncFile.createDimension(name: "time", length: om.dim1),
+                    try ncFile.createDimension(name: "time", length: dim1),
                     try ncFile.createDimension(name: "LAT", length: ny),
                     try ncFile.createDimension(name: "LON", length: nx)
                 ])
-                let data2 = Array2DFastTime(data: data, nLocations: om.dim0, nTime: om.dim1).transpose()
+                let data2 = Array2DFastTime(data: data, nLocations: dim0, nTime: dim1).transpose()
                 try ncVariable.write(data2.data)
             } else {
                 // fast time dimension
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
                     try ncFile.createDimension(name: "LAT", length: ny),
                     try ncFile.createDimension(name: "LON", length: nx),
-                    try ncFile.createDimension(name: "time", length: om.dim1)
+                    try ncFile.createDimension(name: "time", length: dim1)
                 ])
                 try ncVariable.write(data)
             }
         } else {
             var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                try ncFile.createDimension(name: "LAT", length: om.dim1),
-                try ncFile.createDimension(name: "LON", length: om.dim0),
+                try ncFile.createDimension(name: "LAT", length: dim1),
+                try ncFile.createDimension(name: "LON", length: dim0),
             ])
             try ncVariable.write(data)
         }
@@ -84,7 +94,7 @@ struct ConvertOmCommand: Command {
     /// Read om file and write it as version 3 and reshape data to proper 3d files
     func convertOmv3(src: String, dest: String, grid: Gridable) throws {
         // Read data from the input OM file
-        guard let readfile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
+        guard let readfile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
               let reader = readfile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(src)")
         }
@@ -132,7 +142,7 @@ struct ConvertOmCommand: Command {
         let fileHandle = try FileHandle.createNewFile(file: dest)
 
         // Write the compressed data to the output OM file
-        let fileWriter = OmFileWriter2(fn: fileHandle, initialCapacity: 1024 * 1024 * 10) // Initial capacity of 10MB
+        let fileWriter = OmFileWriter(fn: fileHandle, initialCapacity: 1024 * 1024 * 10) // Initial capacity of 10MB
         print("created writer")
 
         let writer = try fileWriter.prepareArray(
@@ -184,7 +194,7 @@ struct ConvertOmCommand: Command {
         print("Finished writing")
         
         /*// Verify the output
-        guard let verificationFile = try? OmFileReader2(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
+        guard let verificationFile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
             let verificationReader = verificationFile.asArray(of: Float.self) else {
             fatalError("Failed to open file: \(dest)")
         }

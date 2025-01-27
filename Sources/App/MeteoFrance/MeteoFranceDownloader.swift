@@ -125,7 +125,7 @@ struct MeteoFranceDownload: AsyncCommand {
         //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: true)
         //message.dumpAttributes()
         
-        try OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: 20, chunk1: 20).write(file: surfaceElevationFileOm, compressionType: .pfor_delta2d_int16, scalefactor: 1, all: grib2d.array.data)
+        try grib2d.array.data.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid, createNetCdf: false)
     }
     
     /// Temporarily keep those varibles to derive others
@@ -205,7 +205,7 @@ struct MeteoFranceDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let grid = domain.grid
+        //let grid = domain.grid
         var handles = [GenericVariableHandle]()
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2*60))
         
@@ -578,7 +578,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
 extension VariablePerMemberStorage {
     /// Sum up rain, snow and graupel for total precipitation
-    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmFileWriter) throws -> [GenericVariableHandle] {
+    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: {$0.key.timestampAndMember})
             .compactMap({ (t, handles) -> GenericVariableHandle? in

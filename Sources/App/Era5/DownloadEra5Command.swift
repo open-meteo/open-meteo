@@ -8,7 +8,7 @@ import OmFileFormat
 
 struct DownloadEra5Command: AsyncCommand {
     /// 6k locations require around 200 MB memory for a yearly time-series
-    static var nLocationsPerChunk = 6_000
+    //static var nLocationsPerChunk = 6_000
     
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -81,8 +81,9 @@ struct DownloadEra5Command: AsyncCommand {
         }
         
         if signature.calculateBiasField {
-            try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
-            return
+            fatalError("BIAS correction calculation not available anymore")
+            //try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
+            //return
         }
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
@@ -119,7 +120,7 @@ struct DownloadEra5Command: AsyncCommand {
     
     /// Generate seasonal averages for bias corrections for CMIP climate data
     /// They way how `GenericReaderMulti` is used, is not the cleanest, but otherwise daily calculations need to be implemented manually
-    func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int) throws {
+    /*func generateBiasCorrectionFields(logger: Logger, domain: CdsDomain, prefetchFactor: Int) throws {
         logger.info("Calculating bias correction fields")
         
         let binsPerYear = 6
@@ -184,7 +185,7 @@ struct DownloadEra5Command: AsyncCommand {
             })
             progress.finish()
         }
-    }
+    }*/
     
     /**
      Soil type information: https://www.ecmwf.int/en/forecasts/documentation-and-support/evolution-ifs/cycles/change-soil-hydrology-scheme-ifs-cycle
@@ -333,11 +334,8 @@ struct DownloadEra5Command: AsyncCommand {
             fatalError("missing elevation in grib")
         }
         
-        let chunk0 = min(domain.grid.ny, 20)
-        let writer = OmFileWriter(dim0: domain.grid.ny, dim1: domain.grid.nx, chunk0: chunk0, chunk1: 400/chunk0)
-        
         if let soilType {
-            try writer.write(file: domain.soilTypeFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: soilType)
+            try soilType.writeOmFile2D(file: domain.soilTypeFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
         }
         
         // Set all sea grid points to -999
@@ -347,14 +345,8 @@ struct DownloadEra5Command: AsyncCommand {
                 elevation[i] = -999
             }
         }
-        
-        if createNetCdf {
-            let file = domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc")
-            let elevation = Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny)
-            try elevation.writeNetcdf(filename: file)
-        }
 
-        try writer.write(file: domain.surfaceElevationFileOm.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: 1, all: elevation)
+        try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
     }
     
     func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
@@ -421,7 +413,7 @@ struct DownloadEra5Command: AsyncCommand {
         let downloadDir = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
         
-        let writer = OpenMeteo.generteOmFilesVersion3 ? OmFileSplitter.makeSpatialWriter(domain: domain) : OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         var handles = [GenericVariableHandle]()
         
@@ -535,7 +527,7 @@ struct DownloadEra5Command: AsyncCommand {
         let curl = Curl(logger: logger, client: client, deadLineHours: 99999)
         var handles = [GenericVariableHandle]()
         
-        let writer = OpenMeteo.generteOmFilesVersion3 ? OmFileSplitter.makeSpatialWriter(domain: domain) : OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
         
         struct EcmwfQuery: Encodable {
@@ -699,7 +691,7 @@ struct DownloadEra5Command: AsyncCommand {
         
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 99999)
         
-        let writer = OpenMeteo.generteOmFilesVersion3 ? OmFileSplitter.makeSpatialWriter(domain: domain) : OmFileWriter(dim0: 1, dim1: domain.grid.count, chunk0: 1, chunk1: Self.nLocationsPerChunk)
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         var handles = [GenericVariableHandle]()
         
         
@@ -831,17 +823,33 @@ struct DownloadEra5Command: AsyncCommand {
         let nx = domain.grid.nx // 721
         let ny = domain.grid.ny // 1440
         let nt = timeintervalHourly.count // 8784
+        let nTimePerFile = nt
+        let chunknLocations = 6
+        let chunknTime = 21 * 24
                 
         // convert to yearly file
         for variable in variables {
             let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
-            let writeFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
-            if !forceUpdate && FileManager.default.fileExists(atPath: writeFile.getFilePath()) {
+            let writeFilePath = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
+            if !forceUpdate && FileManager.default.fileExists(atPath: writeFilePath.getFilePath()) {
                 continue
             }
-            try writeFile.createDirectory()
+            try writeFilePath.createDirectory()
+            let tempFile = writeFilePath.getFilePath() + "~"
+            FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
+            try FileManager.default.removeItemIfExists(at: tempFile)
+            let writeFn = try FileHandle.createNewFile(file: tempFile)
+            let writeFile = OmFileWriter(fn: writeFn, initialCapacity: 1024*1024)
+            let writer = try writeFile.prepareArray(
+                type: Float.self,
+                dimensions: [UInt64(ny), UInt64(nx), UInt64(nTimePerFile)],
+                chunkDimensions: [1, UInt64(chunknLocations), UInt64(chunknTime)],
+                compression: .pfor_delta2d_int16,
+                scale_factor: variable.scalefactor,
+                add_offset: 0
+            )
             
-            let existingFile = forceUpdate ? try writeFile.openRead() : nil
+            let existingFile = forceUpdate ? try writeFilePath.openRead2() : nil
             let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
                 let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
                 let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
@@ -850,34 +858,45 @@ struct DownloadEra5Command: AsyncCommand {
                 }
                 return try OmFileReader(file: omFile)
             }
-            // For updates, delete file before creating a new one.
-            // Because the file is open, data access is still possible
-            try FileManager.default.removeItemIfExists(at: writeFile.getFilePath())
             
-            // chunk 6 locations and 21 days of data
-            try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: 21 * 24).write(file: writeFile.getFilePath(), compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, overwrite: false, supplyChunk: { dim0 in
-                let locationRange = dim0..<min(dim0+Self.nLocationsPerChunk, nx*ny)
-                
-                var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
-                
-                if let existingFile {
-                    // Load existing data if present
-                    try existingFile.read(into: &fasttime.data, arrayRange: 0..<locationRange.count, arrayDim1Length: nt, dim0Slow: locationRange, dim1: 0..<nt)
-                }
-                
-                for (i, omfile) in omFiles.enumerated() {
-                    guard let omfile else {
-                        continue
+            /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
+            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: 1)
+            var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nt)
+            
+            for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(spatialChunks.y)) {
+                for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(spatialChunks.x)) {
+                    let yRange = yStart ..< min(yStart + UInt64(spatialChunks.y), UInt64(ny))
+                    let xRange = xStart ..< min(xStart + UInt64(spatialChunks.x), UInt64(nx))
+                    
+                    fileData.fillWithNaNs()
+                    if let existingFile, let existingFile = existingFile.asArray(of: Float.self) {
+                        // Load existing data if present
+                        try existingFile.read(into: &fileData, range: [yRange, xRange, 0..<UInt64(nt)])
                     }
-                    try omfile.willNeed(dim0Slow: 0..<1, dim1: locationRange)
-                    let read = try omfile.read(dim0Slow: 0..<1, dim1: locationRange)
-                    for l in 0..<locationRange.count {
-                        fasttime[l, i] = read[l]
+                    
+                    for (i, omfile) in omFiles.enumerated() {
+                        guard let omfile = omfile?.asArray(of: Float.self) else {
+                            continue
+                        }
+                        let read = try omfile.read(range: [yRange, xRange])
+                        for l in 0..<read.count {
+                            fileData[l * nt + i] = read[l]
+                        }
                     }
+                    try writer.writeData(
+                        array: Array(fileData[0..<yRange.count * xRange.count * nt]),
+                        arrayDimensions: [UInt64(yRange.count), UInt64(xRange.count), UInt64(nt)]
+                    )
+                    
+                    progress.add(yRange.count * xRange.count)
                 }
-                progress.add(locationRange.count)
-                return ArraySlice(fasttime.data)
-            })
+            }
+            let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
+            try writeFile.writeTrailer(rootVariable: root)
+            try writeFn.close()
+            
+            // Commit new yearly file
+            try FileManager.default.moveFileOverwrite(from: tempFile, to: writeFilePath.getFilePath())
             progress.finish()
         }
     }
