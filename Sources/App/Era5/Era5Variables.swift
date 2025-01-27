@@ -258,7 +258,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         
         if domain == .ecmwf_ifs_analysis_long_window || domain == .ecmwf_ifs_analysis {
             switch self {
-            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation, .boundary_layer_height:
+            case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation, .boundary_layer_height, .precipitation:
+                // PZ 2025-01-27: ECMWF removed precipitation from assimilation
                 return false
             default:
                 return true
