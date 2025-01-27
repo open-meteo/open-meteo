@@ -264,12 +264,12 @@ enum VariableOrDerived<Raw: RawRepresentableString, Derived: RawRepresentableStr
     case derived(Derived)
     
     init?(rawValue: String) {
-        if let val = Raw.init(rawValue: rawValue) {
-            self = .raw(val)
-            return
-        }
         if let val = Derived.init(rawValue: rawValue) {
             self = .derived(val)
+            return
+        }
+        if let val = Raw.init(rawValue: rawValue) {
+            self = .raw(val)
             return
         }
         return nil
