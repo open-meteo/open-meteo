@@ -103,32 +103,44 @@ struct GenericVariableHandle {
     static private func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
         let grid = domain.grid
         let nLocations = grid.count
+        let dtSeconds = domain.dtSeconds
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
-            guard let timeMinMax = handles.minAndMax(by: {$0.time < $1.time}) else {
+            let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try handles.grouped(by: {$0.time}).flatMap { (time, h) in
+                return try h.map {
+                    let reader = try $0.makeReader()
+                    let dimensions = reader.getDimensions()
+                    let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
+                    let time = TimerangeDt(start: time, nTime: nt, dtSeconds: dtSeconds)
+                    return(time, reader, $0.member)
+                }
+            }
+            guard let timeMin = readers.min(by: {$0.time.range.lowerBound < $1.time.range.lowerBound})?.time.range.lowerBound else {
+                logger.warning("No data to convert")
+                return
+            }
+            guard let timeMax = readers.max(by: {$0.time.range.upperBound > $1.time.range.upperBound})?.time.range.upperBound else {
+                logger.warning("No data to convert")
+                return
+            }
+            guard let maxTimeStepsPerFile = readers.max(by: {$0.time.count > $1.time.count})?.time.count else {
                 logger.warning("No data to convert")
                 return
             }
             /// `timeMinMax.min.time` has issues with `skip`
             /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
-            let startTime = min(run ?? timeMinMax.min.time, timeMinMax.min.time)
-            let time = TimerangeDt(range: startTime...timeMinMax.max.time, dtSeconds: domain.dtSeconds)
+            let startTime = min(run ?? timeMin, timeMin)
+            let time = TimerangeDt(range: startTime..<timeMax, dtSeconds: dtSeconds)
             
             let variable = handles[0].variable
             let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
             
             let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
             if onlyGeneratePreviousDays && !storePreviousForecast {
                 // No need to generate previous day forecast
                 continue
             }
-            
-            let readers: [(time: Timestamp, reader: [(fn: OmFileReaderArray<MmapFile, Float>, member: Int)])] = try handles.grouped(by: {$0.time}).map { (time, h) in
-                return (time, try h.map{(try $0.makeReader(), $0.member)})
-            }
-            
             /// If only one value is set, this could be the model initialisation or modifcation time
             /// TODO: check if single value mode is still required
             //let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
@@ -140,9 +152,9 @@ struct GenericVariableHandle {
             )
             //let nLocationsPerChunk = om.nLocationsPerChunk
             
-            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: nMembers)
+            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: nMembers, nTime: 1)
             var data3d = Array3DFastTime(nLocations: spatialChunks.x * spatialChunks.y, nLevel: nMembers, nTime: time.count)
-            var readTemp = [Float](repeating: .nan, count: spatialChunks.x * spatialChunks.y)
+            var readTemp = [Float](repeating: .nan, count: spatialChunks.x * spatialChunks.y * maxTimeStepsPerFile)
             
             // Create netcdf file for debugging
             if createNetcdf && !onlyGeneratePreviousDays {
@@ -156,27 +168,35 @@ struct GenericVariableHandle {
                     try ncFile.createDimension(name: "LON", length: grid.nx)
                 ])
                 for reader in readers {
-                    for r in reader.reader {
-                        let data = try r.fn.read()
-                        try ncVariable.write(data, offset: [time.index(of: reader.time)!, r.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
+                    let data = try reader.reader.read()
+                    let nt = reader.time.count
+                    let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
+                    if nt > 1 {
+                        let fastSpace = Array2DFastTime(data: data, nLocations: grid.count, nTime: nt).transpose().data
+                        try ncVariable.write(fastSpace, offset: [timeArrayIndex, reader.member, 0, 0], count: [nt, 1, grid.ny, grid.nx])
+                    } else {
+                        try ncVariable.write(data, offset: [timeArrayIndex, reader.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
                     }
                 }
             }
+            
+            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
                         
             try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { (yRange, xRange, memberRange) in
-                
-                
                 let nLoc = yRange.count * xRange.count
                 data3d.data.fillWithNaNs()
                 for reader in readers {
-                    precondition(reader.reader.count == nMembers, "nMember count wrong")
-                    for (i,member) in memberRange.enumerated() {
-                        guard let r = reader.reader.first(where: {$0.member == Int(member)}) else {
-                            logger.warning("Coult not get reader for member \(member)")
-                            continue
-                        }
-                        try r.fn.read(into: &readTemp, range: [yRange, xRange])
-                        data3d[0..<nLoc, i, time.index(of: reader.time)!] = readTemp[0..<nLoc]
+                    let dimensions = reader.reader.getDimensions()
+                    let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
+                    if dimensions.count == 3 {
+                        /// Number of time steps in this file
+                        let nt = dimensions[2]
+                        try reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
+                        data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex+Int(nt)] = readTemp[0..<nLoc*Int(nt)]
+                    } else {
+                        // Single time step
+                        try reader.reader.read(into: &readTemp, range: [yRange, xRange])
+                        data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }
                 
