@@ -119,11 +119,11 @@ struct GenericVariableHandle {
                 logger.warning("No data to convert")
                 return
             }
-            guard let timeMax = readers.max(by: {$0.time.range.upperBound > $1.time.range.upperBound})?.time.range.upperBound else {
+            guard let timeMax = readers.max(by: {$0.time.range.upperBound < $1.time.range.upperBound})?.time.range.upperBound else {
                 logger.warning("No data to convert")
                 return
             }
-            guard let maxTimeStepsPerFile = readers.max(by: {$0.time.count > $1.time.count})?.time.count else {
+            guard let maxTimeStepsPerFile = readers.max(by: {$0.time.count < $1.time.count})?.time.count else {
                 logger.warning("No data to convert")
                 return
             }

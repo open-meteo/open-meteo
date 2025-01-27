@@ -42,6 +42,19 @@ struct EumetsatSarahDownload: AsyncCommand {
             fatalError("Parameter access token required")
         }
         
+        if let timeinterval = signature.timeinterval {
+            let chunkDt = domain.omFileLength * domain.dtSeconds
+            let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400)
+            for (_, runs) in timerange.groupedPreservedOrder(by: {$0.timeIntervalSince1970 / chunkDt}) {
+                logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
+                let handles = try await runs.asyncFlatMap { run in
+                    return try await downloadRun(application: context.application, run: run, domain: domain, accessToken: accessToken, variables: [.shortwave_radiation])
+                }
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            }
+            return
+        }
+        
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 1)
         let handles = try await downloadRun(application: context.application, run: run, domain: domain, accessToken: accessToken, variables: [.shortwave_radiation])
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
@@ -56,6 +69,18 @@ struct EumetsatSarahDownload: AsyncCommand {
             let url = "https://api.eumetsat.int/data/download/1.0.0/collections/EO%3AEUM%3ADAT%3A0863/products/\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA/entry?name=\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA.nc&access_token=\(accessToken)"
             let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
             let (time, data) = try memory.readNetcdf(name: variable.eumetsatName)
+            
+            // TODO correct for scan time and calculate backwards averages
+            /*if /*variable == .direct_radiation ||*/ variable == .shortwave_radiation {
+                let factor = Zensun.backwardsAveragedToInstantFactor(grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: TimerangeDt(start: timestamp, nTime: 1, dtSeconds: domain.dtSeconds))
+                for i in data.indices {
+                    if factor.data[i] < 0.05 {
+                        continue
+                    }
+                    data[i] /= factor.data[i]
+                }
+            }*/
+            
             let dataFastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: time.count).transpose().data
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: time.count)
             let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: dataFastTime)
@@ -79,7 +104,6 @@ fileprivate extension ByteBuffer {
             guard let time = try nc.getVariable(name: "time")?.asType(Double.self)?.read().map ({ Timestamp(1983,1,1).add(Int($0*3600)) }) else {
                 fatalError("Could not open variable time")
             }
-            print(time.iso8601_YYYYMMddHHmm)
             if let data = try nc.getVariable(name: name)?.asType(Float.self)?.read() {
                 return (time, data)
             }
