@@ -579,7 +579,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .ncep_nbm_conus:
             return try NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .eumetsat_sarah3:
-            let sarah3 = try GenericReader<EumetsatSarahDomain, EumetsatSarahVariable>(domain: EumetsatSarahDomain.sarah3_30minutely, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let sarah3 = try EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30minutely, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sarah3].compactMap({$0})
         }
     }
