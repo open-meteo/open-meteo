@@ -93,7 +93,7 @@ protocol GenericVariable: GenericVariableMixable {
     var storePreviousForecast: Bool { get }
 }
 
-enum ReaderInterpolation {
+public enum ReaderInterpolation {
     /// Simple linear interpolation
     case linear
     
