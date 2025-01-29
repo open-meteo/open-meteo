@@ -279,6 +279,89 @@ public struct Zensun {
         return out
     }
     
+    /// Assumes data is an instantaneous 2D field of satellite solar radiation which is converted to backwards averaged solar radiation
+    /// Corrects for scan time difference for each location
+    /// TODO: Correct for sunset
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double]) {
+        for (t, timestamp) in timerange.enumerated() {
+            /// fractional day number with 12am 1jan = 1
+            let decang = timestamp.getSunDeclination()
+            let eqtime = timestamp.getSunEquationOfTime()
+            
+            let alpha = Float(0.83333).degreesToRadians
+            
+            let latsun=decang
+            /// universal time
+            let ut = timestamp.hourWithFraction
+            let t1 = (90-latsun).degreesToRadians
+            
+            for (i, gridpoint) in locationRange.enumerated() {
+                let pos = i * timerange.count + t
+                if data[pos].isNaN {
+                    continue
+                }
+                let scantime = timestamp.add(Int(scanTimeDifferenceHours[i] * 3600))
+                
+                /// fractional day number with 12am 1jan = 1
+                let decangScan = scantime.getSunDeclination()
+                let eqtimeScan = scantime.getSunEquationOfTime()
+                                
+                let t1Scan = (90-decangScan).degreesToRadians
+                
+                let lonsun = -15.0*(ut-12.0+eqtime)
+                let lonsunScan = -15.0*(ut-12.0+eqtimeScan)
+                
+                let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
+                /// longitude of sun
+                let p1 = lonsun.degreesToRadians
+                let p1Scan = lonsunScan.degreesToRadians
+                
+                let ut0 = ut - (Float(timerange.dtSeconds)/3600)
+                let lonsun0 = -15.0*(ut0-12.0+eqtime)
+                
+                let p10 = lonsun0.degreesToRadians
+                
+                let t0=(90-latitude).degreesToRadians                     // colatitude of point
+                
+                /// longitude of point
+                var p0 = longitude.degreesToRadians
+                if p0 < p1 - .pi {
+                    p0 += 2 * .pi
+                }
+                if p0 > p1 + .pi {
+                    p0 -= 2 * .pi
+                }
+                
+                // limit p1 and p10 to sunrise/set
+                let arg = -(sin(alpha)+cos(t0)*cos(t1))/(sin(t0)*sin(t1))
+                let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                let sunrise = p0 + carg
+                let sunset = p0 - carg
+                let p1_l = min(sunrise, p10)
+                let p10_l = max(sunset, p1)
+                
+                // solve integral to get sun elevation dt
+                // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
+                let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                /// sun elevation (`zz = sin(alpha)`)
+                let zzBackwards = (left-right) / (p1_l - p10_l)
+                
+                /// Instant sun elevation
+                let zzInstant = cos(t0)*cos(t1Scan)+sin(t0)*sin(t1Scan)*cos(p1Scan-p0)
+                if zzBackwards <= 0 || zzInstant <= 0 {
+                    data[pos] = 0
+                    continue
+                }
+                let factor = zzInstant / zzBackwards
+                if factor < 0.05 {
+                    continue
+                }
+                data[pos] = data[pos] / factor
+            }
+        }
+    }
+    
     
     /// Calculate scaling factor from backwards to instant radiation factor
     public static func backwardsAveragedToInstantFactor(time: TimerangeDt, latitude: Float, longitude: Float) -> [Float] {
