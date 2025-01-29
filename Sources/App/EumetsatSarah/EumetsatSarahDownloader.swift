@@ -64,6 +64,39 @@ struct EumetsatSarahDownload: AsyncCommand {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         
+        // Download meta data for elevation and scan time offsets
+        let metaDataFile = "\(domain.downloadDirectory)/AuxilaryData_SARAH-3.nc"
+        if !FileManager.default.fileExists(atPath: metaDataFile) {
+            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+            let url = "https://public.cmsaf.dwd.de/data/perm/auxilliary_data/AuxilaryData_SARAH-3.nc"
+            try await curl.download(url: url, toFile: metaDataFile, bzip2Decode: false)
+        }
+        guard let meta: (elevation: [Float], landMask: [Int8], timeDifference: [Double]) = try NetCDF.open(path: metaDataFile, allowUpdate: false).map ({ nc in
+            guard let elevation = try nc.getVariable(name: "altitude")?.asType(Float.self)?.read() else {
+                fatalError("Could not read altitude")
+            }
+            /// land mask (0==sea, any other value==land)
+            guard let landMask = try nc.getVariable(name: "land_mask")?.asType(Int8.self)?.read() else {
+                fatalError("Could not read land_mask")
+            }
+            /// time difference of the acquisition time since 2006 onwards (SEVIRI) to the time provided in the instantaneous data files
+            /// time difference of the acquisition time during 1983-2005 (MVIRI) to the time provided in the instantaneous data files
+            let timeDifferenceKey = run >= Timestamp(2006, 1, 1) ? "time_difference_SEVIRI" : "time_difference_MVIRI"
+            guard let timeDifference = try nc.getVariable(name: timeDifferenceKey)?.asType(Double.self)?.read().map({ $0 <= -999 ? Double.nan : $0 }) else {
+                fatalError("Could not read \(timeDifferenceKey)")
+            }
+            return (elevation, landMask, timeDifference)
+        }) else {
+            fatalError("Could not read metadata")
+        }
+        let elevationFile = domain.surfaceElevationFileOm
+        if !FileManager.default.fileExists(atPath: elevationFile.getFilePath()) {
+            try elevationFile.createDirectory()
+            let elevation: [Float] = meta.elevation.enumerated().map { (i, value) in
+                return meta.timeDifference[i].isNaN ? .nan : meta.landMask[i] == 0 ? -999 : Float(value)
+            }
+            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: true)
+        }
         
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
             let url = "https://api.eumetsat.int/data/download/1.0.0/collections/EO%3AEUM%3ADAT%3A0863/products/\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA/entry?name=\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA.nc&access_token=\(accessToken)"
