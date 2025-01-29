@@ -309,6 +309,7 @@ public struct Zensun {
                 let t1 = (90-latsun).degreesToRadians
                 
                 let scantime = timestamp.add(Int(scanTimeDifferenceHours[i] * 3600))
+                let utScan = scantime.hourWithFraction
                 
                 /// fractional day number with 12am 1jan = 1
                 let decangScan = scantime.getSunDeclination()
@@ -317,7 +318,7 @@ public struct Zensun {
                 let t1Scan = (90-decangScan).degreesToRadians
                 
                 let lonsun = -15.0*(ut-12.0+eqtime)
-                let lonsunScan = -15.0*(ut-12.0+eqtimeScan)
+                let lonsunScan = -15.0*(utScan-12.0+eqtimeScan)
                 
                 let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
                 /// longitude of sun
