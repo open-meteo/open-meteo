@@ -1,6 +1,12 @@
 import Vapor
 import SwiftNetCDF
 
+/**
+ Important: SARAH-3 data originally uses instantaneous solar radiation values. However, each line has a scan time offset of 0-15 minutes.
+ In Europe the offset is closer to 15 minutes.
+ 
+ OpenMeteo corrects this scan time offset and stores backwards averaged 30 minutes values.
+ */
 struct EumetsatSarahDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -95,7 +101,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             let elevation: [Float] = meta.elevation.enumerated().map { (i, value) in
                 return meta.timeDifference[i].isNaN ? .nan : meta.landMask[i] == 0 ? -999 : Float(value)
             }
-            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: true)
+            try elevation.writeOmFile2D(file: elevationFile.getFilePath(), grid: domain.grid, createNetCdf: false)
         }
         
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
@@ -105,7 +111,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             var dataFastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: time.count).transpose().data
             
             // Transform instant solar radiation values to backwards averaged values
-            // Instant values have a scan time difference which needs to be accounted for
+            // Instant values have a scan time difference which needs to be corrected for
             if /*variable == .direct_radiation ||*/ variable == .shortwave_radiation {
                 let timerange = TimerangeDt(start: run, nTime: time.count, dtSeconds: domain.dtSeconds)
                 Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &dataFastTime, grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: timerange, scanTimeDifferenceHours: meta.timeDifference)

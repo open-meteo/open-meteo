@@ -279,27 +279,35 @@ public struct Zensun {
         return out
     }
     
-    /// Assumes data is an instantaneous 2D field of satellite solar radiation which is converted to backwards averaged solar radiation
-    /// Corrects for scan time difference for each location
-    /// TODO: Correct for sunset
+    /// Assumes data is an instantaneous satellite solar radiation which is converted to backwards averaged solar radiation.
+    /// Corrects for scan time difference for each location. With EUMETSAT this is around 10 to 15 minutes in Europe.
+    /// Corrects for missing averages radiation values at sunset assuming the cloudiness index `kt` from the previous step. This only works for `t>0` timesteps
+    ///
+    /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
+    /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them....
     public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double]) {
-        for (t, timestamp) in timerange.enumerated() {
-            /// fractional day number with 12am 1jan = 1
-            let decang = timestamp.getSunDeclination()
-            let eqtime = timestamp.getSunEquationOfTime()
             
-            let alpha = Float(0.83333).degreesToRadians
+        for (i, gridpoint) in locationRange.enumerated() {
+            var ktPrevious = Float.nan
             
-            let latsun=decang
-            /// universal time
-            let ut = timestamp.hourWithFraction
-            let t1 = (90-latsun).degreesToRadians
-            
-            for (i, gridpoint) in locationRange.enumerated() {
+            for (t, timestamp) in timerange.enumerated() {
                 let pos = i * timerange.count + t
                 if data[pos].isNaN {
+                    ktPrevious = .nan
                     continue
                 }
+                
+                /// fractional day number with 12am 1jan = 1
+                let decang = timestamp.getSunDeclination()
+                let eqtime = timestamp.getSunEquationOfTime()
+                
+                let alpha = Float(0.83333).degreesToRadians
+                
+                let latsun=decang
+                /// universal time
+                let ut = timestamp.hourWithFraction
+                let t1 = (90-latsun).degreesToRadians
+                
                 let scantime = timestamp.add(Int(scanTimeDifferenceHours[i] * 3600))
                 
                 /// fractional day number with 12am 1jan = 1
@@ -349,15 +357,25 @@ public struct Zensun {
                 
                 /// Instant sun elevation
                 let zzInstant = cos(t0)*cos(t1Scan)+sin(t0)*sin(t1Scan)*cos(p1Scan-p0)
+                // SARAH-3 already shows 0 watts close to sunset even at zzInstant > 0
+                if data[pos] == 0 && zzBackwards > 0 && ktPrevious.isFinite {
+                    // condition at sunset, use previous kt index to estimate solar radiation
+                    data[pos] = ktPrevious * zzBackwards
+                    continue
+                }
                 if zzBackwards <= 0 || zzInstant <= 0 {
-                    data[pos] = 0
+                    ktPrevious = .nan
                     continue
                 }
                 let factor = zzInstant / zzBackwards
                 if factor < 0.05 {
+                    ktPrevious = .nan
                     continue
                 }
-                data[pos] = data[pos] / factor
+                let instant = data[pos]
+                let backwards = instant / factor
+                data[pos] = backwards
+                ktPrevious = (instant / zzInstant)
             }
         }
     }
