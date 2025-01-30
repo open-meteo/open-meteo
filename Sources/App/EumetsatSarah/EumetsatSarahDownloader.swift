@@ -113,6 +113,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             // Transform instant solar radiation values to backwards averaged values
             // Instant values have a scan time difference which needs to be corrected for
             if /*variable == .direct_radiation ||*/ variable == .shortwave_radiation {
+                let start = DispatchTime.now()
                 let timerange = TimerangeDt(start: run, nTime: time.count, dtSeconds: domain.dtSeconds)
                 Zensun.instantaneousSolarRadiationToBackwardsAverages(
                     timeOrientedData: &dataFastTime,
@@ -122,6 +123,7 @@ struct EumetsatSarahDownload: AsyncCommand {
                     scanTimeDifferenceHours: meta.timeDifference,
                     sunDeclinationCutOffDegrees: 1
                 )
+                logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
             }
             
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: time.count)
