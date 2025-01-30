@@ -107,14 +107,14 @@ struct EumetsatSarahDownload: AsyncCommand {
         }
         
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
-            let url = "https://api.eumetsat.int/data/download/1.0.0/collections/EO%3AEUM%3ADAT%3A0863/products/\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA/entry?name=\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA.nc&access_token=\(accessToken)"
-            let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
+            let url = "https://api.eumetsat.int/data/download/1.0.0/collections/EO%3AEUM%3ADAT%3A0863/products/\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA/entry?name=\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA.nc"
+            let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024, headers: [("Authorization", "Bearer \(accessToken)")])
             let (time, data) = try memory.readNetcdf(name: variable.eumetsatName)
             var dataFastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: time.count).transpose().data
             
             // Transform instant solar radiation values to backwards averaged values
             // Instant values have a scan time difference which needs to be corrected for
-            if /*variable == .direct_radiation ||*/ variable == .shortwave_radiation {
+            if variable == .direct_radiation || variable == .shortwave_radiation {
                 let start = DispatchTime.now()
                 let timerange = TimerangeDt(start: run, nTime: time.count, dtSeconds: domain.dtSeconds)
                 Zensun.instantaneousSolarRadiationToBackwardsAverages(
