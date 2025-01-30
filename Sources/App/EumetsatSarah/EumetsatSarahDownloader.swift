@@ -111,7 +111,9 @@ struct EumetsatSarahDownload: AsyncCommand {
         }
         
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
-            let url = "https://api.eumetsat.int/data/download/1.0.0/collections/EO%3AEUM%3ADAT%3A0863/products/\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA/entry?name=\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001I1MA.nc"
+            let wiredNumber = run >= Timestamp(2021, 1, 1) ? "I" : "0"
+            let id = "\(variable.eumetsatApiName)\(run.format_YYYYMMdd)00000042310001\(wiredNumber)1MA"
+            let url = "https://api.eumetsat.int/data/download/1.0.0/collections/EO%3AEUM%3ADAT%3A0863/products/\(id)/entry?name=\(id).nc"
             let memory = try await api.download(url: url)
             let (time, data) = try memory.readNetcdf(name: variable.eumetsatName)
             var dataFastTime = Array2DFastSpace(data: data, nLocations: domain.grid.count, nTime: time.count).transpose().data
