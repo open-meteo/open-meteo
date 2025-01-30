@@ -310,15 +310,9 @@ public struct Zensun {
                 
                 let scantime = timestamp.add(Int(scanTimeDifferenceHours[i] * 3600))
                 let utScan = scantime.hourWithFraction
-                
-                /// fractional day number with 12am 1jan = 1
-                let decangScan = scantime.getSunDeclination()
-                let eqtimeScan = scantime.getSunEquationOfTime()
-                                
-                let t1Scan = (90-decangScan).degreesToRadians
-                
+                                                
                 let lonsun = -15.0*(ut-12.0+eqtime)
-                let lonsunScan = -15.0*(utScan-12.0+eqtimeScan)
+                let lonsunScan = -15.0*(utScan-12.0+eqtime)
                 
                 let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
                 /// longitude of sun
@@ -357,7 +351,7 @@ public struct Zensun {
                 let zzBackwards = (left-right) / (p1_l - p10_l)
                 
                 /// Instant sun elevation
-                let zzInstant = cos(t0)*cos(t1Scan)+sin(t0)*sin(t1Scan)*cos(p1Scan-p0)
+                let zzInstant = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1Scan-p0)
                 // SARAH-3 already shows 0 watts close to sunset even at zzInstant > 0
                 if data[pos] == 0 && zzBackwards > 0 && ktPrevious.isFinite {
                     // condition at sunset, use previous kt index to estimate solar radiation
