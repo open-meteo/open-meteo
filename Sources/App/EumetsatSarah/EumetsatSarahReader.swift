@@ -74,7 +74,8 @@ struct EumetsatSarahReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(dni, direct.unit)
         case .diffuse_radiation:
             let swrad = try get(raw: .shortwave_radiation, time: time)
-            let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            let dir = try get(raw: .direct_radiation, time: time)
+            let diffuse = zip(swrad.data, dir.data).map(-)
             return DataAndUnit(diffuse, swrad.unit)
         case .direct_radiation_instant:
             let direct = try get(raw: .direct_radiation, time: time)
@@ -99,11 +100,15 @@ struct EumetsatSarahReader: GenericReaderDerived, GenericReaderProtocol {
     
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
         switch derived {
-            // TODO prefetch direct radiation
         case .terrestrial_radiation, .terrestrial_radiation_instant:
             break
-        case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant,  .direct_radiation_instant, .shortwave_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant:
+        case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
+        case .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant:
+            try prefetchData(raw: .direct_radiation, time: time)
+        case .diffuse_radiation, .diffuse_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant:
+            try prefetchData(raw: .shortwave_radiation, time: time)
+            try prefetchData(raw: .direct_radiation, time: time)
         }
     }
 }

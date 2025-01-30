@@ -48,21 +48,23 @@ struct EumetsatSarahDownload: AsyncCommand {
             fatalError("Parameter access token required")
         }
         
+        let variables = EumetsatSarahVariable.allCases
+        
         if let timeinterval = signature.timeinterval {
             let chunkDt = domain.omFileLength * domain.dtSeconds
             let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400)
             for (_, runs) in timerange.groupedPreservedOrder(by: {$0.timeIntervalSince1970 / chunkDt}) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
                 let handles = try await runs.asyncFlatMap { run in
-                    return try await downloadRun(application: context.application, run: run, domain: domain, accessToken: accessToken, variables: [.shortwave_radiation])
+                    return try await downloadRun(application: context.application, run: run, domain: domain, accessToken: accessToken, variables: variables)
                 }
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
             }
             return
         }
         
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 1)
-        let handles = try await downloadRun(application: context.application, run: run, domain: domain, accessToken: accessToken, variables: [.shortwave_radiation])
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
+        let handles = try await downloadRun(application: context.application, run: run, domain: domain, accessToken: accessToken, variables: variables)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
@@ -178,15 +180,19 @@ enum EumetsatSarahVariable: String, CaseIterable, GenericVariable, GenericVariab
     
     var eumetsatName: String {
         switch self {
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation:
             return "SIS"
+        case .direct_radiation:
+            return "SID"
         }
     }
     
     var eumetsatApiName: String {
         switch self {
-        case .shortwave_radiation, .direct_radiation:
+        case .shortwave_radiation:
             return "SISin"
+        case .direct_radiation:
+            return "SIDin"
         }
     }
     
