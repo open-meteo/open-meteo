@@ -12,13 +12,16 @@ enum CurlError: Error {
     case sizeTooSmall
     case didNotGetAllGribMessages(got: Int, expected: Int)
     case downloadFailed(code: HTTPStatus)
-    case unauthorized
     case fileNotFound
     case timeoutReached
     case timeoutPerChunkReached
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
     case couldNotGetContentLengthForConcurrentDownload
+}
+
+enum CurlErrorNonRetry: NonRetryError {
+    case unauthorized
 }
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
@@ -150,6 +153,9 @@ final class Curl {
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     //await print(try response.body.collect(upTo: 10000000).readStringImmutable())
+                    if response.status == .unauthorized {
+                        throw CurlErrorNonRetry.unauthorized
+                    }
                     throw CurlError.downloadFailed(code: response.status)
                 }
                 if let minSize = minSize, let contentLength = try response.contentLength(), contentLength < minSize {

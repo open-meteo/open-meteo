@@ -26,7 +26,7 @@ extension HTTPClientResponse {
 
     func throwOnFatalError() throws {
         if status == .unauthorized {
-            throw CurlError.unauthorized
+            throw CurlErrorNonRetry.unauthorized
         }
     }
 }
@@ -56,9 +56,9 @@ extension HTTPClient {
                     throw CurlError.fileNotFound
                 }
                 return response
-            } catch CurlError.unauthorized {
+            } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key.")
-                throw CurlError.unauthorized
+                throw CurlErrorNonRetry.unauthorized
             } catch {
                 var wait = TimeAmount.nanoseconds(min(backoffFactor.nanoseconds * Int64(pow(2, Double(n-1))), backoffMaximum.nanoseconds))
                 
