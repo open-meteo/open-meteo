@@ -114,7 +114,14 @@ struct EumetsatSarahDownload: AsyncCommand {
             // Instant values have a scan time difference which needs to be corrected for
             if /*variable == .direct_radiation ||*/ variable == .shortwave_radiation {
                 let timerange = TimerangeDt(start: run, nTime: time.count, dtSeconds: domain.dtSeconds)
-                Zensun.instantaneousSolarRadiationToBackwardsAverages(timeOrientedData: &dataFastTime, grid: domain.grid, locationRange: 0..<domain.grid.count, timerange: timerange, scanTimeDifferenceHours: meta.timeDifference)
+                Zensun.instantaneousSolarRadiationToBackwardsAverages(
+                    timeOrientedData: &dataFastTime,
+                    grid: domain.grid,
+                    locationRange: 0..<domain.grid.count,
+                    timerange: timerange,
+                    scanTimeDifferenceHours: meta.timeDifference,
+                    sunDeclinationCutOffDegrees: 1
+                )
             }
             
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: time.count)

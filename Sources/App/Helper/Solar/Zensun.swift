@@ -285,7 +285,8 @@ public struct Zensun {
     ///
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
     /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them....
-    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double]) {
+    /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double], sunDeclinationCutOffDegrees: Float) {
             
         for (i, gridpoint) in locationRange.enumerated() {
             var ktPrevious = Float.nan
@@ -301,7 +302,7 @@ public struct Zensun {
                 let decang = timestamp.getSunDeclination()
                 let eqtime = timestamp.getSunEquationOfTime()
                 
-                let alpha = Float(0.83333).degreesToRadians
+                let alpha = Float(0.83333).degreesToRadians - sunDeclinationCutOffDegrees.degreesToRadians
                 
                 let latsun=decang
                 /// universal time
