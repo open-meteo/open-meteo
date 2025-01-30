@@ -3,13 +3,13 @@
  Definition of GEM domains from the Canadian Weather Service
  */
 enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
-    case sarah3_30minutely
+    case sarah3_30min
     case sarah3_daily
     
     var domainRegistry: DomainRegistry {
         switch self {
-        case .sarah3_30minutely:
-            return .eumetsat_sarah3_30minutely
+        case .sarah3_30min:
+            return .eumetsat_sarah3_30min
         case .sarah3_daily:
             return .eumetsat_sarah3_daily
         }
@@ -29,7 +29,7 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         switch self {
-        case .sarah3_30minutely:
+        case .sarah3_30min:
             return 1800
         case .sarah3_daily:
             return 24*3600
@@ -46,7 +46,7 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
-        case .sarah3_30minutely:
+        case .sarah3_30min:
             return 2*24*7
         case .sarah3_daily:
             return 30

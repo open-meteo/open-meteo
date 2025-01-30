@@ -296,8 +296,8 @@ public struct Zensun {
             
             for (t, timestamp) in timerange.enumerated() {
                 let pos = i * timerange.count + t
-                if data[pos].isNaN {
-                    ktPrevious = .nan
+                let scanTimeDifferenceHours = scanTimeDifferenceHours[i]
+                if scanTimeDifferenceHours.isNaN {
                     continue
                 }
                 let decang = decang[t]
@@ -310,7 +310,7 @@ public struct Zensun {
                 let ut = timestamp.hourWithFraction
                 let t1 = (90-latsun).degreesToRadians
                 
-                let scantime = timestamp.add(Int(scanTimeDifferenceHours[i] * 3600))
+                let scantime = timestamp.add(Int(scanTimeDifferenceHours * 3600))
                 let utScan = scantime.hourWithFraction
                                                 
                 let lonsun = -15.0*(ut-12.0+eqtime)
@@ -355,9 +355,13 @@ public struct Zensun {
                 /// Instant sun elevation
                 let zzInstant = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1Scan-p0)
                 // SARAH-3 already shows 0 watts close to sunset even at zzInstant > 0
-                if data[pos] == 0 && zzBackwards > 0 && ktPrevious.isFinite {
+                // Additionally very old files have missing some timesteps. Use kt to backfill data
+                if (data[pos] == 0 || data[pos].isNaN) && zzBackwards > 0 && ktPrevious.isFinite {
                     // condition at sunset, use previous kt index to estimate solar radiation
                     data[pos] = ktPrevious * zzBackwards
+                    continue
+                }
+                if data[pos].isNaN {
                     continue
                 }
                 if zzBackwards <= 0 || zzInstant <= 0 {
