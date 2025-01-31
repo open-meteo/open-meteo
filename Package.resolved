@@ -28,6 +28,15 @@
       }
     },
     {
+      "identity" : "curl-swift",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/patrick-zippenfenig/curl-swift.git",
+      "state" : {
+        "revision" : "e85e15e03ac255d74335287c69a020147b54a065",
+        "version" : "1.0.0"
+      }
+    },
+    {
       "identity" : "flatbuffers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/google/flatbuffers.git",

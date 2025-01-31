@@ -102,6 +102,8 @@ struct GenericVariableHandle {
     /// Process each variable and update time-series optimised files
     static private func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
         let grid = domain.grid
+        let nx = grid.nx
+        let ny = grid.ny
         let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
         
@@ -111,6 +113,9 @@ struct GenericVariableHandle {
                     let reader = try $0.makeReader()
                     let dimensions = reader.getDimensions()
                     let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
+                    guard dimensions[0] == ny && dimensions[1] == nx else {
+                        fatalError("Dimensions do not match \(dimensions). Ny \(ny), Nx \(nx)")
+                    }
                     let time = TimerangeDt(start: time, nTime: nt, dtSeconds: dtSeconds)
                     return(time, reader, $0.member)
                 }

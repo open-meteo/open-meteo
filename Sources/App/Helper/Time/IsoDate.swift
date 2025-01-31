@@ -46,6 +46,16 @@ public struct IsoDate: Codable {
         return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))"
     }
     
+    /// 2 char month
+    public var mm: String {
+        return month.zeroPadded(len: 2)
+    }
+    
+    /// 2 char day
+    public var dd: String {
+        return day.zeroPadded(len: 2)
+    }
+    
     /// Init form unxtimestamp
     public init(timeIntervalSince1970: Int) {
         var time = timeIntervalSince1970
