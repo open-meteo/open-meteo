@@ -1,6 +1,9 @@
 import Foundation
 import Logging
 
+
+protocol NonRetryError: Error { }
+
 /// Helper to track timeouts and throw errors once a headline in reached
 final class TimeoutTracker {
     let startTime = Date()
@@ -18,6 +21,9 @@ final class TimeoutTracker {
     
     /// Print statistics, throw if deadline reached, sleep backoff timer
     func check(error: Error, delay: Int? = nil) async throws {
+        if let error = error as? NonRetryError {
+            throw error
+        }
         let delay = delay ?? retryDelaySeconds
         let timeElapsed = Date().timeIntervalSince(startTime)
         if Date().timeIntervalSince(lastPrint) > 60 {

@@ -55,7 +55,8 @@ extension Request {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
             return nil
         }
-        let isFreeApi = host.starts(with: subdomain) || alias.contains(where: {host.starts(with: $0)}) == true
+        let isDevNode = host.contains("eu0") || host.contains("us0")
+        let isFreeApi = host.starts(with: subdomain) || alias.contains(where: {host.starts(with: $0)}) == true || isDevNode
         let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
         
         if !(isFreeApi || isCustomerApi) {

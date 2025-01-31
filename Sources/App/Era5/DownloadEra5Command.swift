@@ -860,7 +860,7 @@ struct DownloadEra5Command: AsyncCommand {
             }
             
             /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
-            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: 1)
+            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: 1, nTime: 1)
             var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nt)
             
             for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(spatialChunks.y)) {

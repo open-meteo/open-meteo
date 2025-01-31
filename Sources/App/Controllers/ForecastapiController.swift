@@ -354,6 +354,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ukmo_global_deterministic_10km
     case ukmo_uk_deterministic_2km
     
+    case eumetsat_sarah3
 
     
     /// Return the required readers for this domain configuration
@@ -577,6 +578,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [ukmoUk].compactMap({$0})
         case .ncep_nbm_conus:
             return try NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .eumetsat_sarah3:
+            let sarah3 = try EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [sarah3].compactMap({$0})
         }
     }
     
