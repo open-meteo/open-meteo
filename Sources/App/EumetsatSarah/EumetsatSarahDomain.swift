@@ -1,7 +1,3 @@
-
-/**
- Definition of GEM domains from the Canadian Weather Service
- */
 enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
     case sarah3_30min
     case sarah3_daily
@@ -52,5 +48,4 @@ enum EumetsatSarahDomain: String, GenericDomain, CaseIterable {
             return 30
         }
     }
-    
 }
