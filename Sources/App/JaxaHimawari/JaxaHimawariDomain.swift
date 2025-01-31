@@ -33,7 +33,7 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
     }
     
     var grid: any Gridable {
-        return RegularGrid(nx: 2401, ny: 2401, latMin: -65, lonMin: -65, dx: 0.05, dy: 0.05)
+        return RegularGrid(nx: 2401, ny: 2401, latMin: -60, lonMin: 80, dx: 0.05, dy: 0.05)
     }
     
     var updateIntervalSeconds: Int {

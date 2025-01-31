@@ -32,8 +32,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/curl-swift.git",
       "state" : {
-        "revision" : "e85e15e03ac255d74335287c69a020147b54a065",
-        "version" : "1.0.0"
+        "revision" : "ea1342d7c78ebce74d25e067c7b54b6e6d0a1d4c",
+        "version" : "1.0.1"
       }
     },
     {
