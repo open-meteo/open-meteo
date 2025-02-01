@@ -51,7 +51,7 @@ struct JaxaHimawariDownload: AsyncCommand {
         
         if let timeinterval = signature.timeinterval {
             let chunkDt = domain.omFileLength * domain.dtSeconds
-            let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400)
+            let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: domain.dtSeconds)
             for (_, runs) in timerange.groupedPreservedOrder(by: {$0.timeIntervalSince1970 / chunkDt}) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
                 let handles = try await runs.asyncFlatMap { run in
@@ -68,12 +68,14 @@ struct JaxaHimawariDownload: AsyncCommand {
     }
     
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: JaxaHimawariDomain, variables: [JaxaHimawariVariable], downloader: JaxaFtpDownloader) async throws -> [GenericVariableHandle] {
-        //let logger = application.logger
+        let logger = application.logger
         
         return try await variables.asyncMap({ variable -> GenericVariableHandle in
+            logger.info("Downloading \(variable) \(run.iso8601_YYYY_MM_dd_HH_mm)")
             let c = run.toComponents()
             // ftp://ftp.ptree.jaxa.jp/pub/himawari/L3/PAR/021/202501/31/H09_20250131_0200_1H_RFL021_FLDK.02401_02401.nc
-            let data = try downloader.get(path: "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc")
+            let path = "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc"
+            let data = try await downloader.get(logger: logger, path: path)
             let sw = try data.readNetcdf(name: "SWR")
             
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
@@ -96,11 +98,26 @@ fileprivate struct JaxaFtpDownloader {
         self.auth = "\(username):\(password)"
     }
     
-    public func get(path: String) throws -> Data {
-        let shared = CURLSH()
-        let req = CURL(method: "GET", url: "ftp://\(auth)@ftp.ptree.jaxa.jp\(path)")
-        let response = try shared.perform(curl: req)
-        return response.body
+    public func get(logger: Logger, path: String) async throws -> Data {
+        let url = "ftp://\(auth)@ftp.ptree.jaxa.jp\(path)"
+        let cacheFile = Curl.cacheDirectory.map { "\($0)/\(url.base64Bytes().hexEncodedString())" }
+        if let cacheFile, FileManager.default.fileExists(atPath: cacheFile) {
+            return try Data(contentsOf: URL(fileURLWithPath: cacheFile))
+        }
+        let req = CURL(method: "GET", url: url)
+        let progress = TimeoutTracker(logger: logger, deadline: Date().addingTimeInterval(1*3600))
+        while true {
+            do {
+                let response = try shared.perform(curl: req)
+                let data = response.body
+                if let cacheFile {
+                    try data.write(to: URL(fileURLWithPath: cacheFile), options: .atomic)
+                }
+                return data
+            } catch {
+                try await progress.check(error: CurlError.timeoutReached, delay: 5)
+            }
+        }
     }
 }
 
