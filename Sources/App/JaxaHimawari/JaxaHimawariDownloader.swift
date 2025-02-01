@@ -100,11 +100,13 @@ fileprivate struct JaxaFtpDownloader {
     
     public func get(logger: Logger, path: String) async throws -> Data {
         let url = "ftp://\(auth)@ftp.ptree.jaxa.jp\(path)"
-        let cacheFile = Curl.cacheDirectory.map { "\($0)/\(url.base64Bytes().hexEncodedString())" }
+        let cacheFile = Curl.cacheDirectory.map { "\($0)/\(url.sha256))" }
         if let cacheFile, FileManager.default.fileExists(atPath: cacheFile) {
+            logger.info("Using cached file for \(path)")
             return try Data(contentsOf: URL(fileURLWithPath: cacheFile))
         }
-        let req = CURL(method: "GET", url: url)
+        logger.info("Downloading \(path)")
+        let req = CURL(method: "GET", url: url, verbose: false)
         let progress = TimeoutTracker(logger: logger, deadline: Date().addingTimeInterval(1*3600))
         while true {
             do {
