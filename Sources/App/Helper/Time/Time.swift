@@ -239,6 +239,11 @@ public struct Timestamp: Hashable {
         hour.zeroPadded(len: 2)
     }
     
+    // Return minute string as 2 character
+    var mm: String {
+        minute.zeroPadded(len: 2)
+    }
+    
     /// Return a new timestamp with setting the hour
     func with(hour: Int) -> Timestamp {
         return Timestamp(timeIntervalSince1970 / 86400 * 86400 + hour * 3600)
