@@ -16,7 +16,7 @@ enum JaxaHimawariVariable: String, CaseIterable, GenericVariable, GenericVariabl
     var interpolation: ReaderInterpolation {
         switch self {
         case .shortwave_radiation:
-            return .solar_backwards_averaged
+            return .solar_backwards_missing_not_averaged
         }
     }
     

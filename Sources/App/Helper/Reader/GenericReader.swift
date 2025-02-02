@@ -195,7 +195,7 @@ extension TimerangeDt {
         switch interpolation {
         case .linear, .linearDegrees, .hermite(_):
             return self.with(dtSeconds: modelDt)
-        case .solar_backwards_averaged, .backwards_sum, .backwards:
+        case .solar_backwards_averaged, .solar_backwards_missing_not_averaged, .backwards_sum, .backwards:
             // Need to read previous timesteps to sum/average the correct value
             let steps = dtSeconds / modelDt
             let backSeconds = -1 * modelDt * (steps - 1)

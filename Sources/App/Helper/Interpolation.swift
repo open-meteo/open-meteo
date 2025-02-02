@@ -11,7 +11,7 @@ extension Array where Element == Float {
             return interpolateLinearDegrees(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)
         case .hermite(let bounds):
             return interpolateHermite(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor, bounds: bounds)
-        case .solar_backwards_averaged:
+        case .solar_backwards_averaged, .solar_backwards_missing_not_averaged:
             return interpolateSolarBackwards(timeOld: timeOld, timeNew: timeNew, latitude: latitude, longitude: longitude, scalefactor: scalefactor)
         case .backwards_sum:
             return backwardsSum(timeOld: timeOld, timeNew: timeNew, scalefactor: scalefactor)

@@ -43,7 +43,9 @@ extension Array where Element == Float {
         case .hermite(let bounds):
             interpolateInplaceHermite(nTime: time.count, bounds: bounds)
         case .solar_backwards_averaged:
-            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange)
+            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange, missingValuesAreBackwardsAveraged: true)
+        case .solar_backwards_missing_not_averaged:
+            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange, missingValuesAreBackwardsAveraged: false)
         case .backwards_sum:
             interpolateInplaceBackwards(nTime: time.count, isSummation: true)
         case .backwards:
@@ -242,7 +244,10 @@ extension Array where Element == Float {
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
     ///
     /// Automatically detects data spacing. e.g. `--D--D--D` and correctly backfills
-    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
+    ///
+    /// If `missingValuesAreBackwardsAveraged` is set, it is assumed that values after missing data is properly averaged over the missing time-steps.
+    /// `true` for weather model data. `false` for satellite data and other measurements
+    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>, missingValuesAreBackwardsAveraged: Bool) {
         let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
@@ -327,11 +332,14 @@ extension Array where Element == Float {
                 let B = self[l * nTime + posB]
                 let solB = solar2d[sPos, posB - sLow]
                 
-                /// solC is an average of the solar factor from posB until posC
-                let solC = solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean()
+                let solC = solar2d[sPos, posC - sLow]
+                let solD = solar2d[sPos, posD - sLow]
+                
+                /// solAvgC is an average of the solar factor from posB until posC
+                let solAvgC = missingValuesAreBackwardsAveraged ? solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean() : solC
 
                 /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
-                var ktC = solC <= 0.005 ? .nan : Swift.min(C / solC, 1100)
+                var ktC = solAvgC <= 0.005 ? .nan : Swift.min(C / solAvgC, 1100)
                 /// Clearness index at point B, or use `ktC` for low radiation levels. B could be NaN if data is immediately missing in the bedinning of a time-series
                 var ktB = solB <= 0.005 || B.isNaN ? ktC : Swift.min(B / solB, 1100)
                 if ktC.isNaN && ktB > 0 {
@@ -361,8 +369,8 @@ extension Array where Element == Float {
                     ktD = ktC
                 } else {
                     /// solC is an average of the solar factor from posC until posD
-                    let solD = solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean()
-                    ktD = solD <= 0.005 ? ktC : Swift.min(D / solD, 1100)
+                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solD
+                    ktD = solAvgD <= 0.005 ? ktC : Swift.min(D / solAvgD, 1100)
                 }
                 
                 // Espcially for 6h values, aggressively try to find any KT index that works
@@ -390,7 +398,7 @@ extension Array where Element == Float {
                 }
                 
                 // Deaverage point C, ktC could be NaN at night, therefore `max(0, ktC)` instead of `max(ktC, 0)`
-                self[l * nTime + posC] = Swift.max(0, ktC) * solar2d[sPos, posC - sLow]
+                self[l * nTime + posC] = Swift.max(0, ktC) * solC
             }
         }
     }

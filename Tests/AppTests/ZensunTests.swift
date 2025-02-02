@@ -180,7 +180,7 @@ final class ZensunTests: XCTestCase {
             averagedWithNaNs[7+i*2+1] = averagedWithNaNs[7+i*2..<9+i*2].mean()
             averagedWithNaNs[7+i*2] = .nan
         }
-        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1)
+        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
         XCTAssertEqualArray(reference, averagedWithNaNs, accuracy: 0.001)
         
         averagedWithNaNs = reference
@@ -190,7 +190,7 @@ final class ZensunTests: XCTestCase {
             averagedWithNaNs[7+i*3] = .nan
         }
         print(averagedWithNaNs)
-        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1)
+        averagedWithNaNs.interpolateInplaceSolarBackwards(time: time, grid: position, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
         XCTAssertEqualArray(reference, averagedWithNaNs, accuracy: 0.01)
     }
     
