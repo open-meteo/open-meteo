@@ -110,6 +110,16 @@ final class ArrayTests: XCTestCase {
         time = TimerangeDt(start: Timestamp(2022,08,16,12), nTime: data.count, dtSeconds: 3600)
         data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
         XCTAssertEqualArray(data, [.nan, 306.46954, 321.95593, 304.3659, 247.148, 171.532, 101.99449, 46.063854, 10.676279, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
+        
+        data = [321.95593, .nan, 247.148]
+        time = TimerangeDt(start: Timestamp(2022,08,16,14), nTime: data.count, dtSeconds: 3600)
+        data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
+        XCTAssertEqualArray(data, [321.95593, 290.95282, 247.148], accuracy: 0.001) 
+        
+        data = [321.95593, .nan]
+        time = TimerangeDt(start: Timestamp(2022,08,16,14), nTime: data.count, dtSeconds: 3600)
+        data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
+        XCTAssertEqualArray(data, [321.95593, .nan], accuracy: 0.001)
     }
     
     func testRangeFraction() {

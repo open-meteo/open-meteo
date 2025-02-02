@@ -7,6 +7,9 @@ import curl_swift
  L2 10 min data is instantaneous with scan time offset, but has missing steps
  L3 1h hourly seem to be averaged 10 minutes values, completely ignoring zenith angle -> which makes no sense whatsoever.
  Himawari notes state: "This product is a beta version and is intended to show the preliminary result from Himawari-8. Users should keep in mind that the data is NOT quality assured."
+ 
+ https://www.eorc.jaxa.jp/ptree/userguide.html
+ https://www.eorc.jaxa.jp/ptree/documents/README_HimawariGeo_en.txt
  */
 struct JaxaHimawariDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -58,24 +61,39 @@ struct JaxaHimawariDownload: AsyncCommand {
             let chunkDt = domain.omFileLength * domain.dtSeconds
             let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: domain.dtSeconds)
             for (_, runs) in timerange.groupedPreservedOrder(by: {$0.timeIntervalSince1970 / chunkDt}) {
-                logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
+                logger.info("Downloading runs \(runs.iso8601_YYYYMMddHHmm)")
                 let handles = try await runs.asyncFlatMap { run in
                     return try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
                 }
-                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false, interpolation: false)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
         }
-        
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
-        let handles = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, interpolation: false)
+        // 11 minutes delay
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().subtract(minutes: 10).floor(toNearest: domain.dtSeconds)
+        let handles: [GenericVariableHandle]
+        if run.minute == 40+10 && [2, 14].contains(run.hour) {
+            // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
+            // At 2:50 and 14:50 we download the previous step and interpolate data at 2:40 and 14:40
+            handles = try await TimerangeDt(start: run.subtract(minutes: 20), nTime: 3, dtSeconds: 600).asyncFlatMap {
+                try await downloadRun(application: context.application, run: $0, domain: domain, variables: variables, downloader: downloader)
+            }
+        } else {
+            handles = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+        }
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: JaxaHimawariDomain, variables: [JaxaHimawariVariable], downloader: JaxaFtpDownloader) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         
-        // Download meta data for elevation and scan time offsets
+        if run.minute == 40 && [2, 14].contains(run.hour) {
+            // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
+            logger.info("Skipping run \(run) because it is during a house-keeping window")
+            return []
+        }
+        
+        // Download meta data for scan time offsets
         let metaDataFile = "\(domain.downloadDirectory)/AuxilaryData.nc"
         if !FileManager.default.fileExists(atPath: metaDataFile) {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
