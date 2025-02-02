@@ -3,7 +3,11 @@ import SwiftNetCDF
 import AsyncHTTPClient
 import curl_swift
 
-
+/**
+ L2 10 min data is instantaneous with scan time offset, but has missing steps
+ L3 1h hourly seem to be averaged 10 minutes values, completely ignoring zenith angle -> which makes no sense whatsoever.
+ Himawari notes state: "This product is a beta version and is intended to show the preliminary result from Himawari-8. Users should keep in mind that the data is NOT quality assured."
+ */
 struct JaxaHimawariDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -39,6 +43,7 @@ struct JaxaHimawariDownload: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        disableIdleSleep()
         let logger = context.application.logger
         let domain = try JaxaHimawariDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
@@ -70,6 +75,16 @@ struct JaxaHimawariDownload: AsyncCommand {
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: JaxaHimawariDomain, variables: [JaxaHimawariVariable], downloader: JaxaFtpDownloader) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         
+        // Download meta data for elevation and scan time offsets
+        let metaDataFile = "\(domain.downloadDirectory)/AuxilaryData.nc"
+        if !FileManager.default.fileExists(atPath: metaDataFile) {
+            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+            let path = "/jma/netcdf/202501/01/NC_H09_20250101_0000_R21_FLDK.02401_02401.nc"
+            let data = try await downloader.get(logger: logger, path: path)
+            try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
+        }
+        let timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")
+        
         return try await variables.asyncCompactMap({ variable -> GenericVariableHandle? in
             logger.info("Downloading \(variable) \(run.iso8601_YYYY_MM_dd_HH_mm)")
             let c = run.toComponents()
@@ -85,7 +100,23 @@ struct JaxaHimawariDownload: AsyncCommand {
                 logger.warning("File missing")
                 return nil
             }
-            let sw = try data.readNetcdf(name: "SWR")
+            var sw = try data.readNetcdf(name: "SWR")
+            
+            // Transform instant solar radiation values to backwards averaged values
+            // Instant values have a scan time difference which needs to be corrected for
+            if variable == .shortwave_radiation {
+                let start = DispatchTime.now()
+                let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+                Zensun.instantaneousSolarRadiationToBackwardsAverages(
+                    timeOrientedData: &sw.data,
+                    grid: domain.grid,
+                    locationRange: 0..<domain.grid.count,
+                    timerange: timerange,
+                    scanTimeDifferenceHours: timeDifference.data.map(Double.init),
+                    sunDeclinationCutOffDegrees: 1
+                )
+                logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
+            }
             
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
             let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
