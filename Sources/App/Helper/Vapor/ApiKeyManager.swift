@@ -73,9 +73,9 @@ extension Request {
     }
     
     /// For customer API endpoints, check API key.
-    func ensureApiKey(_ subdomain: String, alias: [String] = [], apikey: String?) async throws {
+    func ensureApiKey(_ subdomain: String, alias: [String] = [], apikey: String?) async throws -> Int {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
-            return
+            return OpenMeteo.numberOfLocationsMaximum
         }
         let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
         
@@ -87,7 +87,9 @@ extension Request {
             guard await ApiKeyManager.instance.contains(String.SubSequence(apikey)) else {
                 throw ApiKeyManagerError.apiKeyInvalid
             }
+            return apikey.starts(with: "ojHdOi7") ? 200_000 : 10_000;
         }
+        return OpenMeteo.numberOfLocationsMaximum
     }
 }
 

@@ -88,9 +88,8 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 struct GloFasController {
     func query(_ req: Request) async throws -> Response {
         let host = try await req.ensureSubdomain("flood-api")
-        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : OpenMeteo.numberOfLocationsMaximum
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try await req.ensureApiKey("flood-api", apikey: params.apikey)
+        let numberOfLocationsMaximum = try await req.ensureApiKey("flood-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
         
