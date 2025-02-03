@@ -180,6 +180,9 @@ fileprivate struct JaxaFtpDownloader {
                 if code == 78 && str == "Remote file not found" {
                     return nil
                 }
+                if code == 9 && str == "Access denied to remote resource" {
+                    return nil // directory does not exist
+                }
                 logger.warning("CURLError \(code): \(str)")
                 let error = CURLError.internal(code: code, str: str)
                 try await progress.check(error: error, delay: 5)
