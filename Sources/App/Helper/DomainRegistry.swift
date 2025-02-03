@@ -120,6 +120,9 @@ enum DomainRegistry: String, CaseIterable {
     case jma_jaxa_himawari_hourly
     case jma_jaxa_himawari_10min
     
+    case eumetsat_lsasaf_msg
+    case eumetsat_lsasaf_iodc
+    
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
@@ -320,6 +323,10 @@ enum DomainRegistry: String, CaseIterable {
             return JaxaHimawariDomain.himawari_hourly
         case .jma_jaxa_himawari_10min:
             return JaxaHimawariDomain.himawari_10min
+        case .eumetsat_lsasaf_msg:
+            return EumetsatLsaSafDomain.lsasaf_msg
+        case .eumetsat_lsasaf_iodc:
+            return EumetsatLsaSafDomain.lsasaf_iodc
         }
     }
 }
