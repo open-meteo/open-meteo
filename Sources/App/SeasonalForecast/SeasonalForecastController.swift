@@ -149,9 +149,8 @@ extension SeasonalForecastReader {
 struct SeasonalForecastController {
     func query(_ req: Request) async throws -> Response {
         let host = try await req.ensureSubdomain("seasonal-api")
-        let numberOfLocationsMaximum = host?.starts(with: "customer-") == true ? 10_000 : OpenMeteo.numberOfLocationsMaximum
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        try await req.ensureApiKey("seasonal-api", apikey: params.apikey)
+        let numberOfLocationsMaximum = try await req.ensureApiKey("seasonal-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
         let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
         
