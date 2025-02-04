@@ -3,10 +3,11 @@ import SwiftNetCDF
 import AsyncHTTPClient
 
 /**
- Important: SARAH-3 data originally uses instantaneous solar radiation values. However, each line has a scan time offset of 0-15 minutes.
- In Europe the offset is closer to 15 minutes.
+ Important: EUMETSAT LSA SAF data originally uses instantaneous solar radiation values every 15 minutes. However, each line has a scan time offset of 0-15 minutes.
+ In Europe the offset is around 12 minutes. OpenMeteo corrects this scan time offset and stores backwards averaged 15 minutes values.
+ For 15 minutes values, this difference is rather small, but we do the correction anyways.
  
- OpenMeteo corrects this scan time offset and stores backwards averaged 30 minutes values.
+ https://nextcloud.lsasvcs.ipma.pt/s/QSABgnG4dZGBo5W?dir=undefined&path=%2FPUM-Product_User_Manual&openfile=27089
  */
 struct EumetsatLsaSafDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -89,10 +90,11 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let data = try await curl.downloadInMemoryAsync(url: url, minSize: 1000)
         
         /// SEVIRI image scans are performed from South to North. Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 12 minutes.
-        /// TODO might be the other way around
+        /// OpenMeteo grids are ordered South to North, therefore the scan time should increase with the line number
+        /// Europe is at scan line 2570 => (760-(3201-2570)/5) = 633 seconds
         let scanTimeDifferenceHours = (0..<3201*3201).map {
             let line = $0 / 3201
-            return (760 - Double(line) / 5) / 3600
+            return (760 - Double(3201 - line) / 5) / 3600
         }
         
         return try data.withUnsafeReadableBytes { memory in
