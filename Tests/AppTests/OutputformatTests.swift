@@ -638,9 +638,3 @@ final class OutputformatTests: XCTestCase {
         XCTAssertEqual(zip.readData(length: zip.writerIndex)!.sha256, "443f2602754152053754ff14b49218858bd555e74b5d8dc8d5e16fc85c7cdcce")
     }
 }
-
-fileprivate extension Data {
-    var sha256: String {
-        SHA256.hash(data: self).hexEncodedString()
-    }
-}

@@ -15,7 +15,7 @@ extension Array where Element == Float {
                 }
                 return self[i]
             })
-        case .solar_backwards_averaged:
+        case .solar_backwards_averaged, .solar_backwards_missing_not_averaged:
             /// Average past steps
             return timeNew.map({ t in
                 guard let start = timeOld.index(of: t.add(backSeconds)) else {

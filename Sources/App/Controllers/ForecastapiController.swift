@@ -354,6 +354,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ukmo_uk_deterministic_2km
     
     case eumetsat_sarah3
+    case eumetsat_lsasaf_msg
+    case eumetsat_lsasaf_iodc
+    case jma_jaxa_himawari
+    case jma_jaxa_himawari_hourly
 
     
     /// Return the required readers for this domain configuration
@@ -580,6 +584,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .eumetsat_sarah3:
             let sarah3 = try EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sarah3].compactMap({$0})
+        case .jma_jaxa_himawari:
+            let sat = try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [sat].compactMap({$0})
+        case .jma_jaxa_himawari_hourly:
+            let sat = try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [sat].compactMap({$0})
+        case .eumetsat_lsasaf_msg:
+            let sat = try EumetsatLsaSafReader(domain: .lsasaf_msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [sat].compactMap({$0})
+        case .eumetsat_lsasaf_iodc:
+            let sat = try EumetsatLsaSafReader(domain: .lsasaf_iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [sat].compactMap({$0})
         }
     }
     

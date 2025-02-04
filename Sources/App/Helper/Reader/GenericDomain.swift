@@ -103,7 +103,12 @@ enum ReaderInterpolation {
     /// Hermite interpolation for more smooth interpolation for temperature
     case hermite(bounds: ClosedRange<Float>?)
     
+    /// Solar fluxes are properly backwards averaged during model run time. Always be the case with weather models
     case solar_backwards_averaged
+    
+    /// Solar flux is backwards averaged, but values after missing values are not averaged correctly.
+    /// This happens with satellite data and missing time steps
+    case solar_backwards_missing_not_averaged
     
     /// Take the next hour, and devide by `dt` to preserve sums like precipitation
     case backwards_sum
@@ -118,7 +123,7 @@ enum ReaderInterpolation {
             return 1
         case .hermite:
             return 2
-        case .solar_backwards_averaged:
+        case .solar_backwards_averaged, .solar_backwards_missing_not_averaged:
             return 2
         case .backwards_sum, .backwards:
             return 1

@@ -234,9 +234,26 @@ public struct Timestamp: Hashable {
         return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))\(hour.zeroPadded(len: 2))"
     }
     
+    /// With format `yyyyMMddHHmm`
+    var format_YYYYMMddHHmm: String {
+        var time = timeIntervalSince1970
+        var t = tm()
+        gmtime_r(&time, &t)
+        let year = Int(t.tm_year+1900)
+        let month = Int(t.tm_mon+1)
+        let day = Int(t.tm_mday)
+        let hour = Int(t.tm_hour)
+        return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))"
+    }
+    
     // Return hour string as 2 character
     var hh: String {
         hour.zeroPadded(len: 2)
+    }
+    
+    // Return minute string as 2 character
+    var mm: String {
+        minute.zeroPadded(len: 2)
     }
     
     /// Return a new timestamp with setting the hour
