@@ -281,37 +281,39 @@ public struct Zensun {
     
     /// Assumes data is an instantaneous satellite solar radiation which is converted to backwards averaged solar radiation.
     /// Corrects for scan time difference for each location. With EUMETSAT this is around 10 to 15 minutes in Europe.
+    /// Corrects for missing averages radiation values at sunset assuming the cloudiness index `kt` from the previous step. This only works for `t>0` timesteps
     ///
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
     /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them....
     /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
     public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double], sunDeclinationCutOffDegrees: Float) {
+        
+        let decang = timerange.map { $0.getSunDeclination() }
+        let eqtime = timerange.map { $0.getSunEquationOfTime() }
             
-        for (t, timestamp) in timerange.enumerated() {
-            let decang = timestamp.getSunDeclination()
-            let eqtime = timestamp.getSunEquationOfTime()
+        for (i, gridpoint) in locationRange.enumerated() {
+            var ktPrevious = Float.nan
             
-            let alpha = Float(0.83333).degreesToRadians - sunDeclinationCutOffDegrees.degreesToRadians
-            
-            let latsun=decang
-            /// universal time
-            let ut = timestamp.hourWithFraction
-            let t1 = (90-latsun).degreesToRadians
-                                            
-            let lonsun = -15.0*(ut-12.0+eqtime)
-            
-            for (i, gridpoint) in locationRange.enumerated() {
+            for (t, timestamp) in timerange.enumerated() {
                 let pos = i * timerange.count + t
                 let scanTimeDifferenceHours = scanTimeDifferenceHours[i]
                 if scanTimeDifferenceHours.isNaN {
                     continue
                 }
-                if data[pos].isNaN {
-                    continue
-                }
+                let decang = decang[t]
+                let eqtime = eqtime[t]
+                
+                let alpha = Float(0.83333).degreesToRadians - sunDeclinationCutOffDegrees.degreesToRadians
+                
+                let latsun=decang
+                /// universal time
+                let ut = timestamp.hourWithFraction
+                let t1 = (90-latsun).degreesToRadians
+                
                 let scantime = timestamp.add(Int(scanTimeDifferenceHours * 3600))
                 let utScan = scantime.hourWithFraction
-               
+                                                
+                let lonsun = -15.0*(ut-12.0+eqtime)
                 let lonsunScan = -15.0*(utScan-12.0+eqtime)
                 
                 let (latitude, longitude) = grid.getCoordinates(gridpoint: gridpoint)
@@ -352,15 +354,29 @@ public struct Zensun {
                 
                 /// Instant sun elevation
                 let zzInstant = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1Scan-p0)
-                
+                // SARAH-3 already shows 0 watts close to sunset even at zzInstant > 0
+                // Additionally very old files have missing some timesteps. Use kt to backfill data
+                if (data[pos] == 0 || data[pos].isNaN) && zzBackwards > 0 && ktPrevious.isFinite {
+                    // condition at sunset, use previous kt index to estimate solar radiation
+                    data[pos] = ktPrevious * zzBackwards
+                    continue
+                }
+                if data[pos].isNaN {
+                    continue
+                }
                 if zzBackwards <= 0 || zzInstant <= 0 {
+                    ktPrevious = .nan
                     continue
                 }
                 let factor = zzInstant / zzBackwards
                 if factor < 0.05 {
+                    ktPrevious = .nan
                     continue
                 }
-                data[pos] = data[pos] / factor
+                let instant = data[pos]
+                let backwards = instant / factor
+                data[pos] = backwards
+                ktPrevious = (instant / zzInstant)
             }
         }
     }
