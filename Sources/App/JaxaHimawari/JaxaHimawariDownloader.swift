@@ -70,7 +70,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             return
         }
         // 11 minutes delay
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().subtract(minutes: 10).floor(toNearest: domain.dtSeconds)
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds)
         let handles: [GenericVariableHandle]
         if run.minute == 40+10 && [2, 14].contains(run.hour) {
             // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
