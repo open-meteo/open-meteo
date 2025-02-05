@@ -1,13 +1,10 @@
 enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
     case himawari_10min
-    case himawari_hourly
     
     var domainRegistry: DomainRegistry {
         switch self {
         case .himawari_10min:
             return .jma_jaxa_himawari_10min
-        case .himawari_hourly:
-            return .jma_jaxa_himawari_hourly
         }
     }
     
@@ -27,8 +24,6 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .himawari_10min:
             return 600
-        case .himawari_hourly:
-            return 3600
         }
     }
     
@@ -44,8 +39,6 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .himawari_10min:
             return 6*24*2
-        case .himawari_hourly:
-            return 24*7
         }
     }
 }

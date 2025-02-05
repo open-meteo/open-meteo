@@ -5,9 +5,9 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
     var domainRegistry: DomainRegistry {
         switch self {
         case .msg:
-            return .eumetsat_lsa_saf_msg
+            return .eumetsat_lsa_saf_msg_15min
         case .iodc:
-            return .eumetsat_lsa_saf_iodc
+            return .eumetsat_lsa_saf_iodc_15min
         }
     }
     

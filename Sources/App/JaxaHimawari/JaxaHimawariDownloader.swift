@@ -110,8 +110,8 @@ struct JaxaHimawariDownload: AsyncCommand {
             switch domain {
             case .himawari_10min:
                 path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/H09_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.02401_02401.nc"
-            case .himawari_hourly:
-                path = "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc"
+            //case .himawari_hourly:
+            //    path = "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc"
             }
             
             guard let data = try await downloader.get(logger: logger, path: path) else {
