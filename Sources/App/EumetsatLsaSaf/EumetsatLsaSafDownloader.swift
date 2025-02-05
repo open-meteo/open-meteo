@@ -64,9 +64,12 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             }
             return
         }
-        
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
-        let handles = try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
+        // every hour at 19 minutes past, all timesteps for the entire hour are published
+        // cronjobs run every hour at 25 min past
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().subtract(minutes: 20).floor(toNearestHour: 1).subtract(minutes: 45)
+        let handles = try await TimerangeDt(start: run, nTime: 4, dtSeconds: domain.dtSeconds).asyncFlatMap { run in
+            try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
+        }
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
