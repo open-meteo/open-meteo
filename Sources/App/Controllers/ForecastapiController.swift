@@ -354,8 +354,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ukmo_uk_deterministic_2km
     
     case eumetsat_sarah3
-    case eumetsat_lsasaf_msg
-    case eumetsat_lsasaf_iodc
+    case eumetsat_lsa_saf_msg
+    case eumetsat_lsa_saf_iodc
     case jma_jaxa_himawari
     case jma_jaxa_himawari_hourly
 
@@ -590,11 +590,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .jma_jaxa_himawari_hourly:
             let sat = try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({$0})
-        case .eumetsat_lsasaf_msg:
-            let sat = try EumetsatLsaSafReader(domain: .lsasaf_msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        case .eumetsat_lsa_saf_msg:
+            let sat = try EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({$0})
-        case .eumetsat_lsasaf_iodc:
-            let sat = try EumetsatLsaSafReader(domain: .lsasaf_iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        case .eumetsat_lsa_saf_iodc:
+            let sat = try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({$0})
         }
     }

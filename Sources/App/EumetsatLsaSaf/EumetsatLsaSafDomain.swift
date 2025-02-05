@@ -1,13 +1,13 @@
 enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
-    case lsasaf_msg
-    case lsasaf_iodc
+    case msg
+    case iodc
     
     var domainRegistry: DomainRegistry {
         switch self {
-        case .lsasaf_msg:
-            return .eumetsat_lsasaf_msg
-        case .lsasaf_iodc:
-            return .eumetsat_lsasaf_iodc
+        case .msg:
+            return .eumetsat_lsa_saf_msg
+        case .iodc:
+            return .eumetsat_lsa_saf_iodc
         }
     }
     
@@ -25,7 +25,7 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         switch self {
-        case .lsasaf_msg, .lsasaf_iodc:
+        case .msg, .iodc:
             return 15*60
         }
     }
@@ -40,7 +40,7 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
-        case .lsasaf_msg, .lsasaf_iodc:
+        case .msg, .iodc:
             // 3 days per file
             return 4*24*3
         }

@@ -79,9 +79,9 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let server = "https://\(username):\(password)@datalsasaf.lsasvcs.ipma.pt"
         let url: String
         switch domain {
-        case .lsasaf_msg:
+        case .msg:
             url = "\(server)/PRODUCTS/MSG/MDSSFTD/NETCDF/\(run.format_directoriesYYYYMMdd)/NETCDF4_LSASAF_MSG_MDSSFTD_MSG-Disk_\(run.format_YYYYMMddHHmm).nc"
-        case .lsasaf_iodc:
+        case .iodc:
             url = "\(server)/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/\(run.format_directoriesYYYYMMdd)/NETCDF4_LSASAF_MSG0IODC_MDSSFTD_IODC-Disk_\(run.format_YYYYMMddHHmm).nc"
         }
         
