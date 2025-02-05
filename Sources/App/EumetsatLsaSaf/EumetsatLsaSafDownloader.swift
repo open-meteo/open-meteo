@@ -85,7 +85,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         case .msg:
             url = "\(server)/PRODUCTS/MSG/MDSSFTD/NETCDF/\(run.format_directoriesYYYYMMdd)/NETCDF4_LSASAF_MSG_MDSSFTD_MSG-Disk_\(run.format_YYYYMMddHHmm).nc"
         case .iodc:
-            url = "\(server)/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/\(run.format_directoriesYYYYMMdd)/NETCDF4_LSASAF_MSG0IODC_MDSSFTD_IODC-Disk_\(run.format_YYYYMMddHHmm).nc"
+            url = "\(server)/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/\(run.format_directoriesYYYYMMdd)/NETCDF4_LSASAF_MSG-IODC_MDSSFTD_IODC-Disk_\(run.format_YYYYMMddHHmm).nc"
         }
         
         // https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG/MDSSFTD/NETCDF/2025/02/03/NETCDF4_LSASAF_MSG_MDSSFTD_MSG-Disk_202502031430.nc

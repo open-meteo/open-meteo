@@ -31,7 +31,13 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
     }
     
     var grid: any Gridable {
-        return RegularGrid(nx: 3201, ny: 3201, latMin: -80, lonMin: -80, dx: 0.05, dy: 0.05)
+        switch self {
+        case .msg:
+            return RegularGrid(nx: 3201, ny: 3201, latMin: -80, lonMin: -80, dx: 0.05, dy: 0.05)
+        case .iodc:
+            return RegularGrid(nx: 3201, ny: 3201, latMin: -80, lonMin: -40, dx: 0.05, dy: 0.05)
+        }
+        
     }
     
     var updateIntervalSeconds: Int {
