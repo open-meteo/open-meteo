@@ -164,6 +164,9 @@ final class Curl {
                 return response
             } catch {
                 if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code), status.code != 401 {
+                    if status.code == 404 {
+                        throw CurlError.fileNotFound
+                    }
                     logger.error("Download failed with 4xx error, \(error)")
                     throw error
                 }

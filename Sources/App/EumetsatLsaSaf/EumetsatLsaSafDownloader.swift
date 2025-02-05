@@ -72,7 +72,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
     
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatLsaSafDomain, username: String, password: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryError4xx: false)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
@@ -87,7 +87,13 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         
         // https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG/MDSSFTD/NETCDF/2025/02/03/NETCDF4_LSASAF_MSG_MDSSFTD_MSG-Disk_202502031430.nc
         // https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/2025/01/01/NETCDF4_LSASAF_MSG-IODC_MDSSFTD_IODC-Disk_202501012315.nc
-        let data = try await curl.downloadInMemoryAsync(url: url, minSize: 1000)
+        let data: ByteBuffer
+        do {
+            data = try await curl.downloadInMemoryAsync(url: url, minSize: 1000)
+        } catch CurlError.fileNotFound {
+            logger.warning("File not found, skipping")
+            return []
+        }
         
         /// SEVIRI image scans are performed from South to North. Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 12 minutes.
         /// OpenMeteo grids are ordered South to North, therefore the scan time should increase with the line number
