@@ -290,6 +290,9 @@ public struct Zensun {
         
         let decang = timerange.map { $0.getSunDeclination() }
         let eqtime = timerange.map { $0.getSunEquationOfTime() }
+        
+        /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
+        let radMinium = 5 / Zensun.solarConstant
             
         for (i, gridpoint) in locationRange.enumerated() {
             var ktPrevious = Float.nan
@@ -364,7 +367,8 @@ public struct Zensun {
                 if data[pos].isNaN {
                     continue
                 }
-                if zzBackwards <= 0 || zzInstant <= 0 {
+                if zzBackwards <= radMinium || zzInstant <= radMinium {
+                    data[pos] = 0
                     ktPrevious = .nan
                     continue
                 }
