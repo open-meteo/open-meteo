@@ -7,7 +7,9 @@ import AsyncHTTPClient
  In Europe the offset is around 12 minutes. OpenMeteo corrects this scan time offset and stores backwards averaged 15 minutes values.
  For 15 minutes values, this difference is rather small, but we do the correction anyways.
  
- https://nextcloud.lsasvcs.ipma.pt/s/QSABgnG4dZGBo5W?dir=undefined&path=%2FPUM-Product_User_Manual&openfile=27089
+ overview: https://lsa-saf.eumetsat.int/en/data/products/radiation/
+ data: https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG/MDSSFTD/NETCDF/2025/02/03/
+ docs: https://nextcloud.lsasvcs.ipma.pt/s/QSABgnG4dZGBo5W?dir=undefined&path=%2FPUM-Product_User_Manual&openfile=27089
  */
 struct EumetsatLsaSafDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -92,9 +94,13 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         // https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/2025/01/01/NETCDF4_LSASAF_MSG-IODC_MDSSFTD_IODC-Disk_202501012315.nc
         let data: ByteBuffer
         do {
-            data = try await curl.downloadInMemoryAsync(url: url, minSize: 1000)
+            data = try await curl.downloadInMemoryAsync(url: url, minSize: 0)
         } catch CurlError.fileNotFound {
             logger.warning("File not found, skipping")
+            return []
+        }
+        guard data.readableBytes > 0 else {
+            logger.warning("Empty file, skipping")
             return []
         }
         
