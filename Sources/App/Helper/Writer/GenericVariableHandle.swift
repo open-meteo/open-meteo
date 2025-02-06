@@ -23,10 +23,10 @@ struct GenericVariableHandle {
     }
     
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: CompressionType = .pfor_delta2d_int16, interpolation: Bool = true) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: CompressionType = .pfor_delta2d_int16) async throws {
         
         let startTime = DispatchTime.now()
-        try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression, interpolation: interpolation)
+        try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
         logger.info("Convert completed in \(startTime.timeElapsedPretty())")
         
         /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
@@ -79,28 +79,28 @@ struct GenericVariableHandle {
             // if run is nil, do not attempt to generate previous days files
             logger.info("Convert previous day database if required")
             let startTimePreviousDays = DispatchTime.now()
-            try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression, interpolation: interpolation)
+            try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression)
             logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty())")
         }
     }
     
-    static private func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: CompressionType, interpolation: Bool) async throws {
+    static private func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: CompressionType) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
                 .groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"})
                 .evenlyChunked(in: concurrent)
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, interpolation: interpolation)
+                    try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
                     
             })
         } else {
-            try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression, interpolation: interpolation)
+            try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
         }
     }
     
     /// Process each variable and update time-series optimised files
-    static private func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType, interpolation: Bool) throws {
+    static private func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -207,14 +207,12 @@ struct GenericVariableHandle {
                 }
                 
                 // Interpolate all missing values
-                if interpolation {
-                    data3d.interpolateInplace(
-                        type: variable.interpolation,
-                        time: time,
-                        grid: domain.grid,
-                        locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
-                    )
-                }
+                data3d.interpolateInplace(
+                    type: variable.interpolation,
+                    time: time,
+                    grid: domain.grid,
+                    locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
+                )
                 
                 progress.add(nLoc)
                 return data3d.data[0..<nLoc * memberRange.count * time.count]
