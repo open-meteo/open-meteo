@@ -164,6 +164,9 @@ final class Curl {
                 return response
             } catch {
                 if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code), status.code != 401 {
+                    if status.code == 404 {
+                        throw CurlError.fileNotFound
+                    }
                     logger.error("Download failed with 4xx error, \(error)")
                     throw error
                 }
@@ -261,7 +264,7 @@ final class Curl {
     private func initiateDownloadCached(url: String, range: String?, minSize: Int?, cacheDirectory: String, nConcurrent: Int, headers: [(String, String)] = []) async throws -> HTTPClientResponse {
         try FileManager.default.createDirectory(atPath: cacheDirectory, withIntermediateDirectories: true)
         //try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
-        let cacheFile = cacheDirectory + "/" + SHA256.hash(data: (url + (range ?? "")).data(using: .utf8) ?? Data()).hex
+        let cacheFile = cacheDirectory + "/" + (url + (range ?? "")).sha256
         if !FileManager.default.fileExists(atPath: cacheFile) {
             try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
         }

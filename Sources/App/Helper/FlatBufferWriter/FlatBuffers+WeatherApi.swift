@@ -733,7 +733,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ukmoUkDeterministic2km
         case .ncep_nbm_conus:
             return .ncepNbmConus
-        case .eumetsat_sarah3:
+        case .eumetsat_sarah3, .jma_jaxa_himawari, .eumetsat_lsa_saf_msg, .eumetsat_lsa_saf_iodc:
             // TODO register sarah3
             return .ncepNbmConus
         }

@@ -43,7 +43,9 @@ extension Array where Element == Float {
         case .hermite(let bounds):
             interpolateInplaceHermite(nTime: time.count, bounds: bounds)
         case .solar_backwards_averaged:
-            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange)
+            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange, missingValuesAreBackwardsAveraged: true)
+        case .solar_backwards_missing_not_averaged:
+            interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: locationRange, missingValuesAreBackwardsAveraged: false)
         case .backwards_sum:
             interpolateInplaceBackwards(nTime: time.count, isSummation: true)
         case .backwards:
@@ -242,7 +244,10 @@ extension Array where Element == Float {
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
     ///
     /// Automatically detects data spacing. e.g. `--D--D--D` and correctly backfills
-    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
+    ///
+    /// If `missingValuesAreBackwardsAveraged` is set, it is assumed that values after missing data is properly averaged over the missing time-steps.
+    /// `true` for weather model data. `false` for satellite data and other measurements
+    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>, missingValuesAreBackwardsAveraged: Bool) {
         let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
@@ -258,12 +263,18 @@ extension Array where Element == Float {
         }
         /// Which range of hours solar radiation data is required
         let solarHours = firstMissing - 6 ..< lastMissing + 3
-        /// Only calculate solar coefficients for this timerange
+        /// Only calculate solar coefficients for this time-range
         let solarTime = TimerangeDt(
             start: time.range.lowerBound.add(solarHours.lowerBound * time.dtSeconds),
             nTime: solarHours.count,
             dtSeconds: time.dtSeconds
         )
+        
+        /// Make sure solar radiation does not exceed 95% extraterrestrial radiation.
+        let radLimit = Zensun.solarConstant * 0.95
+        
+        /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
+        let radMinium = 5 / Zensun.solarConstant
         
         /// solar factor, backwards averaged over dt
         let solar2d = Zensun.calculateRadiationBackwardsAveraged(grid: grid, locationRange: locationRange, timerange: solarTime)
@@ -291,8 +302,8 @@ extension Array where Element == Float {
             }
             
             /// At  the boundary, it wont be possible to detect a valid spacing for 4 points
-            /// Reuse the previously good known spacing
-            var width = 0
+            /// Reuse the previously good known spacing. The minimum spacing must be 2, meaning `D-D`.
+            var width = 2
             for t in firstValid..<nTime {
                 guard self[l * nTime + t].isNaN else {
                     continue
@@ -317,7 +328,7 @@ extension Array where Element == Float {
                     break
                 }
                 if C.isNaN {
-                    // not possible to to any interpolation
+                    // not possible to do any interpolation
                     break
                 }
                 if !D.isNaN {
@@ -326,14 +337,15 @@ extension Array where Element == Float {
                 let posB = Swift.max(posC - width, 0)
                 let B = self[l * nTime + posB]
                 let solB = solar2d[sPos, posB - sLow]
+                let solC = solar2d[sPos, posC - sLow]
                 
-                /// solC is an average of the solar factor from posB until posC
-                let solC = solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean()
+                /// solAvgC is an average of the solar factor from posB until posC
+                let solAvgC = missingValuesAreBackwardsAveraged ? solar2d[sPos, posB + 1 - sLow ..< posC + 1 - sLow].mean() : solC
 
                 /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
-                var ktC = solC <= 0.005 ? .nan : Swift.min(C / solC, 1100)
-                /// Clearness index at point B, or use `ktC` for low radiation levels. B could be NaN if data is immediately missing in the bedinning of a time-series
-                var ktB = solB <= 0.005 || B.isNaN ? ktC : Swift.min(B / solB, 1100)
+                var ktC = solAvgC <= radMinium ? .nan : Swift.min(C / solAvgC, radLimit)
+                /// Clearness index at point B, or use `ktC` for low radiation levels. B could be NaN if data is immediately missing in the beginning of a time-series
+                var ktB = solB <= radMinium || B.isNaN ? ktC : Swift.min(B / solB, radLimit)
                 if ktC.isNaN && ktB > 0 {
                     ktC = ktB
                 }
@@ -347,7 +359,7 @@ extension Array where Element == Float {
                     /// Solar factor for point A is already deaveraged unlike point C and D
                     let solA = solar2d[sPos, posA - sLow]
                     let A = self[l * nTime + posA]
-                    ktA = solA <= 0.005 || A.isNaN ? ktB : Swift.min(A / solA, 1100)
+                    ktA = solA <= radMinium || A.isNaN ? ktB : Swift.min(A / solA, radLimit)
                 }
 
                 if ktC.isNaN && ktA > 0 {
@@ -361,12 +373,12 @@ extension Array where Element == Float {
                     ktD = ktC
                 } else {
                     /// solC is an average of the solar factor from posC until posD
-                    let solD = solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean()
-                    ktD = solD <= 0.005 ? ktC : Swift.min(D / solD, 1100)
+                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solar2d[sPos, posD - sLow]
+                    ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
                 }
                 
-                // Espcially for 6h values, aggressively try to find any KT index that works
-                // As a future improvement, the clearsky radiation could be approximated by cloud cover total as an additional input
+                // Especially for 6h values, aggressively try to find any KT index that works
+                // As a future improvement, the clear-sky radiation could be approximated by cloud cover total as an additional input
                 // This could improve morning/evening kt approximations
                 if ktC.isNaN && ktD > 0 {
                     ktA = ktD
@@ -389,8 +401,10 @@ extension Array where Element == Float {
                     self[l * nTime + t] = Swift.max(0, kt) * solar2d[sPos, t - sLow]
                 }
                 
-                // Deaverage point C, ktC could be NaN at night, therefore `max(0, ktC)` instead of `max(ktC, 0)`
-                self[l * nTime + posC] = Swift.max(0, ktC) * solar2d[sPos, posC - sLow]
+                if missingValuesAreBackwardsAveraged {
+                    // Deaverage point C, ktC could be NaN at night, therefore `max(0, ktC)` instead of `max(ktC, 0)`
+                    self[l * nTime + posC] = Swift.max(0, ktC) * solC
+                }
             }
         }
     }

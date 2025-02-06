@@ -1,5 +1,5 @@
 
-enum EumetsatSarahVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+enum EumetsatLsaSafVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case shortwave_radiation
     case direct_radiation
     
@@ -11,24 +11,6 @@ enum EumetsatSarahVariable: String, CaseIterable, GenericVariable, GenericVariab
         switch self {
         case .shortwave_radiation, .direct_radiation:
             return 1
-        }
-    }
-    
-    var eumetsatName: String {
-        switch self {
-        case .shortwave_radiation:
-            return "SIS"
-        case .direct_radiation:
-            return "SID"
-        }
-    }
-    
-    var eumetsatApiName: String {
-        switch self {
-        case .shortwave_radiation:
-            return "SISin"
-        case .direct_radiation:
-            return "SIDin"
         }
     }
     

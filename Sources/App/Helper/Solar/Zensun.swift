@@ -290,6 +290,9 @@ public struct Zensun {
         
         let decang = timerange.map { $0.getSunDeclination() }
         let eqtime = timerange.map { $0.getSunEquationOfTime() }
+        
+        /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
+        let radMinium = 5 / Zensun.solarConstant
             
         for (i, gridpoint) in locationRange.enumerated() {
             var ktPrevious = Float.nan
@@ -356,20 +359,23 @@ public struct Zensun {
                 let zzInstant = cos(t0)*cos(t1)+sin(t0)*sin(t1)*cos(p1Scan-p0)
                 // SARAH-3 already shows 0 watts close to sunset even at zzInstant > 0
                 // Additionally very old files have missing some timesteps. Use kt to backfill data
-                if (data[pos] == 0 || data[pos].isNaN) && zzBackwards > 0 && ktPrevious.isFinite {
+                if (data[pos] == 0 || data[pos].isNaN) && zzBackwards > radMinium && ktPrevious.isFinite {
                     // condition at sunset, use previous kt index to estimate solar radiation
                     data[pos] = ktPrevious * zzBackwards
+                    ktPrevious = .nan
                     continue
                 }
                 if data[pos].isNaN {
                     continue
                 }
-                if zzBackwards <= 0 || zzInstant <= 0 {
+                if zzBackwards <= radMinium || zzInstant <= radMinium {
+                    data[pos] = 0
                     ktPrevious = .nan
                     continue
                 }
                 let factor = zzInstant / zzBackwards
                 if factor < 0.05 {
+                    data[pos] = 0
                     ktPrevious = .nan
                     continue
                 }
