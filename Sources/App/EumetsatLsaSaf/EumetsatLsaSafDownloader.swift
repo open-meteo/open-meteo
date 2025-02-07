@@ -68,11 +68,25 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         }
         // every hour at 19 minutes past, all timesteps for the entire hour are published
         // cronjobs run every hour at 25 min past
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().subtract(minutes: 20).floor(toNearestHour: 1).subtract(minutes: 45)
-        let handles = try await TimerangeDt(start: run, nTime: 4, dtSeconds: domain.dtSeconds).asyncFlatMap { run in
+        let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
+        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 3).floor(toNearestHour: 1)
+        let endTime = Timestamp.now().floor(toNearestHour: 1)
+        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile)).map(Int.init)?.flatMap(Timestamp.init))
+        let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
+        guard startTime <= endTime else {
+            logger.info("All steps already downloaded")
+            return
+        }
+        let downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
+        logger.info("Downloading range \(downloadRange.prettyString())")
+        let handles = try await downloadRange.asyncFlatMap { run in
             try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
         }
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        if let last = handles.max(by: {$0.time < $1.time})?.time {
+            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+            try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
+        }
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatLsaSafDomain, username: String, password: String) async throws -> [GenericVariableHandle] {
