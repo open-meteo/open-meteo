@@ -4,7 +4,6 @@
 
 /// Fast winddirection approximtation based on fma approximaled atan2
 /// See: https://mazzo.li/posts/vectorized-atan2.html
-/// Caveat: if x and y is `0`, also `0` is returned
 void windirectionFast(const size_t num_points, const float* ys, const float* xs, float* out) {
   float pi = M_PI;
   float pi_2 = M_PI_2;
@@ -13,6 +12,14 @@ void windirectionFast(const size_t num_points, const float* ys, const float* xs,
     // Ensure input is in [-1, +1]
     float y = ys[i];
     float x = xs[i];
+    if (x == 0) {
+      out[i] = y < 0 ? 90 : 270;
+      continue;
+    }
+    if (y == 0) {
+      out[i] = x < 0 ? 360 : 180;
+      continue;
+    }
     int swap = fabs(x) < fabs(y);
     float atan_input = (swap ? y : x) == 0 ? ((swap ? x : y) / 0.00000001) : ((swap ? x : y) / (swap ? y : x));
 
