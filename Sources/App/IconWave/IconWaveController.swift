@@ -100,6 +100,8 @@ enum MarineVariable: String, GenericVariableMixable {
     case swell_wave_direction
     case ocean_current_velocity
     case ocean_current_direction
+    case sea_level_height_msl
+    case invert_barometer_height
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
