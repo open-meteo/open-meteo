@@ -271,7 +271,7 @@ extension MfWaveDomain {
         case .mfsst:
             /// Only hindcast available after 7 days
             let isHindcast = run.add(days: 7) < Timestamp.now()
-            let type = isHindcast ? "hcast" : "fcst"
+            let type = isHindcast ? "hcst" : "fcst"
             // glo12_rg_6h-i_20250206-18h_3D-thetao_fcst_R20250207.nc
             return [
                 "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-thetao_anfc_0.083deg_PT6H-i_202406/\(r.year)/\(rMM)/glo12_rg_6h-i_\(step.format_YYYYMMdd)-\(step.hh)h_3D-thetao_\(type)_R\(run.format_YYYYMMdd).nc",
