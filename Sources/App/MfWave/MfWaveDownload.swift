@@ -90,7 +90,7 @@ struct MfWaveDownload: AsyncCommand {
             logger.warning("Not data for \(run.format_YYYYMMddHH)")
             return []
         }
-        if domain == .mfcurrents && [Timestamp(2022,11,30)].contains(run) {
+        if domain == .mfcurrents && [Timestamp(2022,11,30), Timestamp(2024,6,26)].contains(run) {
             logger.warning("Skipping due to NRT change \(run.format_YYYYMMddHH)")
             return []
         }
