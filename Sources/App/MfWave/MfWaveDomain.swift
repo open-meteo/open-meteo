@@ -6,6 +6,7 @@ import Foundation
 enum MfWaveDomain: String, CaseIterable, GenericDomain {
     case mfwave
     case mfcurrents
+    case mfsst
     
     var hasYearlyFiles: Bool {
         return false
@@ -21,11 +22,18 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
             return .meteofrance_wave
         case .mfcurrents:
             return .meteofrance_currents
+        case .mfsst:
+            return .meteofrance_sea_surface_temperature
         }
     }
     
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .mfsst:
+            return .meteofrance_currents
+        default:
+            return domainRegistry
+        }
     }
     
     /// Number of time steps in each time series optimised file. 5 days more than each run.
@@ -39,12 +47,14 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
             return 3*3600
         case .mfcurrents:
             return 3600
+        case .mfsst:
+            return 6*3600
         }
     }
     
     var grid: Gridable {
         switch self {
-        case .mfwave:
+        case .mfwave, .mfsst:
             return RegularGrid(nx: 4320, ny: 2041, latMin: -80, lonMin: -180, dx: 1/12, dy: 1/12, searchRadius: 2)
         case .mfcurrents:
             return RegularGrid(nx: 4320, ny: 2041, latMin: -80, lonMin: -180, dx: 1/12, dy: 1/12)
@@ -55,7 +65,7 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
         switch self {
         case .mfwave:
             return 12*3600
-        case .mfcurrents:
+        case .mfcurrents, .mfsst:
             return 24*3600
         }
     }
@@ -66,7 +76,7 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
         case .mfwave:
             // Delay of 11 hours after initialisation
             return t.add(hours: -11).floor(toNearestHour: 12)
-        case .mfcurrents:
+        case .mfcurrents, .mfsst:
             // Delay of 11 hours after initialisation
             return t.add(hours: -11).floor(toNearestHour: 24)
         }
@@ -78,6 +88,8 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
             return 12 // 2 files per day
         case .mfcurrents:
             return 24 // 1 file per day
+        case .mfsst:
+            return 6 // 1 file per 6 hours
         }
     }
 }

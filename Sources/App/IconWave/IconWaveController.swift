@@ -42,6 +42,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
             }
+            let mfsst = try GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let mfwave = try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfWaveReader(reader: reader)
             }
@@ -53,7 +54,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
                 // use mf wave
                 waveModel = [mfwave]
             }
-            let readers: [(any GenericReaderProtocol)?] = waveModel + [mfcurrents, ewam, gwam]
+            let readers: [(any GenericReaderProtocol)?] = waveModel + [mfcurrents, mfsst, ewam, gwam]
             return readers.compactMap({$0})
             /*
             let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)
@@ -72,9 +73,11 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         case .meteofrance_wave:
             return try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[MfWaveReader(reader: $0)]}) ?? []
         case .meteofrance_currents:
-            return try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
+            let mfsst = try GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
-            }.flatMap({[$0]}) ?? []
+            }
+            return [mfsst, mfcurrents].compactMap({$0})
         case .ncep_gfswave025:
             return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ncep_gefswave025:
@@ -102,6 +105,7 @@ enum MarineVariable: String, GenericVariableMixable {
     case ocean_current_direction
     case sea_level_height_msl
     case invert_barometer_height
+    case sea_surface_temperature
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false

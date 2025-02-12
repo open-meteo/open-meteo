@@ -82,6 +82,8 @@ struct MfWaveDownload: AsyncCommand {
         let ny = domain.grid.ny
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
+        let phyModel = domain == .mfsst || domain == .mfcurrents
+        
         /// Only hindcast available after 12 hours
         let isOlderThan12Hours = run.add(hours: 23) < Timestamp.now()
         
@@ -118,20 +120,20 @@ struct MfWaveDownload: AsyncCommand {
         let afterNRTSwitch = run > Timestamp(2022, 11, 23)
         
         // Every 7th run, the past 14 days are updated with hindcast data for 7 days
-        let isNRTUpdateDate = domain == .mfcurrents && isOlderThan12Hours && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
+        let isNRTUpdateDate = phyModel && isOlderThan12Hours && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
         
         // Only NRT update days are kept on S3. Other runs can be ignored
-        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch && isOlderThan12Hours {
+        if phyModel && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch && isOlderThan12Hours {
             logger.warning("Not an NRT update date. Skipping run \(run.format_YYYYMMddHH)")
             return []
         }
         
         /// Each run contains data from 1 day back
-        let startTime = run.add(days: isNRTUpdateDate ? -14 : -1)
+        let startTime = run.add(days: isNRTUpdateDate ? -14 : -1).add(hours: domain == .mfsst ? 6 : 0)
         /// 10 days forecast. 12z run has one timestep less -> therefore floor to 24h
-        let endTimeForecast = run.add(days: 10).floor(toNearestHour: 24)
+        let endTimeForecast = run.add(days: 10).floor(toNearestHour: 24).add(hours: domain == .mfsst ? 6 : 0)
         
-        let endTimeHindcastOnly = run.add(days: isNRTUpdateDate ? (-7-1) : -1).add(hours: domain.stepHoursPerFile)
+        let endTimeHindcastOnly = run.add(days: isNRTUpdateDate ? (-7-1) : -1).add(hours: domain.stepHoursPerFile).add(hours: domain == .mfsst ? 6 : 0)
 
         if isOlderThan12Hours {
             logger.info("Run date is older than 23 hours. Downloading hindcast only.")
@@ -266,6 +268,14 @@ extension MfWaveDomain {
                 "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-sl_PT1H-i_202411/\(r.year)/\(rMM)/MOL_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc",
                 "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/\(r.year)/\(rMM)/SMOC_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc"
             ]
+        case .mfsst:
+            /// Only hindcast available after 7 days
+            let isHindcast = run.add(days: 7) < Timestamp.now()
+            let type = isHindcast ? "hcast" : "fcst"
+            // glo12_rg_6h-i_20250206-18h_3D-thetao_fcst_R20250207.nc
+            return [
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-thetao_anfc_0.083deg_PT6H-i_202406/\(r.year)/\(rMM)/glo12_rg_6h-i_\(step.format_YYYYMMdd)-\(step.hh)h_3D-thetao_\(type)_R\(run.format_YYYYMMdd).nc",
+            ]
         }
     }
 }
@@ -299,6 +309,8 @@ extension Variable {
             return MfCurrentVariable.sea_level_height_msl
         case "invert_barometer":
             return MfCurrentVariable.invert_barometer_height
+        case "thetao":
+            return MfSSTVariable.sea_surface_temperature
         default:
             return nil
         }

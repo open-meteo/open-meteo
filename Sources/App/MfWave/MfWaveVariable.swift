@@ -254,3 +254,46 @@ struct MfWaveReader: GenericReaderProtocol {
 }
 
 
+
+
+enum MfSSTVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    case sea_surface_temperature
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+    
+    /// Si unit
+    var unit: SiUnit {
+        switch self {
+        case .sea_surface_temperature:
+            return .celsius
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .sea_surface_temperature:
+            return 20
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .sea_surface_temperature:
+            return .hermite(bounds: nil)
+        }
+    }
+}
