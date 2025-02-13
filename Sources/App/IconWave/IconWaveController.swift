@@ -37,7 +37,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            let gwam = try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            //let gwam = try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let ewam = try IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
@@ -49,12 +49,12 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             let waveModel: [(any GenericReaderProtocol)?];
             if let update = try MfWaveDomain.mfwave.getMetaJson()?.lastRunAvailabilityTime, update <= Timestamp.now().subtract(hours: 26) {
                 // mf model outdated, use ECMWF
-                waveModel = [try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode), mfwave]
+                waveModel = [mfwave, try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)]
             } else {
                 // use mf wave
                 waveModel = [mfwave]
             }
-            let readers: [(any GenericReaderProtocol)?] = waveModel + [mfcurrents, mfsst, ewam, gwam]
+            let readers: [(any GenericReaderProtocol)?] =  [mfcurrents, mfsst, ewam] + waveModel
             return readers.compactMap({$0})
             /*
             let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)
@@ -136,7 +136,7 @@ struct IconWaveController {
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92, forecastDaysMinutely15Default: 7)
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
