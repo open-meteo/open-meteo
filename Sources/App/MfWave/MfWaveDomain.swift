@@ -28,10 +28,8 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     }
     
     var domainRegistryStatic: DomainRegistry? {
-        switch self {
-        case .mfwave, .mfsst, .mfcurrents:
-            return .meteofrance_wave
-        }
+        /// Note: sea land mask is slighly differnet for each model
+        return domainRegistry
     }
     
     /// Number of time steps in each time series optimised file. 5 days more than each run.

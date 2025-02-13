@@ -82,7 +82,8 @@ struct MfWaveDownload: AsyncCommand {
         let ny = domain.grid.ny
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
-        if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+        // Note: The actual domain data area is slightly different
+        /*if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
             let url = domain.getBathymetryUrl()
             let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
             let bathy = try memory.withUnsafeReadableBytes({ memory in
@@ -108,7 +109,7 @@ struct MfWaveDownload: AsyncCommand {
             }
             try domain.surfaceElevationFileOm.createDirectory()
             try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
-        }
+        }*/
         
         let phyModel = domain == .mfsst || domain == .mfcurrents
         
@@ -218,7 +219,7 @@ struct MfWaveDownload: AsyncCommand {
                                         }
                                     }
                                 }
-                                if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                                     // create land elevation file. 0=land, -999=sea
                                     let elevation = data.map {
                                         return $0.isNaN ? Float(0) : -999
