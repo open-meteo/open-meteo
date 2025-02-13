@@ -82,6 +82,34 @@ struct MfWaveDownload: AsyncCommand {
         let ny = domain.grid.ny
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
+        if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            let url = domain.getBathymetryUrl()
+            let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
+            let bathy = try memory.withUnsafeReadableBytes({ memory in
+                guard let nc = try NetCDF.open(memory: memory) else {
+                    fatalError("Could not open netcdf from memory")
+                }
+                guard let ncvar = nc.getVariable(name: "deptho"),
+                      let data = try ncvar.asType(Double.self)?.read(),
+                      let fillValue: Double = try ncvar.getAttribute("_FillValue")?.read()
+                else {
+                    fatalError("Could not deptho array")
+                }
+                return data.map { value in
+                    if fillValue == value {
+                        return Float.nan
+                    }
+                    return Float(value)
+                }
+            })
+            // create land elevation file. 0=land, -999=sea. NaN = no data
+            let elevation = bathy.map {
+                return $0.isNaN ? Float.nan : -999
+            }
+            try domain.surfaceElevationFileOm.createDirectory()
+            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+        }
+        
         let phyModel = domain == .mfsst || domain == .mfcurrents
         
         /// Only hindcast available after 12 hours
@@ -254,6 +282,10 @@ struct MfWaveDownload: AsyncCommand {
 }
 
 extension MfWaveDomain {
+    func getBathymetryUrl() -> String {
+        return "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_0.083deg_static_202211/GLO-MFC_001_024_mask_bathy.nc"
+    }
+    
     func getUrl(run: Timestamp, step: Timestamp) -> [String] {
         let server = "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/"
         let r = step.toComponents()
