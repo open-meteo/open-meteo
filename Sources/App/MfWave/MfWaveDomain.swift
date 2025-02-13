@@ -29,10 +29,8 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     
     var domainRegistryStatic: DomainRegistry? {
         switch self {
-        case .mfsst:
-            return .meteofrance_currents
-        default:
-            return domainRegistry
+        case .mfwave, .mfsst, .mfcurrents:
+            return .meteofrance_wave
         }
     }
     
@@ -54,10 +52,8 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     
     var grid: Gridable {
         switch self {
-        case .mfwave, .mfsst:
+        case .mfwave, .mfsst, .mfcurrents:
             return RegularGrid(nx: 4320, ny: 2041, latMin: -80, lonMin: -180, dx: 1/12, dy: 1/12, searchRadius: 2)
-        case .mfcurrents:
-            return RegularGrid(nx: 4320, ny: 2041, latMin: -80, lonMin: -180, dx: 1/12, dy: 1/12)
         }
     }
     

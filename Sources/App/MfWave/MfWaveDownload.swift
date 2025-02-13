@@ -190,7 +190,7 @@ struct MfWaveDownload: AsyncCommand {
                                         }
                                     }
                                 }
-                                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                                if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                                     // create land elevation file. 0=land, -999=sea
                                     let elevation = data.map {
                                         return $0.isNaN ? Float(0) : -999
