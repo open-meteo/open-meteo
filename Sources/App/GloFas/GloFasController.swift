@@ -87,7 +87,7 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GloFasController {
     func query(_ req: Request) async throws -> Response {
-        let host = try await req.ensureSubdomain("flood-api")
+        _ = try await req.ensureSubdomain("flood-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         let numberOfLocationsMaximum = try await req.ensureApiKey("flood-api", apikey: params.apikey)
         let currentTime = Timestamp.now()

@@ -128,7 +128,10 @@ struct IconWaveController {
         let paramsHourly = try MarineVariable.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try MarineVariable.load(commaSeparatedOptional: params.current)
         let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
-        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, {$0 + $1.countEnsembleMember})
+        let paramsMinutely = try MarineVariable.load(commaSeparatedOptional: params.minutely_15)
+
+        let nParamsMinutely = paramsMinutely?.count ?? 0
+        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, {$0 + $1.countEnsembleMember})
         
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
@@ -214,7 +217,25 @@ struct IconWaveController {
                         }
                     },
                     sixHourly: nil,
-                    minutely15: nil
+                    minutely15: paramsMinutely.map { variables in
+                        return {
+                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
+                                var unit: SiUnit? = nil
+                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                    guard let d = try reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                        return nil
+                                    }
+                                    unit = d.unit
+                                    assert(timeHourlyRead.count == d.data.count)
+                                    return ApiArray.float(d.data)
+                                }
+                                guard allMembers.count > 0 else {
+                                    return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
+                                }
+                                return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
+                            })
+                        }
+                    }
                 )
             }
             guard !readers.isEmpty else {

@@ -5,7 +5,7 @@ import Vapor
 
 struct CmipController {
     func query(_ req: Request) async throws -> Response {
-        let host = try await req.ensureSubdomain("climate-api")
+        _ = try await req.ensureSubdomain("climate-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         let numberOfLocationsMaximum = try await req.ensureApiKey("climate-api", apikey: params.apikey)
         

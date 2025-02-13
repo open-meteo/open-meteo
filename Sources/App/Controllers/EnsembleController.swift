@@ -8,7 +8,7 @@ import Vapor
  */
 public struct EnsembleApiController {
     func query(_ req: Request) async throws -> Response {
-        let host = try await req.ensureSubdomain("ensemble-api")
+        _ = try await req.ensureSubdomain("ensemble-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         let numberOfLocationsMaximum = try await req.ensureApiKey("ensemble-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
