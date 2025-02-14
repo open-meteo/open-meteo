@@ -50,11 +50,11 @@ struct EumetsatSarahDownload: AsyncCommand {
         guard let apiKey = signature.apiKey, let apiSecret = signature.apiSecret else {
             fatalError("Parameter api key and secret required")
         }
-        let api = EumetsatApiDownloader(application: context.application, key: apiKey, secret: apiSecret)
         
         let variables = EumetsatSarahVariable.allCases
         
         if let timeinterval = signature.timeinterval {
+            let api = EumetsatApiDownloader(application: context.application, key: apiKey, secret: apiSecret, deadLineHours: 30*24)
             let chunkDt = domain.omFileLength * domain.dtSeconds
             let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400)
             for (_, runs) in timerange.groupedPreservedOrder(by: {$0.timeIntervalSince1970 / chunkDt}) {
@@ -67,6 +67,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             return
         }
         
+        let api = EumetsatApiDownloader(application: context.application, key: apiKey, secret: apiSecret, deadLineHours: 3)
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(hour: 0).subtract(days: 2)
         let handles = try await downloadRun(application: context.application, run: run, domain: domain, api: api, variables: variables)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
@@ -153,12 +154,13 @@ fileprivate final class EumetsatApiDownloader {
     
     let curl: Curl
     
-    init(application: Application, key: String, secret: String) {
+    init(application: Application, key: String, secret: String, deadLineHours: Double) {
         self.auth = "\(key):\(secret)".base64String()
         self.token = nil
         self.curl = Curl(
             logger: application.logger,
             client: application.dedicatedHttpClient,
+            deadLineHours: deadLineHours,
             retryError4xx: false
         )
     }
