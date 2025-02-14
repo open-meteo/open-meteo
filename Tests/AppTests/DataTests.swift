@@ -525,33 +525,34 @@ final class DataTests: XCTestCase {
     }
     
     func testMfWaveGrid() {
+        // Note: Grid is moved by dx/2 dy/2
         let grid = MfWaveDomain.mfwave.grid
         var coord = grid.findPoint(lat: 36.16667, lon: -0.83333333)!
         var pos = grid.getCoordinates(gridpoint: coord)
         // i=x (i=2150, j=1394) 0.0292969 (x=-0.8333333, y=36.16667)
         XCTAssertEqual(coord, 1394*grid.nx + 2150)
-        XCTAssertEqual(pos.latitude, 36.16667, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, -0.83333333, accuracy: 0.0005)
+        XCTAssertEqual(pos.latitude, 36.208336, accuracy: 0.0005)
+        XCTAssertEqual(pos.longitude, -0.7916565, accuracy: 0.0005)
         
         // (i-3486, j-778) -0.0556641 (x=110.5, y=-15.16667)
         coord = grid.findPoint(lat: -15.16667, lon: 110.5)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 778*grid.nx + 3486)
-        XCTAssertEqual(pos.latitude, -15.16667, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, 110.5)
+        XCTAssertEqual(coord, 777*grid.nx + 3485)
+        XCTAssertEqual(pos.latitude, -15.208336, accuracy: 0.0005)
+        XCTAssertEqual(pos.longitude, 110.45836)
         
         //(i-714, j-1230) 0.0146484 (x=-120.5, y=22.5)
         coord = grid.findPoint(lat: 22.5, lon: -120.5)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 1230*grid.nx + 714)
-        XCTAssertEqual(pos.latitude, 22.5, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, -120.5)
+        XCTAssertEqual(coord, 1230*grid.nx + 713)
+        XCTAssertEqual(pos.latitude, 22.541664, accuracy: 0.0005)
+        XCTAssertEqual(pos.longitude, -120.54166)
         
         // (i=4278, j=1170) -0.321289 (x=176.5, y=17.5)
         coord = grid.findPoint(lat: 17.5, lon: 176.5)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 1170*grid.nx + 4278)
-        XCTAssertEqual(pos.latitude, 17.5, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, 176.5)
+        XCTAssertEqual(coord, 1170*grid.nx + 4277)
+        XCTAssertEqual(pos.latitude, 17.541664, accuracy: 0.0005)
+        XCTAssertEqual(pos.longitude, 176.45836)
     }
 }
