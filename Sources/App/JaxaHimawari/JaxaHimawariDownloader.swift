@@ -70,26 +70,35 @@ struct JaxaHimawariDownload: AsyncCommand {
             return
         }
         
-        let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
-        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
-        let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
-        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile)).map(Int.init)?.flatMap(Timestamp.init))
-        var startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
-        if endTime.minute == 40+20 && [2, 14].contains(endTime.hour) {
-            logger.info("Adjusting time by 20 minutes to account for maintenance window")
-            // At 2:50 and 14:50 download the previous step and interpolate data at 2:40 and 14:40
-            startTime = startTime.subtract(minutes: 20)
+        let downloadRange: TimerangeDt
+        let lastTimestampFile: String?
+        if let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) {
+            downloadRange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+            lastTimestampFile = nil
+        } else {
+            let timestampFile = "\(domain.downloadDirectory)last.txt"
+            let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
+            let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
+            let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile)).map(Int.init)?.flatMap(Timestamp.init))
+            var startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
+            if endTime.minute == 40+20 && [2, 14].contains(endTime.hour) {
+                logger.info("Adjusting time by 20 minutes to account for maintenance window")
+                // At 2:50 and 14:50 download the previous step and interpolate data at 2:40 and 14:40
+                startTime = startTime.subtract(minutes: 20)
+            }
+            guard startTime <= endTime else {
+                logger.info("All steps already downloaded")
+                return
+            }
+            downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
+            lastTimestampFile = timestampFile
         }
-        guard startTime <= endTime else {
-            logger.info("All steps already downloaded")
-            return
-        }
-        let downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
+        
         logger.info("Downloading range \(downloadRange.prettyString())")
         let handles = try await downloadRange.asyncFlatMap { run in
             try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
         }
-        if let last = handles.max(by: {$0.time < $1.time})?.time {
+        if let lastTimestampFile, let last = handles.max(by: {$0.time < $1.time})?.time {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
