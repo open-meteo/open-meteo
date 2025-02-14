@@ -69,7 +69,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         // every hour at 19 minutes past, all timesteps for the entire hour are published
         // cronjobs run every hour at 25 min past
         let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
-        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 3).floor(toNearestHour: 1)
+        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
         let endTime = Timestamp.now().floor(toNearestHour: 1)
         let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile)).map(Int.init)?.flatMap(Timestamp.init))
         let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
