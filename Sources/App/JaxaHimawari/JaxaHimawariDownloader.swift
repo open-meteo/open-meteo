@@ -80,12 +80,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
             let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
             let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile)).map(Int.init)?.flatMap(Timestamp.init))
-            var startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
-            if endTime.minute == 40+20 && [2, 14].contains(endTime.hour) {
-                logger.info("Adjusting time by 20 minutes to account for maintenance window")
-                // At 2:50 and 14:50 download the previous step and interpolate data at 2:40 and 14:40
-                startTime = startTime.subtract(minutes: 20)
-            }
+            let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
             guard startTime <= endTime else {
                 logger.info("All steps already downloaded")
                 return
@@ -93,10 +88,15 @@ struct JaxaHimawariDownload: AsyncCommand {
             downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
             lastTimestampFile = timestampFile
         }
-        
         logger.info("Downloading range \(downloadRange.prettyString())")
-        let handles = try await downloadRange.asyncFlatMap { run in
-            try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+        let handles = try await downloadRange.enumerated().asyncFlatMap { (i,run) in
+            // If the first step is missing, download the previous one to allow interpolation
+            let h = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+            if i == 0 && h.isEmpty && downloadRange.count > 1 {
+                logger.info("Fist step missing, download previoud step for interpolation")
+                return try await downloadRun(application: context.application, run: run.add(-1 * domain.dtSeconds), domain: domain, variables: variables, downloader: downloader)
+            }
+            return h
         }
         if let lastTimestampFile, let last = handles.max(by: {$0.time < $1.time})?.time {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
