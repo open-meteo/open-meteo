@@ -104,6 +104,8 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
 enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case ocean_u_current
     case ocean_v_current
+    case sea_level_height_msl
+    case invert_barometer_height
     
     var storePreviousForecast: Bool {
         return false
@@ -126,6 +128,8 @@ enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         switch self {
         case .ocean_u_current, .ocean_v_current:
             return .metrePerSecond
+        case .sea_level_height_msl, .invert_barometer_height:
+            return .metre
         }
     }
     
@@ -133,12 +137,16 @@ enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         switch self {
         case .ocean_u_current, .ocean_v_current:
             return 20 // 0.05 ms (~0.1 knots)
+        case .sea_level_height_msl, .invert_barometer_height:
+            return 100 // 1cm res
         }
     }
     
     var interpolation: ReaderInterpolation {
         switch self {
         case .ocean_u_current, .ocean_v_current:
+            return .hermite(bounds: nil)
+        case .sea_level_height_msl, .invert_barometer_height:
             return .hermite(bounds: nil)
         }
     }
@@ -246,3 +254,46 @@ struct MfWaveReader: GenericReaderProtocol {
 }
 
 
+
+
+enum MfSSTVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
+    case sea_surface_temperature
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var requiresOffsetCorrectionForMixing: Bool {
+        return false
+    }
+    
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+    
+    /// Si unit
+    var unit: SiUnit {
+        switch self {
+        case .sea_surface_temperature:
+            return .celsius
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .sea_surface_temperature:
+            return 20
+        }
+    }
+    
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .sea_surface_temperature:
+            return .hermite(bounds: nil)
+        }
+    }
+}

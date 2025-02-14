@@ -8,6 +8,10 @@ import SwiftNetCDF
  
  Wave: https://data.marine.copernicus.eu/product/GLOBAL_ANALYSISFORECAST_WAV_001_027/description
  Currents: https://data.marine.copernicus.eu/product/GLOBAL_ANALYSISFORECAST_PHY_001_024/description
+ 
+ Important: Ocean tides use the field "total_sea_level" which is the height above the global mean sea level.
+ This is not the height above lowest atmospherical tide LAT which is usually used in navigation.
+ To estimate the LAT, we can compute the minimum of "total_sea_level - invert_barometer" over 2.5 years. Ideal would be 18 years.
  */
 struct MfWaveDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -28,6 +32,9 @@ struct MfWaveDownload: AsyncCommand {
         
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
+        
+        @Flag(name: "only-tides", help: "Only download tides and skip currents in MF PHY model")
+        var onlyTides: Bool
     }
 
     var help: String {
@@ -48,9 +55,9 @@ struct MfWaveDownload: AsyncCommand {
             for year in runs.groupedPreservedOrder(by: {$0.toComponents().year}) {
                 let handles = try await year.values.asyncFlatMap { run in
                     logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                    return try await download(application: context.application, domain: domain, run: run)
+                    return try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides)
                 }
-                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs.range.lowerBound, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
+                try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
         }
@@ -58,12 +65,12 @@ struct MfWaveDownload: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
-        let handles = try await download(application: context.application, domain: domain, run: run)
+        let handles = try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func download(application: Application, domain: MfWaveDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: MfWaveDomain, run: Timestamp, onlyTides: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         
@@ -75,6 +82,37 @@ struct MfWaveDownload: AsyncCommand {
         let ny = domain.grid.ny
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         
+        // Note: The actual domain data area is slightly different
+        /*if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            let url = domain.getBathymetryUrl()
+            let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
+            let bathy = try memory.withUnsafeReadableBytes({ memory in
+                guard let nc = try NetCDF.open(memory: memory) else {
+                    fatalError("Could not open netcdf from memory")
+                }
+                guard let ncvar = nc.getVariable(name: "deptho"),
+                      let data = try ncvar.asType(Double.self)?.read(),
+                      let fillValue: Double = try ncvar.getAttribute("_FillValue")?.read()
+                else {
+                    fatalError("Could not deptho array")
+                }
+                return data.map { value in
+                    if fillValue == value {
+                        return Float.nan
+                    }
+                    return Float(value)
+                }
+            })
+            // create land elevation file. 0=land, -999=sea. NaN = no data
+            let elevation = bathy.map {
+                return $0.isNaN ? Float.nan : -999
+            }
+            try domain.surfaceElevationFileOm.createDirectory()
+            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+        }*/
+        
+        let phyModel = domain == .mfsst || domain == .mfcurrents
+        
         /// Only hindcast available after 12 hours
         let isOlderThan12Hours = run.add(hours: 23) < Timestamp.now()
         
@@ -83,7 +121,7 @@ struct MfWaveDownload: AsyncCommand {
             logger.warning("Not data for \(run.format_YYYYMMddHH)")
             return []
         }
-        if domain == .mfcurrents && [Timestamp(2022,11,30)].contains(run) {
+        if domain == .mfcurrents && [Timestamp(2022,11,30), Timestamp(2024,6,26)].contains(run) {
             logger.warning("Skipping due to NRT change \(run.format_YYYYMMddHH)")
             return []
         }
@@ -111,20 +149,20 @@ struct MfWaveDownload: AsyncCommand {
         let afterNRTSwitch = run > Timestamp(2022, 11, 23)
         
         // Every 7th run, the past 14 days are updated with hindcast data for 7 days
-        let isNRTUpdateDate = domain == .mfcurrents && isOlderThan12Hours && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
+        let isNRTUpdateDate = phyModel && isOlderThan12Hours && afterNRTSwitch && (run.timeIntervalSince1970 / (24*3600)) % 7 == 6
         
         // Only NRT update days are kept on S3. Other runs can be ignored
-        if domain == .mfcurrents && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch && isOlderThan12Hours {
+        if phyModel && isOlderThan12Hours && !isNRTUpdateDate && afterNRTSwitch && isOlderThan12Hours {
             logger.warning("Not an NRT update date. Skipping run \(run.format_YYYYMMddHH)")
             return []
         }
         
         /// Each run contains data from 1 day back
-        let startTime = run.add(days: isNRTUpdateDate ? -14 : -1)
+        let startTime = run.add(days: isNRTUpdateDate ? -14 : -1).add(hours: domain == .mfsst ? 6 : 0)
         /// 10 days forecast. 12z run has one timestep less -> therefore floor to 24h
-        let endTimeForecast = run.add(days: 10).floor(toNearestHour: 24)
+        let endTimeForecast = run.add(days: 10).floor(toNearestHour: 24).add(hours: domain == .mfsst ? 6 : 0)
         
-        let endTimeHindcastOnly = run.add(days: isNRTUpdateDate ? (-7-1) : -1).add(hours: domain.stepHoursPerFile)
+        let endTimeHindcastOnly = run.add(days: isNRTUpdateDate ? (-7-1) : -1).add(hours: domain.stepHoursPerFile).add(hours: domain == .mfsst ? 6 : 0)
 
         if isOlderThan12Hours {
             logger.info("Run date is older than 23 hours. Downloading hindcast only.")
@@ -141,35 +179,83 @@ struct MfWaveDownload: AsyncCommand {
             logger.info("Downloading file with timestap \(step.iso8601_YYYY_MM_dd_HH_mm) from run \(runDownload.format_YYYYMMddHH)")
             
             let url = domain.getUrl(run: runDownload, step: step)
-            let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
-            return try memory.withUnsafeReadableBytes({ memory in
-                guard let nc = try NetCDF.open(memory: memory) else {
-                    fatalError("Could not open netcdf from memory")
+            return try await url.asyncFlatMap({ url in
+                if onlyTides && !url.contains("MOL") {
+                    return []
                 }
-                // Converted from "hours since 1950-01-01"
-                guard let timestamps = try nc.getVariable(name: "time")?
-                    .asType(Int32.self)?
-                    .read()
-                    .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)}) ??
-                        nc.getVariable(name: "time")?
-                    .asType(Float.self)?
-                    .read()
-                    .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)})
-                else {
-                    fatalError("Could not read time array")
-                }
-                return try nc.getVariables().map { ncvar -> [GenericVariableHandle] in
-                    guard let variable = ncvar.toMfVariable() else {
-                        return []
+                let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024*1024)
+                return try memory.withUnsafeReadableBytes({ memory in
+                    guard let nc = try NetCDF.open(memory: memory) else {
+                        fatalError("Could not open netcdf from memory")
                     }
-                    
-                    // Currents use floating point arrays
-                    if let ncFloat = ncvar.asType(Float.self) {
+                    // Converted from "hours since 1950-01-01"
+                    guard let timestamps = try nc.getVariable(name: "time")?
+                        .asType(Int32.self)?
+                        .read()
+                        .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)}) ??
+                            nc.getVariable(name: "time")?
+                        .asType(Float.self)?
+                        .read()
+                        .map({ Timestamp(Int($0) * 3600 + Timestamp(1950,1,1).timeIntervalSince1970)})
+                    else {
+                        fatalError("Could not read time array")
+                    }
+                    return try nc.getVariables().map { ncvar -> [GenericVariableHandle] in
+                        guard let variable = ncvar.toMfVariable() else {
+                            return []
+                        }
+                        
+                        // Currents use floating point arrays
+                        if let ncFloat = ncvar.asType(Float.self) {
+                            return try timestamps.enumerated().map { (i,timestamp) -> GenericVariableHandle in
+                                logger.info("Process variable \(variable) timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
+                                let dimensions = ncvar.dimensions
+                                // Maybe has 4 dimensions for depth
+                                var data = dimensions.count > 3 ? try ncFloat.read(offset: [i,0,0,0], count: [1, 1, ny, nx]) : try ncFloat.read(offset: [i,0,0], count: [1, ny, nx])
+                                if let fillValue: Float = try ncvar.getAttribute("_FillValue")?.read() {
+                                    for i in data.indices {
+                                        if data[i] == fillValue {
+                                            data[i] = .nan
+                                        }
+                                    }
+                                }
+                                if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+                                    // create land elevation file. 0=land, -999=sea
+                                    let elevation = data.map {
+                                        return $0.isNaN ? Float(0) : -999
+                                    }
+                                    try domain.surfaceElevationFileOm.createDirectory()
+                                    try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+                                }
+                                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
+                                // Note: skipHour0 needs still to be set for solar interpolation
+                                return GenericVariableHandle(
+                                    variable: variable,
+                                    time: timestamp,
+                                    member: 0,
+                                    fn: fn
+                                )
+                            }
+                        }
+                        
+                        // Wave model use Int16 with scalefactor
+                        guard let ncInt16 = ncvar.asType(Int16.self) else {
+                            fatalError("Variable \(variable) is not Int16 type")
+                        }
+                        guard let scaleFactor: Float = try ncvar.getAttribute("scale_factor")?.read() else {
+                            fatalError("Could not get scalefactor")
+                        }
+                        guard let missingValue: Int16 = try ncvar.getAttribute("missing_value")?.read() else {
+                            fatalError("Could not get scalefactor")
+                        }
                         return try timestamps.enumerated().map { (i,timestamp) -> GenericVariableHandle in
                             logger.info("Process variable \(variable) timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
-                            let dimensions = ncvar.dimensions
-                            // Maybe has 4 dimensions for depth
-                            let data = dimensions.count > 3 ? try ncFloat.read(offset: [i,0,0,0], count: [1, 1, ny, nx]) : try ncFloat.read(offset: [i,0,0], count: [1, ny, nx])
+                            let data = try ncInt16.read(offset: [i,0,0], count: [1, ny, nx]).map {
+                                if $0 == missingValue {
+                                    return Float.nan
+                                }
+                                return Float($0) * scaleFactor
+                            }
                             if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                                 // create land elevation file. 0=land, -999=sea
                                 let elevation = data.map {
@@ -187,44 +273,8 @@ struct MfWaveDownload: AsyncCommand {
                                 fn: fn
                             )
                         }
-                    }
-                    
-                    // Wave model use Int16 with scalefactor
-                    guard let ncInt16 = ncvar.asType(Int16.self) else {
-                        fatalError("Variable \(variable) is not Int16 type")
-                    }
-                    guard let scaleFactor: Float = try ncvar.getAttribute("scale_factor")?.read() else {
-                        fatalError("Could not get scalefactor")
-                    }
-                    guard let missingValue: Int16 = try ncvar.getAttribute("missing_value")?.read() else {
-                        fatalError("Could not get scalefactor")
-                    }
-                    return try timestamps.enumerated().map { (i,timestamp) -> GenericVariableHandle in
-                        logger.info("Process variable \(variable) timestamp \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
-                        let data = try ncInt16.read(offset: [i,0,0], count: [1, ny, nx]).map {
-                            if $0 == missingValue {
-                                return Float.nan
-                            }
-                            return Float($0) * scaleFactor
-                        }
-                        if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
-                            // create land elevation file. 0=land, -999=sea
-                            let elevation = data.map {
-                                return $0.isNaN ? Float(0) : -999
-                            }
-                            try domain.surfaceElevationFileOm.createDirectory()
-                            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
-                        }
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                        // Note: skipHour0 needs still to be set for solar interpolation
-                        return GenericVariableHandle(
-                            variable: variable,
-                            time: timestamp,
-                            member: 0,
-                            fn: fn
-                        )
-                    }
-                }.flatMap({$0})
+                    }.flatMap({$0})
+                })
             })
         }.flatMap({$0})
         await curl.printStatistics()
@@ -233,17 +283,32 @@ struct MfWaveDownload: AsyncCommand {
 }
 
 extension MfWaveDomain {
-    func getUrl(run: Timestamp, step: Timestamp) -> String {
+    func getBathymetryUrl() -> String {
+        return "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_0.083deg_static_202211/GLO-MFC_001_024_mask_bathy.nc"
+    }
+    
+    func getUrl(run: Timestamp, step: Timestamp) -> [String] {
         let server = "https://s3.waw3-1.cloudferro.com/mdl-native-14/native/"
         let r = step.toComponents()
         let rMM = r.month.zeroPadded(len: 2)
         switch self {
         case .mfwave:
             // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202311/2024/06/mfwamglocep_2024060500_R20240606_00H.nc
-            return "\(server)GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202411/\(r.year)/\(rMM)/mfwamglocep_\(step.format_YYYYMMddHH)_R\(run.format_YYYYMMdd)_\(run.hh)H.nc"
+            return ["\(server)GLOBAL_ANALYSISFORECAST_WAV_001_027/cmems_mod_glo_wav_anfc_0.083deg_PT3H-i_202411/\(r.year)/\(rMM)/mfwamglocep_\(step.format_YYYYMMddHH)_R\(run.format_YYYYMMdd)_\(run.hh)H.nc"]
         case .mfcurrents:
             // https://s3.waw3-1.cloudferro.com/mdl-native-14/native/GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/2024/06/SMOC_20240606_R20240607.nc
-            return "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/\(r.year)/\(rMM)/SMOC_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc"
+            return [
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-sl_PT1H-i_202411/\(r.year)/\(rMM)/MOL_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc",
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy_anfc_merged-uv_PT1H-i_202211/\(r.year)/\(rMM)/SMOC_\(step.format_YYYYMMdd)_R\(run.format_YYYYMMdd).nc"
+            ]
+        case .mfsst:
+            /// Only hindcast available after 7 days
+            let isHindcast = run.add(days: 7) < Timestamp.now()
+            let type = isHindcast ? "hcst" : "fcst"
+            // glo12_rg_6h-i_20250206-18h_3D-thetao_fcst_R20250207.nc
+            return [
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-thetao_anfc_0.083deg_PT6H-i_202406/\(r.year)/\(rMM)/glo12_rg_6h-i_\(step.format_YYYYMMdd)-\(step.hh)h_3D-thetao_\(type)_R\(run.format_YYYYMMdd).nc",
+            ]
         }
     }
 }
@@ -273,6 +338,12 @@ extension Variable {
             return MfCurrentVariable.ocean_u_current
         case "vtotal":
             return MfCurrentVariable.ocean_v_current
+        case "total_sea_level":
+            return MfCurrentVariable.sea_level_height_msl
+        case "invert_barometer":
+            return MfCurrentVariable.invert_barometer_height
+        case "thetao":
+            return MfSSTVariable.sea_surface_temperature
         default:
             return nil
         }

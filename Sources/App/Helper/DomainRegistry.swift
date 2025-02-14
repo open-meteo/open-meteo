@@ -14,6 +14,7 @@ enum DomainRegistry: String, CaseIterable {
     case meteofrance_arpege_world025_probabilities
     case meteofrance_wave
     case meteofrance_currents
+    case meteofrance_sea_surface_temperature
     
     case cams_europe
     case cams_global
@@ -319,6 +320,8 @@ enum DomainRegistry: String, CaseIterable {
             return EumetsatLsaSafDomain.msg
         case .eumetsat_lsa_saf_iodc_15min:
             return EumetsatLsaSafDomain.iodc
+        case .meteofrance_sea_surface_temperature:
+            return MfWaveDomain.mfsst
         }
     }
 }

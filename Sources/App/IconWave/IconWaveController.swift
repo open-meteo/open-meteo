@@ -37,23 +37,24 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
         switch self {
         case .best_match:
-            let gwam = try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            //let gwam = try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let ewam = try IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
             }
+            let mfsst = try GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, lat: lat, lon: lon, elevation: elevation, mode: mode)
             let mfwave = try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfWaveReader(reader: reader)
             }
             let waveModel: [(any GenericReaderProtocol)?];
             if let update = try MfWaveDomain.mfwave.getMetaJson()?.lastRunAvailabilityTime, update <= Timestamp.now().subtract(hours: 26) {
                 // mf model outdated, use ECMWF
-                waveModel = [try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode), mfwave]
+                waveModel = [mfwave, try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)]
             } else {
                 // use mf wave
                 waveModel = [mfwave]
             }
-            let readers: [(any GenericReaderProtocol)?] = waveModel + [mfcurrents, ewam, gwam]
+            let readers: [(any GenericReaderProtocol)?] =  [mfcurrents, mfsst, ewam] + waveModel
             return readers.compactMap({$0})
             /*
             let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode)
@@ -72,9 +73,11 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
         case .meteofrance_wave:
             return try GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[MfWaveReader(reader: $0)]}) ?? []
         case .meteofrance_currents:
-            return try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
+            let mfsst = try GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, lat: lat, lon: lon, elevation: elevation, mode: mode)
+            let mfcurrents = try GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode).map { reader -> any GenericReaderProtocol in
                 MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
-            }.flatMap({[$0]}) ?? []
+            }
+            return [mfsst, mfcurrents].compactMap({$0})
         case .ncep_gfswave025:
             return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({[$0]}) ?? []
         case .ncep_gefswave025:
@@ -100,6 +103,9 @@ enum MarineVariable: String, GenericVariableMixable {
     case swell_wave_direction
     case ocean_current_velocity
     case ocean_current_direction
+    case sea_level_height_msl
+    case invert_barometer_height
+    case sea_surface_temperature
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -108,7 +114,7 @@ enum MarineVariable: String, GenericVariableMixable {
 
 struct IconWaveController {
     func query(_ req: Request) async throws -> Response {
-        let host = try await req.ensureSubdomain("marine-api")
+        _ = try await req.ensureSubdomain("marine-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         let numberOfLocationsMaximum = try await req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
@@ -122,12 +128,15 @@ struct IconWaveController {
         let paramsHourly = try MarineVariable.load(commaSeparatedOptional: params.hourly)
         let paramsCurrent = try MarineVariable.load(commaSeparatedOptional: params.current)
         let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
-        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, {$0 + $1.countEnsembleMember})
+        let paramsMinutely = try MarineVariable.load(commaSeparatedOptional: params.minutely_15)
+
+        let nParamsMinutely = paramsMinutely?.count ?? 0
+        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, {$0 + $1.countEnsembleMember})
         
         let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
             let coordinates = prepared.coordinate
             let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92, forecastDaysMinutely15Default: 7)
             let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
             
@@ -208,7 +217,25 @@ struct IconWaveController {
                         }
                     },
                     sixHourly: nil,
-                    minutely15: nil
+                    minutely15: paramsMinutely.map { variables in
+                        return {
+                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
+                                var unit: SiUnit? = nil
+                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                    guard let d = try reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                        return nil
+                                    }
+                                    unit = d.unit
+                                    assert(time.minutely15.count == d.data.count)
+                                    return ApiArray.float(d.data)
+                                }
+                                guard allMembers.count > 0 else {
+                                    return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
+                                }
+                                return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
+                            })
+                        }
+                    }
                 )
             }
             guard !readers.isEmpty else {
