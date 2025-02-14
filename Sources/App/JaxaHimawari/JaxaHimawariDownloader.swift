@@ -69,17 +69,29 @@ struct JaxaHimawariDownload: AsyncCommand {
             }
             return
         }
-        // 11 minutes delay
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds)
-        let handles: [GenericVariableHandle]
-        if run.minute == 40+10 && [2, 14].contains(run.hour) {
-            // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
-            // At 2:50 and 14:50 we download the previous step and interpolate data at 2:40 and 14:40
-            handles = try await TimerangeDt(start: run.subtract(minutes: 20), nTime: 3, dtSeconds: 600).asyncFlatMap {
-                try await downloadRun(application: context.application, run: $0, domain: domain, variables: variables, downloader: downloader)
-            }
-        } else {
-            handles = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+        
+        let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
+        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
+        let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
+        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile)).map(Int.init)?.flatMap(Timestamp.init))
+        var startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
+        if endTime.minute == 40+20 && [2, 14].contains(endTime.hour) {
+            logger.info("Adjusting time by 20 minutes to account for maintenance window")
+            // At 2:50 and 14:50 download the previous step and interpolate data at 2:40 and 14:40
+            startTime = startTime.subtract(minutes: 20)
+        }
+        guard startTime <= endTime else {
+            logger.info("All steps already downloaded")
+            return
+        }
+        let downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
+        logger.info("Downloading range \(downloadRange.prettyString())")
+        let handles = try await downloadRange.asyncFlatMap { run in
+            try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+        }
+        if let last = handles.max(by: {$0.time < $1.time})?.time {
+            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+            try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
