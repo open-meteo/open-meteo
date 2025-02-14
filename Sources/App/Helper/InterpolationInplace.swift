@@ -313,7 +313,7 @@ extension Array where Element == Float {
                 var posC = 0
                 var posD = 0
                 // Seek next 2 valid values, point C and D
-                for t2 in t..<Swift.min(t+7, nTime) {
+                for t2 in t..<Swift.min(t+13, nTime) {
                     let value = self[l * nTime + t2]
                     guard !value.isNaN else  {
                         continue
