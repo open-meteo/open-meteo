@@ -114,7 +114,7 @@ enum MarineVariable: String, GenericVariableMixable {
 
 struct IconWaveController {
     func query(_ req: Request) async throws -> Response {
-        let host = try await req.ensureSubdomain("marine-api")
+        _ = try await req.ensureSubdomain("marine-api")
         let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
         let numberOfLocationsMaximum = try await req.ensureApiKey("marine-api", apikey: params.apikey)
         let currentTime = Timestamp.now()
@@ -226,7 +226,7 @@ struct IconWaveController {
                                         return nil
                                     }
                                     unit = d.unit
-                                    assert(timeHourlyRead.count == d.data.count)
+                                    assert(time.minutely15.count == d.data.count)
                                     return ApiArray.float(d.data)
                                 }
                                 guard allMembers.count > 0 else {
