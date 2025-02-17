@@ -244,7 +244,7 @@ struct UkmoDownload: AsyncCommand {
         case .global_deterministic_10km, .global_ensemble_20km:
             deadLineHours = 5
         case .uk_deterministic_2km:
-            deadLineHours = 1
+            deadLineHours = 1.8
         }
         Process.alarm(seconds: Int(deadLineHours+0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
