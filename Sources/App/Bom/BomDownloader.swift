@@ -559,51 +559,68 @@ struct DownloadBomCommand: AsyncCommand {
                 if pos == 0 {
                     // search level if requried
                     let levelIndex = level.map { level in
-                        guard let index = try? ncAnalysis
-                            .getVariable(name: "rho_lvl")?
-                            .asType(Float.self)?
-                            .read()
-                            .firstIndex(where: {abs($0 - level) < 0.1}) else {
-                            fatalError("Could not get level index")
+                        do {
+                            guard let index = try ncAnalysis
+                                .getVariable(name: "rho_lvl")?
+                                .asType(Float.self)?
+                                .read()
+                                .firstIndex(where: {abs($0 - level) < 0.1}) else {
+                                fatalError("Could not get level index for \(variable) dimensions=\(varAnalysis.dimensionsFlat)")
+                            }
+                            return index
+                        } catch {
+                            fatalError("Error during get level index \(error)")
                         }
-                        return index
                     } ?? 0
-                    guard let data = try? varAnalysis.asType(Float.self)?.read(
-                        offset: nDims == 3 ? [0, 0, 0] : [0, levelIndex, 0, 0],
-                        count: nDims == 3 ? [1, ny, nx]: [1, 1, ny, nx]
-                    ) else {
-                        fatalError("Could not read analysis timestep for \(variable) levelIndex=\(levelIndex) dimensions=\(varAnalysis.dimensionsFlat)")
+                    do {
+                        guard let data = try varAnalysis.asType(Float.self)?.read(
+                            offset: nDims == 3 ? [0, 0, 0] : [0, levelIndex, 0, 0],
+                            count: nDims == 3 ? [1, ny, nx]: [1, 1, ny, nx]
+                        ) else {
+                            fatalError("Could not read analysis timestep for \(variable) levelIndex=\(levelIndex) dimensions=\(varAnalysis.dimensionsFlat)")
+                        }
+                        return (run, data)
+                    } catch {
+                        fatalError("Error during read analysis for \(variable) levelIndex=\(levelIndex) dimensions=\(varAnalysis.dimensionsFlat) error=\(error)")
                     }
-                    return (run, data)
                 } else {
                     // search level if requried
                     let levelIndex = level.map { level in
-                        guard let index = try? ncForecast
-                            .getVariable(name: "rho_lvl")?
-                            .asType(Float.self)?
-                            .read()
-                            .firstIndex(where: {abs($0 - level) < 0.1}) else {
-                            fatalError("Could not get level index")
-                        }
-                        return index
-                    } ?? 0
-                    guard var data = try? varForecast.asType(Float.self)?.read(
-                        offset: nDims == 3 ? [pos-1, 0, 0] : [pos-1, levelIndex, 0, 0],
-                        count: nDims == 3 ? [1, ny, nx] : [1, 1, ny, nx]
-                    ) else {
-                        fatalError("Could not read timestep")
-                    }
-                    if isAccumulated {
-                        if let previous = previousStepData {
-                            previousStepData = data
-                            for i in data.indices {
-                                data[i] -= previous[i]
+                        do {
+                            guard let index = try ncForecast
+                                .getVariable(name: "rho_lvl")?
+                                .asType(Float.self)?
+                                .read()
+                                .firstIndex(where: {abs($0 - level) < 0.1}) else {
+                                fatalError("Could not get level index")
                             }
-                        } else {
-                            previousStepData = data
+                            return index
+                        } catch {
+                            fatalError("Could not read data timestep for \(variable) dimensions=\(varForecast.dimensionsFlat) error=\(error)")
                         }
+                    } ?? 0
+                    do {
+                        guard var data = try varForecast.asType(Float.self)?.read(
+                            offset: nDims == 3 ? [pos-1, 0, 0] : [pos-1, levelIndex, 0, 0],
+                            count: nDims == 3 ? [1, ny, nx] : [1, 1, ny, nx]
+                        ) else {
+                            fatalError("Could not read timestep")
+                        }
+                        if isAccumulated {
+                            if let previous = previousStepData {
+                                previousStepData = data
+                                for i in data.indices {
+                                    data[i] -= previous[i]
+                                }
+                            } else {
+                                previousStepData = data
+                            }
+                        }
+                        return (run.add(Int(timeForecast[pos-1])), data)
+                    } catch {
+                        fatalError("Error during read data for \(variable) levelIndex=\(levelIndex) dimensions=\(varForecast.dimensionsFlat) error=\(error)")
                     }
-                    return (run.add(Int(timeForecast[pos-1])), data)
+                    
                 }
             }
         }
