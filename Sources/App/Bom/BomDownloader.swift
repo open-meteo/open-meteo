@@ -73,7 +73,7 @@ struct DownloadBomCommand: AsyncCommand {
         
         logger.info("Downloading height and elevation data")
         
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4, waitAfterLastModifiedBeforeDownload: TimeInterval(60*500))
         var base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/an/"
         if domain == .access_global_ensemble {
             base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/cf/"
@@ -118,8 +118,8 @@ struct DownloadBomCommand: AsyncCommand {
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
     func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
+        let deadLineHours: Double = 6
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let variables = ["wnd_ucmp", "wnd_vcmp"]
     
@@ -179,8 +179,8 @@ struct DownloadBomCommand: AsyncCommand {
     /// Ensemble do no have `rh_scrn` and `cld_phys_thunder_p`
     func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
+        let deadLineHours: Double = 6
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
         // list of variables to download
@@ -322,8 +322,8 @@ struct DownloadBomCommand: AsyncCommand {
     /// Download variables, convert to temporary om files and return all handles
     func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 5
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*5))
+        let deadLineHours: Double = 6
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60*15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
         // list of variables to download
