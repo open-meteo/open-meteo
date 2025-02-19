@@ -139,32 +139,37 @@ struct JaxaHimawariDownload: AsyncCommand {
                 logger.warning("File missing")
                 return nil
             }
-            var sw = try data.readNetcdf(name: "SWR")
-            
-            // Transform instant solar radiation values to backwards averaged values
-            // Instant values have a scan time difference which needs to be corrected for
-            if variable == .shortwave_radiation {
-                let start = DispatchTime.now()
-                let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
-                Zensun.instantaneousSolarRadiationToBackwardsAverages(
-                    timeOrientedData: &sw.data,
-                    grid: domain.grid,
-                    locationRange: 0..<domain.grid.count,
-                    timerange: timerange,
-                    scanTimeDifferenceHours: timeDifference.data.map(Double.init),
-                    sunDeclinationCutOffDegrees: 1
+            do {
+                var sw = try data.readNetcdf(name: "SWR")
+                
+                // Transform instant solar radiation values to backwards averaged values
+                // Instant values have a scan time difference which needs to be corrected for
+                if variable == .shortwave_radiation {
+                    let start = DispatchTime.now()
+                    let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+                    Zensun.instantaneousSolarRadiationToBackwardsAverages(
+                        timeOrientedData: &sw.data,
+                        grid: domain.grid,
+                        locationRange: 0..<domain.grid.count,
+                        timerange: timerange,
+                        scanTimeDifferenceHours: timeDifference.data.map(Double.init),
+                        sunDeclinationCutOffDegrees: 1
+                    )
+                    logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
+                }
+                
+                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
+                return GenericVariableHandle(
+                    variable: variable,
+                    time: run,
+                    member: 0,
+                    fn: fn
                 )
-                logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
+            } catch NetCDFError.ncerror(let code, let error) {
+                logger.info("Skipping NetCDF error \(code): \(error)")
+                return nil
             }
-            
-            let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
-            let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
-            return GenericVariableHandle(
-                variable: variable,
-                time: run,
-                member: 0,
-                fn: fn
-            )
         })
     }
 }
