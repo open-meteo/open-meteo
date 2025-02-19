@@ -103,13 +103,13 @@ final class ArrayTests: XCTestCase {
         data = [.nan, .nan, .nan, 320.9375, .nan, .nan, 246.95312, .nan, .nan, 2.578125, .nan, .nan, 0.0, .nan, .nan, 0.0]
         time = TimerangeDt(start: Timestamp(2022,08,16,12), nTime: data.count, dtSeconds: 3600)
         data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: true)
-        XCTAssertEqualArray(data, [.nan, 316.6924, 327.28204, 319.8192, 304.3659, 271.0651, 201.56267, 101.99449, 25.591284, 0.6671406, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
+        XCTAssertEqualArray(data, [.nan, 316.37225, 326.621, 319.8192, 294.02402, 253.06091, 201.56267, 101.99449, 25.591284, 0.6671406, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
         
         /// Assuming the value afterwards is not averaged correctly
         data = [.nan, .nan, .nan, 304.3659, .nan, .nan, 101.99449, .nan, .nan, 0.0, .nan, .nan, 0.0, .nan, .nan, 0.0]
         time = TimerangeDt(start: Timestamp(2022,08,16,12), nTime: data.count, dtSeconds: 3600)
         data.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
-        XCTAssertEqualArray(data, [.nan, 306.46954, 321.95593, 304.3659, 247.148, 171.532, 101.99449, 46.063854, 10.676279, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
+        XCTAssertEqualArray(data, [.nan, 301.08548, 310.839, 304.3659, 241.74438, 162.12485, 101.99449, 46.063854, 10.676279, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.001)
         
         data = [321.95593, .nan, 247.148]
         time = TimerangeDt(start: Timestamp(2022,08,16,14), nTime: data.count, dtSeconds: 3600)

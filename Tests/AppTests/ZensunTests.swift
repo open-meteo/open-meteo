@@ -234,4 +234,12 @@ final class ZensunTests: XCTestCase {
         // Note: Differences to the actual diffuse radiation are expected!
         XCTAssertEqualArray(diff, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 9.287625, 116.9848, 133.84239, 166.59798, 219.15633, 200.51555, 205.13588, 167.13881, 146.30597, 132.74532, 84.49708, 4.2427073, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
     }
+    
+    func testSarahInterpolation() {
+        let time = TimerangeDt(start: Timestamp(2006,5,18), nTime: 24*2, dtSeconds: 1800)
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 52.25, lonMin: 21, dx: 1, dy: 1)
+        var rad = [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 502.0, 464.0, Float.nan, .nan, .nan, .nan, .nan, .nan, 62.0, 34.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        rad.interpolateInplaceSolarBackwards(time: time, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
+        XCTAssertEqualArray(rad, [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 502.0, 464.0, 410.29044, 342.34622, 269.43915, 199.72142, 139.58559, 93.16319, 62.0, 34.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01)
+    }
 }
