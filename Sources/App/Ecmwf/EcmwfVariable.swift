@@ -780,13 +780,13 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .divergence_of_wind_100hPa: return "d"
         case .divergence_of_wind_50hPa: return "d"
         case .cloud_cover:
-            return nil
+            return "tcc"
         case .cloud_cover_low:
-            return nil
+            return "lcc"
         case .cloud_cover_mid:
-            return nil
+            return "mcc"
         case .cloud_cover_high:
-            return nil
+            return "hcc"
         case .dew_point_2m:
             return "2d"
         case .relative_humidity_2m:
