@@ -97,6 +97,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
      12 = Freezing drizzle (i.e. supercooled drizzle which freezes on contact with the ground and other surfaces)
      */
     case precipitation_type
+    /// only in AIFS025_single
+    case snowfall_water_equivalent
+    /// only in AIFS025_single
+    case showers
     /// only in aifs
     case dew_point_2m
     case runoff
@@ -355,6 +359,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         switch self {
         case .precipitation_type: return .dimensionless
         case .precipitation: fallthrough
+        case .snowfall_water_equivalent, .showers: fallthrough
         case .runoff: return .millimetre
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
         case .surface_temperature: return .celsius
@@ -502,7 +507,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// pressure level in hPa or meter in the grib files
     var level: Int? {
         switch self {
-        case .precipitation, .precipitation_type: fallthrough
+        case .precipitation, .precipitation_type, .snowfall_water_equivalent, .showers: fallthrough
         case .runoff: return nil
         case .soil_temperature_0_to_7cm: return 1
         case .soil_temperature_7_to_28cm: return 2
@@ -660,6 +665,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         switch self {
         case .precipitation_type: return "ptype"
         case .precipitation: return "tp"
+        case .snowfall_water_equivalent: return "sf"
+        case .showers: return "cp"
         case .runoff: return "ro"
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return "sot" // sot?
         case .surface_temperature: return "skt"
@@ -780,13 +787,13 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .divergence_of_wind_100hPa: return "d"
         case .divergence_of_wind_50hPa: return "d"
         case .cloud_cover:
-            return nil
+            return "tcc"
         case .cloud_cover_low:
-            return nil
+            return "lcc"
         case .cloud_cover_mid:
-            return nil
+            return "mcc"
         case .cloud_cover_high:
-            return nil
+            return "hcc"
         case .dew_point_2m:
             return "2d"
         case .relative_humidity_2m:
@@ -811,7 +818,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     var scalefactor: Float {
         switch self {
         case .precipitation_type: return 1
-        case .precipitation: fallthrough
+        case .precipitation, .snowfall_water_equivalent, .showers: fallthrough
         case .runoff: return 10
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 20
         case .surface_temperature: return 20
