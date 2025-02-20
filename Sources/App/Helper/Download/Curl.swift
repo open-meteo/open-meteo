@@ -429,9 +429,12 @@ extension HTTPClientResponse {
     
     /// Optionally wait to stay delayed a fixed time amount after last modified header
     func waitAfterLastModified(logger: Logger, wait: TimeInterval?) async throws {
-        guard let wait, let lastModified = headers.lastModified?.value else {
+        guard let wait else {
             return
-            
+        }
+        guard let lastModified = headers.lastModified?.value else {
+            logger.warning("Could not get the last modified header. Skipping delay")
+            return
         }
         let delta = wait - lastModified.distance(to: Date())
         if delta > 1 {
