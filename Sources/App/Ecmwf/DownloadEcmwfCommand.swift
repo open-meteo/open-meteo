@@ -283,7 +283,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 
-                if shortName == "z" && domain == .aifs025 {
+                if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single].contains(domain) {
                     grib2d.array.data.multiplyAdd(multiply: 1/9.80665, add: 0)
                 }
                 
@@ -306,6 +306,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 // geopotential and vertical velocity for wind calculation
                 if [EcmwfDomain.aifs025, .aifs025_single].contains(domain) && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                }
+                if variable.gribName == "w" {
+                    // do not store specific humidity on disk
+                    return nil
                 }
                 if variable == .temperature_2m {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
