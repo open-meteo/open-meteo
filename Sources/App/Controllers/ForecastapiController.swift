@@ -16,7 +16,9 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             hasCurrentWeather: false,
             defaultModel: .archive_best_match,
-            subdomain: "archive-api")
+            subdomain: "archive-api",
+            alias: ["satellite-api"]
+        )
         categoriesRoute.getAndPost("era5", use: era5.query)
         categoriesRoute.getAndPost("archive", use: era5.query)
         
