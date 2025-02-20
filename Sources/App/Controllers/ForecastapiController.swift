@@ -353,6 +353,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ukmo_global_deterministic_10km
     case ukmo_uk_deterministic_2km
     
+    case satellite_radiation_seamless
     case eumetsat_sarah3
     case eumetsat_lsa_saf_msg
     case eumetsat_lsa_saf_iodc
@@ -592,6 +593,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .eumetsat_lsa_saf_iodc:
             let sat = try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({$0})
+        case .satellite_radiation_seamless:
+            if (-60..<50).contains(lon) { // MSG on 0°
+                return [try EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+            }
+            if (50..<90).contains(lon) { // IODC on 41.5°
+                return [try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+            }
+            if (90...).contains(lon) { // Himawari on 140°
+                return [try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+            }
+            // TODO GOES east + west
+            return []
         }
     }
     
