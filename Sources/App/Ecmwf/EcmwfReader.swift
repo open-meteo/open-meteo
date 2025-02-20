@@ -316,6 +316,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let rh = try get(raw: .relative_humidity_50hPa, time: time)
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50)}), .percentage)
         case .snowfall:
+            if reader.domain == .aifs025_single {
+                let snow = try get(raw: .snowfall_water_equivalent, time: time).data.map({$0 * 7})
+                return DataAndUnit(snow, .centimetre)
+            }
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)
             let precipitationType = try get(raw: .precipitation_type, time: time)
@@ -333,8 +337,13 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 return precip * (isMixed ? 0.7/2 : isSnow ? 0.7 : 0)
             }), .centimetre)
         case .rain:
-            let temperature = try get(raw: .temperature_2m, time: time)
             let precipitation = try get(raw: .precipitation, time: time)
+            if reader.domain == .aifs025_single {
+                let snow = try get(raw: .snowfall_water_equivalent, time: time).data
+                let showers = try get(raw: .showers, time: time).data
+                return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map{ $0 - $1.0 - $1.1 }, .millimetre)
+            }
+            let temperature = try get(raw: .temperature_2m, time: time)
             let precipitationType = try get(raw: .precipitation_type, time: time)
             return DataAndUnit(zip(zip(temperature.data, precipitationType.data), precipitation.data).map({
                 let ptype = $0.1
@@ -350,6 +359,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 return precip * (isMixed ? 1/2 : isSnow ? 0 : 1)
             }), .millimetre)
         case .showers:
+            if reader.domain == .aifs025_single {
+                return try get(raw: .showers, time: time)
+            }
             let precipitation = try get(raw: .precipitation, time: time)
             return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
         case .is_day:
@@ -737,13 +749,28 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .cape, time: time)
         case .rain:
-            fallthrough
+            try prefetchData(raw: .precipitation, time: time)
+            if reader.domain == .aifs025_single {
+                try prefetchData(raw: .snowfall_water_equivalent, time: time)
+                try prefetchData(raw: .showers, time: time)
+            } else {
+                try prefetchData(raw: .temperature_2m, time: time)
+                try prefetchData(raw: .precipitation_type, time: time)
+            }
         case .snowfall:
-            try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .precipitation, time: time)
-            try prefetchData(raw: .precipitation_type, time: time)
+            if reader.domain == .aifs025_single {
+                try prefetchData(raw: .snowfall_water_equivalent, time: time)
+            } else {
+                try prefetchData(raw: .precipitation, time: time)
+                try prefetchData(raw: .temperature_2m, time: time)
+                try prefetchData(raw: .precipitation_type, time: time)
+            }
         case .showers:
-            try prefetchData(raw: .precipitation, time: time)
+            if reader.domain == .aifs025_single {
+                try prefetchData(raw: .showers, time: time)
+            } else {
+                try prefetchData(raw: .precipitation, time: time)
+            }
         case .is_day:
             break
         case .relativehumidity_1000hPa:

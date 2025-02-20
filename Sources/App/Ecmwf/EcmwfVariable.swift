@@ -666,7 +666,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .precipitation_type: return "ptype"
         case .precipitation: return "tp"
         case .snowfall_water_equivalent: return "sf"
-        case .showers: return "cf"
+        case .showers: return "cp"
         case .runoff: return "ro"
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return "sot" // sot?
         case .surface_temperature: return "skt"
