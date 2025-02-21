@@ -1008,7 +1008,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .precipitation: fallthrough
+        case .precipitation, .showers, .snowfall_water_equivalent: fallthrough
         case .runoff: return .backwards_sum
         case .cloud_cover: fallthrough
         case .cloud_cover_low: fallthrough
