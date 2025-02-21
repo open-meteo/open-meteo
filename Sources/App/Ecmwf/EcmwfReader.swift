@@ -341,7 +341,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             if reader.domain == .aifs025_single {
                 let snow = try get(raw: .snowfall_water_equivalent, time: time).data
                 let showers = try get(raw: .showers, time: time).data
-                return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map{ $0 - $1.0 - $1.1 }, .millimetre)
+                return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map{ max($0 - $1.0 - $1.1, 0) }, .millimetre)
             }
             let temperature = try get(raw: .temperature_2m, time: time)
             let precipitationType = try get(raw: .precipitation_type, time: time)
