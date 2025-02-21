@@ -279,7 +279,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 //fatalError()
                 
                 // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
+                if let fma = variable.multiplyAdd(domain: domain) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 

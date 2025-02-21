@@ -983,8 +983,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return (1/100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
             if domain == .aifs025_single {
-                // AIFS Single uses precipitation rate
-                return (1/Float(domain.dtSeconds), 0)
+                // AIFS Single is already kg/m2
+                return (1, 0)
             }
             return (1000, 0) // meters to millimeter
         case .specific_humidity_1000hPa: fallthrough
