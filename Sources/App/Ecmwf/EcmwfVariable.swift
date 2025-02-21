@@ -959,7 +959,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         }
     }
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(domain: EcmwfDomain) -> (multiply: Float, add: Float)? {
         switch self {
         case .surface_temperature: fallthrough
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
@@ -981,9 +981,11 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return (1/100, 0)
         case .surface_pressure:
             return (1/100, 0)
-        case .precipitation:
-            fallthrough
-        case .runoff:
+        case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
+            if domain == .aifs025_single {
+                // AIFS Single is already kg/m2
+                return (1, 0)
+            }
             return (1000, 0) // meters to millimeter
         case .specific_humidity_1000hPa: fallthrough
         case .specific_humidity_925hPa: fallthrough
@@ -998,7 +1000,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_100hPa: fallthrough
         case .specific_humidity_50hPa:
             return (1000, 0)
-        case .shortwave_radiation: return (1/(3*3600), 0) // joules to watt
+        case .shortwave_radiation: return (1/Float(domain.dtSeconds), 0) // joules to watt
         default:
             return nil
         }
@@ -1006,7 +1008,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .precipitation: fallthrough
+        case .precipitation, .showers, .snowfall_water_equivalent: fallthrough
         case .runoff: return .backwards_sum
         case .cloud_cover: fallthrough
         case .cloud_cover_low: fallthrough

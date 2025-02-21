@@ -317,7 +317,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50)}), .percentage)
         case .snowfall:
             if reader.domain == .aifs025_single {
-                let snow = try get(raw: .snowfall_water_equivalent, time: time).data.map({$0 * 7})
+                let snow = try get(raw: .snowfall_water_equivalent, time: time).data.map({$0 * 0.7})
                 return DataAndUnit(snow, .centimetre)
             }
             let temperature = try get(raw: .temperature_2m, time: time)
