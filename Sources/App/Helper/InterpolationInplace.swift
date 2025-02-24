@@ -301,40 +301,35 @@ extension Array where Element == Float {
                 break
             }
             
-            /// At  the boundary, it wont be possible to detect a valid spacing for 4 points
-            /// Reuse the previously good known spacing. The minimum spacing must be 2, meaning `D-D`.
-            var width = 2
             for t in firstValid..<nTime {
                 guard self[l * nTime + t].isNaN else {
                     continue
                 }
+                
                 var C = Float.nan
-                var D = Float.nan
+                //var D = Float.nan
+                let posB = t - 1
                 var posC = 0
-                var posD = 0
-                // Seek next 2 valid values, point C and D
-                for t2 in t..<nTime {
+                // Find the first valid value for point C within the next 7 hours
+                for t2 in t..<Swift.min(t + 7*3600/time.dtSeconds, nTime) {
                     let value = self[l * nTime + t2]
                     guard !value.isNaN else  {
                         continue
                     }
-                    if C.isNaN {
-                        C = value
-                        posC = t2
-                        continue
-                    }
-                    D = value
-                    posD = t2
+                    C = value
+                    posC = t2
                     break
                 }
                 if C.isNaN {
                     // not possible to do any interpolation
                     break
                 }
-                if !D.isNaN {
-                    width = posD - posC
-                }
-                let posB = Swift.max(posC - width, 0)
+                let width = posC - posB
+                let posA = posB - width
+                let posD = posC + width
+                let posAValid = posA >= 0 && posA - sLow >= 0 && !self[l * nTime + posA].isNaN
+                let posDValid = posD < nTime && posD - sLow < solarTime.count && !self[l * nTime + posD].isNaN
+                
                 let B = self[l * nTime + posB]
                 let solB = solar2d[sPos, posB - sLow]
                 let solC = solar2d[sPos, posC - sLow]
@@ -344,37 +339,37 @@ extension Array where Element == Float {
 
                 /// clearness index at point C. At low radiation levels it is impossible to estimate KT indices, set to NaN
                 var ktC = solAvgC <= radMinium ? .nan : Swift.min(C / solAvgC, radLimit)
+                
                 /// Clearness index at point B, or use `ktC` for low radiation levels. B could be NaN if data is immediately missing in the beginning of a time-series
                 var ktB = solB <= radMinium || B.isNaN ? ktC : Swift.min(B / solB, radLimit)
-                if ktC.isNaN && ktB > 0 {
-                    ktC = ktB
+                
+                
+                var ktA, ktD: Float
+                if posDValid && posAValid {
+                    // 4 point Hermite kt interpolation
+                    let A = self[l * nTime + posA]
+                    let D = self[l * nTime + posD]
+                    
+                    let solA = solar2d[sPos, posA - sLow]
+                    ktA = solA <= radMinium ? ktB : Swift.min(A / solA, radLimit)
+                    
+                    /// solD is an average of the solar factor from posC until posD
+                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solar2d[sPos, posD - sLow]
+                    ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
+                } else {
+                    // 2 point linear kt interpolation
+                    ktA = ktB
+                    ktD = ktC
                 }
                 
-                var ktA: Float
-                if posB - width < 0 {
-                    // Replicate point B if A would be outside
-                    ktA = ktB
-                } else {
-                    let posA = posB - width
-                    /// Solar factor for point A is already deaveraged unlike point C and D
-                    let solA = solar2d[sPos, posA - sLow]
-                    let A = self[l * nTime + posA]
-                    ktA = solA <= radMinium || A.isNaN ? ktB : Swift.min(A / solA, radLimit)
+
+                if ktC.isNaN && ktB > 0 {
+                    ktC = ktB
                 }
 
                 if ktC.isNaN && ktA > 0 {
                     ktB = ktA
                     ktC = ktA
-                }
-                
-                let ktD: Float
-                if D.isNaN {
-                    // Replicate point C if D is outside boundary
-                    ktD = ktC
-                } else {
-                    /// solC is an average of the solar factor from posC until posD
-                    let solAvgD = missingValuesAreBackwardsAveraged ? solar2d[sPos, posC + 1 - sLow ..< posD + 1 - sLow].mean() : solar2d[sPos, posD - sLow]
-                    ktD = solAvgD <= radMinium ? ktC : Swift.min(D / solAvgD, radLimit)
                 }
                 
                 // Especially for 6h values, aggressively try to find any KT index that works

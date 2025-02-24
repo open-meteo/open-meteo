@@ -7,6 +7,9 @@ public struct ForecastapiController: RouteCollection {
     /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
     static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
+    /// Single thread
+    static var isolationLoop = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
@@ -16,7 +19,9 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             hasCurrentWeather: false,
             defaultModel: .archive_best_match,
-            subdomain: "archive-api")
+            subdomain: "archive-api",
+            alias: ["satellite-api"]
+        )
         categoriesRoute.getAndPost("era5", use: era5.query)
         categoriesRoute.getAndPost("archive", use: era5.query)
         
@@ -243,7 +248,7 @@ struct WeatherApiController {
             return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
+        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
         return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
@@ -354,6 +359,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ukmo_global_deterministic_10km
     case ukmo_uk_deterministic_2km
     
+    case satellite_radiation_seamless
     case eumetsat_sarah3
     case eumetsat_lsa_saf_msg
     case eumetsat_lsa_saf_iodc
@@ -595,6 +601,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .eumetsat_lsa_saf_iodc:
             let sat = try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({$0})
+        case .satellite_radiation_seamless:
+            if (-60..<50).contains(lon) { // MSG on 0°
+                return [try EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+            }
+            if (50..<90).contains(lon) { // IODC on 41.5°
+                return [try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+            }
+            if (90...).contains(lon) { // Himawari on 140°
+                return [try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+            }
+            // TODO GOES east + west
+            return []
         }
     }
     

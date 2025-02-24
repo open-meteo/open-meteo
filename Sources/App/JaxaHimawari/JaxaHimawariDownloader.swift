@@ -70,26 +70,35 @@ struct JaxaHimawariDownload: AsyncCommand {
             return
         }
         
-        let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
-        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
-        let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
-        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile)).map(Int.init)?.flatMap(Timestamp.init))
-        var startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
-        if endTime.minute == 40+20 && [2, 14].contains(endTime.hour) {
-            logger.info("Adjusting time by 20 minutes to account for maintenance window")
-            // At 2:50 and 14:50 download the previous step and interpolate data at 2:40 and 14:40
-            startTime = startTime.subtract(minutes: 20)
+        let downloadRange: TimerangeDt
+        let lastTimestampFile: String?
+        if let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) {
+            downloadRange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+            lastTimestampFile = nil
+        } else {
+            let timestampFile = "\(domain.downloadDirectory)last.txt"
+            let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
+            let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
+            let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile)).map(Int.init)?.flatMap(Timestamp.init))
+            let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
+            guard startTime <= endTime else {
+                logger.info("All steps already downloaded")
+                return
+            }
+            downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
+            lastTimestampFile = timestampFile
         }
-        guard startTime <= endTime else {
-            logger.info("All steps already downloaded")
-            return
-        }
-        let downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
         logger.info("Downloading range \(downloadRange.prettyString())")
-        let handles = try await downloadRange.asyncFlatMap { run in
-            try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+        let handles = try await downloadRange.enumerated().asyncFlatMap { (i,run) in
+            // If the first step is missing, download the previous one to allow interpolation
+            let h = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
+            if i == 0 && h.isEmpty && downloadRange.count > 1 {
+                logger.info("Fist step missing, download previoud step for interpolation")
+                return try await downloadRun(application: context.application, run: run.add(-1 * domain.dtSeconds), domain: domain, variables: variables, downloader: downloader)
+            }
+            return h
         }
-        if let last = handles.max(by: {$0.time < $1.time})?.time {
+        if let lastTimestampFile, let last = handles.max(by: {$0.time < $1.time})?.time {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
@@ -119,9 +128,10 @@ struct JaxaHimawariDownload: AsyncCommand {
             logger.info("Downloading \(variable) \(run.iso8601_YYYY_MM_dd_HH_mm)")
             let c = run.toComponents()
             let path: String
+            let satellite: String = run >= Timestamp(2022,12,13) ? "H09" : "H08"
             switch domain {
             case .himawari_10min:
-                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/H09_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.02401_02401.nc"
+                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.02401_02401.nc"
             //case .himawari_hourly:
             //    path = "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc"
             }
@@ -130,32 +140,37 @@ struct JaxaHimawariDownload: AsyncCommand {
                 logger.warning("File missing")
                 return nil
             }
-            var sw = try data.readNetcdf(name: "SWR")
-            
-            // Transform instant solar radiation values to backwards averaged values
-            // Instant values have a scan time difference which needs to be corrected for
-            if variable == .shortwave_radiation {
-                let start = DispatchTime.now()
-                let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
-                Zensun.instantaneousSolarRadiationToBackwardsAverages(
-                    timeOrientedData: &sw.data,
-                    grid: domain.grid,
-                    locationRange: 0..<domain.grid.count,
-                    timerange: timerange,
-                    scanTimeDifferenceHours: timeDifference.data.map(Double.init),
-                    sunDeclinationCutOffDegrees: 1
+            do {
+                var sw = try data.readNetcdf(name: "SWR")
+                
+                // Transform instant solar radiation values to backwards averaged values
+                // Instant values have a scan time difference which needs to be corrected for
+                if variable == .shortwave_radiation {
+                    let start = DispatchTime.now()
+                    let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+                    Zensun.instantaneousSolarRadiationToBackwardsAverages(
+                        timeOrientedData: &sw.data,
+                        grid: domain.grid,
+                        locationRange: 0..<domain.grid.count,
+                        timerange: timerange,
+                        scanTimeDifferenceHours: timeDifference.data.map(Double.init),
+                        sunDeclinationCutOffDegrees: 1
+                    )
+                    logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
+                }
+                
+                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
+                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
+                return GenericVariableHandle(
+                    variable: variable,
+                    time: run,
+                    member: 0,
+                    fn: fn
                 )
-                logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
+            } catch NetCDFError.ncerror(let code, let error) {
+                logger.info("Skipping NetCDF error \(code): \(error)")
+                return nil
             }
-            
-            let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
-            let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
-            return GenericVariableHandle(
-                variable: variable,
-                time: run,
-                member: 0,
-                fn: fn
-            )
         })
     }
 }

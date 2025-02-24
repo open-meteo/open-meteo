@@ -139,10 +139,15 @@ enum RateLimitError: Error, AbortError {
     }
 }
 
+fileprivate let isolcationQueue = DispatchQueue(label: "first")
+
 extension Request {
-    func incrementRateLimiter(weight: Float) async {
+    func incrementRateLimiter(weight: Float, apikey: String?) async {
         guard let address = peerAddress ?? remoteAddress else {
             return
+        }
+        if let apikey {
+            await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         }
         /// Free API
         if headers[.host].contains(where: { $0.contains("open-meteo.com") && !$0.starts(with: "customer-") }) {
@@ -150,3 +155,4 @@ extension Request {
         }
     }
 }
+

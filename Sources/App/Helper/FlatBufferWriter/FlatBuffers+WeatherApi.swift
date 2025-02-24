@@ -739,6 +739,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .eumetsat_sarah3, .jma_jaxa_himawari, .eumetsat_lsa_saf_msg, .eumetsat_lsa_saf_iodc:
             // TODO register sarah3
             return .ncepNbmConus
+        case .satellite_radiation_seamless:
+            // TODO register
+            return .ncepNbmConus
         }
     }
 }

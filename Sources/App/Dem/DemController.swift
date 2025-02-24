@@ -36,10 +36,10 @@ struct DemController {
     func query(_ req: Request) async throws -> Response {
         try await req.ensureSubdomain("api")
         let params = req.method == .POST ? try req.content.decode(Query.self) : try req.query.decode(Query.self)
-        let _ = try await req.ensureApiKey("api", apikey: params.apikey)
+        let keyCheck = try await req.ensureApiKey("api", apikey: params.apikey)
         
         let (latitude, longitude) = try params.validate()
-        await req.incrementRateLimiter(weight: 1)
+        await req.incrementRateLimiter(weight: 1, apikey: keyCheck.apikey)
         // Run query on separat thread pool to not block the main pool
         return try await ForecastapiController.runLoop.next().submit({
             let elevation = try zip(latitude, longitude).map { (latitude, longitude) in

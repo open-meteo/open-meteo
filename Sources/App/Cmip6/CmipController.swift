@@ -75,7 +75,8 @@ struct CmipController {
         }
         let result = ForecastapiResult<Cmip6Domain>(timeformat: params.timeformatOrDefault, results: locations)
         // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables) / 24 / 5)
+        let weight = result.calculateQueryWeight(nVariablesModels: nVariables) / 24 / 5
+        await req.incrementRateLimiter(weight: weight, apikey: numberOfLocationsMaximum.apikey)
         return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
