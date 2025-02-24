@@ -7,6 +7,9 @@ public struct ForecastapiController: RouteCollection {
     /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
     static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
+    /// Single thread
+    static var isolationLoop = MultiThreadedEventLoopGroup(numberOfThreads: 1)
+    
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
@@ -246,7 +249,7 @@ struct WeatherApiController {
         }
         let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum.numberOfLocations)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

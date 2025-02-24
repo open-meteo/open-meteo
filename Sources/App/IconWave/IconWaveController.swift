@@ -245,7 +245,7 @@ struct IconWaveController {
         }
         let result = ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
         await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum.numberOfLocations)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

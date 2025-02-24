@@ -12,7 +12,9 @@ public final actor ApiKeyManager {
         guard let apikeysPath = Environment.get("API_APIKEYS_PATH") else {
             return
         }
-        self.apiKeys = (try? String(contentsOfFile: apikeysPath, encoding: .utf8))?.split(separator: ",") ?? []
+        let keys = (try? String(contentsOfFile: apikeysPath, encoding: .utf8))?.split(separator: ",") ?? []
+        self.apiKeys = keys
+        self.usage = .init(repeating: (0,0), count: keys.count)
     }
     
     var apiKeys = [String.SubSequence]()

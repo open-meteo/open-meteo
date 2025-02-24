@@ -139,6 +139,8 @@ enum RateLimitError: Error, AbortError {
     }
 }
 
+fileprivate let isolcationQueue = DispatchQueue(label: "first")
+
 extension Request {
     func incrementRateLimiter(weight: Float, apikey: String?) async {
         guard let address = peerAddress ?? remoteAddress else {
@@ -153,3 +155,4 @@ extension Request {
         }
     }
 }
+
