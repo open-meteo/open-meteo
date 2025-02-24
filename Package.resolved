@@ -41,8 +41,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/google/flatbuffers.git",
       "state" : {
-        "revision" : "595bf0007ab1929570c7671f091313c8fc20644e",
-        "version" : "24.3.25"
+        "revision" : "1c514626e83c20fffa8557e75641848e1e15cd5e",
+        "version" : "25.2.10"
       }
     },
     {
@@ -76,8 +76,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "9924b6a8627cd4237fd955445cf3d0b99e1db0bf",
-        "version" : "1.18.0"
+        "branch" : "new_models",
+        "revision" : "5121eabe8e667829932450d9bd90fee569502961"
       }
     },
     {

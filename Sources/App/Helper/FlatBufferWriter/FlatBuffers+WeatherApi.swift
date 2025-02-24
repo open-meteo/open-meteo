@@ -377,9 +377,18 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .icePelletsProbability, previousDay: previousDay)
         case .snowfall_probability:
             return .init(variable: .snowfallProbability, previousDay: previousDay)
-        case .hail, .albedo, .precipitation_type, .convective_cloud_base, .convective_cloud_top, .snow_depth_water_equivalent:
-            // TODO register hail, albedo, precipitation_type in SDK. Followed by convective cloud top/bottom shortly
-            return .init(variable: .precipitation, previousDay: previousDay)
+        case .hail:
+            return .init(variable: .hail, previousDay: previousDay)
+        case .albedo:
+            return .init(variable: .albedo, previousDay: previousDay)
+        case .precipitation_type:
+            return .init(variable: .precipitationType, previousDay: previousDay)
+        case .convective_cloud_base:
+            return .init(variable: .convectiveCloudBase, previousDay: previousDay)
+        case .convective_cloud_top:
+            return .init(variable: .convectiveCloudTop, previousDay: previousDay)
+        case .snow_depth_water_equivalent:
+            return .init(variable: .snowDepthWaterEquivalent, previousDay: previousDay)
         case .temperature_2m_max:
             return .init(variable: .temperature, aggregation: .max, altitude: 2, previousDay: previousDay)
         case .temperature_2m_min:
@@ -734,14 +743,17 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .ncep_nbm_conus:
             return .ncepNbmConus
         case .ecmwf_aifs025_single:
-            // TODO register
-            return .ncepNbmConus
-        case .eumetsat_sarah3, .jma_jaxa_himawari, .eumetsat_lsa_saf_msg, .eumetsat_lsa_saf_iodc:
-            // TODO register sarah3
-            return .ncepNbmConus
+            return .ecmwfAifs025Single
+        case .eumetsat_sarah3:
+            return .eumetsatSarah3
+        case .jma_jaxa_himawari:
+            return .jmaJaxaHimawari
+        case .eumetsat_lsa_saf_msg:
+            return .eumetsatLsaSafMsg
+        case .eumetsat_lsa_saf_iodc:
+            return .eumetsatLsaSafIodc
         case .satellite_radiation_seamless:
-            // TODO register
-            return .ncepNbmConus
+            return .satelliteRadiationSeamless
         }
     }
 }
