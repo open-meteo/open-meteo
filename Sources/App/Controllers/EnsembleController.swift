@@ -79,8 +79,8 @@ public struct EnsembleApiController {
             return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
         }
         let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables))
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
+        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
+        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum.numberOfLocations)
     }
 }
 
