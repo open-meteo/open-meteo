@@ -12,7 +12,7 @@ public final actor ApiKeyManager {
         guard let apikeysPath = Environment.get("API_APIKEYS_PATH") else {
             return
         }
-        let keys = (try? String(contentsOfFile: apikeysPath, encoding: .utf8))?.split(separator: ",") ?? []
+        let keys = ((try? String(contentsOfFile: apikeysPath, encoding: .utf8))?.split(separator: ",") ?? []).sorted()
         self.apiKeys = keys
         self.usage = .init(repeating: (0,0), count: keys.count)
     }
@@ -66,7 +66,7 @@ public final actor ApiKeyManager {
             return
         }
         // Set new keys
-        await ApiKeyManager.instance.set(string.split(separator: ","))
+        await ApiKeyManager.instance.set(string.split(separator: ",").sorted())
     }
 }
 
