@@ -52,7 +52,7 @@ public final actor ApiKeyManager {
             return
         }
         let logger = application.logger
-        if Timestamp.now().second == 0 {
+        if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
             logger.warning("API key usage: \(usage)")
         }
