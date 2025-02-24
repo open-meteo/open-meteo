@@ -316,8 +316,8 @@ extension TimerangeDt {
 extension Array where Element == Float {
     /// Resulting array will be `dt` elements shorter
     func slidingAverageDroppingFirstDt(dt: Int) -> [Float] {
-        return (0 ..< self.count - dt).map { i in
-            return self[i..<i+dt].reduce(0, +) / 24
+        return (0 ..< Swift.max(self.count - dt, 0)).map { i in
+            return self[i..<Swift.min(i+dt, self.count)].reduce(0, +) / Float(dt)
         }
     }
 }

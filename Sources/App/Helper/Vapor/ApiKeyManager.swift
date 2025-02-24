@@ -17,19 +17,33 @@ public final actor ApiKeyManager {
     
     var apiKeys = [String.SubSequence]()
     
+    var usage = [Int]()
+    
     func set(_ keys: [String.SubSequence]) {
         if self.apiKeys == keys {
             return
         }
         self.apiKeys = keys
+        self.usage = [Int](repeating: 0, count: keys.count)
     }
+    
+    /// Return current API key usage
+    func getUsage() -> String {
+        let usage: [(String.SubSequence, Int)] = zip(self.apiKeys, self.usage).sorted { $0.1 > $1.1 }
+        return usage[0..<min(10, usage.count)].map{"\($0.0)=\($0.1)"}.joined(separator: ", ")
+    }
+    
     
     func isEmpty() -> Bool {
         return apiKeys.isEmpty
     }
     
     func contains(_ string: String.SubSequence) -> Bool {
-        return apiKeys.contains(string)
+        guard let index = apiKeys.firstIndex(where: { $0 == string }) else {
+            return false
+        }
+        usage[index] += 1
+        return true
     }
     
     /// Fetch API keys and update database
@@ -38,6 +52,10 @@ public final actor ApiKeyManager {
             return
         }
         let logger = application.logger
+        if Timestamp.now().second == 0 {
+            let usage = await ApiKeyManager.instance.getUsage()
+            logger.warning("API key usage: \(usage)")
+        }
         guard let string = try? String(contentsOfFile: apikeysPath, encoding: .utf8) else {
             logger.error("Could not read content from API_APIKEYS_PATH \(apikeysPath)")
             return
