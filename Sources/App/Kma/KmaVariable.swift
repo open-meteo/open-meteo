@@ -15,6 +15,8 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     case wind_speed_10m
     case wind_direction_10m
+    case wind_speed_50m
+    case wind_direction_50m
     
     case snowfall_water_equivalent
     /// Only downloaded and added to regular snow. Not stored on disk
@@ -74,9 +76,9 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         case .snowfall_water_equivalent, .snowfall_water_equivalent_convective:
             return 10
-        case .wind_speed_10m:
+        case .wind_speed_10m, .wind_speed_50m:
             return 10
-        case .wind_direction_10m:
+        case .wind_direction_10m, .wind_direction_50m:
             return 1
         case .cape:
             return 0.1
@@ -107,9 +109,9 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...10e9)
         case .visibility:
             return .linear
-        case .wind_speed_10m:
+        case .wind_speed_10m, .wind_speed_50m:
             return .hermite(bounds: 0...10e9)
-        case .wind_direction_10m:
+        case .wind_direction_10m, .wind_direction_50m:
             return .linearDegrees
         }
     }
@@ -136,9 +138,9 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .joulePerKilogram
         case .visibility:
             return .metre
-        case .wind_speed_10m:
+        case .wind_speed_10m, .wind_speed_50m:
             return .metrePerSecond
-        case .wind_direction_10m:
+        case .wind_direction_10m, .wind_direction_50m:
             return .degreeDirection
         }
     }

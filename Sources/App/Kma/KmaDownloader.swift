@@ -63,7 +63,7 @@ struct KmaDownload: AsyncCommand {
     /// - DONE check download time + delay
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours = Double(4)
+        let deadLineHours = Double(6)
         Process.alarm(seconds: Int(deadLineHours+0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
@@ -101,7 +101,7 @@ struct KmaDownload: AsyncCommand {
                     return (array2d, attributes)
                 })
                 
-                if [KmaSurfaceVariable.wind_speed_10m, .wind_direction_10m, .snowfall_water_equivalent, .snowfall_water_equivalent_convective].contains(variable) {
+                if [KmaSurfaceVariable.wind_speed_10m, .wind_direction_10m, .snowfall_water_equivalent, .snowfall_water_equivalent_convective, .wind_speed_50m, .wind_direction_50m].contains(variable) {
                     logger.info("Keep in memory \(variable) timestep \(attributes.timestamp.format_YYYYMMddHH) unit \(attributes.unit)")
                     await inMemory.set(variable: variable, timestamp: attributes.timestamp, member: 0, data: array2d.array)
                     return nil
@@ -118,10 +118,11 @@ struct KmaDownload: AsyncCommand {
             }.compactMap({$0})
             logger.info("Calculating wind speed, direction and snow")
             // Convert U/V wind components to speed and direction
-            let wind = try await inMemory.calculateWindSpeed(u: .wind_speed_10m, v: .wind_direction_10m, outSpeedVariable: KmaSurfaceVariable.wind_speed_10m, outDirectionVariable: KmaSurfaceVariable.wind_direction_10m, writer: writer)
+            let wind10 = try await inMemory.calculateWindSpeed(u: .wind_speed_10m, v: .wind_direction_10m, outSpeedVariable: KmaSurfaceVariable.wind_speed_10m, outDirectionVariable: KmaSurfaceVariable.wind_direction_10m, writer: writer)
+            let wind50 = try await inMemory.calculateWindSpeed(u: .wind_speed_50m, v: .wind_direction_50m, outSpeedVariable: KmaSurfaceVariable.wind_speed_50m, outDirectionVariable: KmaSurfaceVariable.wind_direction_50m, writer: writer)
             // Snow is downloaded as large scale and convective. Sum up both
             let snow = try await inMemory.sumUp(var1: .snowfall_water_equivalent, var2: .snowfall_water_equivalent_convective, outVariable: KmaSurfaceVariable.snowfall_water_equivalent, writer: writer)
-            return handles + wind + snow
+            return handles + wind10 + wind50 + snow
         }
     }
 }
@@ -177,6 +178,10 @@ extension KmaSurfaceVariable: KmaVariableDownloadable {
             return "ugrd"
         case .wind_direction_10m:
             return "vgrd"
+        case .wind_speed_50m:
+            return "50mu"
+        case .wind_direction_50m:
+            return "50mv"
         case .snowfall_water_equivalent:
             return "snol"
         case .snowfall_water_equivalent_convective:
