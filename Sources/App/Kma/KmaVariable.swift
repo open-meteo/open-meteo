@@ -13,8 +13,8 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case pressure_msl
     case relative_humidity_2m
     
-    case wind_u_component_10m
-    case wind_v_component_10m
+    case wind_speed_10m
+    case wind_direction_10m
     
     case snowfall_water_equivalent
     case showers
@@ -35,7 +35,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .precipitation, .snowfall_water_equivalent: return true
-        case .wind_u_component_10m, .wind_v_component_10m: return true
+        case .wind_speed_10m, .wind_direction_10m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation, .direct_radiation: return true
@@ -72,8 +72,10 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         case .snowfall_water_equivalent:
             return 10
-        case .wind_u_component_10m, .wind_v_component_10m:
+        case .wind_speed_10m:
             return 10
+        case .wind_direction_10m:
+            return 1
         case .cape:
             return 0.1
         case .visibility:
@@ -103,8 +105,10 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...10e9)
         case .visibility:
             return .linear
-        case .wind_u_component_10m, .wind_v_component_10m:
+        case .wind_speed_10m:
             return .hermite(bounds: 0...10e9)
+        case .wind_direction_10m:
+            return .linearDegrees
         }
     }
     
@@ -130,8 +134,10 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .joulePerKilogram
         case .visibility:
             return .metre
-        case .wind_u_component_10m, .wind_v_component_10m:
+        case .wind_speed_10m:
             return .metrePerSecond
+        case .wind_direction_10m:
+            return .degreeDirection
         }
     }
     

@@ -39,7 +39,7 @@ struct KmaDownload: AsyncCommand {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
-        let nConcurrent = signature.concurrent ?? System.coreCount
+        let nConcurrent = signature.concurrent ?? 4
         
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         
@@ -53,12 +53,13 @@ struct KmaDownload: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    /// TODO: sum large + conv snow
-    /// calc wind speed direction while downloading
-    /// 404 wait retry
-    /// test SW rad -> all fine and even correctly backwards averaged!
-    /// surface elevation + seamask
-    /// confirm domain grid
+    /// TODO:
+    /// - sum large + conv snow
+    /// - DONE calc wind speed direction while downloading
+    /// - 404 wait retry
+    /// - DONE test SW rad -> all fine and even correctly backwards averaged!
+    /// - surface elevation + seamask
+    /// - confirm domain grid
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(4)
@@ -69,17 +70,17 @@ struct KmaDownload: AsyncCommand {
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
         
         let ftp = FtpDownloader()
-        
-        let variables = [KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
+        let variables = KmaSurfaceVariable.allCases //[KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
         let forecastHoursMax = run.hour % 12 == 6 ? 87 : 288
         let forecastHours = stride(from: 0, through: min(forecastHoursMax, maxForecastHour ?? forecastHoursMax), by: 3)
         
-        return try await forecastHours.asyncFlatMap { forecastHour in
-            return try await variables.asyncMap { variable in
+        return try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
+            let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
+            let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> GenericVariableHandle? in
                 let fHHH = forecastHour.zeroPadded(len: 3)
                 let url = "\(server)GDPS/UNIS/g128_v070_\(variable.kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
-                guard let data = try await ftp.get(logger: logger, url: url, verbose: true, connectTimeout: 7) else {
+                guard let data = try await ftp.get(logger: logger, url: url, verbose: false, connectTimeout: 7) else {
                     fatalError()
                 }
                 let (array2d, attributes) = try data.withUnsafeBytes({
@@ -98,6 +99,11 @@ struct KmaDownload: AsyncCommand {
                     return (array2d, attributes)
                 })
                 
+                if variable == .wind_speed_10m {
+                    await inMemory.set(variable: variable, timestamp: attributes.timestamp, member: 0, data: array2d.array)
+                    return nil
+                }
+                
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
                 logger.info("Processing \(variable) timestep \(attributes.timestamp) unit \(attributes.unit)")
                 return GenericVariableHandle(
@@ -106,7 +112,10 @@ struct KmaDownload: AsyncCommand {
                     member: 0,
                     fn: fn
                 )
-            }
+            }.compactMap({$0})
+            // Convert U/V wind components to speed and direction
+            let wind = try await inMemory.calculateWindSpeed(u: .wind_speed_10m, v: .wind_direction_10m, outSpeedVariable: KmaSurfaceVariable.wind_speed_10m, outDirectionVariable: KmaSurfaceVariable.wind_direction_10m, writer: writer)
+            return handles + wind
         }
     }
 }
@@ -134,9 +143,9 @@ extension KmaSurfaceVariable: KmaVariableDownloadable {
             return "prms"
         case .relative_humidity_2m:
             return "rhwt"
-        case .wind_u_component_10m:
+        case .wind_speed_10m:
             return "ugrd"
-        case .wind_v_component_10m:
+        case .wind_direction_10m:
             return "vgrd"
         case .snowfall_water_equivalent:
             return "snol"
@@ -158,6 +167,4 @@ extension KmaSurfaceVariable: KmaVariableDownloadable {
             return "visi"
         }
     }
-    
-    
 }

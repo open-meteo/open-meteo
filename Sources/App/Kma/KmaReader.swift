@@ -124,18 +124,15 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             switch surface {
             case .apparent_temperature:
                 try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .wind_speed_10m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .relativehumidity_2m:
                 try prefetchData(variable: .relative_humidity_2m, time: time)
             case .windspeed_10m:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .wind_speed_10m, time: time)
             case .winddirection_10m:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .wind_direction_10m, time: time)
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -143,8 +140,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .shortwave_radiation, time: time)
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try prefetchData(variable: .wind_speed_10m, time: time)
             case .snowfall:
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .surface_pressure:
@@ -215,11 +211,11 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
             case .windspeed_10m:
-                fatalError()
+                return try get(raw: .wind_speed_10m, time: time)
             case .winddirection_10m:
-                fatalError()
+                return try get(raw: .wind_direction_10m, time: time)
             case .apparent_temperature:
-                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
+                let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let relhum = try get(raw: .relative_humidity_2m, time: time).data
                 let radiation = try get(raw: .shortwave_radiation, time: time).data
@@ -233,7 +229,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
-                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
+                let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 
