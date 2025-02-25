@@ -176,47 +176,17 @@ struct JaxaHimawariDownload: AsyncCommand {
 }
 
 fileprivate struct JaxaFtpDownloader {
-    let shared = CURLSH()
+    let ftp: FtpDownloader
     let auth: String
     
     public init(username: String, password: String) {
         self.auth = "\(username):\(password)"
+        self.ftp = .init()
     }
     
     public func get(logger: Logger, path: String) async throws -> Data? {
         let url = "ftp://\(auth)@ftp.ptree.jaxa.jp\(path)"
-        let cacheFile = Curl.cacheDirectory.map { "\($0)/\(url.sha256))" }
-        if let cacheFile, FileManager.default.fileExists(atPath: cacheFile) {
-            logger.info("Using cached file for \(path)")
-            return try Data(contentsOf: URL(fileURLWithPath: cacheFile))
-        }
-        logger.info("Downloading \(path)")
-        let req = CURL(method: "GET", url: url, verbose: false)
-        req.connectTimeout = 60
-        req.resourceTimeout = 300
-        let progress = TimeoutTracker(logger: logger, deadline: Date().addingTimeInterval(1*3600))
-        while true {
-            do {
-                let response = try shared.perform(curl: req)
-                let data = response.body
-                if let cacheFile {
-                    try data.write(to: URL(fileURLWithPath: cacheFile), options: .atomic)
-                }
-                return data
-            } catch CURLError.internal(code: let code, str: let str) {
-                if code == 78 && str == "Remote file not found" {
-                    return nil
-                }
-                if code == 9 && str == "Access denied to remote resource" {
-                    return nil // directory does not exist
-                }
-                logger.warning("CURLError \(code): \(str)")
-                let error = CURLError.internal(code: code, str: str)
-                try await progress.check(error: error, delay: 5)
-            } catch {
-                try await progress.check(error: error, delay: 5)
-            }
-        }
+        return try await ftp.get(logger: logger, url: url)
     }
 }
 
