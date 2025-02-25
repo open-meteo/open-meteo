@@ -48,8 +48,14 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
     }
     
     var omFileLength: Int {
-        // 60 timesteps
-        return 90
+        switch self {
+        case .gdps:
+            // 96 steps per run + 2 days extra
+            return 96 + 16
+        case .ldps:
+            // 49 hours per run + 1 day extra
+            return 48 + 24
+        }
     }
     
     var ensembleMembers: Int {
@@ -63,13 +69,13 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
         case .gdps, .ldps:
-            // Delay of 2:30 hours after initialisation, updates every 3 hours. Cronjob every x:35
-            return t.add(hours: -2).floor(toNearestHour: 3)
+            // Delay of 3:20 hours after initialisation, updates every 6 hours. Cronjob every x:20
+            // LDPS 3:40 delay
+            return t.add(hours: -3).floor(toNearestHour: 6)
         }
     }
 }

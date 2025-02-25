@@ -17,6 +17,8 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_direction_10m
     
     case snowfall_water_equivalent
+    /// Only downloaded and added to regular snow. Not stored on disk
+    case snowfall_water_equivalent_convective
     case showers
     case precipitation
     
@@ -70,7 +72,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 10
         case .shortwave_radiation, .direct_radiation:
             return 1
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_convective:
             return 10
         case .wind_speed_10m:
             return 10
@@ -95,7 +97,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
-        case .snowfall_water_equivalent: //, .snow_depth_water_equivalent:
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_convective: //, .snow_depth_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
@@ -128,7 +130,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hectopascal
         case .shortwave_radiation, .direct_radiation:
             return .wattPerSquareMetre
-        case .snowfall_water_equivalent:
+        case .snowfall_water_equivalent, .snowfall_water_equivalent_convective:
             return .millimetre
         case .cape:
             return .joulePerKilogram

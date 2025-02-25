@@ -54,12 +54,13 @@ struct KmaDownload: AsyncCommand {
     }
 
     /// TODO:
-    /// - sum large + conv snow
+    /// - DONE sum large + conv snow
     /// - DONE calc wind speed direction while downloading
-    /// - 404 wait retry
+    /// - DONE 404 wait retry
     /// - DONE test SW rad -> all fine and even correctly backwards averaged!
     /// - surface elevation + seamask
     /// - confirm domain grid
+    /// - DONE check download time + delay
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(4)
@@ -70,6 +71,7 @@ struct KmaDownload: AsyncCommand {
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
         
         let ftp = FtpDownloader()
+        ftp.connectTimeout = 7
         let variables = KmaSurfaceVariable.allCases //[KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
         let forecastHoursMax = run.hour % 12 == 6 ? 87 : 288
@@ -80,9 +82,7 @@ struct KmaDownload: AsyncCommand {
             let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> GenericVariableHandle? in
                 let fHHH = forecastHour.zeroPadded(len: 3)
                 let url = "\(server)GDPS/UNIS/g128_v070_\(variable.kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
-                guard let data = try await ftp.get(logger: logger, url: url, verbose: false, connectTimeout: 7) else {
-                    fatalError()
-                }
+                let data = try await ftp.get404Retry(logger: logger, url: url)
                 let (array2d, attributes) = try data.withUnsafeBytes({
                     let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
                     let attributes = try message.getAttributes()
@@ -90,6 +90,8 @@ struct KmaDownload: AsyncCommand {
                     switch variable {
                     case .cloud_cover, .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
                         array2d.array.data.multiplyAdd(multiply: 100, add: 0)
+                    case .pressure_msl:
+                        array2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
                     default:
                         break
                     }
@@ -99,13 +101,14 @@ struct KmaDownload: AsyncCommand {
                     return (array2d, attributes)
                 })
                 
-                if variable == .wind_speed_10m {
+                if [KmaSurfaceVariable.wind_speed_10m, .wind_direction_10m, .snowfall_water_equivalent, .snowfall_water_equivalent_convective].contains(variable) {
+                    logger.info("Keep in memory \(variable) timestep \(attributes.timestamp.format_YYYYMMddHH) unit \(attributes.unit)")
                     await inMemory.set(variable: variable, timestamp: attributes.timestamp, member: 0, data: array2d.array)
                     return nil
                 }
                 
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
-                logger.info("Processing \(variable) timestep \(attributes.timestamp) unit \(attributes.unit)")
+                logger.info("Processing \(variable) timestep \(attributes.timestamp.format_YYYYMMddHH) unit \(attributes.unit)")
                 return GenericVariableHandle(
                     variable: variable,
                     time: attributes.timestamp,
@@ -113,12 +116,39 @@ struct KmaDownload: AsyncCommand {
                     fn: fn
                 )
             }.compactMap({$0})
+            logger.info("Calculating wind speed, direction and snow")
             // Convert U/V wind components to speed and direction
             let wind = try await inMemory.calculateWindSpeed(u: .wind_speed_10m, v: .wind_direction_10m, outSpeedVariable: KmaSurfaceVariable.wind_speed_10m, outDirectionVariable: KmaSurfaceVariable.wind_direction_10m, writer: writer)
-            return handles + wind
+            // Snow is downloaded as large scale and convective. Sum up both
+            let snow = try await inMemory.sumUp(var1: .snowfall_water_equivalent, var2: .snowfall_water_equivalent_convective, outVariable: KmaSurfaceVariable.snowfall_water_equivalent, writer: writer)
+            return handles + wind + snow
         }
     }
 }
+
+extension VariablePerMemberStorage {
+    /// Sum up 2 variables
+    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
+        return try self.data
+            .groupedPreservedOrder(by: {$0.key.timestampAndMember})
+            .compactMap({ (t, handles) -> GenericVariableHandle? in
+                guard
+                    let var1 = handles.first(where: {$0.key.variable == var1}),
+                    let var2 = handles.first(where: {$0.key.variable == var2}) else {
+                    return nil
+                }
+                let snowfall = zip(var1.value.data, var2.value.data).map(+)
+                return GenericVariableHandle(
+                    variable: outVariable,
+                    time: t.timestamp,
+                    member: t.member,
+                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
+                )
+            }
+        )
+    }
+}
+
 
 protocol KmaVariableDownloadable {
     var kmaName: String { get }
@@ -149,6 +179,8 @@ extension KmaSurfaceVariable: KmaVariableDownloadable {
             return "vgrd"
         case .snowfall_water_equivalent:
             return "snol"
+        case .snowfall_water_equivalent_convective:
+            return "snoc"
         case .showers:
             return "acpc"
         case .precipitation:
