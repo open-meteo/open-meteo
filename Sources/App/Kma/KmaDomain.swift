@@ -31,7 +31,12 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
     }
     
     var dtSeconds: Int {
-        return 1*3600
+        switch self {
+        case .gdps:
+            return 3*3600
+        case .ldps:
+            return 1*3600
+        }
     }
     
     var hasYearlyFiles: Bool {

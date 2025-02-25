@@ -32,6 +32,7 @@ struct KmaDownload: AsyncCommand {
     }
     
     func run(using context: CommandContext, signature: Signature) async throws {
+        disableIdleSleep()
         let start = DispatchTime.now()
         let logger = context.application.logger
         let domain = try KmaDomain.load(rawValue: signature.domain)
@@ -52,7 +53,12 @@ struct KmaDownload: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    
+    /// TODO: sum large + conv snow
+    /// calc wind speed direction while downloading
+    /// 404 wait retry
+    /// test SW rad -> all fine and even correctly backwards averaged!
+    /// surface elevation + seamask
+    /// confirm domain grid
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(4)
@@ -64,21 +70,28 @@ struct KmaDownload: AsyncCommand {
         
         let ftp = FtpDownloader()
         
-        let variables = [KmaSurfaceVariable.temperature_2m]
+        let variables = [KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
-        let forecastHours = stride(from: 0, through: run.hour % 12 == 6 ? 87 : 288, by: 3)
+        let forecastHoursMax = run.hour % 12 == 6 ? 87 : 288
+        let forecastHours = stride(from: 0, through: min(forecastHoursMax, maxForecastHour ?? forecastHoursMax), by: 3)
         
         return try await forecastHours.asyncFlatMap { forecastHour in
             return try await variables.asyncMap { variable in
                 let fHHH = forecastHour.zeroPadded(len: 3)
-                let url = "\(server)GDPS/UNIS/g128_v070_tmpr_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
-                guard let data = try await ftp.get(logger: logger, url: url) else {
+                let url = "\(server)GDPS/UNIS/g128_v070_\(variable.kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
+                guard let data = try await ftp.get(logger: logger, url: url, verbose: true, connectTimeout: 7) else {
                     fatalError()
                 }
                 let (array2d, attributes) = try data.withUnsafeBytes({
                     let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
                     let attributes = try message.getAttributes()
                     var array2d = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
+                    switch variable {
+                    case .cloud_cover, .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+                        array2d.array.data.multiplyAdd(multiply: 100, add: 0)
+                    default:
+                        break
+                    }
                     if attributes.unit == "K" {
                         array2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                     }
@@ -86,7 +99,7 @@ struct KmaDownload: AsyncCommand {
                 })
                 
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
-                logger.info("Processing \(variable) timestep \(attributes.timestamp)")
+                logger.info("Processing \(variable) timestep \(attributes.timestamp) unit \(attributes.unit)")
                 return GenericVariableHandle(
                     variable: variable,
                     time: attributes.timestamp,
@@ -96,4 +109,55 @@ struct KmaDownload: AsyncCommand {
             }
         }
     }
+}
+
+protocol KmaVariableDownloadable {
+    var kmaName: String { get }
+}
+
+extension KmaSurfaceVariable: KmaVariableDownloadable {
+    var kmaName: String {
+        switch self {
+        case .temperature_2m:
+            return "tmpr"
+        case .cloud_cover:
+            return "tcar"
+        case .cloud_cover_low:
+            return "lcdc"
+        case .cloud_cover_mid:
+            return "mcdc"
+        case .cloud_cover_high:
+            return "hcdc"
+        case .cloud_cover_2m:
+            return "fogf"
+        case .pressure_msl:
+            return "prms"
+        case .relative_humidity_2m:
+            return "rhwt"
+        case .wind_u_component_10m:
+            return "ugrd"
+        case .wind_v_component_10m:
+            return "vgrd"
+        case .snowfall_water_equivalent:
+            return "snol"
+        case .showers:
+            return "acpc"
+        case .precipitation:
+            return "apcp"
+        case .wind_gusts_10m:
+            return "maxg"
+        case .shortwave_radiation:
+            return "tdsw"
+        case .direct_radiation:
+            return "swdr"
+        case .surface_temperature:
+            return "tmps"
+        case .cape:
+            return "cape"
+        case .visibility:
+            return "visi"
+        }
+    }
+    
+    
 }

@@ -2,21 +2,21 @@ import curl_swift
 import Vapor
 
 /// Simple helper to download files from a FTP server using CURL
-struct FtpDownloader {
+public class FtpDownloader {
     let shared = CURLSH()
     
     public init() {}
     
-    public func get(logger: Logger, url: String, deadLineHours: Double = 1) async throws -> Data? {
+    public func get(logger: Logger, url: String, deadLineHours: Double = 1, verbose: Bool = false, connectTimeout: Int = 30, resourceTimeout: Int = 300) async throws -> Data? {
         let cacheFile = Curl.cacheDirectory.map { "\($0)/\(url.sha256))" }
         if let cacheFile, FileManager.default.fileExists(atPath: cacheFile) {
             logger.info("Using cached file for \(url.stripHttpPassword())")
             return try Data(contentsOf: URL(fileURLWithPath: cacheFile))
         }
         logger.info("Downloading \(url.stripHttpPassword())")
-        let req = CURL(method: "GET", url: url, verbose: false)
-        req.connectTimeout = 60
-        req.resourceTimeout = 300
+        let req = CURL(method: "GET", url: url, verbose: verbose)
+        req.connectTimeout = connectTimeout
+        req.resourceTimeout = resourceTimeout
         let progress = TimeoutTracker(logger: logger, deadline: Date().addingTimeInterval(deadLineHours*3600))
         while true {
             do {

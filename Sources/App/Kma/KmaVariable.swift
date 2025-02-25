@@ -13,32 +13,11 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case pressure_msl
     case relative_humidity_2m
     
-    case cloud_base
-    case cloud_top
-
-    case wind_speed_10m
-    case wind_speed_50m
-    case wind_speed_100m
-    case wind_speed_150m
-    case wind_speed_250m
-    case wind_speed_350m
-    case wind_speed_450m
-    
-    /// Wind direction has been corrected due to grid projection
-    case wind_direction_10m
-    case wind_direction_50m
-    case wind_direction_100m
-    case wind_direction_150m
-    case wind_direction_250m
-    case wind_direction_350m
-    case wind_direction_450m
-    
-    case temperature_50m
-    case temperature_100m
-    case temperature_150m
-    case temperature_250m
+    case wind_u_component_10m
+    case wind_v_component_10m
     
     case snowfall_water_equivalent
+    case showers
     case precipitation
     
     //case snow_depth_water_equivalent
@@ -49,20 +28,14 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case direct_radiation
     
     case surface_temperature
-    case convective_inhibition
     case cape
     case visibility
-    case freezing_level_height
     
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .precipitation, .snowfall_water_equivalent: return true
-        case .wind_speed_10m, .wind_direction_10m: return true
-        case .wind_speed_50m, .wind_direction_50m: return true
-        case .wind_speed_100m, .wind_direction_100m: return true
-        case .wind_speed_150m, .wind_direction_150m: return true
-        case .wind_speed_250m, .wind_direction_250m: return true
+        case .wind_u_component_10m, .wind_v_component_10m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation, .direct_radiation: return true
@@ -89,7 +62,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         case .relative_humidity_2m:
             return 1
-        case .precipitation:
+        case .precipitation, .showers:
             return 10
         case .wind_gusts_10m:
             return 10
@@ -99,30 +72,18 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         case .snowfall_water_equivalent:
             return 10
-        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
-            return 1
-        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
+        case .wind_u_component_10m, .wind_v_component_10m:
             return 10
-        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
-            return 20
-        //case .snow_depth_water_equivalent:
-        //    return 10
-        case .convective_inhibition:
-            return 1
         case .cape:
             return 0.1
         case .visibility:
-            return 0.05 // 20 metre
-        case .freezing_level_height:
-            return 0.1 // zero height 10 metre resolution
-        case .cloud_top, .cloud_base:
             return 0.05 // 20 metre
         }
     }
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m, .surface_temperature:
+        case .temperature_2m, .surface_temperature, .showers:
             return .hermite(bounds: nil)
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return .hermite(bounds: 0...100)
@@ -138,21 +99,11 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
-        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
-            return .hermite(bounds: nil)
-        case .convective_inhibition:
-            return .hermite(bounds: nil)
         case .cape:
             return .hermite(bounds: 0...10e9)
         case .visibility:
             return .linear
-        case .freezing_level_height:
-            return .linear
-        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
-            return .linearDegrees
-        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
-            return .hermite(bounds: 0...10e9)
-        case .cloud_top, .cloud_base:
+        case .wind_u_component_10m, .wind_v_component_10m:
             return .hermite(bounds: 0...10e9)
         }
     }
@@ -165,7 +116,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .precipitation: //, .snow_depth_water_equivalent:
+        case .precipitation, .showers: //, .snow_depth_water_equivalent:
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond
@@ -175,22 +126,12 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .wattPerSquareMetre
         case .snowfall_water_equivalent:
             return .millimetre
-        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
-            return .celsius
-        case .convective_inhibition:
-            return .joulePerKilogram
         case .cape:
             return .joulePerKilogram
         case .visibility:
             return .metre
-        case .freezing_level_height:
-            return .metre
-        case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_150m, .wind_direction_250m, .wind_direction_350m, .wind_direction_450m:
-            return .degreeDirection
-        case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_150m, .wind_speed_250m, .wind_speed_350m, .wind_speed_450m:
+        case .wind_u_component_10m, .wind_v_component_10m:
             return .metrePerSecond
-        case .cloud_top, .cloud_base:
-            return .metre
         }
     }
     
@@ -198,8 +139,6 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m:
             fallthrough
-        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
-            return true
         default:
             return false
         }

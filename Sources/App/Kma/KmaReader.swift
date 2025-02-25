@@ -9,32 +9,7 @@ enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case dew_point_2m
     case windspeed_10m
     case winddirection_10m
-    case windspeed_100m
-    case winddirection_100m
     
-    /// Is using 100m wind
-    case windspeed_80m
-    case winddirection_80m
-    /// Is using 100m wind
-    case windspeed_120m
-    case winddirection_120m
-    /// Is using 150m wind
-    case windspeed_180m
-    case winddirection_180m
-    
-    /// Is using 100m wind
-    case wind_speed_80m
-    case wind_direction_80m
-    /// Is using 100m wind
-    case wind_speed_120m
-    case wind_direction_120m
-    /// Is using 150m wind
-    case wind_speed_180m
-    case wind_direction_180m
-
-    case temperature_80m
-    case temperature_120m
-    case temperature_180m
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation_instant
@@ -149,23 +124,18 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             switch surface {
             case .apparent_temperature:
                 try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .wind_speed_10m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .relativehumidity_2m:
                 try prefetchData(variable: .relative_humidity_2m, time: time)
             case .windspeed_10m:
-                try prefetchData(variable: .wind_speed_10m, time: time)
-            case .windspeed_80m, .wind_speed_80m, .windspeed_100m, .windspeed_120m, .wind_speed_120m:
-                try prefetchData(variable: .wind_speed_100m, time: time)
-            case .windspeed_180m, .wind_speed_180m:
-                try prefetchData(variable: .wind_speed_150m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
             case .winddirection_10m:
-                try prefetchData(variable: .wind_direction_10m, time: time)
-            case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
-                try prefetchData(variable: .wind_direction_100m, time: time)
-            case .winddirection_180m, .wind_direction_180m:
-                try prefetchData(variable: .wind_direction_150m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -173,7 +143,8 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .shortwave_radiation, time: time)
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-                try prefetchData(variable: .wind_speed_10m, time: time)
+                try prefetchData(variable: .wind_u_component_10m, time: time)
+                try prefetchData(variable: .wind_v_component_10m, time: time)
             case .snowfall:
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .surface_pressure:
@@ -202,12 +173,6 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .is_day:
                 break
-            case .temperature_80m:
-                try prefetchData(variable: .temperature_100m, time: time)
-            case .temperature_120m:
-                try prefetchData(variable: .temperature_100m, time: time)
-            case .temperature_180m:
-                try prefetchData(variable: .temperature_150m, time: time)
             case .wet_bulb_temperature_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
@@ -250,29 +215,11 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
             case .windspeed_10m:
-                return try get(raw: .wind_speed_10m, time: time)
-            case .windspeed_100m:
-                return try get(raw: .wind_speed_100m, time: time)
-            case .windspeed_80m, .wind_speed_80m:
-                let data = try get(raw: .wind_speed_100m, time: time)
-                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 80)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
-            case .windspeed_120m, .wind_speed_120m:
-                let data = try get(raw: .wind_speed_100m, time: time)
-                let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
-            case .windspeed_180m, .wind_speed_180m:
-                let data = try get(raw: .wind_speed_150m, time: time)
-                let scalefactor = Meteorology.scaleWindFactor(from: 150, to: 180)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+                fatalError()
             case .winddirection_10m:
-                return try get(raw: .wind_direction_10m, time: time)
-            case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
-                return try get(raw: .wind_direction_100m, time: time)
-            case .winddirection_180m, .wind_direction_180m:
-                return try get(raw: .wind_direction_150m, time: time)
+                fatalError()
             case .apparent_temperature:
-                let windspeed = try get(raw: .wind_speed_10m, time: time).data
+                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let relhum = try get(raw: .relative_humidity_2m, time: time).data
                 let radiation = try get(raw: .shortwave_radiation, time: time).data
@@ -286,7 +233,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
-                let windspeed = try get(raw: .wind_speed_10m, time: time).data
+                let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
                 let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
                 
@@ -361,12 +308,6 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
-            case .temperature_80m:
-                return try get(raw: .temperature_100m, time: time)
-            case .temperature_120m:
-                return try get(raw: .temperature_100m, time: time)
-            case .temperature_180m:
-                return try get(raw: .temperature_150m, time: time)
             case .showers:
                 let precipitation = try get(raw: .precipitation, time: time)
                 return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)

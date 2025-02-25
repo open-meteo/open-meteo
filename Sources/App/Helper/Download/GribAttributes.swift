@@ -37,6 +37,7 @@ struct GribAttributes {
         case heightAboveGround
         case depthBelowLandLayer
         case hybrid
+        case unknown // only KMA
     }
     
     enum StepType: String {
