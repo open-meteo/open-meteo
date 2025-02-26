@@ -1,9 +1,12 @@
 import Foundation
 
-
 public extension Double {
     func round(digits: Int) -> Double {
+        #if os(Linux)
+        let mut = pow(10, Double(digits))
+        #else
         let mut = Double.pow(10, Double(digits))
+        #endif
         return (self * mut).rounded() / mut
     }
 }
