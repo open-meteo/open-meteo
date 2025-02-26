@@ -74,44 +74,62 @@ struct KmaDownload: AsyncCommand {
         ftp.connectTimeout = 7
         let variables = KmaSurfaceVariable.allCases //[KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
-        let forecastHoursMax = run.hour % 12 == 6 ? 87 : 288
-        let forecastHours = stride(from: 0, through: min(forecastHoursMax, maxForecastHour ?? forecastHoursMax), by: 3)
+        let forecastHours: StrideThrough<Int>
+        switch domain {
+        case .gdps:
+            let forecastHoursMax = run.hour % 12 == 6 ? 87 : 288
+            forecastHours = stride(from: 0, through: min(forecastHoursMax, maxForecastHour ?? forecastHoursMax), by: 3)
+        case .ldps:
+            forecastHours = stride(from: 0, through: min(48, maxForecastHour ?? 48), by: 1)
+        }
         
         return try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
             let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> GenericVariableHandle? in
+                if domain == .ldps {
+                    switch variable {
+                    case .wind_speed_50m, .wind_direction_50m, .snowfall_water_equivalent_convective, .showers, .precipitation, .cape:
+                        return nil
+                    default:
+                        break
+                    }
+                }
+                
                 let fHHH = forecastHour.zeroPadded(len: 3)
-                let url = "\(server)GDPS/UNIS/g128_v070_\(variable.kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
+                let timestamp = run.add(hours: forecastHour)
+                let url = "\(server)\(domain.filePrefix)_v070_\(variable.kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
                 let data = try await ftp.get404Retry(logger: logger, url: url)
-                let (array2d, attributes) = try data.withUnsafeBytes({
+                let array2d = try data.withUnsafeBytes({
                     let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
-                    let attributes = try message.getAttributes()
                     var array2d = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
                     switch variable {
                     case .cloud_cover, .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
                         array2d.array.data.multiplyAdd(multiply: 100, add: 0)
                     case .pressure_msl:
                         array2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
+                    case .temperature_2m, .surface_temperature:
+                        array2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                     default:
                         break
                     }
-                    if attributes.unit == "K" {
-                        array2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
-                    }
-                    return (array2d, attributes)
+                    return array2d
                 })
                 
-                if [KmaSurfaceVariable.wind_speed_10m, .wind_direction_10m, .snowfall_water_equivalent, .snowfall_water_equivalent_convective, .wind_speed_50m, .wind_direction_50m].contains(variable) {
-                    logger.info("Keep in memory \(variable) timestep \(attributes.timestamp.format_YYYYMMddHH) unit \(attributes.unit)")
-                    await inMemory.set(variable: variable, timestamp: attributes.timestamp, member: 0, data: array2d.array)
+                if [KmaSurfaceVariable.wind_speed_10m, .wind_direction_10m, .wind_speed_50m, .wind_direction_50m].contains(variable) {
+                    logger.info("Keep in memory \(variable) timestep \(timestamp.format_YYYYMMddHH)")
+                    await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
+                    return nil
+                }
+                if domain == .gdps && [KmaSurfaceVariable.snowfall_water_equivalent_convective, .snowfall_water_equivalent].contains(variable) {
+                    await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
                     return nil
                 }
                 
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
-                logger.info("Processing \(variable) timestep \(attributes.timestamp.format_YYYYMMddHH) unit \(attributes.unit)")
+                logger.info("Processing \(variable) timestep \(timestamp.format_YYYYMMddHH)")
                 return GenericVariableHandle(
                     variable: variable,
-                    time: attributes.timestamp,
+                    time: timestamp,
                     member: 0,
                     fn: fn
                 )
@@ -123,6 +141,17 @@ struct KmaDownload: AsyncCommand {
             // Snow is downloaded as large scale and convective. Sum up both
             let snow = try await inMemory.sumUp(var1: .snowfall_water_equivalent, var2: .snowfall_water_equivalent_convective, outVariable: KmaSurfaceVariable.snowfall_water_equivalent, writer: writer)
             return handles + wind10 + wind50 + snow
+        }
+    }
+}
+
+extension KmaDomain {
+    var filePrefix: String {
+        switch self {
+        case .gdps:
+            return "GDPS/UNIS/g128"
+        case .ldps:
+            return "LDPS/UNIS/l015"
         }
     }
 }

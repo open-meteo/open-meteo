@@ -34,6 +34,9 @@ public class FtpDownloader {
             do {
                 let response = try shared.perform(curl: req)
                 let data = response.body
+                guard data.count > 0 else {
+                    return nil
+                }
                 if let cacheFile {
                     try data.write(to: URL(fileURLWithPath: cacheFile), options: .atomic)
                 }
