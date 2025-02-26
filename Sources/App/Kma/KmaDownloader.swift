@@ -86,18 +86,13 @@ struct KmaDownload: AsyncCommand {
         return try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
             let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> GenericVariableHandle? in
-                if domain == .ldps {
-                    switch variable {
-                    case .wind_speed_50m, .wind_direction_50m, .snowfall_water_equivalent_convective, .showers, .precipitation, .cape:
-                        return nil
-                    default:
-                        break
-                    }
+                guard let kmaName = variable.getKmaName(domain: domain) else {
+                    return nil
                 }
                 
                 let fHHH = forecastHour.zeroPadded(len: 3)
                 let timestamp = run.add(hours: forecastHour)
-                let url = "\(server)\(domain.filePrefix)_v070_\(variable.kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
+                let url = "\(server)\(domain.filePrefix)_v070_\(kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
                 let data = try await ftp.get404Retry(logger: logger, url: url)
                 let array2d = try data.withUnsafeBytes({
                     let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
@@ -122,9 +117,21 @@ struct KmaDownload: AsyncCommand {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
                     return nil
                 }
-                if domain == .gdps && [KmaSurfaceVariable.snowfall_water_equivalent_convective, .snowfall_water_equivalent].contains(variable) {
-                    await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
-                    return nil
+                switch domain {
+                case .gdps:
+                    if [KmaSurfaceVariable.snowfall_water_equivalent_convective, .snowfall_water_equivalent].contains(variable) {
+                        // sum up snowfall large scale and convective for GDPS
+                        await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
+                        return nil
+                    }
+                case .ldps:
+                    if [KmaSurfaceVariable.precipitation, .snowfall_water_equivalent].contains(variable) {
+                        // Sum up snow and rain to total precipitation
+                        await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
+                        if variable == .precipitation {
+                            return nil
+                        }
+                    }
                 }
                 
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
@@ -140,9 +147,17 @@ struct KmaDownload: AsyncCommand {
             // Convert U/V wind components to speed and direction
             let wind10 = try await inMemory.calculateWindSpeed(u: .wind_speed_10m, v: .wind_direction_10m, outSpeedVariable: KmaSurfaceVariable.wind_speed_10m, outDirectionVariable: KmaSurfaceVariable.wind_direction_10m, writer: writer)
             let wind50 = try await inMemory.calculateWindSpeed(u: .wind_speed_50m, v: .wind_direction_50m, outSpeedVariable: KmaSurfaceVariable.wind_speed_50m, outDirectionVariable: KmaSurfaceVariable.wind_direction_50m, writer: writer)
-            // Snow is downloaded as large scale and convective. Sum up both
-            let snow = try await inMemory.sumUp(var1: .snowfall_water_equivalent, var2: .snowfall_water_equivalent_convective, outVariable: KmaSurfaceVariable.snowfall_water_equivalent, writer: writer)
-            return handles + wind10 + wind50 + snow
+            let precipCorrections: [GenericVariableHandle]
+            switch domain {
+            case .gdps:
+                // Snow is downloaded as large scale and convective. Sum up both
+                precipCorrections = try await inMemory.sumUp(var1: .snowfall_water_equivalent, var2: .snowfall_water_equivalent_convective, outVariable: KmaSurfaceVariable.snowfall_water_equivalent, writer: writer)
+            case .ldps:
+                // Precipitation variable contains rain. Sum up snow and rain to total precipitation
+                precipCorrections = try await inMemory.sumUp(var1: .precipitation, var2: .snowfall_water_equivalent, outVariable: KmaSurfaceVariable.precipitation, writer: writer)
+            }
+
+            return handles + wind10 + wind50 + precipCorrections
         }
     }
 }
@@ -183,11 +198,14 @@ extension VariablePerMemberStorage {
 
 
 protocol KmaVariableDownloadable {
-    var kmaName: String { get }
+    func getKmaName(domain: KmaDomain) -> String?
 }
 
 extension KmaSurfaceVariable: KmaVariableDownloadable {
-    var kmaName: String {
+    func getKmaName(domain: KmaDomain) -> String? {
+        if domain == .ldps && [Self.wind_speed_50m, .wind_direction_50m, .snowfall_water_equivalent_convective, .showers, .cape].contains(self) {
+            return nil
+        }
         switch self {
         case .temperature_2m:
             return "tmpr"
@@ -220,7 +238,8 @@ extension KmaSurfaceVariable: KmaVariableDownloadable {
         case .showers:
             return "acpc"
         case .precipitation:
-            return "apcp"
+            /// download large scale rain for ldps instead of total precip. Calculate total precip in post processing
+            return domain == .ldps ? "ncpc" : "apcp"
         case .wind_gusts_10m:
             return "maxg"
         case .shortwave_radiation:
