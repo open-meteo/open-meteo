@@ -611,7 +611,7 @@ extension EcmwfDomain {
             return "\(base)\(dateStr)/\(runStr)z/aifs/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"
         case .aifs025_single:
             // https://data.ecmwf.int/forecasts/20250220/00z/aifs-single/0p25/experimental/oper/
-            return "\(base)\(dateStr)/\(runStr)z/aifs-single/0p25/experimental/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"
+            return "\(base)\(dateStr)/\(runStr)z/aifs-single/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"
         }
     }
 }
