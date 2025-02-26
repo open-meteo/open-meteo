@@ -62,6 +62,7 @@ struct KmaDownload: AsyncCommand {
     /// - DONE confirm domain grid
     /// - DONE check download time + delay
     /// - DONE fix showers for LDPS -> fill with 0
+    /// - total cloud cover is very pessimistic -> maybe use mid/low/high mixing directly
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(6)
@@ -72,7 +73,7 @@ struct KmaDownload: AsyncCommand {
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
         
         let ftp = FtpDownloader()
-        ftp.connectTimeout = 7
+        ftp.connectTimeout = 5
         let variables = KmaSurfaceVariable.allCases //[KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
         let forecastHours: StrideThrough<Int>

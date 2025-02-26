@@ -89,7 +89,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m, .surface_temperature, .showers:
+        case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return .hermite(bounds: 0...100)
@@ -97,7 +97,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .precipitation:
+        case .precipitation, .showers:
             return .backwards_sum
         case .snowfall_water_equivalent, .snowfall_water_equivalent_convective: //, .snow_depth_water_equivalent:
             return .backwards_sum
