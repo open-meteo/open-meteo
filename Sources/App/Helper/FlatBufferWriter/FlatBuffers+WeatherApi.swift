@@ -754,6 +754,13 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .eumetsatLsaSafIodc
         case .satellite_radiation_seamless:
             return .satelliteRadiationSeamless
+        case .kma_seamless:
+            // TODO register seamless
+            return .kmaGdps
+        case .kma_gdps:
+            return .kmaGdps
+        case .kma_ldps:
+            return .kmaLdps
         }
     }
 }
