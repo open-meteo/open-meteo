@@ -29,7 +29,6 @@ enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case weathercode
     case weather_code
     case is_day
-    case showers
     case rain
     case wet_bulb_temperature_2m
     case cloudcover
@@ -187,6 +186,9 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .cape, time: time)
                 try prefetchData(variable: .visibility, time: time)
                 try prefetchData(variable: .wind_gusts_10m, time: time)
+                if reader.domain == .gdps {
+                    try prefetchData(variable: .showers, time: time)
+                }
             case .is_day:
                 break
             case .wet_bulb_temperature_2m:
@@ -205,10 +207,11 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .sunshine_duration:
                 try prefetchData(variable: .direct_radiation, time: time)
             case .rain:
+                if reader.domain == .gdps {
+                    try prefetchData(variable: .showers, time: time)
+                }
                 try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
-            case .showers:
-                try prefetchData(variable: .precipitation, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -310,10 +313,11 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let cape = try get(raw: .cape, time: time).data
                 let gusts = try get(raw: .wind_gusts_10m, time: time).data
                 let visibility = try get(raw: .visibility, time: time).data
+                let showers = reader.domain == .gdps ? try get(raw: .showers, time: time).data : nil
                 return DataAndUnit(WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
-                    convectivePrecipitation: nil,
+                    convectivePrecipitation: showers,
                     snowfallCentimeters: snowfall,
                     gusts: gusts,
                     cape: cape,
@@ -324,9 +328,6 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 )
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
-            case .showers:
-                let precipitation = try get(raw: .precipitation, time: time)
-                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
@@ -348,6 +349,10 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 let precip = try get(raw: .precipitation, time: time)
                 let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
+                if reader.domain == .gdps {
+                    let showers = try get(raw: .showers, time: time)
+                    return DataAndUnit(zip(precip.data, zip(snoweq.data, showers.data)).map({$0 - $1.0 - $1.1}), precip.unit)
+                }
                 return DataAndUnit(zip(precip.data, snoweq.data).map(-), precip.unit)
             case .global_tilted_irradiance:
                 let directRadiation = try get(raw: .direct_radiation, time: time).data
