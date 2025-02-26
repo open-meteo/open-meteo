@@ -103,10 +103,30 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
     }
     
     func get(raw: KmaVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+        switch raw {
+        case .surface(let variable):
+            if reader.domain == .ldps && variable == .showers {
+                /// Set showers to 0 for LDPS domain
+                let showers = try reader.get(variable: .surface(.precipitation), time: time).data.map({max($0,0)})
+                return DataAndUnit(showers, .millimetre)
+            }
+        case .pressure(_):
+            break
+        }
+
         return try reader.get(variable: raw, time: time)
     }
     
     func prefetchData(raw: KmaVariable, time: TimerangeDtAndSettings) throws {
+        switch raw {
+        case .surface(let variable):
+            if reader.domain == .ldps && variable == .showers {
+                /// Set showers to 0 for LDPS domain
+                try reader.prefetchData(variable: .surface(.precipitation), time: time)
+            }
+        case .pressure(_):
+            break
+        }
         try reader.prefetchData(variable: raw, time: time)
     }
     

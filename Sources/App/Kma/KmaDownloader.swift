@@ -61,6 +61,7 @@ struct KmaDownload: AsyncCommand {
     /// - surface elevation + seamask
     /// - DONE confirm domain grid
     /// - DONE check download time + delay
+    /// - DONE fix showers for LDPS -> fill with 0
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(6)
