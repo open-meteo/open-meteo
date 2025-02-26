@@ -59,7 +59,7 @@ struct KmaDownload: AsyncCommand {
     /// - DONE 404 wait retry
     /// - DONE test SW rad -> all fine and even correctly backwards averaged!
     /// - surface elevation + seamask
-    /// - confirm domain grid
+    /// - DONE confirm domain grid
     /// - DONE check download time + delay
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
@@ -101,6 +101,8 @@ struct KmaDownload: AsyncCommand {
                 let data = try await ftp.get404Retry(logger: logger, url: url)
                 let array2d = try data.withUnsafeBytes({
                     let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
+                    //try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
+                    //fatalError()
                     var array2d = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
                     switch variable {
                     case .cloud_cover, .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:

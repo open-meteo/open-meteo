@@ -1,9 +1,6 @@
 import Foundation
 
-/**
- https://opendatadocs.dmi.govcloud.dk/Data/Forecast_Data_Weather_Model_HARMONIE_DINI_IG
- 
- */
+
 enum KmaDomain: String, GenericDomain, CaseIterable {
     case gdps
     case ldps
@@ -11,7 +8,7 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
     var grid: Gridable {
         switch self {
         case .gdps:
-            return RegularGrid(nx: 2560, ny: 1920, latMin: -90, lonMin: -180, dx: 360/2560, dy: 180/1920)
+            return RegularGrid(nx: 2560, ny: 1920, latMin: -90+180/1920/2, lonMin: -180+360/2560/2, dx: 360/2560, dy: 180/1920)
         case .ldps:
             /**
              # Lambert Conformal (can be secant or tangent, conical or bipolar)  (grib2/tables/4/3.1.table)
@@ -48,7 +45,7 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
                 longitude: 121.834,
                 dx: 1500,
                 dy: 1500,
-                projection: LambertConformalConicProjection(λ0: 126, ϕ0: 38, ϕ1: 38, ϕ2: 38, radius: 6371229)
+                projection: LambertConformalConicProjection(λ0: 126, ϕ0: 38, ϕ1: 30, ϕ2: 60, radius: 6371229)
             )
         }
     }
