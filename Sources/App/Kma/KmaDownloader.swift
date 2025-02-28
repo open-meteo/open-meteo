@@ -102,7 +102,7 @@ struct KmaDownload: AsyncCommand {
                     //fatalError()
                     var array2d = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
                     switch variable {
-                    case .cloud_cover, .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+                    case /*.cloud_cover,*/ .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
                         array2d.array.data.multiplyAdd(multiply: 100, add: 0)
                     case .pressure_msl:
                         array2d.array.data.multiplyAdd(multiply: 1/100, add: 0)
@@ -211,8 +211,8 @@ extension KmaSurfaceVariable: KmaVariableDownloadable {
         switch self {
         case .temperature_2m:
             return "tmpr"
-        case .cloud_cover:
-            return "tcar"
+        //case .cloud_cover:
+        //    return "tcar"
         case .cloud_cover_low:
             return "lcdc"
         case .cloud_cover_mid:

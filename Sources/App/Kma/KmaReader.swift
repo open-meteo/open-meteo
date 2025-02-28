@@ -31,6 +31,7 @@ enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case is_day
     case rain
     case wet_bulb_temperature_2m
+    case cloud_cover
     case cloudcover
     case cloudcover_low
     case cloudcover_mid
@@ -180,7 +181,9 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .shortwave_radiation, time: time)
                 try prefetchData(variable: .direct_radiation, time: time)
             case .weather_code, .weathercode:
-                try prefetchData(variable: .cloud_cover, time: time)
+                try prefetchData(variable: .cloud_cover_low, time: time)
+                try prefetchData(variable: .cloud_cover_mid, time: time)
+                try prefetchData(variable: .cloud_cover_high, time: time)
                 try prefetchData(variable: .precipitation, time: time)
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
                 try prefetchData(variable: .cape, time: time)
@@ -194,8 +197,10 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .wet_bulb_temperature_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .cloudcover:
-                try prefetchData(variable: .cloud_cover, time: time)
+            case .cloudcover, .cloud_cover:
+                try prefetchData(variable: .cloud_cover_low, time: time)
+                try prefetchData(variable: .cloud_cover_mid, time: time)
+                try prefetchData(variable: .cloud_cover_high, time: time)
             case .cloudcover_low:
                 try prefetchData(variable: .cloud_cover_low, time: time)
             case .cloudcover_mid:
@@ -307,7 +312,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
             case .weathercode, .weather_code:
-                let cloudcover = try get(raw: .cloud_cover, time: time).data
+                let cloudcover = try get(derived: .surface(.cloud_cover), time: time).data
                 let precipitation = try get(derived: .surface(.rain), time: time).data
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
                 let cape = try get(raw: .cape, time: time).data
@@ -332,8 +337,11 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
-            case .cloudcover:
-                return try get(raw: .cloud_cover, time: time)
+            case .cloudcover, .cloud_cover:
+                let low = try get(raw: .cloud_cover_low, time: time).data
+                let mid = try get(raw: .cloud_cover_mid, time: time).data
+                let high = try get(raw: .cloud_cover_high, time: time).data
+                return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percentage)
             case .cloudcover_low:
                 return try get(raw: .cloud_cover_low, time: time)
             case .cloudcover_mid:

@@ -5,7 +5,8 @@ import Foundation
  */
 enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
-    case cloud_cover
+    /// Note: The provided cloud cover total is way too high
+    //case cloud_cover
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
@@ -41,7 +42,8 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .precipitation, .snowfall_water_equivalent: return true
         case .wind_speed_10m, .wind_direction_10m: return true
         case .pressure_msl: return true
-        case .cloud_cover: return true
+        //case .cloud_cover: return true
+        case .cloud_cover_mid, .cloud_cover_low, .cloud_cover_high: return true
         case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m: return true
         case .cape: return true
@@ -62,7 +64,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .surface_temperature:
             return 20
-        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
+        case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return 1
         case .relative_humidity_2m:
             return 1
@@ -91,7 +93,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
-        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
+        case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
@@ -120,7 +122,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         switch self {
         case .temperature_2m, .surface_temperature:
             return .celsius
-        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
+        case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .cloud_cover_2m:
             return .percentage
         case .relative_humidity_2m:
             return .percentage
