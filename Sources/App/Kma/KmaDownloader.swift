@@ -46,23 +46,45 @@ struct KmaDownload: AsyncCommand {
         guard let server = signature.server else {
             fatalError("Option server is required")
         }
-                
+        try await downloadElevation(application: context.application, domain: domain, run: run, server: server)
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server)
         
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
-
-    /// TODO:
-    /// - DONE sum large + conv snow
-    /// - DONE calc wind speed direction while downloading
-    /// - DONE 404 wait retry
-    /// - DONE test SW rad -> all fine and even correctly backwards averaged!
-    /// - surface elevation + seamask
-    /// - DONE confirm domain grid
-    /// - DONE check download time + delay
-    /// - DONE fix showers for LDPS -> fill with 0
-    /// - total cloud cover is very pessimistic -> maybe use mid/low/high mixing directly
+    
+    func downloadElevation(application: Application, domain: KmaDomain, run: Timestamp, server: String) async throws {
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm
+        if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
+            return
+        }
+        let logger = application.logger
+        let ftp = FtpDownloader()
+        ftp.connectTimeout = 5
+        
+        let grid = domain.grid
+        let urlLand = "\(server)\(domain.filePrefix)_v070_land_unis_h000.\(run.format_YYYYMMddHH).gb2"
+        /// fraction 0=sea, 1=land
+        let landmask = try await ftp.get404Retry(logger: logger, url: urlLand).withUnsafeBytes({
+            let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
+            return try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
+        })
+        
+        let urlElevation = "\(server)\(domain.filePrefix)_v070_dist_unis_h000.\(run.format_YYYYMMddHH).gb2"
+        var elevation = try await ftp.get404Retry(logger: logger, url: urlElevation).withUnsafeBytes({
+            let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
+            return try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
+        })
+        
+        for i in elevation.array.data.indices {
+            if landmask.array.data[i] < 0.5 {
+                elevation.array.data[i] = -999
+            }
+        }
+        
+        try elevation.array.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
+    }
+    
     func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(6)
@@ -74,7 +96,7 @@ struct KmaDownload: AsyncCommand {
         
         let ftp = FtpDownloader()
         ftp.connectTimeout = 5
-        let variables = KmaSurfaceVariable.allCases //[KmaSurfaceVariable.shortwave_radiation, .direct_radiation] //KmaSurfaceVariable.allCases
+        let variables = KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
         let forecastHours: StrideThrough<Int>
         switch domain {
