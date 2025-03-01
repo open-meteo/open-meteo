@@ -7,8 +7,8 @@ import SwiftNetCDF
  Small helper tool to convert between `om` versions and between om file format and NetCDF for debugging
 
  Examples:
-  - Convert to NetCDF: openmeteo-api convert-om data.om --to netcdf -o output.nc --domain ecmwf_ifs025
-  - Convert between OM versions: openmeteo-api convert-om data.om --to om3 -o data.om3 --domain ecmwf_ifs025
+  - Convert to NetCDF: openmeteo-api convert-om data.om --format netcdf -o output.nc --domain ecmwf_ifs025
+  - Convert between OM versions: openmeteo-api convert-om data.om --format om3 -o data.om3 --domain ecmwf_ifs025
  */
 struct ConvertOmCommand: Command {
     var help: String {
@@ -19,8 +19,8 @@ struct ConvertOmCommand: Command {
         @Argument(name: "infile", help: "Input file")
         var infile: String
 
-        @Option(name: "to", help: "Conversion target format: 'netcdf' or 'om3'")
-        var convertTo: String?
+        @Option(name: "format", help: "Conversion target format: 'netcdf' or 'om3'")
+        var format: String?
 
         @Option(name: "output", short: "o", help: "Output file name. Default: [infile].nc or [infile].om3")
         var outfile: String?
@@ -36,19 +36,22 @@ struct ConvertOmCommand: Command {
         let logger = context.application.logger
         logger.info("Processing file: \(signature.infile)")
 
-        let convertTo = signature.convertTo?.lowercased() ?? "netcdf"
+        let format = signature.format?.lowercased() ?? "netcdf"
 
-        if convertTo == "om3" {
+        if format == "om3" {
             // Handle conversion to OM3
             guard let domain = signature.domain else {
                 throw ConvertOmError("Domain parameter is required for OM3 conversion")
             }
             let domainObj = try DomainRegistry.load(rawValue: domain)
             let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".om3"
+            if signature.transpose {
+                logger.warning("Transpose flag is currently not supported for OM3 conversion")
+            }
             logger.info("Converting OM file to v3 with domain: \(domain). Outfile will be: \(outfile)")
             try convertOmv3(src: signature.infile, dest: outfile, grid: domainObj.getDomain().grid)
             return
-        } else if convertTo == "netcdf" {
+        } else if format == "netcdf" {
             // Handle conversion to NetCDF
             guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
                 throw ConvertOmError("Not a float array")
@@ -63,7 +66,7 @@ struct ConvertOmCommand: Command {
             try convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, domain: signature.domain, logger: logger)
             return
         } else {
-            throw ConvertOmError("Unsupported conversion target: \(convertTo)")
+            throw ConvertOmError("Unsupported conversion target: \(format)")
         }
     }
 
