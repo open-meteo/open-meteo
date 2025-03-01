@@ -141,9 +141,9 @@ struct ConvertOmCommand: Command {
                 try ncFile.createDimension(name: "LAT", length: ny),
                 try ncFile.createDimension(name: "LON", length: nx)
             ])
-            // Need to implement appropriate 3D transpose logic
-            let transposed = transpose3D(data: data, ny: ny, nx: nx, nt: nt)
-            try ncVariable.write(transposed)
+
+            let transposed = Array3D(data: data, dim0: ny, dim1: nx, dim2: nt).transpose()
+            try ncVariable.write(transposed.data)
         } else {
             var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
                 try ncFile.createDimension(name: "LAT", length: ny),
@@ -152,24 +152,6 @@ struct ConvertOmCommand: Command {
             ])
             try ncVariable.write(data)
         }
-    }
-
-    /// Helper function to transpose 3D data from (lat, lon, time) to (time, lat, lon)
-    private func transpose3D(data: [Float], ny: Int, nx: Int, nt: Int) -> [Float] {
-        var result = [Float](repeating: 0, count: data.count)
-
-        for y in 0..<ny {
-            for x in 0..<nx {
-                for t in 0..<nt {
-                    // From (y, x, t) to (t, y, x)
-                    let srcIdx = y * (nx * nt) + x * nt + t
-                    let dstIdx = t * (ny * nx) + y * nx + x
-                    result[dstIdx] = data[srcIdx]
-                }
-            }
-        }
-
-        return result
     }
 
     /// Read om file and write it as version 3 and reshape data to proper 3d files
@@ -308,5 +290,30 @@ extension String {
             return String(dropLast(3))
         }
         return self
+    }
+}
+
+extension Array3D {
+    /// Transpose the array to swap dimensions: (dim0, dim1, dim2) -> (dim2, dim0, dim1)
+    /// This effectively changes from (lat, lon, time) to (time, lat, lon)
+    func transpose() -> Array3D {
+        precondition(data.count == dim0 * dim1 * dim2)
+
+        return data.withUnsafeBufferPointer { data in
+            let out = [Float](unsafeUninitializedCapacity: data.count) { buffer, initializedCount in
+                for d0 in 0..<dim0 {
+                    for d1 in 0..<dim1 {
+                        for d2 in 0..<dim2 {
+                            // From (d0, d1, d2) to (d2, d0, d1)
+                            let srcIdx = d0 * dim1 * dim2 + d1 * dim2 + d2
+                            let dstIdx = d2 * dim0 * dim1 + d0 * dim1 + d1
+                            buffer[dstIdx] = data[srcIdx]
+                        }
+                    }
+                }
+                initializedCount = data.count
+            }
+            return Array3D(data: out, dim0: dim2, dim1: dim0, dim2: dim1)
+        }
     }
 }
