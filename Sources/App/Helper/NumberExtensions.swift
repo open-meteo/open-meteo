@@ -3,7 +3,7 @@ import Foundation
 
 public extension Double {
     func round(digits: Int) -> Double {
-        let mut = pow(10, Double(digits))
+        let mut = Foundation.pow(10, Double(digits))
         return (self * mut).rounded() / mut
     }
 }
