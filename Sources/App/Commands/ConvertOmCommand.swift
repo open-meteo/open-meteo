@@ -4,88 +4,154 @@ import Vapor
 import SwiftNetCDF
 
 /**
- Small helper tool to convert a `om` file to NetCDF for debugging
- 
- e.g. openmeteo-api convert-om /Volumes/2TB_1GBs/data/master-MRI_AGCM3_2_S/windgusts_10m_mean_linear_bias_seasonal.om --nx 1920 --transpose -o temp.nc
- 
+ Small helper tool to convert between `om` versions and between om file format and NetCDF for debugging
+
+ Examples:
+  - Convert to NetCDF: openmeteo-api convert-om data.om --format netcdf -o output.nc --domain ecmwf_ifs025
+  - Convert between OM versions: openmeteo-api convert-om data.om --format om3 -o data.om3 --domain ecmwf_ifs025
  */
 struct ConvertOmCommand: Command {
     var help: String {
-        return "Convert an om file to to NetCDF"
+        return "Convert between om file format version or convert to NetCDF"
     }
-    
+
     struct Signature: CommandSignature {
         @Argument(name: "infile", help: "Input file")
         var infile: String
-        
-        @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
+
+        @Option(name: "format", help: "Conversion target format: 'netcdf' or 'om3'")
+        var format: String?
+
+        @Option(name: "output", short: "o", help: "Output file name. Default: [infile].nc or [infile].om3")
         var outfile: String?
-        
+
         @Flag(name: "transpose", help: "Transpose data to fast space")
         var transpose: Bool
-        
-        @Option(name: "nx", help: "Use this nx value to convert to d3")
-        var nx: Int?
-        
-        @Option(name: "domain", help: "Domain used for grid definiton")
+
+        @Option(name: "domain", help: "Domain used for grid definition")
         var domain: String?
     }
-    
+
     func run(using context: CommandContext, signature: Signature) throws {
         let logger = context.application.logger
-        
-        if let domain = signature.domain {
-            let domain = try DomainRegistry.load(rawValue: domain)
-            let oufile = signature.outfile ?? "\(signature.infile).om3"
-            try convertOmv3(src: signature.infile, dest: oufile, grid: domain.getDomain().grid)
-            return
-        }
-        
-        guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
-            fatalError("Not a float array")
-        }
-        let dimensions = om.getDimensions()
-        let chunks = om.getChunkDimensions()
-        guard dimensions.count == 2 else {
-            fatalError("Not a 2D array")
-        }
-        let dim0 = Int(dimensions[0])
-        let dim1 = Int(dimensions[1])
-        let chunk0 = chunks[0]
-        let chunk1 = chunks[1]
-        logger.info("dim0=\(dim0) dim1=\(dim1) chunk0=\(chunk0) chunk1=\(chunk1)")
-        
-        let data = try om.read()
-        
-        let oufile = signature.outfile ?? "\(signature.infile).nc"
-        let ncFile = try NetCDF.create(path: oufile, overwriteExisting: true)
-        try ncFile.setAttribute("TITLE", "open-meteo file convert")
-        
-        if let nx = signature.nx {
-            let ny = dim0 / nx
+        logger.info("Processing file: \(signature.infile)")
+
+        let format = signature.format?.lowercased() ?? "netcdf"
+
+        if format == "om3" {
+            // Handle conversion to OM3
+            guard let domain = signature.domain else {
+                throw ConvertOmError("Domain parameter is required for OM3 conversion")
+            }
+            let domainObj = try DomainRegistry.load(rawValue: domain)
+            let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".om3"
             if signature.transpose {
-                logger.info("Transpose to nx=\(nx) ny=\(ny)")
-                // to fast space
+                logger.warning("Transpose flag is currently not supported for OM3 conversion")
+            }
+            logger.info("Converting OM file to v3 with domain: \(domain). Outfile will be: \(outfile)")
+            try convertOmv3(src: signature.infile, dest: outfile, grid: domainObj.getDomain().grid)
+            return
+        } else if format == "netcdf" {
+            // Handle conversion to NetCDF
+            guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
+                throw ConvertOmError("Not a float array")
+            }
+            let dimensions = om.getDimensions().map { $0 }
+            let chunks = om.getChunkDimensions().map { $0 }
+            logger.info("File dimensions: \(dimensions), chunks: \(chunks)")
+
+            let data = try om.read()
+            let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".nc"
+            logger.info("Converting to NetCDF: \(outfile)")
+            try convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, domain: signature.domain, logger: logger)
+            return
+        } else {
+            throw ConvertOmError("Unsupported conversion target: \(format)")
+        }
+    }
+
+    /// Convert data to NetCDF format
+    private func convertToNetCDF(data: [Float], dimensions: [UInt64], outfile: String, transpose: Bool, domain: String?, logger: Logger) throws {
+        let ncFile = try NetCDF.create(path: outfile, overwriteExisting: true)
+        try ncFile.setAttribute("TITLE", "open-meteo data")
+
+        switch dimensions.count {
+        case 2:
+            try convertToNetCDF2D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose, domain: domain, logger: logger)
+        case 3:
+            try convertToNetCDF3D(data: data, dimensions: dimensions, ncFile: ncFile, transpose: transpose)
+        default:
+            logger.error("Unsupported number of dimensions for netcdf conversion: \(dimensions.count)")
+            throw ConvertOmError("Unsupported number of dimensions: \(dimensions.count)")
+        }
+
+        logger.info("NetCDF conversion completed successfully")
+    }
+
+    /// Handle 2D data conversion to NetCDF
+    private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, domain: String?, logger: Logger) throws {
+        if let domain = domain {
+            let grid = try DomainRegistry.load(rawValue: domain).getDomain().grid
+            let ny = grid.ny
+            let nx = grid.nx
+            let nt = Int(dimensions[1])
+
+            guard dimensions[0] == nx * ny, ny > 1, nx > 1 else {
+                throw ConvertOmError("Wrong grid! Expected \(nx * ny) locations, got \(dimensions[0])")
+            }
+
+            if transpose {
+                // Fast time dimension (locations, time) -> (time, locations)
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                    try ncFile.createDimension(name: "time", length: dim1),
+                    try ncFile.createDimension(name: "time", length: nt),
                     try ncFile.createDimension(name: "LAT", length: ny),
                     try ncFile.createDimension(name: "LON", length: nx)
                 ])
-                let data2 = Array2DFastTime(data: data, nLocations: dim0, nTime: dim1).transpose()
-                try ncVariable.write(data2.data)
+                let transposedData = Array2DFastTime(data: data, nLocations: nx * ny, nTime: nt).transpose()
+                try ncVariable.write(transposedData.data)
             } else {
-                // fast time dimension
+                // Default layout
                 var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
                     try ncFile.createDimension(name: "LAT", length: ny),
                     try ncFile.createDimension(name: "LON", length: nx),
-                    try ncFile.createDimension(name: "time", length: dim1)
+                    try ncFile.createDimension(name: "time", length: nt)
                 ])
                 try ncVariable.write(data)
             }
         } else {
+            logger.warning("No domain provided, converting to LAT and LON dimensions, which might not be what you want for weather domains!")
+            logger.warning("If you want to convert to a proper 3-dimensional NetCDF file, please provide a domain (for grid dimensions).")
+
+            // Default layout
             var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
-                try ncFile.createDimension(name: "LAT", length: dim1),
-                try ncFile.createDimension(name: "LON", length: dim0),
+                try ncFile.createDimension(name: "LAT", length: Int(dimensions[0])),
+                try ncFile.createDimension(name: "LON", length: Int(dimensions[1]))
+            ])
+            try ncVariable.write(data)
+        }
+    }
+
+    /// Handle 3D data conversion to NetCDF
+    private func convertToNetCDF3D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool) throws {
+        let ny = Int(dimensions[0])
+        let nx = Int(dimensions[1])
+        let nt = Int(dimensions[2])
+
+        if transpose {
+            // Transpose to fast space (lat, lon, time) -> (time, lat, lon)
+            var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+                try ncFile.createDimension(name: "time", length: nt),
+                try ncFile.createDimension(name: "LAT", length: ny),
+                try ncFile.createDimension(name: "LON", length: nx)
+            ])
+
+            let transposed = Array3D(data: data, dim0: ny, dim1: nx, dim2: nt).transpose()
+            try ncVariable.write(transposed.data)
+        } else {
+            var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+                try ncFile.createDimension(name: "LAT", length: ny),
+                try ncFile.createDimension(name: "LON", length: nx),
+                try ncFile.createDimension(name: "time", length: nt)
             ])
             try ncVariable.write(data)
         }
@@ -96,7 +162,7 @@ struct ConvertOmCommand: Command {
         // Read data from the input OM file
         guard let readfile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
               let reader = readfile.asArray(of: Float.self) else {
-            fatalError("Failed to open file: \(src)")
+            throw ConvertOmError("Failed to open file: \(src)")
         }
 
         let dimensions = Array(reader.getDimensions())
@@ -106,20 +172,19 @@ struct ConvertOmCommand: Command {
         print("dimensions: \(dimensions)")
         print("chunks: \(chunks)")
         print("scaleFactor: \(reader.scaleFactor)")
-        
 
         let ny = UInt64(grid.ny)
         let nx = UInt64(grid.nx)
         let nt = dimensions[1]
-        
+
         guard dimensions.count == 2, nx * ny == dimensions[0], ny > 1, nx > 1 else {
-            fatalError("wrong grid")
+            throw ConvertOmError("Wrong grid! Expected \(nx * ny) locations, got \(dimensions[0])")
         }
-        
+
         let dimensionsOut = [ny, nx, nt]
         let chunksOut = [1,chunks[0],chunks[1]]
         // TODO somehow 5x5 is larger than 1x25....
-        
+
         /*let dataRaw = try reader.read(range: [0..<ny*nx, 0..<nt])
         print("data read")
         if false {
@@ -137,7 +202,7 @@ struct ConvertOmCommand: Command {
             print("nc wwrite done")
             return
         }*/
-        
+
         try FileManager.default.removeItemIfExists(at: dest)
         let fileHandle = try FileHandle.createNewFile(file: dest)
 
@@ -164,7 +229,7 @@ struct ConvertOmCommand: Command {
                     let xRange = xStart ..< min(xStart + chunksOut[1], nx)
                     let tRange = tStart ..< min(tStart + chunksOut[2], nt)
                     //print("chunk y=\(yRange) x=\(xRange) t=\(tRange)")
-                    
+
                     var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for (row, y) in yRange.enumerated() {
                         try reader.read(
@@ -183,7 +248,7 @@ struct ConvertOmCommand: Command {
                 }
             }
         }
-       
+
 
         let variableMeta = try writer.finalise()
         print("Finalized Array")
@@ -192,7 +257,7 @@ struct ConvertOmCommand: Command {
         try fileWriter.writeTrailer(rootVariable: variable)
 
         print("Finished writing")
-        
+
         /*// Verify the output
         guard let verificationFile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: dest))),
             let verificationReader = verificationFile.asArray(of: Float.self) else {
@@ -200,8 +265,8 @@ struct ConvertOmCommand: Command {
         }
 
         let dataVerify = try verificationReader.read(range: [0..<ny, 0..<nx, 0..<nt])
-        
-        
+
+
         guard dataVerify == dataRaw else {
             for i in 0..<min(dataVerify.count, 1000) {
                 if dataVerify[i] != dataRaw[i] {//}&& !dataRaw[i].isNaN && !dataVerify[i].isNaN {
@@ -211,5 +276,47 @@ struct ConvertOmCommand: Command {
             print("verify failed")
             fatalError()
         }*/
+    }
+}
+
+struct ConvertOmError: Error {
+    let message: String
+
+    init(_ message: String) {
+        self.message = message
+    }
+}
+
+extension String {
+    var withoutOmSuffix: String {
+        if hasSuffix(".om") {
+            return String(dropLast(3))
+        }
+        return self
+    }
+}
+
+extension Array3D {
+    /// Transpose the array to swap dimensions: (dim0, dim1, dim2) -> (dim2, dim0, dim1)
+    /// This effectively changes from (lat, lon, time) to (time, lat, lon)
+    func transpose() -> Array3D {
+        precondition(data.count == dim0 * dim1 * dim2)
+
+        return data.withUnsafeBufferPointer { data in
+            let out = [Float](unsafeUninitializedCapacity: data.count) { buffer, initializedCount in
+                for d0 in 0..<dim0 {
+                    for d1 in 0..<dim1 {
+                        for d2 in 0..<dim2 {
+                            // From (d0, d1, d2) to (d2, d0, d1)
+                            let srcIdx = d0 * dim1 * dim2 + d1 * dim2 + d2
+                            let dstIdx = d2 * dim0 * dim1 + d0 * dim1 + d1
+                            buffer[dstIdx] = data[srcIdx]
+                        }
+                    }
+                }
+                initializedCount = data.count
+            }
+            return Array3D(data: out, dim0: dim2, dim1: dim0, dim2: dim1)
+        }
     }
 }
