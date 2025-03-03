@@ -307,7 +307,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if [EcmwfDomain.aifs025, .aifs025_single].contains(domain) && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                 }
-                if variable.gribName == "w" {
+                if ["w", "q"].contains(variable.gribName) {
                     // do not store specific humidity on disk
                     return nil
                 }
@@ -388,7 +388,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 }
                 
                 // Relative humidity missing in AIFS
-                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.specific_humidity_1000hPa && $0.time == timestamp && $0.member == member}) {
+                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.relative_humidity_1000hPa && $0.time == timestamp && $0.member == member}) {
                     logger.info("Calculating relative humidity")
                     try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
                     try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
