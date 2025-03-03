@@ -121,6 +121,9 @@ enum DomainRegistry: String, CaseIterable {
     case eumetsat_lsa_saf_msg_15min
     case eumetsat_lsa_saf_iodc_15min
     
+    case kma_gdps
+    case kma_ldps
+    
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
@@ -325,6 +328,10 @@ enum DomainRegistry: String, CaseIterable {
             return EumetsatLsaSafDomain.iodc
         case .meteofrance_sea_surface_temperature:
             return MfWaveDomain.mfsst
+        case .kma_gdps:
+            return KmaDomain.gdps
+        case .kma_ldps:
+            return KmaDomain.ldps
         }
     }
 }

@@ -364,6 +364,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case eumetsat_lsa_saf_msg
     case eumetsat_lsa_saf_iodc
     case jma_jaxa_himawari
+    
+    case kma_seamless
+    case kma_gdps
+    case kma_ldps
 
     
     /// Return the required readers for this domain configuration
@@ -613,6 +617,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             }
             // TODO GOES east + west
             return []
+        case .kma_seamless:
+            let ldps = try KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let gdps = try KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [gdps, ldps].compactMap({$0})
+        case .kma_gdps:
+            let reader = try KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [reader].compactMap({$0})
+        case .kma_ldps:
+            let reader = try KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [reader].compactMap({$0})
         }
     }
     

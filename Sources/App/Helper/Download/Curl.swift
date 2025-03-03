@@ -116,7 +116,7 @@ final class Curl {
         if _url.contains("@") && _url.contains(":") {
             let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
             auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
-            url = _url.split(separator: "/")[0] + "//" + _url.split(separator: "@")[1]
+            url = _url.stripHttpPassword()
         } else {
             url = _url
             auth = nil

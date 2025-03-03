@@ -37,6 +37,7 @@ struct GribAttributes {
         case heightAboveGround
         case depthBelowLandLayer
         case hybrid
+        case unknown // only KMA
     }
     
     enum StepType: String {
@@ -66,10 +67,8 @@ struct GribAttributes {
         
         parameterName = try message.getOrThrow(attribute: "parameterName")
         parameterUnits = try message.getOrThrow(attribute: "parameterUnits")
-        let validityTime = try message.getOrThrow(attribute: "validityTime")
-        let validityDate = try message.getOrThrow(attribute: "validityDate")
-        
-        timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+
+        timestamp = try message.getValidTimestamp()
         unit = try message.getOrThrow(attribute: "units")
         paramId = message.getLong(attribute: "paramId") ?? 0
         perturbationNumber = message.getLong(attribute: "perturbationNumber")
@@ -90,5 +89,11 @@ extension GribMessage {
             throw GribAttributeError.couldNotGetAttribute(attribute: attribute)
         }
         return value
+    }
+    
+    func getValidTimestamp() throws -> Timestamp {
+        let validityTime = try getOrThrow(attribute: "validityTime")
+        let validityDate = try getOrThrow(attribute: "validityDate")
+        return try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
     }
 }
