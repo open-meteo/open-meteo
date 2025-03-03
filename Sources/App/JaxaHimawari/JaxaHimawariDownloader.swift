@@ -171,6 +171,10 @@ struct JaxaHimawariDownload: AsyncCommand {
                 logger.info("Skipping NetCDF error \(code): \(error)")
                 return nil
             }
+            catch NetCDFError.hdf5Error {
+               logger.info("Skipping HDF5 error")
+               return nil
+           }
         })
     }
 }
