@@ -26,7 +26,7 @@ extension Curl {
             do {
                 var messages = [GribMessage]()
                 let contentLength = try response.contentLength()
-                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
                         try Task.checkCancellation()
@@ -78,7 +78,7 @@ extension Curl {
             // Retry failed file transfers after this point
             do {
                 let contentLength = try response.contentLength()
-                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 let result: T
                 if bzip2Decode {
                     result = try await body(response.body.tracker(tracker).decompressBzip2().decodeGrib().eraseToAnyAsyncSequence())

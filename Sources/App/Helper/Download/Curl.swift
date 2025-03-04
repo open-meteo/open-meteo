@@ -298,7 +298,7 @@ final class Curl {
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: fileTemp)
                 let contentLength = try response.contentLength() ?? minSize
-                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     try await response.body.tracker(tracker).decompressBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
                 } else {
@@ -330,7 +330,7 @@ final class Curl {
                 if let contentLength {
                     buffer.reserveCapacity(contentLength)
                 }
-                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
+                let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     for try await fragement in response.body.tracker(tracker).decompressBzip2() {
                         try Task.checkCancellation()

@@ -186,7 +186,7 @@ struct GenericVariableHandle {
                 }
             }
             
-            let progress = ProgressTracker(logger: logger, total: nLocations, label: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
+            let progress = TransferAmountTracker(logger: logger, totalSize: nx*ny*time.count*nMembers*MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
                         
             try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { (yRange, xRange, memberRange) in
                 let nLoc = yRange.count * xRange.count
@@ -214,7 +214,7 @@ struct GenericVariableHandle {
                     locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
                 )
                 
-                progress.add(nLoc)
+                progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
                 return data3d.data[0..<nLoc * memberRange.count * time.count]
             }
             progress.finish()

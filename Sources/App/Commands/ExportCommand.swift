@@ -472,9 +472,9 @@ struct ExportCommand: AsyncCommand {
                     }
                     let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                     try ncVariable.write(normals, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
-                    await progress.add(time.count * 4)
+                    progress.add(time.count * 4)
                 }
-                await progress.finish()
+                progress.finish()
                 return
             }
             // Loop over locations, read and write
@@ -486,9 +486,9 @@ struct ExportCommand: AsyncCommand {
                 }
                 let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
                 try ncVariable.write(normals, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
-                await progress.add(time.count * 4)
+                progress.add(time.count * 4)
             }
-            await progress.finish()
+            progress.finish()
             return
         }
         
@@ -520,9 +520,9 @@ struct ExportCommand: AsyncCommand {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [l/grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
-                await progress.add(time.count * 4)
+                progress.add(time.count * 4)
             }
-            await progress.finish()
+            progress.finish()
             return
         }
         
@@ -534,10 +534,10 @@ struct ExportCommand: AsyncCommand {
                 fatalError("Invalid variable \(variable)")
             }
             try ncVariable.write(data.data, offset: [gridpoint/grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
-            await progress.add(time.count * 4)
+            progress.add(time.count * 4)
         }
         
-        await progress.finish()
+        progress.finish()
     }
 }
 

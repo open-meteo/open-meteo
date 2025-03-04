@@ -192,11 +192,11 @@ struct MigrationCommand: AsyncCommand {
                         arrayOffset: nil,
                         arrayCount: nil
                     )
-                    await progress.add(chunk.count * 4)
+                    progress.add(chunk.count * 4)
                 }
             }
         }
-        await progress.finish()
+        progress.finish()
         let variable = try fileWriter.write(
             array: try writer.finalise(),
             name: "",
@@ -230,11 +230,11 @@ struct MigrationCommand: AsyncCommand {
                     guard chunk.isSimilar(verifyData) else {
                         fatalError("Data does not match \(yRange) \(xRange) \(tRange)")
                     }
-                    await progressVerify.add(chunk.count * 4)
+                    progressVerify.add(chunk.count * 4)
                 }
             }
         }
-        await progressVerify.finish()
+        progressVerify.finish()
         try FileManager.default.moveFileOverwrite(from: temporary, to: file)
     }
 }

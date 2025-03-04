@@ -38,7 +38,7 @@ struct MergeYearlyCommand: AsyncCommand {
         
         for year in years {
             for variable in variables {
-                try await Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force)
+                try Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force)
             }
         }
         
@@ -61,7 +61,7 @@ struct MergeYearlyCommand: AsyncCommand {
     }
     
     /// Generate a yearly file for a specified domain, variable and year
-    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool) async throws {
+    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool) throws {
         let registry = domain.domainRegistry
         logger.info("Processing variable \(variable) for year \(year)")
         let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
@@ -155,11 +155,11 @@ struct MergeYearlyCommand: AsyncCommand {
                         arrayOffset: nil,
                         arrayCount: nil
                     )
-                    await progress.add(data.count * 4)
+                    progress.add(data.count * 4)
                 }
             }
         }
-        await progress.finish()
+        progress.finish()
         let variable = try fileWriter.write(
             array: try writer.finalise(),
             name: "",
@@ -213,11 +213,11 @@ struct MergeYearlyCommand: AsyncCommand {
                         logger.error("Data does not match \(yRange) \(xRange) \(tRange)")
                         throw MergeYearlyError.validationFailed
                     }
-                    await progressVerify.add(data.count * 4)
+                    progressVerify.add(data.count * 4)
                 }
             }
         }
-        await progressVerify.finish()
+        progressVerify.finish()
         try FileManager.default.moveFileOverwrite(from: temporary, to: yearlyFilePath)
     }
 }

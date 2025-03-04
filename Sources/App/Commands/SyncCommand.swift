@@ -174,7 +174,7 @@ struct SyncCommand: AsyncCommand {
                     /// Download all files
                     let totalBytes = toDownload.reduce(0, {$0 + $1.fileSize})
                     logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
-                    let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes)
+                    let progress = TransferAmountTrackerActor(logger: logger, totalSize: totalBytes)
                     let curlStartBytes = await curl.totalBytesTransfered.bytes
                     try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
                         var client = ClientRequest(url: URI("\(server)\(download.name)"))
