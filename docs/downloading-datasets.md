@@ -96,12 +96,12 @@ where domain must be one of the following options.
 
 To download a various time-range, specify additionally the parameter time-interval: `<exe> download-era5 <domain> --timeinterval 20220101-20220131 --cdskey ...`
 
-To download an entire year: `<exe> download-era5 <domain> --year 2021 --cdskey`. Per year of data, roughly 60 GB of disk space are required.
+To download an entire year: `<exe> download-era5 <domain> --timeinterval 20210101-20211231 --cdskey`. Per year of data, roughly 60 GB of disk space are required.
 
 All arguments for the `<exe> download-era5` command:
 ```
 # openmeteo-api download-era5 --help
-Usage: openmeteo-api download-era5 <domain> [--timeinterval,-t] [--year,-y] [--stripseaYear,-s] [--cdskey,-k]
+Usage: openmeteo-api download-era5 <domain> [--timeinterval,-t] [--stripseaYear,-s] [--cdskey,-k]
 
 Download ERA5 from the ECMWF climate data store and convert
 

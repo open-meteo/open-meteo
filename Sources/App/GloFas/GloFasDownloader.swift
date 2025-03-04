@@ -11,9 +11,6 @@ struct GloFasDownloader: AsyncCommand {
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download with format 20220101-20220131")
         var timeinterval: String?
         
-        @Option(name: "year", short: "y", help: "Download one year")
-        var year: String?
-        
         @Flag(name: "skip-existing", help: "ONLY FOR TESTING! Do not use in production. May update the database with stale data")
         var skipExisting: Bool
         
@@ -69,25 +66,6 @@ struct GloFasDownloader: AsyncCommand {
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
-            /// Only download one specified year
-            if let yearStr = signature.year {
-                if yearStr.contains("-") {
-                    let split = yearStr.split(separator: "-")
-                    guard split.count == 2 else {
-                        fatalError("year invalid")
-                    }
-                    for year in Int(split[0])! ... Int(split[1])! {
-                        try await downloadYear(application: context.application, year: year, cdskey: cdskey, domain: domain)
-                    }
-                } else {
-                    guard let year = Int(yearStr) else {
-                        fatalError("Could not convert year to integer")
-                    }
-                    try await downloadYear(application: context.application, year: year, cdskey: cdskey, domain: domain)
-                }
-                return
-            }
-            
             let timeInterval = try signature.getTimeinterval()
             try await downloadTimeIntervalConsolidated(application: context.application, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
         case .seasonalv3:
@@ -266,83 +244,6 @@ struct GloFasDownloader: AsyncCommand {
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
             try writer.write(file: dailyFile, compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
         }
-    }
-    
-    /// Download and convert entire year to yearly files
-    func downloadYear(application: Application, year: Int, cdskey: String, domain: GloFasDomain) async throws {
-        fatalError("yearly GloFas download not implemented anymore")
-        
-        /*let logger = application.logger
-        let downloadDir = domain.downloadDirectory
-        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
-        let gribFile = "\(downloadDir)glofasv4_\(year).grib"
-        
-        if !FileManager.default.fileExists(atPath: gribFile) {
-            logger.info("Downloading year \(year)")
-            let query = GlofasQuery(
-                system_version: domain.version,
-                hyear: "\(year)",
-                hmonth: ["april", "august", "december", "february", "january", "july",
-                          "june", "march", "may", "november", "october", "september"],
-                hday: (0...31).map{$0.zeroPadded(len: 2)},
-                product_type: domain.productType
-            )
-            let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
-            try await curl.downloadCdsApi(
-                dataset: "cems-glofas-historical",
-                query: query,
-                apikey: cdskey,
-                destinationFile: gribFile
-            )
-        }
-        
-        logger.info("Converting year \(year) to daily files")
-        
-        try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
-        
-        logger.info("Converting daily files time series")
-        let time = TimerangeDt(range: Timestamp(year, 1, 1) ..< Timestamp(year+1, 1, 1), dtSeconds: 3600*24)
-        let nt = time.count
-        let yearlyFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "river_discharge", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
-        
-        let omFiles = try time.map { time -> OmFileReader in
-            let omFile = "\(downloadDir)glofas_\(time.format_YYYYMMdd).om"
-            return try OmFileReader(file: omFile)
-        }
-        
-        let ny = domain.grid.ny
-        let nx = domain.grid.nx
-        // 21k locations -> 30MB chunks for 1 year
-        let nLocationChunk = nx * ny / 1000
-        var percent = 0
-        var looptime = DispatchTime.now()
-        // Scale logarithmic. Max discharge around 400_000 m3/s
-        // Note: delta 2d coding (chunk0=6) save around 15% space
-        try OmFileWriter(dim0: ny*nx, dim1: nt, chunk0: 6, chunk1: time.count).write(file: yearlyFile.getFilePath(), compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, overwrite: false, supplyChunk: { dim0 in
-            
-            let ratio = Int(Float(dim0) / (Float(nx*ny)) * 100)
-            if percent != ratio {
-                /// time ~4.5 seconds
-                logger.info("\(ratio) %, time per step \(looptime.timeElapsedPretty())")
-                looptime = DispatchTime.now()
-                percent = ratio
-            }
-            
-            /// Process around 360 MB memory at once
-            let locationRange = dim0..<min(dim0+nLocationChunk, nx*ny)
-            
-            var fasttime = Array2DFastTime(data: [Float](repeating: .nan, count: nt * locationRange.count), nLocations: locationRange.count, nTime: nt)
-            
-            for (i, omfile) in omFiles.enumerated() {
-                try omfile.willNeed(dim0Slow: locationRange, dim1: 0..<1)
-                let read = try omfile.read(dim0Slow: locationRange, dim1: 0..<1)
-                let read2d = Array2DFastTime(data: read, nLocations: locationRange.count, nTime: 1)
-                for l in 0..<locationRange.count {
-                    fasttime[l, i ..< (i+1)] = read2d[l, 0..<1]
-                }
-            }
-            return ArraySlice(fasttime.data)
-        })*/
     }
 }
 
