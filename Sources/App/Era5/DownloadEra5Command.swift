@@ -74,11 +74,11 @@ struct DownloadEra5Command: AsyncCommand {
             variables = try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         }
         
-        if signature.calculateBiasField {
+        /*if signature.calculateBiasField {
             fatalError("BIAS correction calculation not available anymore")
             //try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
             //return
-        }
+        }*/
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
         }
