@@ -239,7 +239,7 @@ struct MigrationCommand: AsyncCommand {
     }
 }
 
-fileprivate extension Array where Element == Float {
+public extension Array where Element == Float {
     func isSimilar(_ b: [Float], accuracy: Float = 0.0001) -> Bool {
         let a = self
         guard a.count == b.count else {
