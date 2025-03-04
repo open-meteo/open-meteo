@@ -21,8 +21,7 @@ public extension Float {
 extension Int {
     /// Integer division, but round up instead of floor
     func divideRoundedUp(divisor: Int) -> Int {
-        let rem = self % divisor
-        return rem == 0 ? self / divisor : self / divisor + 1
+        return (self + divisor - 1) / divisor
     }
     
     func zeroPadded(len: Int) -> String {

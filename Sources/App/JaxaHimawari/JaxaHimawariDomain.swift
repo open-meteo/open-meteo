@@ -13,7 +13,7 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
     }
     
     var hasYearlyFiles: Bool {
-        return false
+        return true
     }
     
     var masterTimeRange: Range<Timestamp>? {

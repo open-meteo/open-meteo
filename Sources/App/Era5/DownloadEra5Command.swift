@@ -7,18 +7,12 @@ import OmFileFormat
 
 
 struct DownloadEra5Command: AsyncCommand {
-    /// 6k locations require around 200 MB memory for a yearly time-series
-    //static var nLocationsPerChunk = 6_000
-    
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
         
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download with format 20220101-20220131")
         var timeinterval: String?
-        
-        @Option(name: "year", short: "y", help: "Download one year")
-        var year: String?
         
         @Option(name: "prefetch-factor", short: "p", help: "Prefetch factor for bias calculation. Default 2")
         var prefetchFactor: Int?
@@ -32,8 +26,8 @@ struct DownloadEra5Command: AsyncCommand {
         @Flag(name: "force", short: "f", help: "Force to update given timeinterval, regardless if files could be downloaded")
         var force: Bool
         
-        @Flag(name: "calculate-bias-field", short: "b", help: "Generate seasonal averages for bias corrections for CMIP climate data")
-        var calculateBiasField: Bool
+        /*@Flag(name: "calculate-bias-field", short: "b", help: "Generate seasonal averages for bias corrections for CMIP climate data")
+        var calculateBiasField: Bool*/
         
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -80,11 +74,11 @@ struct DownloadEra5Command: AsyncCommand {
             variables = try Era5Variable.load(commaSeparatedOptional: signature.onlyVariables) ?? Era5Variable.allCases.filter({ $0.availableForDomain(domain: domain) })
         }
         
-        if signature.calculateBiasField {
+        /*if signature.calculateBiasField {
             fatalError("BIAS correction calculation not available anymore")
             //try generateBiasCorrectionFields(logger: logger, domain: domain, prefetchFactor: signature.prefetchFactor ?? 2)
             //return
-        }
+        }*/
         guard let cdskey = signature.cdskey else {
             fatalError("cds key is required")
         }
@@ -92,25 +86,6 @@ struct DownloadEra5Command: AsyncCommand {
         try await downloadElevation(application: context.application, cdskey: cdskey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
         
         let concurrent = signature.concurrent ?? System.coreCount
-        
-        /// Only download one specified year
-        if let yearStr = signature.year {
-            if yearStr.contains("-") {
-                let split = yearStr.split(separator: "-")
-                guard split.count == 2 else {
-                    fatalError("year invalid")
-                }
-                for year in Int(split[0])! ... Int(split[1])! {
-                    try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: nil, concurrent: concurrent)
-                }
-            } else {
-                guard let year = Int(yearStr) else {
-                    fatalError("Could not convert year to integer")
-                }
-                try await runYear(application: context.application, year: year, cdskey: cdskey, email: signature.email, domain: domain, variables: variables, forceUpdate: signature.force, timeintervalDaily: signature.force ? signature.getTimeinterval(domain: domain) : nil, concurrent: concurrent)
-            }
-            return
-        }
         
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
@@ -347,27 +322,6 @@ struct DownloadEra5Command: AsyncCommand {
         }
 
         try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
-    }
-    
-    func runYear(application: Application, year: Int, cdskey: String, email: String?, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool, timeintervalDaily: TimerangeDt?, concurrent: Int) async throws {
-        let timeintervalDaily = timeintervalDaily ?? TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: 24*3600)
-        /// TODO with `forceUpdate` all handles can be returned... pass this along to `convertYear` function
-        let _ = try await downloadDailyFiles(application: application, cdskey: cdskey, email: email, timeinterval: timeintervalDaily, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: forceUpdate)
-        
-        let variablesConvert: [GenericVariable]
-        if domain == .era5_ensemble {
-            // ERA5 ensemble domain also contains a spread variable for each mean variable
-            variablesConvert = variables.flatMap {
-                guard let spread: GenericVariable = Era5Variable(rawValue: "\($0)_spread") else {
-                    fatalError("Did not find spread variable for \($0)")
-                }
-                return [$0, spread]
-            }
-        } else {
-            variablesConvert = variables
-        }
-        
-        try convertYear(logger: application.logger, year: year, domain: domain, variables: variablesConvert, forceUpdate: forceUpdate)
     }
     
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
@@ -813,91 +767,5 @@ struct DownloadEra5Command: AsyncCommand {
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         try FileManager.default.removeItemIfExists(at: "\(tempDownloadGribFile).py")
         return handles
-    }
-    
-    /// Data is stored in one file per hour
-    /// If `forceUpdate` is set, an existing file is updated
-    func convertYear(logger: Logger, year: Int, domain: CdsDomain, variables: [GenericVariable], forceUpdate: Bool) throws {
-        let timeintervalHourly = TimerangeDt(start: Timestamp(year,1,1), to: Timestamp(year+1,1,1), dtSeconds: domain.dtSeconds)
-        
-        let nx = domain.grid.nx // 721
-        let ny = domain.grid.ny // 1440
-        let nt = timeintervalHourly.count // 8784
-        let nTimePerFile = nt
-        let chunknLocations = 6
-        let chunknTime = 21 * 24
-                
-        // convert to yearly file
-        for variable in variables {
-            let progress = ProgressTracker(logger: logger, total: nx*ny, label: "Convert \(variable) year \(year)")
-            let writeFilePath = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: "\(variable)", type: .year, chunk: year, ensembleMember: 0, previousDay: 0)
-            if !forceUpdate && FileManager.default.fileExists(atPath: writeFilePath.getFilePath()) {
-                continue
-            }
-            try writeFilePath.createDirectory()
-            let tempFile = writeFilePath.getFilePath() + "~"
-            FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
-            try FileManager.default.removeItemIfExists(at: tempFile)
-            let writeFn = try FileHandle.createNewFile(file: tempFile)
-            let writeFile = OmFileWriter(fn: writeFn, initialCapacity: 1024*1024)
-            let writer = try writeFile.prepareArray(
-                type: Float.self,
-                dimensions: [UInt64(ny), UInt64(nx), UInt64(nTimePerFile)],
-                chunkDimensions: [1, UInt64(chunknLocations), UInt64(chunknTime)],
-                compression: .pfor_delta2d_int16,
-                scale_factor: variable.scalefactor,
-                add_offset: 0
-            )
-            
-            let existingFile = forceUpdate ? try writeFilePath.openRead2() : nil
-            let omFiles = try timeintervalHourly.map { timeinterval -> OmFileReader<MmapFile>? in
-                let timestampDir = "\(domain.downloadDirectory)\(timeinterval.format_YYYYMMdd)"
-                let omFile = "\(timestampDir)/\(variable.rawValue)_\(timeinterval.format_YYYYMMddHH).om"
-                if !FileManager.default.fileExists(atPath: omFile) {
-                    return nil
-                }
-                return try OmFileReader(file: omFile)
-            }
-            
-            /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
-            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: 1, nTime: 1)
-            var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nt)
-            
-            for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(spatialChunks.y)) {
-                for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(spatialChunks.x)) {
-                    let yRange = yStart ..< min(yStart + UInt64(spatialChunks.y), UInt64(ny))
-                    let xRange = xStart ..< min(xStart + UInt64(spatialChunks.x), UInt64(nx))
-                    
-                    fileData.fillWithNaNs()
-                    if let existingFile, let existingFile = existingFile.asArray(of: Float.self) {
-                        // Load existing data if present
-                        try existingFile.read(into: &fileData, range: [yRange, xRange, 0..<UInt64(nt)])
-                    }
-                    
-                    for (i, omfile) in omFiles.enumerated() {
-                        guard let omfile = omfile?.asArray(of: Float.self) else {
-                            continue
-                        }
-                        let read = try omfile.read(range: [yRange, xRange])
-                        for l in 0..<read.count {
-                            fileData[l * nt + i] = read[l]
-                        }
-                    }
-                    try writer.writeData(
-                        array: Array(fileData[0..<yRange.count * xRange.count * nt]),
-                        arrayDimensions: [UInt64(yRange.count), UInt64(xRange.count), UInt64(nt)]
-                    )
-                    
-                    progress.add(yRange.count * xRange.count)
-                }
-            }
-            let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
-            try writeFile.writeTrailer(rootVariable: root)
-            try writeFn.close()
-            
-            // Commit new yearly file
-            try FileManager.default.moveFileOverwrite(from: tempFile, to: writeFilePath.getFilePath())
-            progress.finish()
-        }
     }
 }
