@@ -2,7 +2,10 @@ import Foundation
 import OmFileFormat
 import Vapor
 
-
+/**
+ Merge database chunks into a yearly file.
+ Data is processed in small portions to keep memory usage low. A single yearly file could exceed 200GB+ raw memory.
+ */
 struct MergeYearlyCommand: AsyncCommand {
     var help: String {
         return "Merge database chunks into yearly files"
@@ -27,27 +30,41 @@ struct MergeYearlyCommand: AsyncCommand {
     
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
-        let domain = try DomainRegistry.load(rawValue: signature.domain)
-        let years = signature.years.getYearsRange()
+        let registry = try DomainRegistry.load(rawValue: signature.domain)
+        let years = try signature.years.getYearsRange()
+        let domain = registry.getDomain()
         
-        let variables: [String] = try signature.variables.map({$0.split(separator: ",").map(String.init)}) ?? FileManager.default.contentsOfDirectory(atPath: domain.directory).filter { !$0.contains(".") && $0 != "static" }
+        let variables: [String] = try signature.variables.map({$0.split(separator: ",").map(String.init)}) ?? FileManager.default.contentsOfDirectory(atPath: registry.directory).filter { !$0.contains(".") && $0 != "static" }
         
         for year in years {
             for variable in variables {
-                try await Self.generateYearlyFile(logger: logger, domain: domain.getDomain(), year: year, variable: variable, force: signature.force)
+                try await Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force)
             }
         }
         
-        // determinate chunks to be deleted (chunk fully covered in years range)
-        // print chunks to be deleted
-        // if delete flag is set, actually delete them
+        // Determinate chunks to be deleted (chunk fully covered in years range)
+        let omFileLength = domain.omFileLength
+        let yearsTime = TimerangeDt(start: Timestamp(years.lowerBound,1,1), to: Timestamp(years.upperBound+1,1,1), dtSeconds: domain.dtSeconds)
+        let yearsIndex = yearsTime.toIndexTime()
+        let fullyCoveredChunks = yearsIndex.lowerBound.divideRoundedUp(divisor: omFileLength) ..< yearsIndex.upperBound / omFileLength
+        logger.info("Chunks within range \(fullyCoveredChunks) could be deleted now. If --delete is set, files will be deleted now")
+        for chunk in fullyCoveredChunks {
+            for variable in variables {
+                let path = "rm \(registry.directory)\(variable)/chunk_\(chunk).om"
+                let time = TimerangeDt(start: Timestamp(chunk * omFileLength * domain.dtSeconds), nTime: omFileLength, dtSeconds: domain.dtSeconds)
+                logger.info("\(path) time \(time.prettyString())")
+                if signature.delete {
+                    try FileManager.default.removeItem(atPath: path)
+                }
+            }
+        }
     }
     
     /// Generate a yearly file for a specified domain, variable and year
     static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool) async throws {
         let registry = domain.domainRegistry
         logger.info("Processing variable \(variable) for year \(year)")
-        let yearlyFilePath = "\(registry.directory)/\(variable)/year_\(year).om"
+        let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
         let fileManager = FileManager.default
         
         guard !fileManager.fileExists(atPath: yearlyFilePath) || force else {
@@ -73,25 +90,16 @@ struct MergeYearlyCommand: AsyncCommand {
             guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
                 return nil
             }
-            /*guard reader.getDimensions().count == 3 else {
-                logger.info("Chunk file \(variable)/chunk_\(chunkIndex).om is not using 3D files. Skipping.")
-                return nil
-            }*/
             let indexTime = chunkIndex*omFileLength ..< (chunkIndex+1)*omFileLength
             return (reader, indexTime)
         }
         guard chunkFiles.count == chunkRange.count else {
-            logger.warning("Not all chunk files are available. Skipping year \(year).")
-            return
+            throw MergeYearlyError.notAllChunksAvailable
         }
         
-        /// Hardcoded to 6 locations times 21 days => 3024 elements. Maybe find a better chunk shape.
+        /// Hardcoded to 6 locations times 21 days in 1-hourly timesteps (504) => 3024 elements
         let chunksOut: [UInt64] = [1, 6, 21 * 24]
-        //let chunksXY = OmFileSplitter.calculateSpatialXYChunk(domain: domain.getDomain(), nMembers: 1, nTime: 1)
-        //let chunksOut = [UInt64(chunksXY.y), UInt64(chunksXY.x), UInt64(omFileLength * 4)]
-        
         let dimensionsOut = [ny, nx, UInt64(yearTime.count)]
-        
         let temporary = "\(yearlyFilePath)~"
         let writeFn = try FileHandle.createNewFile(file: temporary)
         let fileWriter = OmFileWriter(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
@@ -138,7 +146,7 @@ struct MergeYearlyCommand: AsyncCommand {
                                 intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(tRange.count)]
                             )
                         default:
-                            fatalError("Unexpected number of dimensions")
+                            throw MergeYearlyError.unexpectedDimensionsCount
                         }
                     }
                     try writer.writeData(
@@ -162,7 +170,7 @@ struct MergeYearlyCommand: AsyncCommand {
         
         /// Read data again to ensure the written data matches exactly
         guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self) else {
-            fatalError("Could not read temporary file")
+            throw MergeYearlyError.couldNotReadData
         }
         let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensionsOut.reduce(1, *)), name: "Verify")
         for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
@@ -197,12 +205,13 @@ struct MergeYearlyCommand: AsyncCommand {
                                 intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(tRange.count)]
                             )
                         default:
-                            fatalError("Unexpected number of dimensions")
+                            throw MergeYearlyError.unexpectedDimensionsCount
                         }
                     }
                     let verifyData = try verify.read(range: [yRange, xRange, tRange])
                     guard data.isSimilar(verifyData) else {
-                        fatalError("Data does not match \(yRange) \(xRange) \(tRange)")
+                        logger.error("Data does not match \(yRange) \(xRange) \(tRange)")
+                        throw MergeYearlyError.validationFailed
                     }
                     await progressVerify.add(data.count * 4)
                 }
@@ -213,9 +222,17 @@ struct MergeYearlyCommand: AsyncCommand {
     }
 }
 
+enum MergeYearlyError: Error {
+    case notAllChunksAvailable
+    case unexpectedDimensionsCount
+    case validationFailed
+    case invalidYearRange(String)
+    case couldNotReadData
+}
+
 fileprivate extension String {
     /// Expect a single year or a range of years. Format `2017` or `2017-2020`
-    func getYearsRange(valid: ClosedRange<Int> = 1900...2100) -> ClosedRange<Int> {
+    func getYearsRange(valid: ClosedRange<Int> = 1900...2100) throws -> ClosedRange<Int> {
         if self.contains("-") {
             let parts = self.split(separator: "-")
             guard parts.count == 2,
@@ -227,7 +244,7 @@ fileprivate extension String {
                   valid.contains(last),
                   last >= first
             else {
-                fatalError("Invalid year range: \(self)")
+                throw MergeYearlyError.invalidYearRange(self)
             }
             return first...last
         }
@@ -235,7 +252,7 @@ fileprivate extension String {
               let year = Int(self),
               valid.contains(year)
         else {
-            fatalError("Invalid year range: \(self)")
+            throw MergeYearlyError.invalidYearRange(self)
         }
         return year ... year
     }
