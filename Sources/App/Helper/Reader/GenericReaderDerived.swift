@@ -39,7 +39,7 @@ struct GenericReaderOptions {
     /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west. Throws out of bounds error.
     func getAzimuth() throws -> Float {
         guard azimuth.isNaN || (azimuth >= -180 && azimuth <= 180) else {
-            throw ForecastapiError.generic(message: "Parameter `&azimuth=` must be within -90° and 90°")
+            throw ForecastapiError.generic(message: "Parameter `&azimuth=` must be within -180° and 180°")
         }
         return azimuth
     }
