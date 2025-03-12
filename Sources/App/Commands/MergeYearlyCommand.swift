@@ -54,7 +54,7 @@ struct MergeYearlyCommand: AsyncCommand {
                 let time = TimerangeDt(start: Timestamp(chunk * omFileLength * domain.dtSeconds), nTime: omFileLength, dtSeconds: domain.dtSeconds)
                 logger.info("rm \(path) time \(time.prettyString())")
                 if signature.delete {
-                    try FileManager.default.removeItem(atPath: path)
+                    try FileManager.default.removeItemIfExists(at: path)
                 }
             }
         }
