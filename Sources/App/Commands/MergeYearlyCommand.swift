@@ -50,9 +50,9 @@ struct MergeYearlyCommand: AsyncCommand {
         logger.info("Chunks within range \(fullyCoveredChunks) could be deleted now. If --delete is set, files will be deleted now")
         for chunk in fullyCoveredChunks {
             for variable in variables {
-                let path = "rm \(registry.directory)\(variable)/chunk_\(chunk).om"
+                let path = "\(registry.directory)\(variable)/chunk_\(chunk).om"
                 let time = TimerangeDt(start: Timestamp(chunk * omFileLength * domain.dtSeconds), nTime: omFileLength, dtSeconds: domain.dtSeconds)
-                logger.info("\(path) time \(time.prettyString())")
+                logger.info("rm \(path) time \(time.prettyString())")
                 if signature.delete {
                     try FileManager.default.removeItem(atPath: path)
                 }
