@@ -57,10 +57,11 @@ public final actor ApiKeyManager {
         guard let apikeysPath = Environment.get("API_APIKEYS_PATH") else {
             return
         }
+        let concurrencyLimit = apiConcurrencyLimiter.stats()
         let logger = application.logger
         if (0..<10).contains(Timestamp.now().second) {
             let usage = await ApiKeyManager.instance.getUsage()
-            logger.error("API key usage: \(usage)")
+            logger.error("API key usage: \(usage). Concurrency \(concurrencyLimit)")
         }
         guard let string = try? String(contentsOfFile: apikeysPath, encoding: .utf8) else {
             logger.error("Could not read content from API_APIKEYS_PATH \(apikeysPath)")

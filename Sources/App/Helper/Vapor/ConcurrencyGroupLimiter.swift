@@ -14,6 +14,12 @@ final class ConcurrencyGroupLimiter {
     private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
 
     init() {}
+    
+    func stats() -> (monitored_ips: Int, quues_requests: Int) {
+        lock.withLock {
+            return (counts.count, waiters.count)
+        }
+    }
 
     func wait(slot: Int) async throws {
         lock.lock()
