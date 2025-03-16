@@ -3,12 +3,19 @@ import Vapor
 
 extension BodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(_ task: @escaping () async throws -> Void) {
+    func submit(unlockSlot: Int?, _ task: @escaping () async throws -> Void) {
         _ = eventLoop.makeFutureWithTask { try await task() }
+            .always({ _ in
+                if let unlockSlot {
+                    apiConcurrencyLimiter.release(slot: unlockSlot)
+                }
+            })
             .flatMapError({ error in
-                write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
-                    .flatMap({write(.error(error))})
-        })
+                return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
+                    .flatMap({
+                        write(.error(error))
+                    })
+                })
     }
 }
 
@@ -19,11 +26,11 @@ extension ForecastapiResult {
      Memory footprint is therefore much smaller and fits better into L2/L3 caches.
      Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
      */
-    func toJsonResponse(fixedGenerationTime: Double?) throws -> Response {
+    func toJsonResponse(fixedGenerationTime: Double?, unlockSlot: Int?) throws -> Response {
         // First excution outside stream, to capture potential errors better
         //var first = try self.first?()
         let response = Response(body: .init(stream: { writer in
-            writer.submit {
+            writer.submit(unlockSlot: unlockSlot) {
                 var b = BufferAndWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1
