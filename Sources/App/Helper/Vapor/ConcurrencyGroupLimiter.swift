@@ -23,11 +23,11 @@ final class ConcurrencyGroupLimiter {
             //print("Single request slot \(slot)")
             return
         }
-        counts[slot] = count + 1
         guard count < 10 else {
             lock.unlock()
             throw ForecastapiError.generic(message: "Too many concurrent requests")
         }
+        counts[slot] = count + 1
         await withCheckedContinuation {
             //print("Queuing request slot \(slot)")
             waiters.append((slot, $0))
