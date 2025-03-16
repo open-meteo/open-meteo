@@ -74,11 +74,11 @@ extension SocketAddress {
     var rateLimitSlot: Int {
         switch self {
         case .v4(let socket):
-            return Int(socket.address.sin_addr.s_addr) % 10000
+            return Int(socket.address.sin_addr.s_addr)
         case .v6(_):
             var hasher = Hasher()
             self.hash(into: &hasher)
-            return hasher.finalize() % 10000
+            return hasher.finalize()
         case .unixDomainSocket(_):
             return 0
         }
