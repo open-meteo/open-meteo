@@ -30,33 +30,33 @@ paths:
             type: string
             enum:
             - temperature_2m
-            - relativehumidity_2m
-            - dewpoint_2m
+            - relative_humidity_2m
+            - dew_point_2m
             - apparent_temperature
             - pressure_msl
-            - cloudcover
-            - cloudcover_low
-            - cloudcover_mid
-            - cloudcover_high
-            - windspeed_10m
-            - windspeed_80m
-            - windspeed_120m
-            - windspeed_180m
-            - winddirection_10m
-            - winddirection_80m
-            - winddirection_120m
-            - winddirection_180m
-            - windgusts_10m
+            - cloud_cover
+            - cloud_cover_low
+            - cloud_cover_mid
+            - cloud_cover_high
+            - wind_speed_10m
+            - wind_speed_80m
+            - wind_speed_120m
+            - wind_speed_180m
+            - wind_direction_10m
+            - wind_direction_80m
+            - wind_direction_120m
+            - wind_direction_180m
+            - wind_gusts_10m
             - shortwave_radiation
             - direct_radiation
             - direct_normal_irradiance
             - diffuse_radiation
-            - vapor_pressure_deficit
+            - vapour_pressure_deficit
             - evapotranspiration
             - precipitation
-            - weathercode
-            - snow_depth
-            - freezinglevel_height
+            - weather_code
+            - snow_height
+            - freezing_level_height
             - soil_temperature_0cm
             - soil_temperature_6cm
             - soil_temperature_18cm
@@ -79,13 +79,16 @@ paths:
             - apparent_temperature_min
             - precipitation_sum
             - precipitation_hours
-            - weathercode
+            - weather_code
             - sunrise
             - sunset
-            - windspeed_10m_max
-            - windgusts_10m_max
-            - winddirection_10m_dominant
+            - wind_speed_10m_max
+            - wind_gusts_10m_max
+            - wind_direction_10m_dominant
             - shortwave_radiation_sum
+            - uv_index_max
+            - uv_index_clear_sky_max
+            - et0_fao_evapotranspiration
       - name: latitude
         in: query
         required: true
@@ -112,7 +115,7 @@ paths:
           enum:
           - celsius
           - fahrenheit
-      - name: windspeed_unit
+      - name: wind_speed_unit
         in: query
         schema:
           type: string
@@ -167,23 +170,27 @@ paths:
                   generationtime_ms:
                     type: number
                     example: 2.2119
-                    description: Generation time of the weather forecast in milliseconds. This is mainly used for performance monitoring and improvements.
+                    description: Generation time of the weather forecast in milli seconds. This is mainly used for performance monitoring and improvements.
                   utc_offset_seconds:
                     type: integer
                     example: 3600
                     description: Applied timezone offset from the &timezone= parameter.
                   hourly:
-                    $ref: '#/components/schemas/HourlyResponse'
+                    $ref: "#/components/schemas/HourlyResponse"
                   hourly_units:
                     type: object
+                    additionalProperties:
+                      type: string
                     description: For each selected weather variable, the unit will be listed here.
                   daily:
-                    $ref: '#/components/schemas/DailyResponse'
+                    $ref: "#/components/schemas/DailyResponse"
                   daily_units:
                     type: object
+                    additionalProperties:
+                      type: string
                     description: For each selected daily weather variable, the unit will be listed here.
                   current_weather:
-                    $ref: '#/components/schemas/CurrentWeather'
+                    $ref: "#/components/schemas/CurrentWeather"
         400:
           description: Bad Request
           content:
@@ -197,11 +204,12 @@ paths:
                   reason:
                     type: string
                     description: Description of the error
-                    example: "Latitude must be in rang of -90 to 90°. Given: 300"
+                    example: "Latitude must be in range of -90 to 90°. Given: 300"
 components:
   schemas:
     HourlyResponse:
       type: object
+      description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
       required:
         - time
       properties:
@@ -297,7 +305,7 @@ components:
           type: array
           items:
             type: number
-        vapor_pressure_deficit:
+        vapour_pressure_deficit:
           type: array
           items:
             type: number
@@ -312,8 +320,8 @@ components:
         weather_code:
           type: array
           items:
-            type: integer
-        snow_depth:
+            type: number
+        snow_height:
           type: array
           items:
             type: number
@@ -359,6 +367,7 @@ components:
             type: number
     DailyResponse:
       type: object
+      description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
       properties:
         time:
           type: array
@@ -391,15 +400,15 @@ components:
         weather_code:
           type: array
           items:
-            type: integer
+            type: number
         sunrise:
           type: array
           items:
-            type: string
+            type: number
         sunset:
           type: array
           items:
-            type: string
+            type: number
         wind_speed_10m_max:
           type: array
           items:
@@ -416,10 +425,23 @@ components:
           type: array
           items:
             type: number
+        uv_index_max:
+          type: array
+          items:
+            type: number
+        uv_index_clear_sky_max:
+          type: array
+          items:
+            type: number
+        et0_fao_evapotranspiration:
+          type: array
+          items:
+            type: number
       required:
         - time
     CurrentWeather:
       type: object
+      description: "Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code"
       properties:
         time:
           type: string
