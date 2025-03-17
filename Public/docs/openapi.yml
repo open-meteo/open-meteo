@@ -92,14 +92,14 @@ paths:
         description: "WGS84 coordinate"
         schema:
           type: number
-          format: float
+          format: double
       - name: longitude
         in: query
         required: true
         description: "WGS84 coordinate"
         schema:
           type: number
-          format: float
+          format: double
       - name: current_weather
         in: query
         schema:
