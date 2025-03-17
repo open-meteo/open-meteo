@@ -148,7 +148,7 @@ paths:
           - 1
           - 2
       responses:
-        200:
+        "200":
           description: OK
           content:
             application/json:
@@ -191,7 +191,7 @@ paths:
                     description: For each selected daily weather variable, the unit will be listed here.
                   current_weather:
                     $ref: "#/components/schemas/CurrentWeather"
-        400:
+        "400":
           description: Bad Request
           content:
             application/json:
