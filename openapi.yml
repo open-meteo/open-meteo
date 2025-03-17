@@ -176,24 +176,21 @@ paths:
                     example: 3600
                     description: Applied timezone offset from the &timezone= parameter.
                   hourly:
-                    type: HourlyResponse
-                    description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
+                    $ref: "#/components/schemas/HourlyResponse"
                   hourly_units:
                     type: object
                     additionalProperties:
                       type: string
                     description: For each selected weather variable, the unit will be listed here.
                   daily:
-                    type: DailyResponse
-                    description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
+                    $ref: "#/components/schemas/DailyResponse"
                   daily_units:
                     type: object
                     additionalProperties:
                       type: string
                     description: For each selected daily weather variable, the unit will be listed here.
                   current_weather:
-                    type: CurrentWeather
-                    description: "Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code"
+                    $ref: "#/components/schemas/CurrentWeather"
         400:
           description: Bad Request
           content:
@@ -212,6 +209,7 @@ components:
   schemas:
     HourlyResponse:
       type: object
+      description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
       required:
         - time
       properties:
@@ -369,6 +367,7 @@ components:
             type: number
     DailyResponse:
       type: object
+      description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
       properties:
         time:
           type: array
@@ -442,6 +441,7 @@ components:
         - time
     CurrentWeather:
       type: object
+      description: "Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code"
       properties:
         time:
           type: string
@@ -452,7 +452,7 @@ components:
         wind_direction:
           type: number
         weather_code:
-          type: int
+          type: integer
       required:
         - time
         - temperature
