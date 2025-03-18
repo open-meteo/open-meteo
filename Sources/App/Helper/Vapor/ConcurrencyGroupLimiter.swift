@@ -20,6 +20,17 @@ final class ConcurrencyGroupLimiter {
             return (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.count)
         }
     }
+    
+    func waitForce(slot: Int) {
+        lock.lock()
+        guard let count = self.counts[slot] else {
+            self.counts[slot] = 1
+            lock.unlock()
+            return
+        }
+        counts[slot] = count + 1
+        lock.unlock()
+    }
 
     func wait(slot: Int) async throws {
         lock.lock()

@@ -4,12 +4,17 @@ import Vapor
 extension BodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
     func submit(unlockSlot: Int?, _ task: @escaping () async throws -> Void) {
-        _ = eventLoop.makeFutureWithTask { try await task() }
-            .always({ _ in
+        _ = eventLoop.makeFutureWithTask {
+            if let unlockSlot {
+                apiConcurrencyLimiter.waitForce(slot: unlockSlot)
+            }
+            defer {
                 if let unlockSlot {
                     apiConcurrencyLimiter.release(slot: unlockSlot)
                 }
-            })
+            }
+            try await task() 
+        }
             .flatMapError({ error in
                 return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
                     .flatMap({

@@ -117,6 +117,7 @@ extension Request {
                 try await RateLimiter.instance.check(address: address)
                 let (weight, response) = try await fn(host, slot, OpenMeteo.numberOfLocationsMaximum, try parseApiParams())
                 await RateLimiter.instance.increment(address: address, count: weight)
+                apiConcurrencyLimiter.release(slot: slot)
                 return response
             } catch {
                 apiConcurrencyLimiter.release(slot: slot)
