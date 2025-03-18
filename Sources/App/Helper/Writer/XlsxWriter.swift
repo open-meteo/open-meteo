@@ -3,7 +3,7 @@ import Vapor
 
 
 extension ForecastapiResult {
-    func toXlsxResponse(timestamp: Timestamp) throws -> Response {
+    func toXlsxResponse(timestamp: Timestamp, unlockSlot: Int? = nil) throws -> Response {
         let multiLocation = results.count > 1
         
         let sheet = try XlsxWriter()
@@ -56,6 +56,7 @@ extension ForecastapiResult {
         response.headers.replaceOrAdd(name: .contentType, value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").xlsx\"")
         return response
+
     }
 }
 
