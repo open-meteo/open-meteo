@@ -95,14 +95,14 @@ paths:
         description: "WGS84 coordinate"
         schema:
           type: number
-          format: float
+          format: double
       - name: longitude
         in: query
         required: true
         description: "WGS84 coordinate"
         schema:
           type: number
-          format: float
+          format: double
       - name: current_weather
         in: query
         schema:
@@ -148,7 +148,7 @@ paths:
           - 1
           - 2
       responses:
-        200:
+        "200":
           description: OK
           content:
             application/json:
@@ -176,25 +176,22 @@ paths:
                     example: 3600
                     description: Applied timezone offset from the &timezone= parameter.
                   hourly:
-                    type: HourlyResponse
-                    description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
+                    $ref: "#/components/schemas/HourlyResponse"
                   hourly_units:
                     type: object
                     additionalProperties:
                       type: string
                     description: For each selected weather variable, the unit will be listed here.
                   daily:
-                    type: DailyResponse
-                    description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
+                    $ref: "#/components/schemas/DailyResponse"
                   daily_units:
                     type: object
                     additionalProperties:
                       type: string
                     description: For each selected daily weather variable, the unit will be listed here.
                   current_weather:
-                    type: CurrentWeather
-                    description: "Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code"
-        400:
+                    $ref: "#/components/schemas/CurrentWeather"
+        "400":
           description: Bad Request
           content:
             application/json:
@@ -212,6 +209,7 @@ components:
   schemas:
     HourlyResponse:
       type: object
+      description: For each selected weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
       required:
         - time
       properties:
@@ -222,153 +220,154 @@ components:
         temperature_2m:
           type: array
           items:
-            type: float
+            type: number
         relative_humidity_2m:
           type: array
           items:
-            type: float
+            type: number
         dew_point_2m:
           type: array
           items:
-            type: float
+            type: number
         apparent_temperature:
           type: array
           items:
-            type: float
+            type: number
         pressure_msl:
           type: array
           items:
-            type: float
+            type: number
         cloud_cover:
           type: array
           items:
-            type: float
+            type: number
         cloud_cover_low:
           type: array
           items:
-            type: float
+            type: number
         cloud_cover_mid:
           type: array
           items:
-            type: float
+            type: number
         cloud_cover_high:
           type: array
           items:
-            type: float
+            type: number
         wind_speed_10m:
           type: array
           items:
-            type: float
+            type: number
         wind_speed_80m:
           type: array
           items:
-            type: float
+            type: number
         wind_speed_120m:
           type: array
           items:
-            type: float
+            type: number
         wind_speed_180m:
           type: array
           items:
-            type: float
+            type: number
         wind_direction_10m:
           type: array
           items:
-            type: float
+            type: number
         wind_direction_80m:
           type: array
           items:
-            type: float
+            type: number
         wind_direction_120m:
           type: array
           items:
-            type: float
+            type: number
         wind_direction_180m:
           type: array
           items:
-            type: float
+            type: number
         wind_gusts_10m:
           type: array
           items:
-            type: float
+            type: number
         shortwave_radiation:
           type: array
           items:
-            type: float
+            type: number
         direct_radiation:
           type: array
           items:
-            type: float
+            type: number
         direct_normal_irradiance:
           type: array
           items:
-            type: float
+            type: number
         diffuse_radiation:
           type: array
           items:
-            type: float
+            type: number
         vapour_pressure_deficit:
           type: array
           items:
-            type: float
+            type: number
         evapotranspiration:
           type: array
           items:
-            type: float
+            type: number
         precipitation:
           type: array
           items:
-            type: float
+            type: number
         weather_code:
           type: array
           items:
-            type: float
+            type: number
         snow_height:
           type: array
           items:
-            type: float
+            type: number
         freezing_level_height:
           type: array
           items:
-            type: float
+            type: number
         soil_temperature_0cm:
           type: array
           items:
-            type: float
+            type: number
         soil_temperature_6cm:
           type: array
           items:
-            type: float
+            type: number
         soil_temperature_18cm:
           type: array
           items:
-            type: float
+            type: number
         soil_temperature_54cm:
           type: array
           items:
-            type: float
+            type: number
         soil_moisture_0_1cm:
           type: array
           items:
-            type: float
+            type: number
         soil_moisture_1_3cm:
           type: array
           items:
-            type: float
+            type: number
         soil_moisture_3_9cm:
           type: array
           items:
-            type: float
+            type: number
         soil_moisture_9_27cm:
           type: array
           items:
-            type: float
+            type: number
         soil_moisture_27_81cm:
           type: array
           items:
-            type: float
+            type: number
     DailyResponse:
       type: object
+      description: For each selected daily weather variable, data will be returned as a floating point array. Additionally a `time` array will be returned with ISO8601 timestamps.
       properties:
         time:
           type: array
@@ -377,82 +376,83 @@ components:
         temperature_2m_max:
           type: array
           items:
-            type: float
+            type: number
         temperature_2m_min:
           type: array
           items:
-            type: float
+            type: number
         apparent_temperature_max:
           type: array
           items:
-            type: float
+            type: number
         apparent_temperature_min:
           type: array
           items:
-            type: float
+            type: number
         precipitation_sum:
           type: array
           items:
-            type: float
+            type: number
         precipitation_hours:
           type: array
           items:
-            type: float
+            type: number
         weather_code:
           type: array
           items:
-            type: float
+            type: number
         sunrise:
           type: array
           items:
-            type: float
+            type: number
         sunset:
           type: array
           items:
-            type: float
+            type: number
         wind_speed_10m_max:
           type: array
           items:
-            type: float
+            type: number
         wind_gusts_10m_max:
           type: array
           items:
-            type: float
+            type: number
         wind_direction_10m_dominant:
           type: array
           items:
-            type: float
+            type: number
         shortwave_radiation_sum:
           type: array
           items:
-            type: float
+            type: number
         uv_index_max:
           type: array
           items:
-            type: float
+            type: number
         uv_index_clear_sky_max:
           type: array
           items:
-            type: float
+            type: number
         et0_fao_evapotranspiration:
           type: array
           items:
-            type: float
+            type: number
       required:
         - time
     CurrentWeather:
       type: object
+      description: "Current weather conditions with the attributes: time, temperature, wind_speed, wind_direction and weather_code"
       properties:
         time:
           type: string
         temperature:
-          type: float
+          type: number
         wind_speed:
-          type: float
+          type: number
         wind_direction:
-          type: float
+          type: number
         weather_code:
-          type: int
+          type: integer
       required:
         - time
         - temperature
