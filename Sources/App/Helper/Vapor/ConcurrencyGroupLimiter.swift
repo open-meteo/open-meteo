@@ -15,9 +15,9 @@ final class ConcurrencyGroupLimiter {
 
     init() {}
     
-    func stats() -> (monitored_ips: Int, quues_requests: Int) {
+    func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
         lock.withLock {
-            return (counts.count, waiters.count)
+            return (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.count)
         }
     }
 
@@ -34,16 +34,19 @@ final class ConcurrencyGroupLimiter {
             throw RateLimitError.tooManyConcurrentRequests
         }
         counts[slot] = count + 1
-        await withCheckedContinuation {
+        lock.unlock()
+        /*await withCheckedContinuation {
             //print("Queuing request slot \(slot)")
             waiters.append((slot, $0))
             lock.unlock()
-        }
+        }*/
     }
 
     func release(slot: Int) {
         lock.lock()
         guard let count = self.counts[slot] else {
+            print("Released slot \(slot) but it was not in use")
+            lock.unlock()
             return
         }
         guard count > 1 else {
@@ -53,13 +56,13 @@ final class ConcurrencyGroupLimiter {
             return
         }
         self.counts[slot] = count - 1
-        guard let index = waiters.firstIndex(where: {$0.0 == slot}) else {
+        /*guard let index = waiters.firstIndex(where: {$0.0 == slot}) else {
             fatalError("Did not find waiting request")
         }
         //print("Running queued request at slot \(slot)")
         let cont = waiters[index].1
-        waiters.remove(at: index)
+        waiters.remove(at: index)*/
         lock.unlock()
-        cont.resume()
+        /*cont.resume()*/
     }
 }

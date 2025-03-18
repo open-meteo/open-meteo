@@ -227,8 +227,8 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormat, numberOfLocationsMaximum: (numberOfLocations: Int, apikey: String?), timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, unlockSlot: Int? = nil) async throws -> Response {
-        //let loop = (numberOfLocationsMaximum.apikey?.starts(with: "xHV7AdGfV") ?? false) ? ForecastapiController.isolationLoop : ForecastapiController.runLoop
-        //return try await loop.next().submit {
+        let loop = (numberOfLocationsMaximum.apikey?.starts(with: "xHV7AdGfV") ?? false) ? ForecastapiController.isolationLoop : ForecastapiController.runLoop
+        return try await loop.next().submit {
             if results.count > numberOfLocationsMaximum.numberOfLocations {
                 throw ForecastapiError.generic(message: "Only up to \(numberOfLocationsMaximum.numberOfLocations) locations can be requested at once")
             }
@@ -250,7 +250,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
             case .flatbuffers:
                 return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, unlockSlot: unlockSlot)
             }
-        //}.get()
+        }.get()
     }
     
     /// Calculate excess weight of an API query. The following factors are considered:
