@@ -614,6 +614,13 @@ extension TimeZone {
         if identifier == "America/Nuuk", let tz = TimeZone(identifier: "America/Godthab") {
             return tz
         }
+
+        // Asia/Qostanay and Asia/Almaty are outdated in Swift.
+        // https://github.com/open-meteo/open-meteo/issues/1236
+        if identifier == "Asia/Qostanay" || identifier == "Asia/Almaty", let tz = TimeZone(identifier: "Asia/Qyzylorda") {
+            return tz
+        }
+
         guard let tz = TimeZone(identifier: identifier) else {
             if identifier == "America/Ciudad_Juarez", let tz = TimeZone(identifier: "America/Mexico_City") {
                 return tz
