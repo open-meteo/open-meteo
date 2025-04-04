@@ -593,6 +593,12 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .daylightDuration)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
+        case .snow_depth_min:
+            return .init(variable: .snowDepth, aggregation: .minimum)
+        case .snow_depth_mean:
+            return .init(variable: .snowDepth, aggregation: .mean)
+        case .snow_depth_max:
+            return .init(variable: .snowDepth, aggregation: .maximum)
         }
     }
 }

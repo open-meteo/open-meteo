@@ -1154,6 +1154,9 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case showers_sum
     case snowfall_sum
     case snowfall_water_equivalent_sum
+    case snow_depth_min
+    case snow_depth_mean
+    case snow_depth_max
     case soil_moisture_0_to_100cm_mean
     case soil_moisture_0_to_10cm_mean
     case soil_moisture_0_to_7cm_mean
@@ -1357,6 +1360,12 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .none
         case .sunshine_duration:
             return .sum(.surface(.init(.sunshine_duration, 0)))
+        case .snow_depth_min:
+            return .min(.surface(.init(.snow_depth, 0)))
+        case .snow_depth_mean:
+            return .mean(.surface(.init(.snow_depth, 0)))
+        case .snow_depth_max:
+            return .max(.surface(.init(.snow_depth, 0)))
         }
     }
 }
