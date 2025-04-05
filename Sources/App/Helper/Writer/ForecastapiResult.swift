@@ -55,7 +55,7 @@ fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable:
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
-    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, unlockSlot: Int?) async throws -> Response
+    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
     
     var numberOfLocations: Int { get }
 }
@@ -246,7 +246,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, unlockSlot: Int? = nil) async throws -> Response {
+    func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
         let loop = ForecastapiController.runLoop
         return try await loop.next().submit {
             if format == .xlsx && results.count > 100 {
@@ -259,13 +259,13 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
             switch format ?? .json {
             case .json:
-                return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, unlockSlot: unlockSlot)
+                return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
             case .xlsx:
-                return try toXlsxResponse(timestamp: timestamp, unlockSlot: unlockSlot)
+                return try toXlsxResponse(timestamp: timestamp)
             case .csv:
-                return try toCsvResponse(unlockSlot: unlockSlot)
+                return try toCsvResponse(concurrencySlot: concurrencySlot)
             case .flatbuffers:
-                return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, unlockSlot: unlockSlot)
+                return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
             }
         }.get()
     }
