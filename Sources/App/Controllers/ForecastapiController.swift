@@ -7,9 +7,6 @@ public struct ForecastapiController: RouteCollection {
     /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
     static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
-    /// Single thread
-    static var isolationLoop = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-    
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
@@ -107,149 +104,146 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        let host = try await req.ensureSubdomain(subdomain, alias: alias)
-        /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
-        let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
-        let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
-        let forecastDayDefault = isHistoricalForecastApi ? 1 : self.forecastDay
-        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        let numberOfLocationsMaximum = try await req.ensureApiKey(subdomain, alias: alias, apikey: params.apikey)
-        
-        let currentTime = Timestamp.now()
-        let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)
-        
-        let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
-        let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
-        let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
-        let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
-        let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
-        let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
-        let nParamsHourly = paramsHourly?.count ?? 0
-        let nParamsMinutely = paramsMinutely?.count ?? 0
-        let nParamsCurrent = paramsCurrent?.count ?? 0
-        let nParamsDaily = paramsDaily?.count ?? 0
-        let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
-        
-        /// Prepare readers based on geometry
-        /// Readers are returned as a callback to release memory after data has been retrieved
-        let prepared = try GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
-        
-        let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
-            let timezone = prepared.timezone
-            let time = prepared.time
-            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-            let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
+        try await req.withApiParameter(subdomain, alias: alias) { host, params in
+            /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
+            let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
+            let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
+            let forecastDayDefault = isHistoricalForecastApi ? 1 : self.forecastDay
             
-            let readers: [ForecastapiResult<MultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
-                guard let reader = try readerAndDomain.reader() else {
-                    return nil
-                }
-                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-                let domain = readerAndDomain.domain
+            let currentTime = Timestamp.now()
+            let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)
+            
+            let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
+            let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
+            let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
+            let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
+            let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
+            let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
+            let nParamsHourly = paramsHourly?.count ?? 0
+            let nParamsMinutely = paramsMinutely?.count ?? 0
+            let nParamsCurrent = paramsCurrent?.count ?? 0
+            let nParamsDaily = paramsDaily?.count ?? 0
+            let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
+            
+            /// Prepare readers based on geometry
+            /// Readers are returned as a callback to release memory after data has been retrieved
+            let prepared = try GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
+            
+            let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
+                let timezone = prepared.timezone
+                let time = prepared.time
+                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
                 
-                return .init(
-                    model: domain,
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    prefetch: {
-                        if let paramsCurrent {
-                            for variable in paramsCurrent {
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
-                            }
-                        }
-                        if let paramsMinutely {
-                            for variable in paramsMinutely {
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
-                            }
-                        }
-                        if let paramsHourly {
-                            for variable in paramsHourly {
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                try reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
-                            }
-                        }
-                        if let paramsDaily {
-                            try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
-                        }
-                    },
-                    current: paramsCurrent.map { variables in
-                        return {
-                            .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                guard let d = try reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return .init(variable: variable.resultVariable, unit: .undefined, value: .nan)
-                                }
-                                return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
-                            })
-                        }
-                    },
-                    hourly: paramsHourly.map { variables in
-                        return {
-                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                guard let d = try reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: timeHourlyRead.count))])
-                                }
-                                assert(timeHourlyRead.count == d.data.count)
-                                return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
-                            })
-                        }
-                    },
-                    daily: paramsDaily.map { dailyVariables in
-                        return {
-                            var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
-                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<ForecastVariableDaily> in
-                                if variable == .sunrise || variable == .sunset {
-                                    // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
-                                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: reader.modelLat, lon: reader.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                                    riseSet = times
-                                    if variable == .sunset {
-                                        return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
-                                    } else {
-                                        return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
-                                    }
-                                }
-                                if variable == .daylight_duration {
-                                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: reader.modelLat)
-                                    return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
-                                }
-                                
-                                guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
-                                    return ApiColumn(variable: variable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.dailyRead.count))])
-                                }
-                                assert(time.dailyRead.count == d.data.count)
-                                return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
-                            })
-                        }
-                    },
-                    sixHourly: nil,
-                    minutely15: paramsMinutely.map { variables in
-                        return {
-                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
-                                let (v, previousDay) = variable.variableAndPreviousDay
-                                guard let d = try reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
-                                    return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.minutely15.count))])
-                                }
-                                assert(time.minutely15.count == d.data.count)
-                                return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
-                            })
-                        }
+                let readers: [ForecastapiResult<MultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                    guard let reader = try readerAndDomain.reader() else {
+                        return nil
                     }
-                )
+                    let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                    let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                    let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+                    let domain = readerAndDomain.domain
+                    
+                    return .init(
+                        model: domain,
+                        latitude: reader.modelLat,
+                        longitude: reader.modelLon,
+                        elevation: reader.targetElevation,
+                        prefetch: {
+                            if let paramsCurrent {
+                                for variable in paramsCurrent {
+                                    let (v, previousDay) = variable.variableAndPreviousDay
+                                    try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                                }
+                            }
+                            if let paramsMinutely {
+                                for variable in paramsMinutely {
+                                    let (v, previousDay) = variable.variableAndPreviousDay
+                                    try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                                }
+                            }
+                            if let paramsHourly {
+                                for variable in paramsHourly {
+                                    let (v, previousDay) = variable.variableAndPreviousDay
+                                    try reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
+                                }
+                            }
+                            if let paramsDaily {
+                                try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
+                            }
+                        },
+                        current: paramsCurrent.map { variables in
+                            return {
+                                .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
+                                    let (v, previousDay) = variable.variableAndPreviousDay
+                                    guard let d = try reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                        return .init(variable: variable.resultVariable, unit: .undefined, value: .nan)
+                                    }
+                                    return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
+                                })
+                            }
+                        },
+                        hourly: paramsHourly.map { variables in
+                            return {
+                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                                    let (v, previousDay) = variable.variableAndPreviousDay
+                                    guard let d = try reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                        return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: timeHourlyRead.count))])
+                                    }
+                                    assert(timeHourlyRead.count == d.data.count)
+                                    return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
+                                })
+                            }
+                        },
+                        daily: paramsDaily.map { dailyVariables in
+                            return {
+                                var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
+                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<ForecastVariableDaily> in
+                                    if variable == .sunrise || variable == .sunset {
+                                        // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
+                                        let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: reader.modelLat, lon: reader.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                                        riseSet = times
+                                        if variable == .sunset {
+                                            return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
+                                        } else {
+                                            return ApiColumn(variable: .sunrise, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
+                                        }
+                                    }
+                                    if variable == .daylight_duration {
+                                        let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: reader.modelLat)
+                                        return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
+                                    }
+                                    
+                                    guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
+                                        return ApiColumn(variable: variable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.dailyRead.count))])
+                                    }
+                                    assert(time.dailyRead.count == d.data.count)
+                                    return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
+                                })
+                            }
+                        },
+                        sixHourly: nil,
+                        minutely15: paramsMinutely.map { variables in
+                            return {
+                                return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
+                                    let (v, previousDay) = variable.variableAndPreviousDay
+                                    guard let d = try reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                        return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.minutely15.count))])
+                                    }
+                                    assert(time.minutely15.count == d.data.count)
+                                    return .init(variable: variable.resultVariable, unit: d.unit, variables: [.float(d.data)])
+                                })
+                            }
+                        }
+                    )
+                }
+                guard !readers.isEmpty else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
+            return ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
-        let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

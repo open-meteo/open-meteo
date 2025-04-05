@@ -137,7 +137,7 @@ final class OutputformatTests: XCTestCase {
             ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10),
         ])
         
-        let numberOfLocationsMaximum: (numberOfLocations: Int, apikey: String?) = (1000, nil)
+        let numberOfLocationsMaximum = 1000
         
         let res = ForecastapiResult<MultiDomains>.PerModel(
             model: .best_match,
@@ -338,7 +338,7 @@ final class OutputformatTests: XCTestCase {
             ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10),
         ])
         
-        let numberOfLocationsMaximum: (numberOfLocations: Int, apikey: String?) = (1000, nil)
+        let numberOfLocationsMaximum = 1000
         
         let res = ForecastapiResult<MultiDomains>.PerModel(
             model: .best_match,
