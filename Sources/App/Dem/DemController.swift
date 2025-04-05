@@ -3,14 +3,10 @@ import Vapor
 
 
 struct DemController {
-    struct Query: Content {
-        let latitude: [String]
-        let longitude: [String]
-        let apikey: String?
-        
-        func validate() throws -> (latitude: [Float], longitude: [Float]) {
-            let latitude = try Float.load(commaSeparated: self.latitude)
-            let longitude = try Float.load(commaSeparated: self.longitude)
+    func query(_ req: Request) async throws -> Response {
+        try await req.withApiParameter("api") { host, params in
+            let latitude = try Float.load(commaSeparated: params.latitude)
+            let longitude = try Float.load(commaSeparated: params.longitude)
             
             guard latitude.count == longitude.count else {
                 throw ForecastapiError.latitudeAndLongitudeSameCount
@@ -29,18 +25,22 @@ struct DemController {
                     throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
                 }
             }
-            return (latitude, longitude)
+            return DemResponder(latitude: latitude, longitude: longitude)
         }
     }
+}
 
-    func query(_ req: Request) async throws -> Response {
-        try await req.ensureSubdomain("api")
-        let params = req.method == .POST ? try req.content.decode(Query.self) : try req.query.decode(Query.self)
-        let keyCheck = try await req.ensureApiKey("api", apikey: params.apikey)
-        
-        let (latitude, longitude) = try params.validate()
-        await req.incrementRateLimiter(weight: 1, apikey: keyCheck.apikey)
-        // Run query on separat thread pool to not block the main pool
+fileprivate struct DemResponder: ForecastapiResponder {
+    var numberOfLocations: Int { 1 }
+    
+    let latitude: [Float]
+    let longitude: [Float]
+    
+    func calculateQueryWeight(nVariablesModels: Int?) -> Float {
+        return Float(nVariablesModels ?? latitude.count)
+    }
+    
+    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response {
         return try await ForecastapiController.runLoop.next().submit({
             let elevation = try zip(latitude, longitude).map { (latitude, longitude) in
                 try Dem90.read(lat: latitude, lon: longitude)
@@ -53,4 +53,3 @@ struct DemController {
         }).get()
     }
 }
-

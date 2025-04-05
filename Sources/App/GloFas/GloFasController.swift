@@ -87,78 +87,75 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GloFasController {
     func query(_ req: Request) async throws -> Response {
-        _ = try await req.ensureSubdomain("flood-api")
-        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        let numberOfLocationsMaximum = try await req.ensureApiKey("flood-api", apikey: params.apikey)
-        let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
-        
-        let prepared = try params.prepareCoordinates(allowTimezones: false)
-        guard case .coordinates(let prepared) = prepared else {
-            throw ForecastapiError.generic(message: "Bounding box not supported")
-        }
-        let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
-        guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
-            throw ForecastapiError.generic(message: "Parameter 'daily' required")
-        }
-        let nVariables = (params.ensemble ? 51 : 1) * domains.count
-        
-        let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try prepared.map { prepared in
-            let coordinates = prepared.coordinate
-            let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
-            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+        try await req.withApiParameter("flood-api") { host, params in
+            let currentTime = Timestamp.now()
+            let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
             
-            let readers: [ForecastapiResult<GlofasDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest, options: params.readerOptions) else {
-                    return nil
-                }
-                return ForecastapiResult<GlofasDomainApi>.PerModel(
-                    model: domain,
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    prefetch: {
-                        for param in paramsDaily {
-                            try reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
-                        }
-                        if params.ensemble {
-                            for member in 1..<51 {
-                                try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
+            let prepared = try params.prepareCoordinates(allowTimezones: false)
+            guard case .coordinates(let prepared) = prepared else {
+                throw ForecastapiError.generic(message: "Bounding box not supported")
+            }
+            let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
+            guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
+                throw ForecastapiError.generic(message: "Parameter 'daily' required")
+            }
+            let nVariables = (params.ensemble ? 51 : 1) * domains.count
+            
+            let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try prepared.map { prepared in
+                let coordinates = prepared.coordinate
+                let timezone = prepared.timezone
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                
+                let readers: [ForecastapiResult<GlofasDomainApi>.PerModel] = try domains.compactMap { domain in
+                    guard let reader = try domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest, options: params.readerOptions) else {
+                        return nil
+                    }
+                    return ForecastapiResult<GlofasDomainApi>.PerModel(
+                        model: domain,
+                        latitude: reader.modelLat,
+                        longitude: reader.modelLon,
+                        elevation: reader.targetElevation,
+                        prefetch: {
+                            for param in paramsDaily {
+                                try reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
                             }
-                        }
-                    },
-                    current: nil,
-                    hourly: nil,
-                    daily: {
-                        return ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
-                            switch variable {
-                            case .raw(_):
-                                let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
-                                    let d = try reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
-                                    assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
-                                    return ApiArray.float(d.data)
+                            if params.ensemble {
+                                for member in 1..<51 {
+                                    try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
                                 }
-                                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
-                            case .derived(let derived):
-                                let d = try reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
-                                assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
-                                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
                             }
-                        })
-                    },
-                    sixHourly: nil,
-                    minutely15: nil
-                )
+                        },
+                        current: nil,
+                        hourly: nil,
+                        daily: {
+                            return ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
+                                switch variable {
+                                case .raw(_):
+                                    let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
+                                        let d = try reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                                        assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
+                                        return ApiArray.float(d.data)
+                                    }
+                                    return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
+                                case .derived(let derived):
+                                    let d = try reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                                    assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
+                                    return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
+                                }
+                            })
+                        },
+                        sixHourly: nil,
+                        minutely15: nil
+                    )
+                }
+                guard !readers.isEmpty else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+            return ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
-        let result = ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

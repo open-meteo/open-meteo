@@ -122,6 +122,7 @@ enum RateLimitError: Error, AbortError {
     case dailyExceeded
     case hourlyExceeded
     case minutelyExceeded
+    case tooManyConcurrentRequests
     
     var status: NIOHTTP1.HTTPResponseStatus {
         return .tooManyRequests
@@ -135,6 +136,8 @@ enum RateLimitError: Error, AbortError {
             return "Hourly API request limit exceeded. Please try again in the next hour."
         case .minutelyExceeded:
             return "Minutely API request limit exceeded. Please try again in one minute."
+        case .tooManyConcurrentRequests:
+            return "Too many concurrent requests"
         }
     }
 }

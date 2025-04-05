@@ -8,79 +8,76 @@ import Vapor
  */
 public struct EnsembleApiController {
     func query(_ req: Request) async throws -> Response {
-        _ = try await req.ensureSubdomain("ensemble-api")
-        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        let numberOfLocationsMaximum = try await req.ensureApiKey("ensemble-api", apikey: params.apikey)
-        let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 36)
-        
-        let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
-        let prepared = try GenericReaderMulti<EnsembleVariable, EnsembleMultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 7, forecastDaysMax: 36, pastDaysMax: 92, allowedRange: allowedRange)
-        
-        let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
-        let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, {$0 + $1.countEnsembleMember})
-        
-        let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
-            let timezone = prepared.timezone
-            let time = prepared.time
-            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+        try await req.withApiParameter("ensemble-api") { host, params in
+            let currentTime = Timestamp.now()
+            let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 36)
             
-            let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
-                guard let reader = try readerAndDomain.reader() else {
-                    return nil
-                }
-                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-                let domain = readerAndDomain.domain
+            let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
+            let prepared = try GenericReaderMulti<EnsembleVariable, EnsembleMultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 7, forecastDaysMax: 36, pastDaysMax: 92, allowedRange: allowedRange)
+            
+            let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
+            let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, {$0 + $1.countEnsembleMember})
+            
+            let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
+                let timezone = prepared.timezone
+                let time = prepared.time
+                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 
-                return .init(
-                    model: domain,
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    prefetch: {
-                        if let hourlyVariables = paramsHourly {
-                            for variable in hourlyVariables {
-                                for member in 0..<reader.domain.countEnsembleMember {
-                                    try reader.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
+                let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                    guard let reader = try readerAndDomain.reader() else {
+                        return nil
+                    }
+                    let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                    let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                    let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+                    let domain = readerAndDomain.domain
+                    
+                    return .init(
+                        model: domain,
+                        latitude: reader.modelLat,
+                        longitude: reader.modelLon,
+                        elevation: reader.targetElevation,
+                        prefetch: {
+                            if let hourlyVariables = paramsHourly {
+                                for variable in hourlyVariables {
+                                    for member in 0..<reader.domain.countEnsembleMember {
+                                        try reader.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
+                                    }
                                 }
                             }
-                        }
-                    },
-                    current: nil,
-                    hourly: paramsHourly.map { variables in
-                        return {
-                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
-                                var unit: SiUnit? = nil
-                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                        return nil
+                        },
+                        current: nil,
+                        hourly: paramsHourly.map { variables in
+                            return {
+                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                                    var unit: SiUnit? = nil
+                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                        guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                            return nil
+                                        }
+                                        unit = d.unit
+                                        assert(timeHourlyRead.count == d.data.count)
+                                        return ApiArray.float(d.data)
                                     }
-                                    unit = d.unit
-                                    assert(timeHourlyRead.count == d.data.count)
-                                    return ApiArray.float(d.data)
-                                }
-                                guard allMembers.count > 0 else {
-                                    return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
-                                }
-                                return .init(variable: variable.resultVariable, unit: unit ?? .undefined, variables: allMembers)
-                            })
-                        }
-                    },
-                    daily: nil,
-                    sixHourly: nil,
-                    minutely15: nil
-                )
+                                    guard allMembers.count > 0 else {
+                                        return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
+                                    }
+                                    return .init(variable: variable.resultVariable, unit: unit ?? .undefined, variables: allMembers)
+                                })
+                            }
+                        },
+                        daily: nil,
+                        sixHourly: nil,
+                        minutely15: nil
+                    )
+                }
+                guard !readers.isEmpty else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
+            return ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
-        let result = ForecastapiResult<EnsembleMultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

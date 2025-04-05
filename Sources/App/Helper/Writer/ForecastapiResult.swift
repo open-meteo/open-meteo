@@ -53,11 +53,31 @@ fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable:
     }
 }
 
+protocol ForecastapiResponder {
+    func calculateQueryWeight(nVariablesModels: Int?) -> Float
+    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
+    
+    var numberOfLocations: Int { get }
+}
+
 /// Stores the API output for multiple locations
-struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder {
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
+    
+    var numberOfLocations: Int {
+        results.count
+    }
+    
+    /// Number of variables times number of somains. Used to rate limiting
+    let nVariablesTimesDomains: Int
+
+    init(timeformat: Timeformat, results: [PerLocation], nVariablesTimesDomains: Int = 1) {
+        self.timeformat = timeformat
+        self.results = results
+        self.nVariablesTimesDomains = nVariablesTimesDomains
+    }
     
     struct PerLocation {
         let timezone: TimezoneWithOffset
@@ -226,12 +246,9 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormat, numberOfLocationsMaximum: (numberOfLocations: Int, apikey: String?), timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil) async throws -> Response {
-        let loop = (numberOfLocationsMaximum.apikey?.starts(with: "xHV7AdGfV") ?? false) ? ForecastapiController.isolationLoop : ForecastapiController.runLoop
+    func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
+        let loop = ForecastapiController.runLoop
         return try await loop.next().submit {
-            if results.count > numberOfLocationsMaximum.numberOfLocations {
-                throw ForecastapiError.generic(message: "Only up to \(numberOfLocationsMaximum.numberOfLocations) locations can be requested at once")
-            }
             if format == .xlsx && results.count > 100 {
                 throw ForecastapiError.generic(message: "XLSX supports only up to 100 locations")
             }
@@ -240,15 +257,15 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
                     try model.prefetch()
                 }
             }
-            switch format {
+            switch format ?? .json {
             case .json:
-                return try toJsonResponse(fixedGenerationTime: fixedGenerationTime)
+                return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
             case .xlsx:
                 return try toXlsxResponse(timestamp: timestamp)
             case .csv:
-                return try toCsvResponse()
+                return try toCsvResponse(concurrencySlot: concurrencySlot)
             case .flatbuffers:
-                return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime)
+                return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
             }
         }.get()
     }
@@ -262,14 +279,14 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable> {
     /// `weight = max(variables / 10, variables / 10 * days / 14) * locations`
     ///
     /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
-    func calculateQueryWeight(nVariablesModels: Int) -> Float {
+    func calculateQueryWeight(nVariablesModels: Int? = nil) -> Float {
         let referenceDays = 14
         let referenceVariables = 10
         // Sum up weights for each location. Technically each location can have a different time interval
         return results.reduce(0, {
             let nDays = $1.time.range.durationSeconds / 86400
             let timeFraction = Float(nDays) / Float(referenceDays)
-            let variablesFraction = Float(nVariablesModels) / Float(referenceVariables)
+            let variablesFraction = Float(nVariablesModels ?? nVariablesTimesDomains) / Float(referenceVariables)
             let weight = max(variablesFraction, timeFraction * variablesFraction)
             return $0 + max(1, weight)
         })

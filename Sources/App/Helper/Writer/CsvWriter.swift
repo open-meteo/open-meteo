@@ -4,9 +4,9 @@ import Vapor
 
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    func toCsvResponse() throws -> Response {
+    func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
         let response = Response(body: .init(stream: { writer in
-            _ = writer.eventLoop.makeFutureWithTask {
+            writer.submit(concurrencySlot: concurrencySlot) {
                 var b = BufferAndWriter(writer: writer)
                 let multiLocation = results.count > 1
                 

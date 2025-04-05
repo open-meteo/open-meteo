@@ -8,11 +8,11 @@ extension ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
-    func toFlatbuffersResponse(fixedGenerationTime: Double?) throws -> Response {
+    func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int? = nil) throws -> Response {
         // First excution outside stream, to capture potential errors better
         //var first = try self.first?()
         let response = Response(body: .init(stream: { writer in
-            writer.submit {
+            writer.submit(concurrencySlot: concurrencySlot) {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
                 // TODO: Estimate initial buffer size
                 let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)

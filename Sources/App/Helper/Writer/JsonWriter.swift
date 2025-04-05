@@ -3,12 +3,24 @@ import Vapor
 
 extension BodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(_ task: @escaping () async throws -> Void) {
-        _ = eventLoop.makeFutureWithTask { try await task() }
+    func submit(concurrencySlot: Int?, _ task: @escaping () async throws -> Void) {
+        _ = eventLoop.makeFutureWithTask {
+            if let concurrencySlot {
+                try await apiConcurrencyLimiter.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
+            }
+            defer {
+                if let concurrencySlot {
+                    apiConcurrencyLimiter.release(slot: concurrencySlot)
+                }
+            }
+            try await task() 
+        }
             .flatMapError({ error in
-                write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
-                    .flatMap({write(.error(error))})
-        })
+                return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
+                    .flatMap({
+                        write(.error(error))
+                    })
+                })
     }
 }
 
@@ -19,11 +31,11 @@ extension ForecastapiResult {
      Memory footprint is therefore much smaller and fits better into L2/L3 caches.
      Additionally code is fully async, to not block the a thread for almost a second to generate a JSON response...
      */
-    func toJsonResponse(fixedGenerationTime: Double?) throws -> Response {
+    func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?) throws -> Response {
         // First excution outside stream, to capture potential errors better
         //var first = try self.first?()
         let response = Response(body: .init(stream: { writer in
-            writer.submit {
+            writer.submit(concurrencySlot: concurrencySlot) {
                 var b = BufferAndWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1
