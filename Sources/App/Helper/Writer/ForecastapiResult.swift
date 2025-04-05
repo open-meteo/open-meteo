@@ -55,8 +55,9 @@ fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable:
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
-    func response(format: ForecastResultFormat?, numberOfLocationsMaximum: Int, timestamp: Timestamp, fixedGenerationTime: Double?, unlockSlot: Int?) async throws -> Response
+    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, unlockSlot: Int?) async throws -> Response
     
+    var numberOfLocations: Int { get }
 }
 
 /// Stores the API output for multiple locations
@@ -64,6 +65,10 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
+    
+    var numberOfLocations: Int {
+        results.count
+    }
     
     /// Number of variables times number of somains. Used to rate limiting
     let nVariablesTimesDomains: Int
@@ -241,12 +246,9 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormat?, numberOfLocationsMaximum: Int, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, unlockSlot: Int? = nil) async throws -> Response {
+    func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, unlockSlot: Int? = nil) async throws -> Response {
         let loop = ForecastapiController.runLoop
         return try await loop.next().submit {
-            if results.count > numberOfLocationsMaximum {
-                throw ForecastapiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
-            }
             if format == .xlsx && results.count > 100 {
                 throw ForecastapiError.generic(message: "XLSX supports only up to 100 locations")
             }

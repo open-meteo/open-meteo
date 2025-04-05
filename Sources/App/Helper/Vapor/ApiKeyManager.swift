@@ -98,7 +98,7 @@ extension Request {
         guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
             // localhost or not an openmeteo host
             let params = try parseApiParams()
-            return try await fn(nil, params).response(format: params.format, numberOfLocationsMaximum: OpenMeteo.numberOfLocationsMaximum, timestamp: .now(), fixedGenerationTime: nil, unlockSlot: nil)
+            return try await fn(nil, params).response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, unlockSlot: nil)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: {host.starts(with: $0)}) == true || isDevNode
@@ -120,8 +120,11 @@ extension Request {
             try await RateLimiter.instance.check(address: address)
             let params = try parseApiParams()
             let responder = try await fn(host, params)
+            if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
+                throw ForecastapiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
+            }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            let response = try await responder.response(format: params.format, numberOfLocationsMaximum: OpenMeteo.numberOfLocationsMaximum, timestamp: .now(), fixedGenerationTime: nil, unlockSlot: slot)
+            let response = try await responder.response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, unlockSlot: slot)
             await RateLimiter.instance.increment(address: address, count: weight)
             return response
         }
@@ -140,55 +143,13 @@ extension Request {
             apiConcurrencyLimiter.release(slot: slot)
         }
         let responder = try await fn(host, params)
+        if responder.numberOfLocations > numberOfLocationsMaximum {
+            throw ForecastapiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+        }
         let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-        let response = try await responder.response(format: params.format, numberOfLocationsMaximum: numberOfLocationsMaximum, timestamp: .now(), fixedGenerationTime: nil, unlockSlot: slot)
+        let response = try await responder.response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, unlockSlot: slot)
         await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         return response
-    }
-    
-    /// On open-meteo servers, make sure, the right domain is active
-    /// Returns the hostdomain if running on "open-meteo.com"
-    @discardableResult @available(*, deprecated)
-    func ensureSubdomain(_ subdomain: String, alias: [String] = []) async throws -> String? {
-        guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
-            return nil
-        }
-        let isDevNode = host.contains("eu0") || host.contains("us0")
-        let isFreeApi = host.starts(with: subdomain) || alias.contains(where: {host.starts(with: $0)}) == true || isDevNode
-        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
-        
-        if !(isFreeApi || isCustomerApi) {
-            throw Abort.init(.notFound)
-        }
-        
-        if isFreeApi {
-            guard let address = peerAddress ?? remoteAddress else {
-                return host
-            }
-            try await RateLimiter.instance.check(address: address)
-        }
-        return host
-    }
-    
-    /// For customer API endpoints, check API key.
-    @available(*, deprecated)
-    func ensureApiKey(_ subdomain: String, alias: [String] = [], apikey: String?) async throws -> (numberOfLocations: Int, apikey: String?) {
-        guard let host = headers[.host].first(where: {$0.contains("open-meteo.com")}) else {
-            return (OpenMeteo.numberOfLocationsMaximum, nil)
-        }
-        let isCustomerApi = host.starts(with: "customer-\(subdomain)") || alias.contains(where: {host.starts(with: "customer-\($0)")}) == true
-        
-        /// API node dedicated to customers
-        if await !ApiKeyManager.instance.isEmpty() && isCustomerApi {
-            guard let apikey else {
-                throw ApiKeyManagerError.apiKeyRequired
-            }
-            guard await ApiKeyManager.instance.contains(String.SubSequence(apikey)) else {
-                throw ApiKeyManagerError.apiKeyInvalid
-            }
-            return (apikey.starts(with: "ojHdOi7") ? 200_000 : 10_000, apikey);
-        }
-        return (OpenMeteo.numberOfLocationsMaximum, nil)
     }
 }
 
