@@ -6,7 +6,7 @@ extension BodyStreamWriter {
     func submit(unlockSlot: Int?, _ task: @escaping () async throws -> Void) {
         _ = eventLoop.makeFutureWithTask {
             if let unlockSlot {
-                apiConcurrencyLimiter.waitForce(slot: unlockSlot)
+                try await apiConcurrencyLimiter.wait(slot: unlockSlot, maxConcurrent: .max, maxConcurrentHard: .max)
             }
             defer {
                 if let unlockSlot {

@@ -7,9 +7,6 @@ public struct ForecastapiController: RouteCollection {
     /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
     static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
     
-    /// Single thread
-    static var isolationLoop = MultiThreadedEventLoopGroup(numberOfThreads: 1)
-    
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
@@ -107,7 +104,7 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter(subdomain, alias: alias) { host, unlockSlot, numberOfLocationsMaximum, params in
+        try await req.withApiParameter(subdomain, alias: alias) { host, params in
             /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
             let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
             let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
@@ -245,9 +242,7 @@ struct WeatherApiController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            let result = ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations)
-            let weight = result.calculateQueryWeight(nVariablesModels: nVariables)
-            return (weight, try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: (numberOfLocationsMaximum, nil), unlockSlot: unlockSlot))
+            return ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
     }
 }

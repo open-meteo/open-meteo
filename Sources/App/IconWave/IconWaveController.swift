@@ -114,138 +114,135 @@ enum MarineVariable: String, GenericVariableMixable {
 
 struct IconWaveController {
     func query(_ req: Request) async throws -> Response {
-        _ = try await req.ensureSubdomain("marine-api")
-        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        let numberOfLocationsMaximum = try await req.ensureApiKey("marine-api", apikey: params.apikey)
-        let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 17)
-        
-        let prepared = try params.prepareCoordinates(allowTimezones: true)
-        guard case .coordinates(let prepared) = prepared else {
-            throw ForecastapiError.generic(message: "Bounding box not supported")
-        }
-        let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
-        let paramsHourly = try MarineVariable.load(commaSeparatedOptional: params.hourly)
-        let paramsCurrent = try MarineVariable.load(commaSeparatedOptional: params.current)
-        let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
-        let paramsMinutely = try MarineVariable.load(commaSeparatedOptional: params.minutely_15)
-
-        let nParamsMinutely = paramsMinutely?.count ?? 0
-        let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, {$0 + $1.countEnsembleMember})
-        
-        let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
-            let coordinates = prepared.coordinate
-            let timezone = prepared.timezone
-            let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92, forecastDaysMinutely15Default: 7)
-            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-            let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
+        try await req.withApiParameter("marine-api") { host, params in
+            let currentTime = Timestamp.now()
+            let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 17)
             
-            let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
-                guard let reader = try GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
-                    return nil
-                }
-                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+            let prepared = try params.prepareCoordinates(allowTimezones: true)
+            guard case .coordinates(let prepared) = prepared else {
+                throw ForecastapiError.generic(message: "Bounding box not supported")
+            }
+            let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
+            let paramsHourly = try MarineVariable.load(commaSeparatedOptional: params.hourly)
+            let paramsCurrent = try MarineVariable.load(commaSeparatedOptional: params.current)
+            let paramsDaily = try IconWaveVariableDaily.load(commaSeparatedOptional: params.daily)
+            let paramsMinutely = try MarineVariable.load(commaSeparatedOptional: params.minutely_15)
+            
+            let nParamsMinutely = paramsMinutely?.count ?? 0
+            let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, {$0 + $1.countEnsembleMember})
+            
+            let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
+                let coordinates = prepared.coordinate
+                let timezone = prepared.timezone
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92, forecastDaysMinutely15Default: 7)
+                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
                 
-                return .init(
-                    model: domain,
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    prefetch: {
-                        if let paramsHourly {
-                            for member in 0..<reader.domain.countEnsembleMember {
-                                try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(ensembleMember: member))
-                            }
-                        }
-                        if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
-                        }
-                        if let paramsDaily {
-                            for member in 0..<reader.domain.countEnsembleMember {
-                                try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(ensembleMember: member))
-                            }
-                        }
-                    },
-                    current: paramsCurrent.map { variables in
-                        return {
-                            return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                guard let d = try reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
-                                    return nil
-                                }
-                                return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
-                            })
-                        }
-                    },
-                    hourly: paramsHourly.map { variables in
-                        return {
-                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
-                                var unit: SiUnit? = nil
-                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                        return nil
-                                    }
-                                    unit = d.unit
-                                    assert(timeHourlyRead.count == d.data.count)
-                                    return ApiArray.float(d.data)
-                                }
-                                guard allMembers.count > 0 else {
-                                    return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
-                                }
-                                return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
-                            })
-                        }
-                    },
-                    daily: paramsDaily.map { paramsDaily in
-                        return {
-                            return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable -> ApiColumn<IconWaveVariableDaily> in
-                                var unit: SiUnit? = nil
-                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member -> ApiArray? in
-                                    guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                        return nil
-                                    }
-                                    unit = d.unit
-                                    assert(time.dailyRead.count == d.data.count)
-                                    return ApiArray.float(d.data)
-                                }
-                                guard allMembers.count > 0 else {
-                                    return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: reader.domain.countEnsembleMember))
-                                }
-                                return ApiColumn<IconWaveVariableDaily>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
-                            })
-                        }
-                    },
-                    sixHourly: nil,
-                    minutely15: paramsMinutely.map { variables in
-                        return {
-                            return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
-                                var unit: SiUnit? = nil
-                                let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                    guard let d = try reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                        return nil
-                                    }
-                                    unit = d.unit
-                                    assert(time.minutely15.count == d.data.count)
-                                    return ApiArray.float(d.data)
-                                }
-                                guard allMembers.count > 0 else {
-                                    return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
-                                }
-                                return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
-                            })
-                        }
+                let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
+                    guard let reader = try GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
+                        return nil
                     }
-                )
+                    let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                    let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                    let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+                    
+                    return .init(
+                        model: domain,
+                        latitude: reader.modelLat,
+                        longitude: reader.modelLon,
+                        elevation: reader.targetElevation,
+                        prefetch: {
+                            if let paramsHourly {
+                                for member in 0..<reader.domain.countEnsembleMember {
+                                    try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(ensembleMember: member))
+                                }
+                            }
+                            if let paramsCurrent {
+                                try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
+                            }
+                            if let paramsDaily {
+                                for member in 0..<reader.domain.countEnsembleMember {
+                                    try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(ensembleMember: member))
+                                }
+                            }
+                        },
+                        current: paramsCurrent.map { variables in
+                            return {
+                                return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
+                                    guard let d = try reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
+                                        return nil
+                                    }
+                                    return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
+                                })
+                            }
+                        },
+                        hourly: paramsHourly.map { variables in
+                            return {
+                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                                    var unit: SiUnit? = nil
+                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                        guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                            return nil
+                                        }
+                                        unit = d.unit
+                                        assert(timeHourlyRead.count == d.data.count)
+                                        return ApiArray.float(d.data)
+                                    }
+                                    guard allMembers.count > 0 else {
+                                        return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
+                                    }
+                                    return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
+                                })
+                            }
+                        },
+                        daily: paramsDaily.map { paramsDaily in
+                            return {
+                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable -> ApiColumn<IconWaveVariableDaily> in
+                                    var unit: SiUnit? = nil
+                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member -> ApiArray? in
+                                        guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                            return nil
+                                        }
+                                        unit = d.unit
+                                        assert(time.dailyRead.count == d.data.count)
+                                        return ApiArray.float(d.data)
+                                    }
+                                    guard allMembers.count > 0 else {
+                                        return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: reader.domain.countEnsembleMember))
+                                    }
+                                    return ApiColumn<IconWaveVariableDaily>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+                                })
+                            }
+                        },
+                        sixHourly: nil,
+                        minutely15: paramsMinutely.map { variables in
+                            return {
+                                return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
+                                    var unit: SiUnit? = nil
+                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                        guard let d = try reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                            return nil
+                                        }
+                                        unit = d.unit
+                                        assert(time.minutely15.count == d.data.count)
+                                        return ApiArray.float(d.data)
+                                    }
+                                    guard allMembers.count > 0 else {
+                                        return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
+                                    }
+                                    return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
+                                })
+                            }
+                        }
+                    )
+                }
+                guard !readers.isEmpty else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+            return ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
-        let result = ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 

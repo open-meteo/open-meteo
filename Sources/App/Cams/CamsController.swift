@@ -41,83 +41,79 @@ extension CamsMixer: GenericReaderProvider {
  */
 struct CamsController {
     func query(_ req: Request) async throws -> Response {
-        _ = try await req.ensureSubdomain("air-quality-api")
-        let params = req.method == .POST ? try req.content.decode(ApiQueryParameter.self) : try req.query.decode(ApiQueryParameter.self)
-        let numberOfLocationsMaximum = try await req.ensureApiKey("air-quality-api", apikey: params.apikey)
-        
-        let currentTime = Timestamp.now()
-        let allowedRange = Timestamp(2013, 1, 1) ..< currentTime.add(86400 * 6)
-        
-        let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
-        let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
-        let domains = try (params.domains.map({[$0]}) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
-
-        let nVariables = (paramsHourly?.count ?? 0) * domains.count
-        
-        let prepared = try CamsMixer.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
-        
-        let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
-            let timezone = prepared.timezone
-            let time = prepared.time
-            let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-            let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
+        try await req.withApiParameter("air-quality-api") { host, params in
+            let currentTime = Timestamp.now()
+            let allowedRange = Timestamp(2013, 1, 1) ..< currentTime.add(86400 * 6)
             
-            let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
-                guard let reader = try readerAndDomain.reader() else {
-                    return nil
-                }
-                let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-                let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-                let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-                let domain = readerAndDomain.domain
+            let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
+            let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
+            let domains = try (params.domains.map({[$0]}) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+            
+            let nVariables = (paramsHourly?.count ?? 0) * domains.count
+            
+            let prepared = try CamsMixer.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
+            
+            let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
+                let timezone = prepared.timezone
+                let time = prepared.time
+                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
                 
-                let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
-                    return {
-                        return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
-                            assert(timeHourlyRead.count == d.data.count)
-                            return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
-                        })
+                let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                    guard let reader = try readerAndDomain.reader() else {
+                        return nil
                     }
-                }
-                
-                let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsCurrent.map { variables in
-                    return {
-                        return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
-                            let d = try reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
-                            return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
-                        })
+                    let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+                    let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+                    let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+                    let domain = readerAndDomain.domain
+                    
+                    let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
+                        return {
+                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                                let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
+                                assert(timeHourlyRead.count == d.data.count)
+                                return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
+                            })
+                        }
                     }
+                    
+                    let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsCurrent.map { variables in
+                        return {
+                            return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
+                                let d = try reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
+                                return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
+                            })
+                        }
+                    }
+                    
+                    return ForecastapiResult<CamsQuery.Domain>.PerModel.init(
+                        model: domain,
+                        latitude: reader.modelLat,
+                        longitude: reader.modelLon,
+                        elevation: reader.targetElevation,
+                        prefetch: {
+                            if let paramsCurrent {
+                                try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
+                            }
+                            if let paramsHourly {
+                                try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
+                            }
+                        },
+                        current: currentFn,
+                        hourly: hourlyFn,
+                        daily: nil,
+                        sixHourly: nil,
+                        minutely15: nil
+                    )
                 }
-                
-                return ForecastapiResult<CamsQuery.Domain>.PerModel.init(
-                    model: domain,
-                    latitude: reader.modelLat,
-                    longitude: reader.modelLon,
-                    elevation: reader.targetElevation,
-                    prefetch: {
-                        if let paramsCurrent {
-                            try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
-                        }
-                        if let paramsHourly {
-                            try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
-                        }
-                    },
-                    current: currentFn,
-                    hourly: hourlyFn,
-                    daily: nil,
-                    sixHourly: nil,
-                    minutely15: nil
-                )
+                guard !readers.isEmpty else {
+                    throw ForecastapiError.noDataAvilableForThisLocation
+                }
+                return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            guard !readers.isEmpty else {
-                throw ForecastapiError.noDataAvilableForThisLocation
-            }
-            return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
+            return ForecastapiResult<CamsQuery.Domain>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
-        let result = ForecastapiResult<CamsQuery.Domain>(timeformat: params.timeformatOrDefault, results: locations)
-        await req.incrementRateLimiter(weight: result.calculateQueryWeight(nVariablesModels: nVariables), apikey: numberOfLocationsMaximum.apikey)
-        return try await result.response(format: params.format ?? .json, numberOfLocationsMaximum: numberOfLocationsMaximum)
     }
 }
 
