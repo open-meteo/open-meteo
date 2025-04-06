@@ -1,9 +1,9 @@
 import Vapor
 //import Leaf
 
-struct OpenMeteo {
+public struct OpenMeteo {
     /// Data directory with trailing slash
-    static var dataDirectory = {
+    public static var dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
             guard dir.last == "/" else {
                 fatalError("DATA_DIRECTORY must end with a trailing slash")

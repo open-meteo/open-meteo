@@ -9,9 +9,9 @@ import CHelper
  The Swift version is approx 5 times faster than C by skipping unnecessary calculations.
  Calculation of 50 years hourly solar position requires roughly 700ms.
  */
-struct SolarPositionAlgorithm {
+public struct SolarPositionAlgorithm {
     /// Calculate solar position for a given timerange
-    static func sunPosition(timerange: TimerangeDt) -> (declination: [Float], equationOfTime: [Float]) {
+    public static func sunPosition(timerange: TimerangeDt) -> (declination: [Float], equationOfTime: [Float]) {
         var declination = [Float]()
         var equationOfTime = [Float]()
         declination.reserveCapacity(timerange.count)
