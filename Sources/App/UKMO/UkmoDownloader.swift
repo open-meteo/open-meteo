@@ -50,8 +50,8 @@ struct UkmoDownload: AsyncCommand {
         @Flag(name: "skip-missing", help: "Ignore missing files while downloading")
         var skipMissing: Bool
         
-        //@Flag(name: "fix-solar", help: "Fix old solar files")
-        //var fixSolar: Bool
+        @Flag(name: "fix-uv", help: "Fix old uv files")
+        var fixUv: Bool
     }
 
     var help: String {
@@ -87,12 +87,12 @@ struct UkmoDownload: AsyncCommand {
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
             
-            /*if signature.fixSolar {
+            if signature.fixUv {
                 // timeinterval devided by chunk time range
                 let time = try Timestamp.parseRange(yyyymmdd: timeinterval)
-                try self.fixSolarFiles(application: context.application, domain: domain, timerange: time)
+                try self.fixUvFiles(application: context.application, domain: domain, timerange: time)
                 return
-            }*/
+            }
             
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
                 let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
@@ -154,6 +154,57 @@ struct UkmoDownload: AsyncCommand {
             }
         }
     }*/
+    
+    /// Used wrong scaling factor. Multiply data by 4
+    func fixUvFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
+        let nTimePerFile = domain.omFileLength
+        let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
+        
+        for variable in [UkmoSurfaceVariable.uv_index] {
+            for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
+                for previousDay in 0..<10 { // 0..<10}
+                    //let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
+                    let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                    guard let omRead = try readFile.openRead() else {
+                        continue
+                    }
+                    let fileName = readFile.getFilePath()
+                    application.logger.info("Correcting file \(fileName)")
+                    let tempFile = fileName + "~"
+                    try FileManager.default.removeItemIfExists(at: tempFile)
+                    let fn = try FileHandle.createNewFile(file: tempFile)
+                    
+                    let fileWriter = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024 * 10)
+                    let writer = try fileWriter.prepareArray(
+                        type: Float.self,
+                        dimensions: omRead.getDimensions().map({$0}),
+                        chunkDimensions: omRead.getChunkDimensions().map({$0}),
+                        compression: omRead.compression,
+                        scale_factor: omRead.scaleFactor,
+                        add_offset: omRead.addOffset
+                    )
+                    
+                    var data = try omRead.read()
+                    data.multiplyAdd(multiply: 4, add: 0)
+                    for i in data.indices {
+                        data[i] *= 4
+                    }
+                    
+                    try writer.writeData(array: data)
+                    let variable = try fileWriter.write(
+                        array: try writer.finalise(),
+                        name: "",
+                        children: []
+                    )
+                    try fileWriter.writeTrailer(rootVariable: variable)
+                    try fn.close()
+                    
+                    // Overwrite existing file, with newly created
+                    try FileManager.default.moveFileOverwrite(from: tempFile, to: fileName)
+                }
+            }
+        }
+    }
     
     func downloadElevation(application: Application, domain: UkmoDomain, run: Timestamp, server: String?, createNetcdf: Bool) async throws {
         
