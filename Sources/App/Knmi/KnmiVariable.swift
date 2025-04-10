@@ -171,7 +171,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return .celsius
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
-            return .percentage
+            return .degreeDirection
         case .visibility:
             return .metre
         }
