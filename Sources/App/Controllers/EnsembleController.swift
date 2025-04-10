@@ -224,6 +224,8 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     case wind_direction_10m
     case wind_speed_80m
     case wind_direction_80m
+    case wind_speed_100m
+    case wind_direction_100m
     case wind_speed_120m
     case wind_direction_120m
     case direct_normal_irradiance
