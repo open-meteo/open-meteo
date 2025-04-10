@@ -103,6 +103,10 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance)
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant)
+        case .wind_speed_100m:
+            return .init(variable: .windSpeed, altitude: 10)
+        case .wind_direction_100m:
+            return .init(variable: .windDirection, altitude: 10)
         }
     }
 }
