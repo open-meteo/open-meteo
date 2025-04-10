@@ -260,7 +260,7 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         case .wind_speed:
             return .metrePerSecond
         case .wind_direction:
-            return .percentage
+            return .degreeDirection
         case .geopotential_height:
             return .metre
         case .relative_humidity:
