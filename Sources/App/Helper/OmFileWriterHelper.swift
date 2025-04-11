@@ -92,3 +92,23 @@ extension Array where Element == Float {
         try writeOmFile(file: file, dimensions: [grid.ny, grid.nx], chunks: [chunk0, 400/chunk0], compression: compression, scalefactor: scalefactor, createNetCdf: createNetCdf)
     }
 }
+
+public final class OmFileWriterAndHandles {
+    let writer: OmFileWriterHelper
+    let handles: GenericVariableHandleStorage
+    
+    init(domain: GenericDomain, nMembers: Int = 1, nTime: Int = 1) {
+        writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: nMembers, nTime: nTime)
+        handles = .init()
+    }
+    
+    func append(variable: GenericVariable, time: Timestamp, member: Int, data: [Float]) async throws {
+        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
+        await handles.append(GenericVariableHandle(
+            variable: variable,
+            time: time,
+            member: member,
+            fn: fn
+        ))
+    }
+}

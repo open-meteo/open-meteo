@@ -1,5 +1,5 @@
 /// Required additions to a GFS variable to make it downloadable
-protocol GfsVariableDownloadable: GenericVariable {
+protocol GfsVariableDownloadable: GenericVariable, Hashable {
     func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String?
     func skipHour0(for domain: GfsDomain) -> Bool
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)?

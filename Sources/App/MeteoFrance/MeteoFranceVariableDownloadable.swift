@@ -1,5 +1,5 @@
 /// Required additions to a MeteoFrance variable to make it downloadable
-protocol MeteoFranceVariableDownloadable: GenericVariable {
+protocol MeteoFranceVariableDownloadable: GenericVariable, Hashable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     func skipHour0(domain: MeteoFranceDomain) -> Bool
     

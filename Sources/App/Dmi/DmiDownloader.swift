@@ -239,7 +239,7 @@ struct DmiDownload: AsyncCommand {
                     }
                     
                     // Deaccumulate precipitation
-                    guard await previousScoped.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                    guard await previousScoped.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return nil
                     }
                     
