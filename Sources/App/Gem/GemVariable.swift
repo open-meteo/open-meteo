@@ -3,7 +3,7 @@ import Foundation
 /**
  Protocol to define meta information to download
  */
-protocol GemVariableDownloadable: GenericVariable {
+protocol GemVariableDownloadable: GenericVariable, Hashable {
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var skipHour0: Bool { get }
     func includedFor(hour: Int, domain: GemDomain) -> Bool

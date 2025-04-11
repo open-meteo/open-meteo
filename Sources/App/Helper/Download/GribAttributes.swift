@@ -37,6 +37,8 @@ struct GribAttributes {
         case heightAboveGround
         case depthBelowLandLayer
         case hybrid
+        case isobaricLayer // ItaliaMeteo ARPAE
+        case depthBelowLand // ItaliaMeteo ARPAE
         case unknown // only KMA
     }
     

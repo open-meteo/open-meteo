@@ -1,7 +1,7 @@
 import Foundation
 
 /// Required additions to a GFS variable to make it downloadable
-protocol CmaVariableDownloadable: GenericVariable {
+protocol CmaVariableDownloadable: GenericVariable, Hashable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
 }
 

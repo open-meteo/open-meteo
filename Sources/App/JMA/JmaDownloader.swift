@@ -149,7 +149,7 @@ struct JmaDownload: AsyncCommand {
     }
 }
 
-protocol JmaVariableDownloadable: GenericVariable {
+protocol JmaVariableDownloadable: GenericVariable, Hashable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
 }
