@@ -767,6 +767,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .kmaGdps
         case .kma_ldps:
             return .kmaLdps
+        case .italia_meteo_arpae_icon_2i:
+            // TODO register
+            return .arpaeCosmo2i
         }
     }
 }

@@ -92,7 +92,7 @@ enum ItaliaMeteoArpaeVariablesDownload: String, CaseIterable {
         case .CLCM:
             return ItaliaMeteoArpaeSurfaceVariable.cloud_cover_mid
         case .CLCT:
-            return ItaliaMeteoArpaeSurfaceVariable.shortwave_radiation
+            return ItaliaMeteoArpaeSurfaceVariable.cloud_cover
         case .HZEROCL:
             return ItaliaMeteoArpaeSurfaceVariable.freezing_level_height
         case .H_SNOW:

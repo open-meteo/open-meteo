@@ -362,6 +362,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case kma_seamless
     case kma_gdps
     case kma_ldps
+    
+    case italia_meteo_arpae_icon_2i
 
     
     /// Return the required readers for this domain configuration
@@ -620,6 +622,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [reader].compactMap({$0})
         case .kma_ldps:
             let reader = try KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [reader].compactMap({$0})
+        case .italia_meteo_arpae_icon_2i:
+            let reader = try ItaliaMeteoArpaeReader(domain: .icon_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [reader].compactMap({$0})
         }
     }
