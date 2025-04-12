@@ -7,7 +7,7 @@ enum ItaliaMeteoArpaeDomain: String, GenericDomain, CaseIterable {
     var grid: Gridable {
         switch self {
         case .icon_2i:
-            return RegularGrid(nx: 761, ny: 761, latMin: 33.7, lonMin: 3, dx: 0.02, dy: 0.025)
+            return RegularGrid(nx: 761, ny: 761, latMin: 33.7, lonMin: 3, dx: 0.025, dy: 0.02)
         }
     }
     
