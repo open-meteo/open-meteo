@@ -59,7 +59,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
-        let onlyVariables: [MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {
+        let onlyVariables: [any MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
                 if let variable = MeteoFrancePressureVariable(rawValue: String($0)) {
                     return variable
@@ -401,7 +401,7 @@ struct MeteoFranceDownload: AsyncCommand {
         return handles
     }
     
-    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> MeteoFranceVariableDownloadable? {
+    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> (any MeteoFranceVariableDownloadable)? {
         
         switch (parameterName, levelStr) {
         case ("Total cloud cover", "0"):
@@ -505,7 +505,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
     
     /// Download one field at a time
-    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [any MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }

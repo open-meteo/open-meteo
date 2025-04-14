@@ -156,7 +156,7 @@ protocol JmaVariableDownloadable: GenericVariable, Hashable {
 
 extension GribMessage {
     /// Return the corresponding JMA variable for this grib message
-    func toJmaVariable() -> JmaVariableDownloadable? {
+    func toJmaVariable() -> (any JmaVariableDownloadable)? {
         guard let shortName = get(attribute: "shortName"),
               let parameterCategory = get(attribute: "parameterCategory").flatMap(Int.init),
               let parameterNumber = get(attribute: "parameterNumber").flatMap(Int.init),

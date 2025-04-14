@@ -109,7 +109,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
     }*/
     
-    func getCmaVariable(logger: Logger, message: GribMessage) -> CmaVariableDownloadable? {
+    func getCmaVariable(logger: Logger, message: GribMessage) -> (any CmaVariableDownloadable)? {
         guard let shortName = message.get(attribute: "shortName"),
               let stepRange = message.get(attribute: "stepRange"),
               let stepType = message.get(attribute: "stepType"),

@@ -104,7 +104,7 @@ struct GenericVariableHandle {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
-        let nLocations = grid.count
+        //let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
