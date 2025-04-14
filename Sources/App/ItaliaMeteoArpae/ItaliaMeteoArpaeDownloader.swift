@@ -5,16 +5,17 @@ import OmFileFormat
 
 /**
  Modifications / Calculations:
- - deaccumulate precipitation and snow
- - deaverage radiation
- - relative humidity 2m from temperature and dew point
- - sum up snowfall from SNOW_CON + SNOW_GSP
- - correct weather code for temperature, precipitation and snowfall height
- - correct freezinglevel and snow height based on temperature and elevation
- - add snow to rain if temperature > 1.5°
- - set snow to 0 if temperature > 1.5
- - wind speed & direction from U/V levels
- - calculate vertical velocity
+ - Deaccumulate precipitation and snow
+ - Deaverage radiation
+ - Relative humidity 2m from temperature and dew point
+ - Sum up snowfall from SNOW_CON + SNOW_GSP
+ - Correct weather code for temperature, precipitation and snowfall height
+ - Correct freezinglevel and snow height based on temperature and elevation
+ - Add snow to rain if temperature > 1.5°
+ - Set snow to 0 if temperature > 1.5
+ - Wind speed & direction from U/V levels
+ - Convert pressure vertical velocity `omega` (Pa/s) to geometric vertical velocity `w` (m/s)
+ - Calculate average soil moisture fraction from absolute values
  */
 struct ItaliaMeteoArpaeDownload: AsyncCommand {
     struct Signature: CommandSignature {
