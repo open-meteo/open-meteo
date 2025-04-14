@@ -165,13 +165,3 @@ public func configure(_ app: Application) throws {
     // register routes
     try routes(app)
 }
-
-
-extension Application {
-  public static func testable() throws -> Application {
-    let app = Application(.testing)
-    try configure(app)
-
-    return app
-  }
-}

@@ -167,7 +167,7 @@ struct S3DataController: RouteCollection {
             }
             return response
         }
-        let response = req.fileio.streamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
+        let response = try await req.fileio.asyncStreamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
         return response
     }
 }

@@ -23,7 +23,7 @@ extension TimeError: AbortError {
 }
 
 
-public struct Timestamp: Hashable {
+public struct Timestamp: Hashable, Sendable {
     public let timeIntervalSince1970: Int
     
     /// Hour in 0-23
