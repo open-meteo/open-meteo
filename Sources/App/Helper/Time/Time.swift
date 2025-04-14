@@ -326,7 +326,7 @@ extension Range where Bound == Timestamp {
 
 
 /// Time with utc offset seconds
-public struct TimerangeLocal {
+public struct TimerangeLocal: Sendable {
     /// utc timestamp
     public let range: Range<Timestamp>
     

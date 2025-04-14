@@ -28,7 +28,7 @@ struct MigrationCommand: AsyncCommand {
             return
         }
         
-        for case let fileURL as URL in directoryEnumerator {
+        for case let fileURL as URL in AnySequence(directoryEnumerator) {
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                   let isDirectory = resourceValues.isDirectory,
                   let name = resourceValues.name, 
@@ -47,7 +47,7 @@ struct MigrationCommand: AsyncCommand {
                 logger.warning("No files at \(OpenMeteo.dataDirectory)\(name)")
                 continue
             }
-            for case let fileURL as URL in directoryEnumerator {
+            for case let fileURL as URL in AnySequence(directoryEnumerator) {
                 guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                       let isDirectory = resourceValues.isDirectory,
                       let variable = resourceValues.name,
@@ -62,7 +62,7 @@ struct MigrationCommand: AsyncCommand {
                     logger.warning("No files at \(path)")
                     continue
                 }
-                for case let fileURL as URL in directoryEnumerator {
+                for case let fileURL as URL in AnySequence(directoryEnumerator) {
                     guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                           let isDirectory = resourceValues.isDirectory,
                           let file = resourceValues.name,
