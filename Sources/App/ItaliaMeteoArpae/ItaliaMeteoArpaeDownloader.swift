@@ -118,9 +118,9 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         
         let inMemory = VariablePerMemberStorage<VariableLevel>()
         for v in variableLevel {
-            if v.variable == .T_SO || v.variable == .W_SO {
+            /*if !(v.variable == .T_SO || v.variable == .W_SO) {
                 continue
-            }
+            }*/
             let url = "https://meteohub.mistralportal.it/nwp/ICON-2I_all2km/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
             let deaverager = GribDeaverager()
             for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
@@ -253,6 +253,61 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     let level = Int(attributes.levelStr)!
                     let vv = Meteorology.verticalVelocityPressureToGeometric(omega: array2d.array.data, temperature: t.data, pressureLevel: Float(level))
                     try await writer.append(variable: ItaliaMeteoArpaePressureVariable.init(variable: .vertical_velocity, level: level), time: time, member: member, data: vv)
+                }
+                if v.variable == .T_SO {
+                    guard let scaledValueOfFirstFixedSurface = message.getLong(attribute: "scaledValueOfFirstFixedSurface") else {
+                        fatalError("Could not get scaledValueOfFirstFixedSurface")
+                    }
+                    let variable: ItaliaMeteoArpaeSurfaceVariable
+                    switch scaledValueOfFirstFixedSurface {
+                    case 0:
+                        variable = .soil_temperature_0cm
+                    case 6:
+                        variable = .soil_temperature_6cm
+                    case 18:
+                        variable = .soil_temperature_18cm
+                    case 54:
+                        variable = .soil_temperature_54cm
+                    case 162:
+                        variable = .soil_temperature_162cm
+                    case 486:
+                        variable = .soil_temperature_486cm
+                    case 1458:
+                        variable = .soil_temperature_1458cm
+                    default:
+                        continue
+                    }
+                    try await writer.append(variable: variable, time: time, member: member, data: array2d.array.data)
+                }
+                if v.variable == .W_SO {
+                    guard let scaledValueOfFirstFixedSurface = message.getLong(attribute: "scaledValueOfFirstFixedSurface"),
+                          let scaledValueOfSecondFixedSurface = message.getLong(attribute: "scaledValueOfSecondFixedSurface") else {
+                        fatalError("Could not get scaledValueOfFirstFixedSurface")
+                    }
+                    let variable: ItaliaMeteoArpaeSurfaceVariable
+                    switch (scaledValueOfFirstFixedSurface, scaledValueOfSecondFixedSurface) {
+                    case (0, 1):
+                        variable = .soil_moisture_0_to_1cm
+                    case (1, 3):
+                        variable = .soil_moisture_1_to_3cm
+                    case (3, 9):
+                        variable = .soil_moisture_3_to_9cm
+                    case (9, 27):
+                        variable = .soil_moisture_9_to_27cm
+                    case (27, 81):
+                        variable = .soil_moisture_27_to_81cm
+                    case (81, 243):
+                        variable = .soil_moisture_81_to_243cm
+                    case (243, 729):
+                        variable = .soil_moisture_243_to_729cm
+                    case (729, 2187):
+                        variable = .soil_moisture_729_to_2187cm
+                    default:
+                        continue
+                    }
+                    let depth = Float(scaledValueOfSecondFixedSurface - scaledValueOfFirstFixedSurface)
+                    array2d.array.data.multiplyAdd(multiply: 0.1 / depth, add: 0)
+                    try await writer.append(variable: variable, time: time, member: member, data: array2d.array.data)
                 }
                 
                 if let variable = v.variable.getGenericVariable(attributes: attributes) {

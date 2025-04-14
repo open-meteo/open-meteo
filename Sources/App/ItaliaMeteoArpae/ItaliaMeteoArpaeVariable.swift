@@ -120,11 +120,9 @@ enum ItaliaMeteoArpaeVariablesDownload: String, CaseIterable {
         case .T_2M:
             return ItaliaMeteoArpaeSurfaceVariable.temperature_2m
         case .T_SO:
-            print(attributes)
             return nil
         case .W_SO:
-            print(attributes)
-            fatalError()
+            return nil
         case .TOT_PREC:
             return ItaliaMeteoArpaeSurfaceVariable.precipitation
         case .TQV:
@@ -189,6 +187,9 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     case soil_temperature_6cm
     case soil_temperature_18cm
     case soil_temperature_54cm
+    case soil_temperature_162cm
+    case soil_temperature_486cm
+    case soil_temperature_1458cm
     
     /// Soil moisture
     /// The model soil moisture data was converted from kg/m2 to m3/m3 by using the formula SM[m3/m3] = SM[kg/m2] * 0.001 * 1/d, where d is the thickness of the soil layer in meters. The factor 0.001 is due to the assumption that 1kg of water represents 1000cm3, which is 0.001m3.
@@ -197,6 +198,9 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     case soil_moisture_3_to_9cm
     case soil_moisture_9_to_27cm
     case soil_moisture_27_to_81cm
+    case soil_moisture_81_to_243cm
+    case soil_moisture_243_to_729cm
+    case soil_moisture_729_to_2187cm
     
     /// LPI Lightning Potential Index . Scales form 0 to ~120
     case lightning_potential
@@ -251,12 +255,12 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         case .soil_temperature_0cm: return 20
         case .soil_temperature_6cm: return 20
         case .soil_temperature_18cm: return 20
-        case .soil_temperature_54cm: return 20
+        case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm: return 20
         case .soil_moisture_0_to_1cm: return 1000
         case .soil_moisture_1_to_3cm: return 1000
         case .soil_moisture_3_to_9cm: return 1000
         case .soil_moisture_9_to_27cm: return 1000
-        case .soil_moisture_27_to_81cm: return 1000
+        case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm: return 1000
         case .snow_depth: return 100 // 1cm res
         case .wind_gusts_10m: return 10
         case .freezing_level_height:  return 0.1 // zero height 10 meter resolution
@@ -308,7 +312,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
             return .hermite(bounds: nil)
         case .soil_temperature_18cm:
             return .hermite(bounds: nil)
-        case .soil_temperature_54cm:
+        case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm:
             return .hermite(bounds: nil)
         case .soil_moisture_0_to_1cm:
             return .hermite(bounds: nil)
@@ -318,7 +322,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
             return .hermite(bounds: nil)
         case .soil_moisture_9_to_27cm:
             return .hermite(bounds: nil)
-        case .soil_moisture_27_to_81cm:
+        case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm:
             return .hermite(bounds: nil)
         case .snow_depth:
             return .linear
@@ -365,12 +369,12 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
             case .soil_temperature_0cm: return .celsius
             case .soil_temperature_6cm: return .celsius
             case .soil_temperature_18cm: return .celsius
-            case .soil_temperature_54cm: return .celsius
+            case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm: return .celsius
             case .soil_moisture_0_to_1cm: return .cubicMetrePerCubicMetre
             case .soil_moisture_1_to_3cm: return .cubicMetrePerCubicMetre
             case .soil_moisture_3_to_9cm: return .cubicMetrePerCubicMetre
             case .soil_moisture_9_to_27cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_27_to_81cm: return .cubicMetrePerCubicMetre
+            case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm: return .cubicMetrePerCubicMetre
             case .snow_depth: return .metre
             case .showers: return .millimetre
             case .rain: return .millimetre
