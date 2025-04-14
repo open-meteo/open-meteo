@@ -35,6 +35,7 @@ enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariab
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
+    case surface_temperature
     
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -174,6 +175,8 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .wind_gusts_10m, time: time)
             case .sunshine_duration:
                 try prefetchData(variable: .direct_radiation, time: time)
+            case .surface_temperature:
+                try prefetchData(variable: .soil_temperature_0cm, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -300,6 +303,8 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 let diffuseRadiation = try get(derived: .surface(.diffuse_radiation), time: time).data
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
+            case .surface_temperature:
+                return try get(raw: .soil_temperature_0cm, time: time)
             }
         case .pressure(let v):
             switch v.variable {
