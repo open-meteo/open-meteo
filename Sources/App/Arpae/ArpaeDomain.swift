@@ -3,6 +3,7 @@ import Foundation
 /**
 Italian ARPAE models from MISTRAL https://meteohub.mistralportal.it/app/datasets
  */
+@available(*, deprecated)
 enum ArpaeDomain: String, GenericDomain, CaseIterable {
     case cosmo_2i
     case cosmo_2i_ruc
@@ -87,22 +88,6 @@ enum ArpaeDomain: String, GenericDomain, CaseIterable {
             return 3*3600
         case .cosmo_5m:
             return 12*3600
-        }
-    }
-    
-    /// Cams has delay of 8 hours
-    var lastRun: Timestamp {
-        let t = Timestamp.now()
-        switch self {
-        case .cosmo_2i:
-            // Delay of 4:50 hours after initialisation with 2 runs a day
-            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 12 * 12)
-        case .cosmo_2i_ruc:
-            // Delay of 3:20 hours after initialisation with 8 runs a day
-            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 3 * 3)
-        case .cosmo_5m:
-            // Delay of 3:55 hours, 2 runs
-            return t.add(hours: -3).with(hour: ((t.hour - 3 + 24) % 24) / 12 * 12)
         }
     }
 }
