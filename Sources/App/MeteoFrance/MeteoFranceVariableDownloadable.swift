@@ -278,7 +278,7 @@ extension MeteoFrancePressureVariable: MeteoFranceVariableDownloadable {
         return true
     }
 
-    func getCoverageId(domain: MeteoFranceDomain) -> (variable: String, height: Int?, pressure: Int?, periodMinutes: Int?)  {
+    func getCoverageId(domain: MeteoFranceDomain) -> (variable: String, height: Int?, pressure: Int?, periodMinutes: Int?) {
         // consider vertical velocity
         switch variable {
         case .temperature:

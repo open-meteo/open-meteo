@@ -93,7 +93,7 @@ struct GloFasDownloader: AsyncCommand {
     }
 
     /// Download the single GRIB file containing 30 days with 50 members and update the database
-    func downloadEnsembleForecast(application: Application, domain: GloFasDomain, run: Timestamp, skipFilesIfExisting: Bool, createNetcdf: Bool, user: String, password: String, concurrent: Int) async throws -> [GenericVariableHandle]{
+    func downloadEnsembleForecast(application: Application, domain: GloFasDomain, run: Timestamp, skipFilesIfExisting: Bool, createNetcdf: Bool, user: String, password: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)

@@ -259,7 +259,7 @@ struct DownloadIconCommand: AsyncCommand {
                     data.data = Meteorology.sealevelPressureSpatial(temperature: t2m.data, pressure: data.data, elevation: domainElevation)
                 }
                 if domain == .iconEps && v.variable == .relative_humidity_2m,
-                   let t2m = await storage.get(v.with(variable: .temperature_2m)){
+                   let t2m = await storage.get(v.with(variable: .temperature_2m)) {
                     // ICON EPS is using dewpoint, convert to relative humidity
                     data.data.multiplyAdd(multiply: 1, add: -273.15)
                     data.data = zip(t2m.data, data.data).map(Meteorology.relativeHumidity)
@@ -269,7 +269,7 @@ struct DownloadIconCommand: AsyncCommand {
                 // Similar for snow at +2°C or more
                 if v.variable == .weather_code,
                     let t2m = await storage.get(v.with(variable: .temperature_2m)),
-                    let precip = await storage.get(v.with(variable: .precipitation)){
+                    let precip = await storage.get(v.with(variable: .precipitation)) {
                     let snowfallHeight = await storage.get(v.with(variable: .snowfall_height))
                     for i in data.data.indices {
                         guard data.data[i].isFinite, let weathercode = WeatherCode(rawValue: Int(data.data[i])) else {
@@ -288,7 +288,7 @@ struct DownloadIconCommand: AsyncCommand {
                 /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
                 /// Note: snowfall height is NaN if snowfall height is at ground level
                 if v.variable == .freezing_level_height || v.variable == .snowfall_height,
-                   let t2m = await storage.get(v.with(variable: .temperature_2m)){
+                   let t2m = await storage.get(v.with(variable: .temperature_2m)) {
                     for i in data.data.indices {
                         let freezingLevelHeight = data.data[i].isNaN ? max(0, domainElevation[i]) : data.data[i]
                         let temperature_2m = t2m.data[i]

@@ -356,8 +356,7 @@ struct GfsDownload: AsyncCommand {
                     // Convert specific humidity to relative humidity
                     if let variable = variable.variable as? GfsSurfaceVariable,
                        variable == .relative_humidity_2m,
-                       shortName == "2sh"
-                    {
+                       shortName == "2sh" {
                         guard let temperature = inMemorySurface[.temperature_2m] else {
                             fatalError("Could not get temperature 2m to convert specific humidity")
                         }
@@ -372,8 +371,7 @@ struct GfsDownload: AsyncCommand {
                     // Convert pressure vertical velocity to geometric velocity in HRRR
                     if let variable = variable.variable as? GfsPressureVariable,
                        variable.variable == .vertical_velocity,
-                       shortName == "w"
-                    {
+                       shortName == "w" {
                         guard let temperature = inMemoryPressure[.init(variable: .temperature, level: variable.level)] else {
                             fatalError("Could not get temperature 2m to convert pressure vertical velocity to geometric velocity")
                         }

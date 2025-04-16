@@ -186,7 +186,7 @@ extension Array where Element == Float {
                 // Seek next 2 valid values, point C and D
                 for t2 in t..<nTime {
                     let value = self[l * nTime + t2]
-                    guard !value.isNaN else  {
+                    guard !value.isNaN else {
                         continue
                     }
                     if C.isNaN {
@@ -310,7 +310,7 @@ extension Array where Element == Float {
                 // Find the first valid value for point C within the next 7 hours
                 for t2 in t..<Swift.min(t + 7 * 3600 / time.dtSeconds, nTime) {
                     let value = self[l * nTime + t2]
-                    guard !value.isNaN else  {
+                    guard !value.isNaN else {
                         continue
                     }
                     C = value

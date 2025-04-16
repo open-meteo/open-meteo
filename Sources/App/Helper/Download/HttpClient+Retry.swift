@@ -40,7 +40,7 @@ extension HTTPClient {
                        timeoutPerRequest: TimeAmount = .seconds(30),
                        backoffFactor: TimeAmount = .milliseconds(1000),
                        backoffMaximum: TimeAmount = .seconds(30),
-                       error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse  {
+                       error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
         var n = 0

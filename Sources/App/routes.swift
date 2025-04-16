@@ -14,8 +14,7 @@ extension RoutesBuilder {
         _ path: PathComponent...,
         use closure: @Sendable @escaping (Request) async throws -> Response
     )
-    where Response: AsyncResponseEncodable
-    {
+    where Response: AsyncResponseEncodable {
         self.on(.GET, path, use: closure)
         self.on(.POST, path, use: closure)
     }

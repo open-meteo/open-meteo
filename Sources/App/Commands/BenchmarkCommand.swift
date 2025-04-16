@@ -85,8 +85,7 @@ struct BenchmarkRun {
     var timePerTest: Int
 
     @discardableResult
-    func measure<T>(_ section: String, _ baseLineMeanMs: Double, fn: () throws -> T) rethrows -> T
-    {
+    func measure<T>(_ section: String, _ baseLineMeanMs: Double, fn: () throws -> T) rethrows -> T {
         print("| \(section.pad(80)) | ", terminator: "")
         // Do not measure first execution
         var result = try fn()

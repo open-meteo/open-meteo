@@ -546,7 +546,7 @@ extension Gridable {
         let yy = gridpoint / nx
         let xx = gridpoint % nx
         for y in min(max(yy - searchRadius, 0), ny) ..< min(max(yy + searchRadius + 1, 0), ny) {
-            for x in min(max(xx - searchRadius, 0), nx) ..< min(max(xx + searchRadius + 1, 0), nx){
+            for x in min(max(xx - searchRadius, 0), nx) ..< min(max(xx + searchRadius + 1, 0), nx) {
                 let point = max(0, min(y * nx + x, count))
                 if try !readElevation(gridpoint: point, elevationFile: elevationFile).isSea {
                     return false

@@ -701,8 +701,7 @@ extension Double {
     }
 
     @inlinable
-    var deg2rad: Double
-    {
+    var deg2rad: Double {
         return (.pi / 180.0) * self
     }
 }

@@ -7,14 +7,14 @@ import NIO
 final class HelperTests: XCTestCase {
     func testMapStream() async {
         let a = (0..<100).map { $0 }
-        let res = try! await a.mapStream(nConcurrent: 4){
+        let res = try! await a.mapStream(nConcurrent: 4) {
             try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
             return $0
         }.collect()
         XCTAssertEqual(res, a)
 
         let a2 = (0..<5).map { $0 }
-        let res2 = try! await a2.mapStream(nConcurrent: 10){
+        let res2 = try! await a2.mapStream(nConcurrent: 10) {
             try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
             return $0
         }.collect()

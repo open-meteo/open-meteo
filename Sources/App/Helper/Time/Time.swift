@@ -413,7 +413,7 @@ public extension Sequence where Element == Timestamp {
         var dateCalculated = Int.min
         return map {
             // only do date calculation if the actual date changes
-            if dateCalculated != $0.timeIntervalSince1970 - $0.timeIntervalSince1970.moduloPositive(86400)  {
+            if dateCalculated != $0.timeIntervalSince1970 - $0.timeIntervalSince1970.moduloPositive(86400) {
                 time = $0.timeIntervalSince1970
                 dateCalculated = $0.timeIntervalSince1970 - $0.timeIntervalSince1970.moduloPositive(86400)
                 gmtime_r(&time, &t)

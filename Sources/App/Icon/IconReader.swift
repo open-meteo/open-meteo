@@ -35,7 +35,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 
     func get(raw: IconVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         // icon-d2 has no levels 800, 900, 925
-        if reader.domain == .iconD2, case let .pressure(pressure) = raw  {
+        if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
             let variable = pressure.variable
             switch level {
@@ -134,7 +134,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
         }
 
         // icon global and EU lack level 975
-        if reader.domain != .iconD2, case let .pressure(pressure) = raw, pressure.level == 975  {
+        if reader.domain != .iconD2, case let .pressure(pressure) = raw, pressure.level == 975 {
             return try self.interpolatePressureLevel(variable: pressure.variable, level: pressure.level, lowerLevel: 950, upperLevel: 1000, time: time)
         }
 
@@ -143,7 +143,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 
     func prefetchData(raw: IconVariable, time: TimerangeDtAndSettings) throws {
         // icon-d2 has no levels 800, 900, 925
-        if reader.domain == .iconD2, case let .pressure(pressure) = raw  {
+        if reader.domain == .iconD2, case let .pressure(pressure) = raw {
             let level = pressure.level
             let variable = pressure.variable
             switch level {
@@ -227,7 +227,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
         }
 
         // icon global and EU lack level 975
-        if reader.domain != .iconD2, case let .pressure(pressure) = raw, pressure.level == 975  {
+        if reader.domain != .iconD2, case let .pressure(pressure) = raw, pressure.level == 975 {
             let variable = pressure.variable
             try reader.prefetchData(variable: .pressure(IconPressureVariable(variable: variable, level: 950)), time: time)
             try reader.prefetchData(variable: .pressure(IconPressureVariable(variable: variable, level: 1000)), time: time)

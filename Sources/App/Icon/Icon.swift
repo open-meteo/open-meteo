@@ -116,7 +116,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             // Hourly data until 48h, 3 hourly until 72, 6 hourly until 120h (same as ICON-EU-EPS) and 12 hourly until 180h
             return Array(0...48) + Array(stride(from: 51, through: 72, by: 3)) + Array(stride(from: 78, through: 120, by: 6)) + Array(stride(from: 132, through: 180, by: 12))
         case .icon:
-            if  run == 6 || run == 18  {
+            if  run == 6 || run == 18 {
                 // only up to 120
                 return Array(0...78) + Array(stride(from: 81, through: 120, by: 3))
             } else {

@@ -410,7 +410,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return Array([gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
             }
             // For Northern Europe and Iceland use DMI Harmonie
-            if (44..<66).contains(lat), let dmiEurope = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options){
+            if (44..<66).contains(lat), let dmiEurope = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
