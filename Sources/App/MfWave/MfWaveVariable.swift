@@ -10,6 +10,9 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
     case swell_wave_height
     case swell_wave_period
     case swell_wave_direction
+    case secondary_swell_wave_height
+    case secondary_swell_wave_period
+    case secondary_swell_wave_direction
     
     var storePreviousForecast: Bool {
         return false
@@ -42,11 +45,11 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
             return .seconds
         case .wind_wave_direction:
             return .degreeDirection
-        case .swell_wave_height:
+        case .swell_wave_height, .secondary_swell_wave_height:
             return .metre
-        case .swell_wave_period:
+        case .swell_wave_period, .secondary_swell_wave_period:
             return .seconds
-        case .swell_wave_direction:
+        case .swell_wave_direction, .secondary_swell_wave_direction:
             return .degreeDirection
         }
     }
@@ -68,11 +71,11 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
             return period
         case .wind_wave_direction:
             return direction
-        case .swell_wave_height:
+        case .swell_wave_height, .secondary_swell_wave_height:
             return height
-        case .swell_wave_period:
+        case .swell_wave_period, .secondary_swell_wave_period:
             return period
-        case .swell_wave_direction:
+        case .swell_wave_direction, .secondary_swell_wave_direction:
             return direction
         }
     }
@@ -91,11 +94,11 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
             return .hermite(bounds: 0...Float.infinity)
         case .wind_wave_direction:
             return .linearDegrees
-        case .swell_wave_height:
+        case .swell_wave_height, .secondary_swell_wave_height:
             return .linear
-        case .swell_wave_period:
+        case .swell_wave_period, .secondary_swell_wave_period:
             return .hermite(bounds: 0...Float.infinity)
-        case .swell_wave_direction:
+        case .swell_wave_direction, .secondary_swell_wave_direction:
             return .linearDegrees
         }
     }

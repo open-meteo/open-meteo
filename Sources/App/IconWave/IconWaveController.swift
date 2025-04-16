@@ -101,6 +101,9 @@ enum MarineVariable: String, GenericVariableMixable {
     case swell_wave_period
     case swell_wave_peak_period
     case swell_wave_direction
+    case secondary_swell_wave_height
+    case secondary_swell_wave_period
+    case secondary_swell_wave_direction
     case ocean_current_velocity
     case ocean_current_direction
     case sea_level_height_msl
