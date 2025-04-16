@@ -7,7 +7,7 @@ extension Curl {
     func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> [GribMessage] {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
-        
+
         // AWS does not allow multi http download ranges. Split download into multiple downloads
         let supportMultiRange = !url.contains("amazonaws.com")
         if !supportMultiRange, let parts = range?.split(separator: ","), parts.count > 1 {
@@ -17,11 +17,11 @@ extension Curl {
             }
             return messages
         }
-        
+
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
-            
+
             // Retry failed file transfers after this point
             do {
                 var messages = [GribMessage]()
@@ -52,15 +52,15 @@ extension Curl {
             }
         }
     }
-    
+
     /// Stream GRIB messages. The grib stream might be restarted on error.
     func withGribStream<T>(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
-        
+
         // TODO fix AWS code path
         // TODO use grib stream for GLOFAS downloader
-        
+
         // AWS does not allow multi http download ranges. Split download into multiple downloads
         /*let supportMultiRange = !url.contains("amazonaws.com")
         if !supportMultiRange, let parts = range?.split(separator: ","), parts.count > 1 {
@@ -70,11 +70,11 @@ extension Curl {
             }
             return messages
         }*/
-        
+
         while true {
             // Start the download and wait for the header
             let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
-            
+
             // Retry failed file transfers after this point
             do {
                 let contentLength = try response.contentLength()
@@ -104,20 +104,20 @@ extension Curl {
 
 extension GribMessage {
     func dumpCoordinates() throws {
-        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
+        guard let nx = get(attribute: "Nx")?.toInt() else {
             fatalError("Could not get Nx")
         }
-        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
+        guard let ny = get(attribute: "Ny")?.toInt() else {
             fatalError("Could not get Ny")
         }
         print("nx=\(nx) ny=\(ny)")
-        for (i,(latitude, longitude,value)) in try iterateCoordinatesAndValues().enumerated() {
-            if i % 10_000 == 0 || i == ny*nx-1 {
+        for (i, (latitude, longitude, value)) in try iterateCoordinatesAndValues().enumerated() {
+            if i % 10_000 == 0 || i == ny * nx - 1 {
                 print("grid \(i) lat \(latitude) lon \(longitude) value \(value)")
             }
         }
     }
-    
+
     /// Read data as 2D grid assuming given `nx` and `ny`. Error is dimensions to not agree
     /// if `shift180LongitudeAndFlipLatitudeIfRequired` is set, automatically check the first and last grid points to see if the grid needs to be shifted to alwys start at -90/-180.
     func to2D(nx: Int, ny: Int, shift180LongitudeAndFlipLatitudeIfRequired: Bool) throws -> GribArray2D {
@@ -131,13 +131,13 @@ struct GribArray2D {
     var bitmap: [Int]
     var double: [Double]
     var array: Array2D
-    
+
     public init(nx: Int, ny: Int) {
-        array = Array2D(data: [Float](repeating: .nan, count: nx*ny), nx: nx, ny: ny)
-        bitmap = .init(repeating: 0, count: nx*ny)
-        double = .init(repeating: .nan, count: nx*ny)
+        array = Array2D(data: [Float](repeating: .nan, count: nx * ny), nx: nx, ny: ny)
+        bitmap = .init(repeating: 0, count: nx * ny)
+        double = .init(repeating: .nan, count: nx * ny)
     }
-    
+
     /// Read data as 2D grid assuming given `nx` and `ny`. Error is dimensions to not agree
     /// if `shift180LongitudeAndFlipLatitudeIfRequired` is set, automatically check the first and last grid points to see if the grid needs to be shifted to alwys start at -90/-180.
     public mutating func load(message: GribMessage, shift180LongitudeAndFlipLatitudeIfRequired: Bool = false) throws {
@@ -145,17 +145,17 @@ struct GribArray2D {
             fatalError("Could not get gridType")
         }
         if gridType == "reduced_gg" {
-            guard let numberOfCodedValues = message.get(attribute: "numberOfCodedValues").map(Int.init) ?? nil else {
+            guard let numberOfCodedValues = message.get(attribute: "numberOfCodedValues")?.toInt() else {
                 fatalError("Could not get numberOfCodedValues")
             }
             guard numberOfCodedValues == array.count else {
                 fatalError("GRIB dimensions (count=\(numberOfCodedValues)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
             }
         } else {
-            guard let nx = message.get(attribute: "Nx").map(Int.init) ?? nil else {
+            guard let nx = message.get(attribute: "Nx")?.toInt() else {
                 fatalError("Could not get Nx")
             }
-            guard let ny = message.get(attribute: "Ny").map(Int.init) ?? nil else {
+            guard let ny = message.get(attribute: "Ny")?.toInt() else {
                 fatalError("Could not get Ny")
             }
             guard nx == array.nx, ny == array.ny else {
@@ -173,7 +173,7 @@ struct GribArray2D {
                 }
             }
         }
-        
+
         /// Some global grids start at latitude 90 and longitude 0. As a convention we always use -90 and -180.
         if shift180LongitudeAndFlipLatitudeIfRequired, gridType == "regular_ll" {
             guard let latitudeFirst = message.get(attribute: "latitudeOfFirstGridPointInDegrees").flatMap(Float.init),

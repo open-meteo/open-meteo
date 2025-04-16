@@ -17,17 +17,17 @@ struct GenericFileManager<File: GenericFileManagable> {
         case exists(file: File, opened: Timestamp)
         case missing(path: String, opened: Timestamp)
     }
-    
+
     /// Non existing files are set to nil
     private let cached = NIOLockedValueBox<[Int: OmFileState]>(.init())
-    
-    private let statistics = NIOLockedValueBox<(count: Double, elapsed: Double, max: Double)>((0,0,0))
-    
+
+    private let statistics = NIOLockedValueBox<(count: Double, elapsed: Double, max: Double)>((0, 0, 0))
+
     /// Called every 2 conds from a life cycle handler on any available thread
     @Sendable func backgroundTask(application: Application) {
         let logger = application.logger
-        var (count, elapsed, max) = statistics.withLockedValue({$0})
-        
+        var (count, elapsed, max) = statistics.withLockedValue({ $0 })
+
         let start = DispatchTime.now()
         let stats = self.secondlyCallback()
         let dt = Double((DispatchTime.now().uptimeNanoseconds - start.uptimeNanoseconds)) / 1_000_000_000
@@ -37,8 +37,8 @@ struct GenericFileManager<File: GenericFileManagable> {
         elapsed += dt
         count += 1
         if count >= 10 {
-            if (stats.open > 0) {
-                logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed/count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint)")
+            if stats.open > 0 {
+                logger.info("OmFileManager checked \(stats.open) open files and \(stats.missing) missing files. Time average=\((elapsed / count).asSecondsPrettyPrint) max=\(max.asSecondsPrettyPrint)")
             }
             count = 0
             elapsed = 0
@@ -46,20 +46,20 @@ struct GenericFileManager<File: GenericFileManagable> {
         }
         statistics.withLockedValue({ $0 = (count, elapsed, max) })
     }
-    
+
     /// Called every couple of seconds to check for any file modifications
     func secondlyCallback() -> (open: Int, missing: Int, ejected: Int) {
         // Could be later used to expose some metrics
         var countExisting = 0
         var countMissing = 0
         var countEjected = 0
-        
+
         let copy = cached.withLockedValue {
             return $0
         }
         // Close file handles after 1 hour
         let ejectionTime = Timestamp.now().subtract(hours: 1)
-        
+
         for e in copy {
             switch e.value {
             case .exists(file: let file, opened: let opened):
@@ -75,7 +75,7 @@ struct GenericFileManager<File: GenericFileManagable> {
                 // Remove file from cache, if it is now available, so the next open, will make it available
                 if opened < ejectionTime || FileManager.default.fileExists(atPath: path) {
                     cached.withLockedValue({
-                        let _ = $0.removeValue(forKey: e.key)
+                        _ = $0.removeValue(forKey: e.key)
                         countEjected += 1
                     })
                 }
@@ -88,13 +88,13 @@ struct GenericFileManager<File: GenericFileManagable> {
     /// Get cached file or return nil, if the files does not exist
     public func get(_ file: OmFileManagerReadable) throws -> File? {
         let key = file.hashValue
-        
+
         return try cached.withLockedValue { cached -> File? in
             if let file = cached[key] {
                 switch file {
                 case .exists(file: let file, opened: _):
                     return file
-                case .missing(path: _, opened: _):
+                case .missing:
                     return nil
                 }
             }

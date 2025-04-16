@@ -2,7 +2,6 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
-
 extension VariableAndPreviousDay: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         let previousDay = Int16(previousDay)
@@ -441,7 +440,6 @@ extension ForecastHeightVariableType: FlatBuffersVariable {
     }
 }
 
-
 extension ForecastVariableDaily: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -603,17 +601,15 @@ extension ForecastVariableDaily: FlatBuffersVariable {
     }
 }
 
-
-
 extension MultiDomains: ModelFlatbufferSerialisable {
     typealias HourlyVariable = VariableAndPreviousDay
-    
+
     typealias HourlyPressureType = ForecastPressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
-    
+
     typealias DailyVariable = ForecastVariableDaily
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .best_match:

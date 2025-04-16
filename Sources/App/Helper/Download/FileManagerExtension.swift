@@ -1,6 +1,5 @@
 import Foundation
 
-
 extension FileManager {
     /// Delete files older than a given date in a directory. No support for recursion.
     public func deleteFiles(direcotry: String, olderThan: Date) throws {

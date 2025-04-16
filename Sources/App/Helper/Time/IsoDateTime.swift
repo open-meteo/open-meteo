@@ -6,61 +6,61 @@ import Foundation
 public struct IsoDateTime {
     /// Encoded as integer `20220101235959`
     public let date: Int
-    
+
     public init(year: Int, month: Int, day: Int, hour: Int, minute: Int, second: Int) {
         date = year * 10000000000 + month * 100000000 + day * 1000000 + hour * 10000 + minute * 100 + second
     }
-    
+
     /// year like 2022
     public var year: Int {
         date / 10000000000
     }
-    
+
     /// month from 1 to 12
     public var month: Int {
         date / 100000000 % 100
     }
-    
+
     /// day from 1 to 31
     public var day: Int {
         date / 1000000 % 100
     }
-    
+
     /// hour from 0 to 23
     public var hour: Int {
         date / 10000 % 100
     }
-    
+
     /// minute from 0 to 59
     public var minute: Int {
         date / 100 % 100
     }
-    
+
     /// second from 0 to 59
     public var second: Int {
         date % 100
     }
-    
+
     /// convert to unix timestamp
     public func toTimestamp() -> Timestamp {
         Timestamp(year, month, day, hour, minute, second)
     }
-    
+
     /// Convert to strideable `YearMonth`
     public func toYearMonth() -> YearMonth {
         return YearMonth(year: year, month: month)
     }
-    
+
     /*public init(from decoder: Decoder) throws {
         let str = try decoder.singleValueContainer().decode(String.self)
         try self.init(fromIsoString: str)
     }*/
-    
+
     /// To iso string like `2022-12-23T00:00:00`
     public func toIsoString() -> String {
         return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2)):\(second.zeroPadded(len: 2))"
     }
-    
+
     /// Init form unxtimestamp
     public init(timeIntervalSince1970: Int) {
         var time = timeIntervalSince1970
@@ -68,9 +68,9 @@ public struct IsoDateTime {
         gmtime_r(&time, &t)
         // day of year = Int(t.tm_yday+1)
         // day of week = Int(t.tm_wday)
-        self.init(year: Int(t.tm_year+1900), month: Int(t.tm_mon+1), day: Int(t.tm_mday), hour: Int(t.tm_hour), minute: Int(t.tm_min), second: Int(t.tm_sec))
+        self.init(year: Int(t.tm_year + 1900), month: Int(t.tm_mon + 1), day: Int(t.tm_mday), hour: Int(t.tm_hour), minute: Int(t.tm_min), second: Int(t.tm_sec))
     }
-    
+
     /// Decode from `2022-12-23` or `2022-12-23T00:00` or `2022-12-23T00:00:00`
     public init(fromIsoString str: String) throws {
         guard str.count >= 10, str.count <= 19, str[4..<5] == "-", str[7..<8] == "-" else {
@@ -89,7 +89,7 @@ public struct IsoDateTime {
             self.init(year: year, month: month, day: day, hour: 0, minute: 0, second: 0)
             return
         }
-        
+
         guard str.count >= 13, str[10..<11] == "T", let hour = Int(str[11..<13]) else {
             throw TimeError.InvalidDateFromat
         }
@@ -124,11 +124,11 @@ extension IsoDateTime {
     static func load(commaSeparated: [String]) throws -> [IsoDateTime] {
         try commaSeparated.flatMap { s in
             try s.split(separator: ",").map { date in
-                return try IsoDateTime.init(fromIsoString: String(date))
+                return try IsoDateTime(fromIsoString: String(date))
             }
         }
     }
-    
+
     static func loadRange(start: [String], end: [String]) throws -> [ClosedRange<Timestamp>] {
         if start.isEmpty, end.isEmpty {
             return []
@@ -138,7 +138,7 @@ extension IsoDateTime {
         guard startDate.count == endDate.count else {
             throw ForecastapiError.startAndEndDateCountMustBeTheSame
         }
-        return try zip(startDate, endDate).map { (startDate, endDate) in
+        return try zip(startDate, endDate).map { startDate, endDate in
             let start = startDate.toTimestamp()
             let includedEnd = endDate.toTimestamp()
             guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
@@ -148,4 +148,3 @@ extension IsoDateTime {
         }
     }
 }
-

@@ -2,7 +2,6 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
-
 extension Cmip6Variable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -112,18 +111,18 @@ extension Cmip6VariableDerivedBiasCorrected: FlatBuffersVariable {
 
 extension Cmip6Domain: ModelFlatbufferSerialisable {
     typealias HourlyVariable = EnsembleSurfaceVariable
-    
+
     typealias HourlyPressureType = ForecastPressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
-    
+
     typealias DailyVariable = Cmip6VariableOrDerivedPostBias
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .CMCC_CM2_VHR4:
             return .cmccCm2Vhr4
-        //case .FGOALS_f3_H_highresSST:
+        // case .FGOALS_f3_H_highresSST:
         //    return .fgoalsF3HHighressst
         case .FGOALS_f3_H:
             return .fgoalsF3H

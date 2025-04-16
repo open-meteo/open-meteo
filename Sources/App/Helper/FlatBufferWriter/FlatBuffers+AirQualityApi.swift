@@ -2,7 +2,6 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
-
 extension CamsVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -121,13 +120,13 @@ extension CamsVariableDerived: FlatBuffersVariable {
 
 extension CamsQuery.Domain: ModelFlatbufferSerialisable {
     typealias HourlyVariable = CamsReader.MixingVar
-    
+
     typealias HourlyPressureType = ForecastPressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
-    
+
     typealias DailyVariable = ForecastVariableDaily
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .auto:

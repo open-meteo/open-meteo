@@ -188,7 +188,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             guard let timestep else {
                 return nil
             }
-            let avg15 = timestep == 0 ? "anl" : "\(timestep-15)-\(timestep) min ave fcst"
+            let avg15 = timestep == 0 ? "anl" : "\(timestep - 15)-\(timestep) min ave fcst"
             let fcst = timestep == 0 ? "anl" : "\(timestep) min fcst"
             switch self {
             case .temperature_2m:
@@ -344,7 +344,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             }
         }
     }
-    
+
     func skipHour0(for domain: GfsDomain) -> Bool {
         if domain == .hrrr_conus_15min {
             switch self {
@@ -373,7 +373,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         default: return false
         }
     }
-    
+
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
@@ -383,7 +383,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .temperature_100m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 0)
+            return (1 / 100, 0)
         case .surface_temperature:
             fallthrough
         case .soil_temperature_0_to_10cm:
@@ -473,11 +473,11 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             }
         }
     }
-    
+
     func skipHour0(for domain: GfsDomain) -> Bool {
         return false
     }
-    
+
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:

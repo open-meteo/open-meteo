@@ -1,6 +1,5 @@
 import Foundation
 
-
 struct RegularGrid: Gridable {
     let nx: Int
     let ny: Int
@@ -9,7 +8,7 @@ struct RegularGrid: Gridable {
     let dx: Float
     let dy: Float
     let searchRadius: Int
-    
+
     public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
         self.nx = nx
         self.ny = ny
@@ -19,22 +18,22 @@ struct RegularGrid: Gridable {
         self.dy = dy
         self.searchRadius = searchRadius
     }
-    
+
     var isGlobal: Bool {
         return (Float(nx) * dx) >= 360 && (Float(ny) * dy) >= 180
     }
-    
+
     func findPoint(lat: Float, lon: Float) -> Int? {
-        guard let (x,y) = findPointXy(lat: lat, lon: lon) else {
+        guard let (x, y) = findPointXy(lat: lat, lon: lon) else {
             return nil
         }
         return y * nx + x
     }
-    
+
     func findPointXy(lat: Float, lon: Float) -> (x: Int, y: Int)? {
-        let x = Int(roundf((lon-lonMin) / dx))
-        let y = Int(roundf((lat-latMin) / dy))
-        
+        let x = Int(roundf((lon - lonMin) / dx))
+        let y = Int(roundf((lat - latMin) / dy))
+
         // Allow points on the border. For global grids, this grid point now wrappes to the eastern side
         let xx = Float(nx) * dx >= 359 ? x.moduloPositive(nx) : x
         let yy = Float(ny) * dy >= 179 ? y.moduloPositive(ny) : y
@@ -43,37 +42,37 @@ struct RegularGrid: Gridable {
         }
         return (xx, yy)
     }
-    
+
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float) {
         let y = gridpoint / nx
-        let x = gridpoint-y * nx
+        let x = gridpoint - y * nx
         let lat = latMin + Float(y) * dy
         let lon = lonMin + Float(x) * dx
         return (lat, lon)
     }
-    
+
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction? {
-        let x = (lon-lonMin) / dx
-        let y = (lat-latMin) / dy
-        
+        let x = (lon - lonMin) / dx
+        let y = (lat - latMin) / dy
+
         if y < 0 || x < 0 || y >= Float(ny) || x >= Float(nx) {
             return nil
         }
-        
-        let xFraction = (lon-lonMin).truncatingRemainder(dividingBy: dx)
-        let yFraction = (lat-latMin).truncatingRemainder(dividingBy: dy)
+
+        let xFraction = (lon - lonMin).truncatingRemainder(dividingBy: dx)
+        let yFraction = (lat - latMin).truncatingRemainder(dividingBy: dy)
         return GridPoint2DFraction(gridpoint: Int(y) * nx + Int(x), xFraction: xFraction, yFraction: yFraction)
     }
-    
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> Optional<any Sequence<Int>> {
+
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> (any Sequence<Int>)? {
         guard let (x1, y1) = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
               let (x2, y2) = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound) else {
             return []
         }
-        
+
         let xRange = x1 ..< x2
         let yRange = y1 > y2 ? y2 ..< y1 : y1 ..< y2
-        
+
         return RegularGridSlice(grid: self, yRange: yRange, xRange: xRange)
     }
 }
@@ -85,7 +84,7 @@ struct RegularGridSlice {
     let ny: Int
     let yRange: Range<Int>
     let xRange: Range<Int>
-    
+
     public init<Grid: Gridable>(grid: Grid, yRange: Range<Int>, xRange: Range<Int>) {
         self.xRange = xRange
         self.yRange = yRange
@@ -109,15 +108,15 @@ extension RegularGridSlice: RandomAccessCollection {
             yield gridpoint
         }
     }
-    
+
     var startIndex: Int {
         0
     }
-    
+
     var endIndex: Int {
         yRange.count * xRange.count
     }
-    
+
     typealias Index = Int
 }
 
@@ -131,7 +130,7 @@ struct GridSliceXyIterator: IteratorProtocol {
     let nxSlice: Int
     /// Number of x steps in the grid
     let nx: Int
-    
+
     init(yRange: Range<Int>, xRange: Range<Int>, nx: Int) {
         let count = xRange.count * yRange.count
         self.end = ((yRange.upperBound - 1) * nx + xRange.upperBound)
@@ -140,7 +139,7 @@ struct GridSliceXyIterator: IteratorProtocol {
         self.nxSlice = xRange.count
         self.nx = nx
     }
-    
+
     mutating func next() -> Int? {
         guard (position + 1) < end else {
             // End of iteration

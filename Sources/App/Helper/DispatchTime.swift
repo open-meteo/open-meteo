@@ -1,6 +1,5 @@
 import Foundation
 
-
 extension DispatchTime {
     /// Nicely format elapsed time
     func timeElapsedPretty() -> String {

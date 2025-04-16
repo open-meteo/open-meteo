@@ -10,33 +10,32 @@ struct GenericVariableHandle {
     let time: Timestamp
     let member: Int
     private let fn: FileHandle
-    
+
     public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle) {
         self.variable = variable
         self.time = time
         self.member = member
         self.fn = fn
     }
-    
+
     public func makeReader() throws -> OmFileReaderArray<MmapFile, Float> {
         try OmFileReader(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
     }
-    
+
     /// Process concurrently
     static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: CompressionType = .pfor_delta2d_int16) async throws {
-        
         let startTime = DispatchTime.now()
         try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
         logger.info("Convert completed in \(startTime.timeElapsedPretty())")
-        
+
         /// Write new model meta data, but only of it contains temperature_2m, precipitation, 10m wind or pressure. Ignores e.g. upper level runs
-        if writeUpdateJson, let run, handles.contains(where: {["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane", "shortwave_radiation"].contains($0.variable.omFileName.file)}) {
-            let end = handles.max(by: {$0.time < $1.time})?.time.add(domain.dtSeconds) ?? Timestamp(0)
-            
-            //let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
-            
+        if writeUpdateJson, let run, handles.contains(where: { ["temperature_2m", "precipitation", "precipitation_probability", "wind_u_component_10m", "pressure_msl", "river_discharge", "ocean_u_current", "wave_height", "pm10", "methane", "shortwave_radiation"].contains($0.variable.omFileName.file) }) {
+            let end = handles.max(by: { $0.time < $1.time })?.time.add(domain.dtSeconds) ?? Timestamp(0)
+
+            // let writer = OmFileWriter(dim0: 1, dim1: 1, chunk0: 1, chunk1: 1)
+
             // generate model update timeseries
-            //let range = TimerangeDt(start: run, to: end, dtSeconds: domain.dtSeconds)
+            // let range = TimerangeDt(start: run, to: end, dtSeconds: domain.dtSeconds)
             let current = Timestamp.now()
             /*let initTimes = try range.flatMap {
                 // TODO timestamps need 64 bit integration
@@ -59,7 +58,7 @@ struct GenericVariableHandle {
             try convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: initTimes, storePreviousForecastOverwrite: storePreviousForecast)*/
             try ModelUpdateMetaJson.update(domain: domain, run: run, end: end, now: current)
         }
-        
+
         if let uploadS3Bucket = uploadS3Bucket {
             logger.info("AWS upload to bucket \(uploadS3Bucket)")
             let startTimeAws = DispatchTime.now()
@@ -83,32 +82,31 @@ struct GenericVariableHandle {
             logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty())")
         }
     }
-    
-    static private func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: CompressionType) async throws {
+
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: CompressionType) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
-                .groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"})
+                .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
                 .evenlyChunked(in: concurrent)
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap{$0.values}, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
-                    
+                    try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap { $0.values }, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
             })
         } else {
             try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
         }
     }
-    
+
     /// Process each variable and update time-series optimised files
-    static private func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
-        //let nLocations = grid.count
+        // let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
-        
-        for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
-            let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try handles.grouped(by: {$0.time}).flatMap { (time, h) in
+
+        for (_, handles) in handles.groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" }) {
+            let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try handles.grouped(by: { $0.time }).flatMap { time, h in
                 return try h.map {
                     let reader = try $0.makeReader()
                     let dimensions = reader.getDimensions()
@@ -120,15 +118,15 @@ struct GenericVariableHandle {
                     return(time, reader, $0.member)
                 }
             }
-            guard let timeMin = readers.min(by: {$0.time.range.lowerBound < $1.time.range.lowerBound})?.time.range.lowerBound else {
+            guard let timeMin = readers.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound else {
                 logger.warning("No data to convert")
                 return
             }
-            guard let timeMax = readers.max(by: {$0.time.range.upperBound < $1.time.range.upperBound})?.time.range.upperBound else {
+            guard let timeMax = readers.max(by: { $0.time.range.upperBound < $1.time.range.upperBound })?.time.range.upperBound else {
                 logger.warning("No data to convert")
                 return
             }
-            guard let maxTimeStepsPerFile = readers.max(by: {$0.time.count < $1.time.count})?.time.count else {
+            guard let maxTimeStepsPerFile = readers.max(by: { $0.time.count < $1.time.count })?.time.count else {
                 logger.warning("No data to convert")
                 return
             }
@@ -136,11 +134,11 @@ struct GenericVariableHandle {
             /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
             let startTime = min(run ?? timeMin, timeMin)
             let time = TimerangeDt(range: startTime..<timeMax, dtSeconds: dtSeconds)
-            
+
             let variable = handles[0].variable
-            let nMembers = (handles.max(by: {$0.member < $1.member})?.member ?? 0) + 1
+            let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
-            
+
             let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
             if onlyGeneratePreviousDays && !storePreviousForecast {
                 // No need to generate previous day forecast
@@ -148,19 +146,19 @@ struct GenericVariableHandle {
             }
             /// If only one value is set, this could be the model initialisation or modifcation time
             /// TODO: check if single value mode is still required
-            //let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
-            
+            // let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
+
             let om = OmFileSplitter(domain,
-                                    //nLocations: isSingleValueVariable ? 1 : nil,
+                                    // nLocations: isSingleValueVariable ? 1 : nil,
                                     nMembers: nMembers/*,
                                     chunknLocations: nMembers > 1 ? nMembers : nil*/
             )
-            //let nLocationsPerChunk = om.nLocationsPerChunk
-            
+            // let nLocationsPerChunk = om.nLocationsPerChunk
+
             let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: nMembers, nTime: 1)
             var data3d = Array3DFastTime(nLocations: spatialChunks.x * spatialChunks.y, nLevel: nMembers, nTime: time.count)
             var readTemp = [Float](repeating: .nan, count: spatialChunks.x * spatialChunks.y * maxTimeStepsPerFile)
-            
+
             // Create netcdf file for debugging
             if createNetcdf && !onlyGeneratePreviousDays {
                 logger.info("Generating NetCDF file for \(variable)")
@@ -185,10 +183,10 @@ struct GenericVariableHandle {
                     }
                 }
             }
-            
-            let progress = TransferAmountTracker(logger: logger, totalSize: nx*ny*time.count*nMembers*MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
-                        
-            try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { (yRange, xRange, memberRange) in
+
+            let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
+
+            try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 data3d.data.fillWithNaNs()
                 for reader in readers {
@@ -198,14 +196,14 @@ struct GenericVariableHandle {
                         /// Number of time steps in this file
                         let nt = dimensions[2]
                         try reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
-                        data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex+Int(nt)] = readTemp[0..<nLoc*Int(nt)]
+                        data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
                     } else {
                         // Single time step
                         try reader.reader.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }
-                
+
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
@@ -213,7 +211,7 @@ struct GenericVariableHandle {
                     grid: domain.grid,
                     locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
                 )
-                
+
                 progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
                 return data3d.data[0..<nLoc * memberRange.count * time.count]
             }
@@ -222,21 +220,20 @@ struct GenericVariableHandle {
     }
 }
 
-
 actor GenericVariableHandleStorage {
     var handles = [GenericVariableHandle]()
-    
+
     func append(_ element: GenericVariableHandle) {
         handles.append(element)
     }
-    
+
     func append(_ element: GenericVariableHandle?) {
         guard let element else {
             return
         }
         handles.append(element)
     }
-    
+
     func append(contentsOf elements: [GenericVariableHandle]) {
         handles.append(contentsOf: elements)
     }
@@ -248,39 +245,39 @@ actor VariablePerMemberStorage<V: Hashable> {
         let variable: V
         let timestamp: Timestamp
         let member: Int
-        
+
         func with(variable: V, timestamp: Timestamp? = nil) -> VariableAndMember {
             .init(variable: variable, timestamp: timestamp ?? self.timestamp, member: self.member)
         }
-        
+
         var timestampAndMember: TimestampAndMember {
             return .init(timestamp: timestamp, member: member)
         }
     }
-    
+
     struct TimestampAndMember: Equatable {
         let timestamp: Timestamp
         let member: Int
     }
-    
+
     var data = [VariableAndMember: Array2D]()
-    
-    init(data: [VariableAndMember : Array2D] = [VariableAndMember: Array2D]()) {
+
+    init(data: [VariableAndMember: Array2D] = [VariableAndMember: Array2D]()) {
         self.data = data
     }
-    
+
     func set(variable: V, timestamp: Timestamp, member: Int, data: Array2D) {
         self.data[.init(variable: variable, timestamp: timestamp, member: member)] = data
     }
-    
+
     func get(variable: V, timestamp: Timestamp, member: Int) -> Array2D? {
         return data[.init(variable: variable, timestamp: timestamp, member: member)]
     }
-    
+
     func get(_ variable: VariableAndMember) -> Array2D? {
         return data[variable]
     }
-    
+
     func getAndForget(_ variable: VariableAndMember) -> Array2D? {
         let value = data[variable]
         data.removeValue(forKey: variable)
@@ -288,15 +285,14 @@ actor VariablePerMemberStorage<V: Hashable> {
     }
 }
 
-
 extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members an timesteps.
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
     func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriterHelper, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
         return try self.data
-            .groupedPreservedOrder(by: {$0.key.timestampAndMember})
-            .flatMap({ (t, handles) -> [GenericVariableHandle] in
-                guard let u = handles.first(where: {$0.key.variable == u}), let v = handles.first(where: {$0.key.variable == v}) else {
+            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
+            .flatMap({ t, handles -> [GenericVariableHandle] in
+                guard let u = handles.first(where: { $0.key.variable == u }), let v = handles.first(where: { $0.key.variable == v }) else {
                     return []
                 }
                 let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
@@ -306,11 +302,11 @@ extension VariablePerMemberStorage {
                     member: t.member,
                     fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outSpeedVariable.scalefactor, all: speed)
                 )
-                
+
                 if let outDirectionVariable {
                     var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
                     if let trueNorth {
-                        direction = zip(direction, trueNorth).map({($0-$1+360).truncatingRemainder(dividingBy: 360)})
+                        direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                     }
                     let directionHandle = GenericVariableHandle(
                         variable: outDirectionVariable,
@@ -324,7 +320,7 @@ extension VariablePerMemberStorage {
             }
         )
     }
-    
+
     /// Generate elevation file
     /// - `elevation`: in metres
     /// - `landMask` 0 = sea, 1 = land. Fractions below 0.5 are considered sea.
@@ -333,11 +329,11 @@ extension VariablePerMemberStorage {
         if FileManager.default.fileExists(atPath: elevationFile.getFilePath()) {
             return
         }
-        guard var elevation = self.data.first(where: {$0.key.variable == elevation})?.value.data,
-              let landMask = self.data.first(where: {$0.key.variable == landmask})?.value.data else {
+        guard var elevation = self.data.first(where: { $0.key.variable == elevation })?.value.data,
+              let landMask = self.data.first(where: { $0.key.variable == landmask })?.value.data else {
             return
         }
-        
+
         try elevationFile.createDirectory()
         for i in elevation.indices {
             if elevation[i] >= 9000 {
@@ -351,16 +347,15 @@ extension VariablePerMemberStorage {
         #if Xcode
         try Array2D(data: elevation, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: domain.surfaceElevationFileOm.getFilePath().replacingOccurrences(of: ".om", with: ".nc"))
         #endif
-        
+
         try elevation.writeOmFile2D(file: elevationFile.getFilePath(), grid: domain.grid, createNetCdf: false)
     }
 }
 
-
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {
     var data: [Int: (step: Int, data: [Float])]
-    
+
     /// Set new value and get previous value out
     func set<V: Hashable>(variable: V, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
         var hash = Hasher()
@@ -371,16 +366,16 @@ actor GribDeaverager {
         data[key] = (step, d)
         return previous
     }
-    
+
     /// Make a deep copy
     func copy() -> GribDeaverager {
         return .init(data: data)
     }
-    
-    public init(data: [Int : (step: Int, data: [Float])] = .init()) {
+
+    public init(data: [Int: (step: Int, data: [Float])] = .init()) {
         self.data = data
     }
-    
+
     /// Returns false if step should be skipped
     func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
         // Deaccumulate precipitation
@@ -397,7 +392,7 @@ actor GribDeaverager {
                 }
             }
         }
-        
+
         // Deaverage data
         if stepType == "avg" {
             guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {
@@ -414,7 +409,7 @@ actor GribDeaverager {
                 }
             }
         }
-        
+
         return true
     }
 }

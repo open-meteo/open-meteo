@@ -10,13 +10,13 @@ final class TransferAmountTracker {
     let logger: Logger
     let totalSize: Int?
     let name: String
-    
+
     public init(logger: Logger, totalSize: Int?, name: String = "Transfer") {
         self.logger = logger
         self.totalSize = totalSize
         self.name = name
     }
-    
+
     /// Print status from time to time
     func set(_ bytes: Int) {
         transfered = bytes
@@ -36,12 +36,12 @@ final class TransferAmountTracker {
             transferedLastPrint = transfered
         }
     }
-    
+
     /// Print status from time to time
     func add(_ bytes: Int) {
         set(bytes + transfered)
     }
-    
+
     /// Print end statistics
     func finish() {
         guard transfered > 0 else {

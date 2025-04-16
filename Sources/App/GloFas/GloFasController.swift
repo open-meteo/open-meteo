@@ -5,7 +5,7 @@ typealias GloFasVariableMember = GloFasVariable
 
 struct GloFasMixer: GenericReaderMixer {
     let reader: [GloFasReader]
-    
+
     static func makeReader(domain: GloFasReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GloFasReader? {
         return try GloFasReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
@@ -18,7 +18,7 @@ enum GlofasDerivedVariable: String, CaseIterable, GenericVariableMixable {
     case river_discharge_median
     case river_discharge_p25
     case river_discharge_p75
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -29,26 +29,26 @@ typealias GloFasVariableOrDerivedMember = VariableOrDerived<GloFasVariableMember
 
 struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     let reader: GenericReaderCached<GloFasDomain, GloFasVariableMember>
-    
+
     typealias Domain = GloFasDomain
-    
+
     typealias Variable = GloFasVariableMember
-    
+
     typealias Derived = GlofasDerivedVariable
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
     }
-    
+
     func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws {
         for member in 0..<51 {
             try reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
         }
     }
-    
+
     func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let data = try (0..<51).map({
             try reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
@@ -59,7 +59,7 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         switch derived {
         case .river_discharge_mean:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.reduce(0, {$0 + $1[t]}) / Float(data.count)
+                data.reduce(0, { $0 + $1[t] }) / Float(data.count)
             }, .cubicMetrePerSecond)
         case .river_discharge_min:
             return DataAndUnit((0..<time.time.count).map { t in
@@ -71,15 +71,15 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }, .cubicMetrePerSecond)
         case .river_discharge_median:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.5), (Float(data.count)*0.5).truncatingRemainder(dividingBy: 1) )
+                data.map({ $0[t] }).sorted().interpolateLinear(Int(Float(data.count) * 0.5), (Float(data.count) * 0.5).truncatingRemainder(dividingBy: 1) )
             }, .cubicMetrePerSecond)
         case .river_discharge_p25:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.25), (Float(data.count)*0.25).truncatingRemainder(dividingBy: 1) )
+                data.map({ $0[t] }).sorted().interpolateLinear(Int(Float(data.count) * 0.25), (Float(data.count) * 0.25).truncatingRemainder(dividingBy: 1) )
             }, .cubicMetrePerSecond)
         case .river_discharge_p75:
             return DataAndUnit((0..<time.time.count).map { t in
-                data.map({$0[t]}).sorted().interpolateLinear(Int(Float(data.count)*0.75), (Float(data.count)*0.75).truncatingRemainder(dividingBy: 1) )
+                data.map({ $0[t] }).sorted().interpolateLinear(Int(Float(data.count) * 0.75), (Float(data.count) * 0.75).truncatingRemainder(dividingBy: 1) )
             }, .cubicMetrePerSecond)
         }
     }
@@ -87,10 +87,10 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GloFasController {
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter("flood-api") { host, params in
+        try await req.withApiParameter("flood-api") { _, params in
             let currentTime = Timestamp.now()
             let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
-            
+
             let prepared = try params.prepareCoordinates(allowTimezones: false)
             guard case .coordinates(let prepared) = prepared else {
                 throw ForecastapiError.generic(message: "Bounding box not supported")
@@ -100,13 +100,13 @@ struct GloFasController {
                 throw ForecastapiError.generic(message: "Parameter 'daily' required")
             }
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
-            
+
             let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try prepared.map { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                
+
                 let readers: [ForecastapiResult<GlofasDomainApi>.PerModel] = try domains.compactMap { domain in
                     guard let reader = try domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest, options: params.readerOptions) else {
                         return nil
@@ -131,7 +131,7 @@ struct GloFasController {
                         daily: {
                             return ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
                                 switch variable {
-                                case .raw(_):
+                                case .raw:
                                     let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
                                         let d = try reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
                                         assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
@@ -161,15 +161,15 @@ struct GloFasController {
 
 enum GlofasDomainApi: String, RawRepresentableString, CaseIterable {
     case best_match
-    
+
     case seamless_v3
     case forecast_v3
     case consolidated_v3
-    
+
     case seamless_v4
     case forecast_v4
     case consolidated_v4
-    
+
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GloFasMixer? {

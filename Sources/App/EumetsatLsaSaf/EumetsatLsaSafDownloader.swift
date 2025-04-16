@@ -15,49 +15,49 @@ struct EumetsatLsaSafDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
-        
+
         @Option(name: "run")
         var run: String?
-        
+
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
-        
+
         @Option(name: "only-variables")
         var onlyVariables: String?
-        
+
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
-        
+
         @Option(name: "username", help: "Username for data server")
         var username: String?
-        
+
         @Option(name: "password", help: "Password for data server")
         var password: String?
-        
+
         @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
         var concurrent: Int?
-        
+
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
     }
-    
+
     var help: String {
         "Download Eumetsat Sarah data"
     }
-    
+
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let domain = try EumetsatLsaSafDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
-        
+
         guard let username = signature.username, let password = signature.password else {
             fatalError("Parameter username and password are required")
         }
-        
+
         if let timeinterval = signature.timeinterval {
             let chunkDt = domain.omFileLength * domain.dtSeconds
             let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: domain.dtSeconds)
-            for (_, runs) in timerange.groupedPreservedOrder(by: {$0.timeIntervalSince1970 / chunkDt}) {
+            for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMdd)")
                 let handles = try await runs.asyncFlatMap { run in
                     return try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
@@ -71,7 +71,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
         let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
         let endTime = Timestamp.now().floor(toNearestHour: 1)
-        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile)).map(Int.init)?.flatMap(Timestamp.init))
+        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile))?.toTimestamp())
         let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
         guard startTime <= endTime else {
             logger.info("All steps already downloaded")
@@ -82,19 +82,19 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let handles = try await downloadRange.asyncFlatMap { run in
             try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
         }
-        if let last = handles.max(by: {$0.time < $1.time})?.time {
+        if let last = handles.max(by: { $0.time < $1.time })?.time {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
-    
+
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetsatLsaSafDomain, username: String, password: String) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryError4xx: false)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
-        
+
         let server = "https://\(username):\(password)@datalsasaf.lsasvcs.ipma.pt"
         let url: String
         switch domain {
@@ -103,7 +103,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         case .iodc:
             url = "\(server)/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/\(run.format_directoriesYYYYMMdd)/NETCDF4_LSASAF_MSG-IODC_MDSSFTD_IODC-Disk_\(run.format_YYYYMMddHHmm).nc"
         }
-        
+
         // https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG/MDSSFTD/NETCDF/2025/02/03/NETCDF4_LSASAF_MSG_MDSSFTD_MSG-Disk_202502031430.nc
         // https://datalsasaf.lsasvcs.ipma.pt/PRODUCTS/MSG-IODC/MDSSFTD/NETCDF/2025/01/01/NETCDF4_LSASAF_MSG-IODC_MDSSFTD_IODC-Disk_202501012315.nc
         let data: ByteBuffer
@@ -117,15 +117,15 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             logger.warning("Empty file, skipping")
             return []
         }
-        
+
         /// SEVIRI image scans are performed from South to North. Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 12 minutes.
         /// OpenMeteo grids are ordered South to North, therefore the scan time should increase with the line number
         /// Europe is at scan line 2570 => (760-(3201-2570)/5) = 633 seconds
-        let scanTimeDifferenceHours = (0..<3201*3201).map {
+        let scanTimeDifferenceHours = (0..<3201 * 3201).map {
             let line = $0 / 3201
             return (760 - Double(3201 - line) / 5) / 3600
         }
-        
+
         return try data.withUnsafeReadableBytes { memory in
             guard let nc = try NetCDF.open(memory: memory) else {
                 fatalError("Could not open netcdf from memory")
@@ -138,7 +138,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
                 fatalError("Could not open variable FRACTION_DIFFUSE")
             }
             diffuse_fraction.flipLatitude(nt: 1, ny: ny, nx: nx)
-            
+
             let start = DispatchTime.now()
             let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
             Zensun.instantaneousSolarRadiationToBackwardsAverages(
@@ -150,11 +150,11 @@ struct EumetsatLsaSafDownload: AsyncCommand {
                 sunDeclinationCutOffDegrees: 1
             )
             logger.info("conversion took \(start.timeElapsedPretty())")
-            
-            let direct_radiation = zip(shortwave_radiation, diffuse_fraction).map { (sw, df) -> Float in
-                return sw * (1-df)
+
+            let direct_radiation = zip(shortwave_radiation, diffuse_fraction).map { sw, df -> Float in
+                return sw * (1 - df)
             }
-            
+
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
             let sw = GenericVariableHandle(
                 variable: EumetsatLsaSafVariable.shortwave_radiation,

@@ -2,8 +2,6 @@ import Foundation
 import OmFileFormat
 import Vapor
 
-
-
 typealias Era5HourlyVariable = VariableOrDerived<Era5Variable, Era5VariableDerived>
 
 enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable {
@@ -55,13 +53,13 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case sunshine_duration
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    
+
     case wind_speed_10m_spread
     case wind_speed_100m_spread
     case wind_direction_10m_spread
     case wind_direction_100m_spread
     case snowfall_spread
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -76,13 +74,13 @@ struct Era5Factory {
         }
         return .init(reader: GenericReaderCached(reader: reader), options: options)
     }
-    
+
     /// Build a single reader for a given CdsDomain
     public static func makeReader(domain: CdsDomain, gridpoint: Int, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderCached<CdsDomain, Era5Variable>> {
         let reader = try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint)
         return .init(reader: GenericReaderCached(reader: reader), options: options)
     }
-    
+
     /// Combine ERA5 and ensemble spread. Used to generate wind speed uncertainties scaled from 0.5° ERA5-Ensemble to 0.25° ERA5.
     public static func makeEra5WithEnsemble(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
@@ -93,7 +91,7 @@ struct Era5Factory {
         }
         return .init(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5ens), GenericReaderCached(reader: era5)]), options: options)
     }
-    
+
     /**
      Build a combined ERA5 and ERA5-Land reader.
      Derived variables are calculated after combinding both variables to make it possible to calculate ET0 evapotransipiration with temperature from ERA5-Land, but radiation from ERA5
@@ -108,7 +106,7 @@ struct Era5Factory {
         }
         return .init(reader: GenericReaderMixerSameDomain(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
     }
-    
+
     public static func makeArchiveBestMatch(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>> {
         guard let era5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode),
               let era5land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode),
@@ -127,20 +125,20 @@ struct Era5Factory {
 
 struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol where Reader.MixingVar == Era5Variable {
     let reader: Reader
-    
+
     let options: GenericReaderOptions
-    
+
     typealias Domain = CdsDomain
-    
+
     typealias Variable = Era5Variable
-    
+
     typealias Derived = Era5VariableDerived
-    
+
     public init(reader: Reader, options: GenericReaderOptions) {
         self.reader = reader
         self.options = options
     }
-    
+
     func prefetchData(variables: [Era5HourlyVariable], time: TimerangeDtAndSettings) throws {
         for variable in variables {
             switch variable {
@@ -151,7 +149,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             }
         }
     }
-    
+
     func prefetchData(derived: Era5VariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .wind_speed_10m:
@@ -288,7 +286,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
         }
     }
-    
+
     func get(variable: Era5HourlyVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
@@ -297,7 +295,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return try get(derived: variable, time: time)
         }
     }
-    
+
     func get(derived: Era5VariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .wind_speed_10m:
@@ -305,7 +303,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .windspeed_10m:
             let u = try get(raw: .wind_u_component_10m, time: time)
             let v = try get(raw: .wind_v_component_10m, time: time)
-            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .apparent_temperature:
             let windspeed = try get(derived: .windspeed_10m, time: time).data
@@ -332,7 +330,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .windspeed_100m:
             let u = try get(raw: .wind_u_component_100m, time: time)
             let v = try get(raw: .wind_v_component_100m, time: time)
-            let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_100m:
             fallthrough
@@ -346,14 +344,14 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .vapor_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let dewpoint = try get(raw: .dew_point_2m, time: time).data
-            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+            return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time.time)
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let windspeed = try get(derived: .windspeed_10m, time: time).data
             let dewpoint = try get(raw: .dew_point_2m, time: time).data
-            
+
             let et0 = swrad.indices.map { i in
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: self.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
             }
@@ -361,7 +359,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
         case .diffuse_radiation:
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             let direct = try get(raw: .direct_radiation, time: time).data
-            let diff = zip(swrad,direct).map(-)
+            let diff = zip(swrad, direct).map(-)
             return DataAndUnit(diff, .wattPerSquareMetre)
         case .surface_pressure:
             let temperature = try get(raw: .temperature_2m, time: time).data
@@ -381,12 +379,12 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let snowwater = try get(raw: .snowfall_water_equivalent, time: time)
             let precip = try get(raw: .precipitation, time: time)
             let rain = zip(precip.data, snowwater.data).map({
-                return max($0.0-$0.1, 0)
+                return max($0.0 - $0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
         case .showers:
             let precipitation = try get(raw: .precipitation, time: time)
-            return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+            return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
         case .weather_code:
             fallthrough
         case .weathercode:
@@ -545,12 +543,12 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             /// https://www.wolframalpha.com/input?i=Simplify%5BSqrt%5BFold%5B%231%2B%232+%26%2CD%5B%5B%2F%2Fmath%3Asqrt%28U*U%2BV*V%29%2F%2F%5D%2C%7B%7B%5B%2F%2Fmath%3AU%2CV%2F%2F%5D%7D%7D%5D%5E2*%7B%5B%2F%2Fmath%3Au%2Cv%2F%2F%5D%7D%5E2%5D%5D%5D
             /// Simplify[Sqrt[Fold[#1+#2 &,D[[//math:sqrt(U*U+V*V)//],{{[//math:U,V//]}}]^2*{[//math:u,v//]}^2]]]
             /// sqrt((u^2 U^2 + v^2 V^2)/(U^2 + V^2))
-            let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
-                let ((u,v),(σu,σv)) = arg
-                if (u*u + v*v) == 0 {
+            let σr = zip(zip(u.data, v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u, v), (σu, σv)) = arg
+                if (u * u + v * v) == 0 {
                     return 0
                 }
-                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u + v*v))
+                return sqrt((u * u * σu * σu + v * v * σv * σv) / (u * u + v * v))
             }
             return DataAndUnit(σr, .metrePerSecond)
         case .wind_speed_100m_spread:
@@ -558,12 +556,12 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let σv = try get(raw: .wind_v_component_100m_spread, time: time)
             let u = try get(raw: .wind_u_component_100m, time: time)
             let v = try get(raw: .wind_v_component_100m, time: time)
-            let σr = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
-                let ((u,v),(σu,σv)) = arg
-                if (u*u + v*v) == 0 {
+            let σr = zip(zip(u.data, v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u, v), (σu, σv)) = arg
+                if (u * u + v * v) == 0 {
                     return 0
                 }
-                return sqrt((u*u * σu*σu + v*v * σv*σv) / (u*u + v*v))
+                return sqrt((u * u * σu * σu + v * v * σv * σv) / (u * u + v * v))
             }
             return DataAndUnit(σr, .metrePerSecond)
         case .wind_direction_10m_spread:
@@ -574,12 +572,12 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             /// https://www.wolframalpha.com/input?i=Simplify%5BSqrt%5BFold%5B%231%2B%232+%26%2CD%5B%5B%2F%2Fmath%3Aatan2%28U%2CV%29*180%2FPI+%2B+180%2F%2F%5D%2C%7B%7B%5B%2F%2Fmath%3AU%2CV%2F%2F%5D%7D%7D%5D%5E2*%7B%5B%2F%2Fmath%3Au%2Cv%2F%2F%5D%7D%5E2%5D%5D%5D
             /// Simplify[Sqrt[Fold[#1+#2 &,D[[//math:atan2(U,V)*180/PI + 180//],{{[//math:U,V//]}}]^2*{[//math:u,v//]}^2]]]
             /// (180 sqrt((u^2 V^2 + U^2 v^2)/(U^2 + V^2)^2))/π
-            let σ = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
-                let ((u,v),(σu,σv)) = arg
-                if (u*u + v*v) == 0 {
+            let σ = zip(zip(u.data, v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u, v), (σu, σv)) = arg
+                if (u * u + v * v) == 0 {
                     return 0
                 }
-                return sqrt((u*u * σv*σv + v*v * σu*σu) / ((u*u + v*v)*(u*u + v*v))) * 180 / .pi
+                return sqrt((u * u * σv * σv + v * v * σu * σu) / ((u * u + v * v) * (u * u + v * v))) * 180 / .pi
             }
             return DataAndUnit(σ, .degreeDirection)
         case .wind_direction_100m_spread:
@@ -587,12 +585,12 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let σv = try get(raw: .wind_v_component_100m_spread, time: time)
             let u = try get(raw: .wind_u_component_100m, time: time)
             let v = try get(raw: .wind_v_component_100m, time: time)
-            let σ = zip(zip(u.data,v.data), zip(σu.data, σv.data)).map { arg -> Float in
-                let ((u,v),(σu,σv)) = arg
-                if (u*u + v*v) == 0 {
+            let σ = zip(zip(u.data, v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u, v), (σu, σv)) = arg
+                if (u * u + v * v) == 0 {
                     return 0
                 }
-                return sqrt((u*u * σv*σv + v*v * σu*σu) / ((u*u + v*v)*(u*u + v*v))) * 180 / .pi
+                return sqrt((u * u * σv * σv + v * v * σu * σu) / ((u * u + v * v) * (u * u + v * v))) * 180 / .pi
             }
             return DataAndUnit(σ, .degreeDirection)
         case .snowfall_spread:

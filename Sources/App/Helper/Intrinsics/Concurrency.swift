@@ -11,7 +11,7 @@ extension Sequence {
         }
         return values
     }
-    
+
     func asyncFlatMap<T>(
         _ transform: (Element) async throws -> [T]
     ) async rethrows -> [T] {
@@ -23,13 +23,13 @@ extension Sequence {
         }
         return values
     }
-    
+
     func asyncCompactMap<T>(
         _ transform: (Element) async throws -> T?
     ) async rethrows -> [T] {
         var values = [T]()
         values.reserveCapacity(self.underestimatedCount)
-        
+
         for element in self {
             guard let result = try await transform(element) else {
                 continue
@@ -38,7 +38,7 @@ extension Sequence {
         }
         return values
     }
-    
+
     /// Execute a closure for each element concurrently
     /// `nConcurrent` limits the number of concurrent tasks
     func foreachConcurrent(
@@ -49,14 +49,14 @@ extension Sequence {
         try await withThrowingTaskGroup(of: Void.self) { group in
             for (index, element) in self.enumerated() {
                 if index >= nConcurrent {
-                    let _ = try await group.next()
+                    _ = try await group.next()
                 }
                 group.addTask { try await body(element) }
             }
             try await group.waitForAll()
         }
     }
-    
+
     /// Execute a closure for each element concurrently and return a new value
     /// `nConcurrent` limits the number of concurrent tasks
     /// Note: Results are ordered which may have a performance penalty
@@ -77,10 +77,10 @@ extension Sequence {
             while let result = try await group.next() {
                 results.append(result)
             }
-            return results.sorted(by: {$0.0 < $1.0}).map{$0.1}
+            return results.sorted(by: { $0.0 < $1.0 }).map { $0.1 }
         }
     }
-    
+
     /// Execute a closure for each element concurrently and return a new value
     /// Returns an `AsyncStream` to process in a pipeline
     /// `nConcurrent` limits the number of concurrent tasks
@@ -136,7 +136,7 @@ extension AsyncSequence {
         }
         return results
     }
-    
+
     /// Execute a closure for each element concurrently and return a new value
     /// Returns an `AsyncStream` to process in a pipeline
     /// `nConcurrent` limits the number of concurrent tasks
@@ -190,11 +190,11 @@ extension AsyncSequence {
 /// Thread safe dictionary
 actor DictionaryActor<Key: Hashable, Value> {
     private var variables = [Key: Value]()
-    
+
     func set(_ key: Key, _ value: Value) {
         variables[key] = value
     }
-    
+
     func get(_ key: Key) -> Value? {
         return variables[key]
     }

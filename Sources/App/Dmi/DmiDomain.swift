@@ -6,7 +6,7 @@ import Foundation
  */
 enum DmiDomain: String, GenericDomain, CaseIterable {
     case harmonie_arome_europe
-    
+
     var grid: Gridable {
         switch self {
         case .harmonie_arome_europe:
@@ -35,49 +35,49 @@ enum DmiDomain: String, GenericDomain, CaseIterable {
             )
         }
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .harmonie_arome_europe:
             return .dmi_harmonie_arome_europe
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
     }
-    
+
     var dtSeconds: Int {
-        return 1*3600
+        return 1 * 3600
     }
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var omFileLength: Int {
         // 60 timesteps
         return 90
     }
-    
+
     var ensembleMembers: Int {
         switch self {
         case .harmonie_arome_europe:
             return 1
         }
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .harmonie_arome_europe:
-            return 3*3600
+            return 3 * 3600
         }
     }
-    
+
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()

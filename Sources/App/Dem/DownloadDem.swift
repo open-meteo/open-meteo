@@ -3,7 +3,6 @@ import Vapor
 import SwiftNetCDF
 import OmFileFormat
 
-
 /**
  Download digital elevation model from Copernicus and Sinergise https://copernicus-dem-30m.s3.amazonaws.com/readme.html
 
@@ -16,31 +15,31 @@ struct Dem90: GenericDomain {
     var grid: Gridable {
         fatalError("Dem90 does not offer a grid")
     }
-    
+
     var domainRegistry: DomainRegistry {
         return .copernicus_dem90
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return .copernicus_dem90
     }
-    
+
     var dtSeconds: Int {
         return 0
     }
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var omFileLength: Int {
         return 0
     }
-    
+
     var updateIntervalSeconds: Int {
         return 0
     }
@@ -59,7 +58,7 @@ struct Dem90: GenericDomain {
         let px = pixel(latitude: lati)
         let lonrow = UInt64((lon + 180) * Float(px))
         var value: Float = .nan
-        try om.read(into: &value, range: [latrow..<latrow+1, lonrow..<lonrow+1])
+        try om.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1])
         return value
     }
 
@@ -121,9 +120,9 @@ struct DownloadDemCommand: AsyncCommand {
     func run(using context: CommandContext, signature: Signature) async throws {
         try FileManager.default.createDirectory(atPath: Dem90().downloadDirectory, withIntermediateDirectories: true)
         let logger = context.application.logger
-        //let curl = Curl(logger: logger)
+        // let curl = Curl(logger: logger)
 
-        //let tifTemp = "\(Dem90.downloadDirectory)temp.tif"
+        // let tifTemp = "\(Dem90.downloadDirectory)temp.tif"
 
         var scheduledConversions = 0
 
@@ -171,8 +170,8 @@ struct DownloadDemCommand: AsyncCommand {
 
                         let ncTemp = "\(Dem90().downloadDirectory)\(lat)_\(lon)_temp.nc"
 
-                        try Process.spawn(cmd: "gdal_translate", args: ["-of","NetCDF",tifLocal,ncTemp])
-                        //try FileManager.default.removeItem(atPath: tifTemp)
+                        try Process.spawn(cmd: "gdal_translate", args: ["-of", "NetCDF", tifLocal, ncTemp])
+                        // try FileManager.default.removeItem(atPath: tifTemp)
 
                         let data = try readNc(file: ncTemp)
                         try FileManager.default.removeItem(atPath: ncTemp)
@@ -201,7 +200,7 @@ struct DownloadDemCommand: AsyncCommand {
 
                 group.addTask {
                     let px = Dem90.pixel(latitude: lat)
-                    var line = [Float](repeating: 0, count: 360*1200*px)
+                    var line = [Float](repeating: 0, count: 360 * 1200 * px)
                     for lon in -180..<180 {
                         logger.info("Dem convert lon \(lon) lat \(lat)")
                         let omFile = "\(Dem90().downloadDirectory)\(lat)_\(lon).om"
@@ -217,13 +216,13 @@ struct DownloadDemCommand: AsyncCommand {
                         precondition(dimensions[1] == px)
                         let data = try om.read()
                         for i in 0..<1200 {
-                            line[i * (px * 360) + (lon+180)*px ..< i * (px * 360) + (lon+180)*px + px] = data[i*px ..< (i+1)*px]
+                            line[i * (px * 360) + (lon + 180) * px ..< i * (px * 360) + (lon + 180) * px + px] = data[i * px ..< (i + 1) * px]
                         }
                     }
 
-                    //let a2 = Array2DFastSpace(data: line, nLocations: 1200*360*px, nTime: 1)
-                    //try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
-                    try line.writeOmFile(file: file.getFilePath(), dimensions: [1200, px*360], chunks: [60, 60])
+                    // let a2 = Array2DFastSpace(data: line, nLocations: 1200*360*px, nTime: 1)
+                    // try a2.writeNetcdf(filename: "\(Dem90.downloadDirectory)lat_\(lat).nc", nx: 360*px, ny: 1200)
+                    try line.writeOmFile(file: file.getFilePath(), dimensions: [1200, px * 360], chunks: [60, 60])
                 }
             }
 

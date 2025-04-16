@@ -2,7 +2,6 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
-
 extension GloFasVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -31,17 +30,15 @@ extension GlofasDerivedVariable: FlatBuffersVariable {
     }
 }
 
-
-
 extension GlofasDomainApi: ModelFlatbufferSerialisable {
     typealias HourlyVariable = EnsembleSurfaceVariable
-    
+
     typealias HourlyPressureType = EnsemblePressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
-    
+
     typealias DailyVariable = GloFasVariableOrDerived
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .best_match:

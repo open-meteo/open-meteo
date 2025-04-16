@@ -2,7 +2,6 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
-
 extension MarineVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -83,7 +82,7 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
     typealias HourlyVariable = MarineVariable
 
     typealias HourlyPressureType = ForecastPressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
 
     typealias DailyVariable = IconWaveVariableDaily

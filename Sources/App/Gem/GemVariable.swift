@@ -21,9 +21,9 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     case relative_humidity_2m
     case cloud_cover
     case pressure_msl
-    
+
     case shortwave_radiation
-    
+
     case wind_speed_10m
     case wind_direction_10m
     case wind_speed_40m
@@ -32,25 +32,24 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
     case wind_direction_80m
     case wind_speed_120m
     case wind_direction_120m
-    
+
     /// there is also min/max
     case wind_gusts_10m
-    
+
     case showers
-    
+
     case snowfall_water_equivalent
-    
+
     case snow_depth
-    
+
     case soil_temperature_0_to_10cm
     case soil_moisture_0_to_10cm
-    
-    
+
     /// accumulated since forecast start `kg m-2 sec-1`
     case precipitation
-    
+
     case cape
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -65,11 +64,11 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         default: return false
         }
     }
-    
-    //case cin
-    
-    //case lifted_index
-    
+
+    // case cin
+
+    // case lifted_index
+
     func gribName(domain: GemDomain) -> String? {
         switch domain {
         case .gem_global:
@@ -118,9 +117,9 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
                 return "WEASN_SFC_0"
             case .cape:
                 return "CAPE_SFC_0"
-            //case .cin:
+            // case .cin:
             //    return "CIN_SFC_0"
-            //case .lifted_index:
+            // case .lifted_index:
             //    return "4LFTX_SFC_0"
             case .soil_temperature_0_to_10cm:
                 return "TSOIL_SFC_0"
@@ -233,18 +232,18 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             }
         }
     }
-    
+
     func includedFor(hour: Int, domain: GemDomain) -> Bool {
         if self == .cape && hour >= 171 {
             return false
         }
         return true
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     /// If this variable is winddirection, return the counterpater windspeed variable. Used to calculate data while downloading
     var winddirectionCounterPartVariable: Self? {
         switch self {
@@ -260,7 +259,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return nil
         }
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m:
@@ -313,8 +312,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return 100 // 1cm res
         }
     }
-    
-    
+
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
@@ -328,14 +326,14 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 0)
+            return (1 / 100, 0)
         case .shortwave_radiation:
-            return (1/Float(dtSeconds), 0) // joules to watt
+            return (1 / Float(dtSeconds), 0) // joules to watt
         default:
             return nil
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m:
@@ -388,7 +386,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .linear
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .temperature_2m:
@@ -441,7 +439,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .metre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
         case .soil_temperature_0_to_10cm:
@@ -458,11 +456,11 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return self == .soil_moisture_0_to_10cm || self == .snow_depth
     }
-    
+
     var skipHour0: Bool {
         switch self {
         case .precipitation: return true
@@ -485,22 +483,21 @@ enum GemPressureVariableType: String, CaseIterable {
     case relative_humidity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: GemPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -519,7 +516,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return "RH_\(isbl)"
         }
     }
-    
+
     func includedFor(hour: Int, domain: GemDomain) -> Bool {
         if domain == .gem_global_ensemble {
             // temperature and RH is missing for level 300 hpa
@@ -540,7 +537,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         }
         return true
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
@@ -558,7 +555,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return (0.05..<1).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -573,7 +570,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return .hermite(bounds: nil)
         }
     }
-    
+
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:
@@ -582,7 +579,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return nil
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -597,11 +594,11 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return .percentage
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var skipHour0: Bool {
         return false
     }
@@ -611,4 +608,3 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
  Combined surface and pressure level variables with all definitions for downloading and API
  */
 typealias GemVariable = SurfaceAndPressureVariable<GemSurfaceVariable, GemPressureVariable>
-

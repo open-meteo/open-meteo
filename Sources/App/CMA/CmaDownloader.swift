@@ -11,22 +11,22 @@ struct DownloadCmaCommand: AsyncCommand {
     struct Signature: CommandSignature {
         @Option(name: "run")
         var run: String?
-        
+
         @Argument(name: "domain")
         var domain: String
-        
+
         @Option(name: "server", help: "Root server path")
         var server: String?
-        
+
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
-        
+
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
-        
+
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
-        
+
         /*@Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
 
@@ -37,16 +37,16 @@ struct DownloadCmaCommand: AsyncCommand {
     var help: String {
         "Download a specified CMA model run"
     }
-    
+
     func run(using context: CommandContext, signature: Signature) async throws {
         disableIdleSleep()
-        
+
         let domain = try CmaDomain.load(rawValue: signature.domain)
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         let logger = context.application.logger
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        
+
         /*if let timeinterval = signature.timeinterval {
             if signature.fixSolar {
                 // timeinterval devided by chunk time range
@@ -56,7 +56,7 @@ struct DownloadCmaCommand: AsyncCommand {
             }
             fatalError("Time interval downloads not possible")
         }*/
-        
+
         guard let server = signature.server else {
             fatalError("Parameter 'server' is required")
         }
@@ -65,7 +65,7 @@ struct DownloadCmaCommand: AsyncCommand {
         let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
-    
+
     /// read each file in chunks, apply shortwave correction and write again
     /*func fixSolarFiles(application: Application, domain: CmaDomain, timerange: ClosedRange<Timestamp>) throws {
         let nTimePerFile = domain.omFileLength
@@ -108,7 +108,7 @@ struct DownloadCmaCommand: AsyncCommand {
             }
         }
     }*/
-    
+
     func getCmaVariable(logger: Logger, message: GribMessage) -> (any CmaVariableDownloadable)? {
         guard let shortName = message.get(attribute: "shortName"),
               let stepRange = message.get(attribute: "stepRange"),
@@ -125,7 +125,7 @@ struct DownloadCmaCommand: AsyncCommand {
         else {
             fatalError("could not get step range or type")
         }
-        
+
         switch typeOfLevel {
         case "isobaricInhPa":
             if level < 10 {
@@ -208,7 +208,7 @@ struct DownloadCmaCommand: AsyncCommand {
             case ("Wind speed (gust)", 10): return CmaSurfaceVariable.wind_gusts_10m
             default: break
             }
-            
+
         case "depthBelowLandLayer":
             guard let depth = Int(scaledValueOfFirstFixedSurface) else {
                 return nil
@@ -226,11 +226,11 @@ struct DownloadCmaCommand: AsyncCommand {
             }
         default: break
         }
-        
+
         logger.debug("Unmapped GRIB message \(shortName) \(stepRange) \(stepType) \(typeOfLevel) \(level) \(parameterName) \(parameterUnits) \(cfName) \(scaledValueOfFirstFixedSurface) \(scaledValueOfSecondFixedSurface) \(paramId)")
         return nil
     }
-    
+
     /// Create elevation and sea mask
     func writeElevation(grib: [GribMessage], domain: CmaDomain) async throws {
         let surfaceElevationFileOm = domain.surfaceElevationFileOm.getFilePath()
@@ -251,18 +251,18 @@ struct DownloadCmaCommand: AsyncCommand {
         try soilMoisture.load(message: soilMoistureGrib)
         orog.array.shift180LongitudeAndFlipLatitude()
         soilMoisture.array.shift180LongitudeAndFlipLatitude()
-        
+
         for i in orog.array.data.indices {
             if soilMoisture.array.data[i].isNaN || soilMoisture.array.data[i] > 1000 {
                 // Mark as sea level
                 orog.array.data[i] = -999
             }
         }
-        //try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
-        
+        // try orog.array.writeNetcdf(filename: surfaceElevationFileOm.replacingOccurrences(of: ".om", with: ".nc"))
+
         try orog.array.data.writeOmFile2D(file: surfaceElevationFileOm, grid: domain.grid)
     }
-    
+
     /// Download CMA data.
     /// Uses concurrent downloads and concurrent data conversion to process data as fast as possible
     /// Each download GRIB file is split into hundrets 16 MB parts and download in parallel using HTTP RANGE.
@@ -274,9 +274,9 @@ struct DownloadCmaCommand: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let nForecastHours = domain.forecastHours(run: run.hour)
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
-        
+
         let previous = GribDeaverager()
-        
+
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
@@ -307,27 +307,27 @@ struct DownloadCmaCommand: AsyncCommand {
                             return nil
                         }
                     }
-                    
+
                     let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    //message.dumpAttributes()
+                    // message.dumpAttributes()
                     try grib2d.load(message: message)
                     grib2d.array.shift180LongitudeAndFlipLatitude()
-                    
+
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-                    
+
                     // Deaccumulate precipitation
                     guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return nil
                     }
-                    
+
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
                     let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
-                }.collect().compactMap({$0})
+                }.collect().compactMap({ $0 })
             }
         }
         await curl.printStatistics()

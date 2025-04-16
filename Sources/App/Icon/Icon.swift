@@ -14,14 +14,14 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     case iconEps = "icon-eps"
     case iconEuEps = "icon-eu-eps"
     case iconD2Eps = "icon-d2-eps"
-    
+
     var dtSeconds: Int {
         if self == .iconD2_15min {
-            return 3600/4
+            return 3600 / 4
         }
         return 3600
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .icon:
@@ -40,7 +40,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return .dwd_icon_d2_eps
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         switch self {
         case .iconD2_15min:
@@ -53,34 +53,34 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     /// How many hourly timesteps to keep in each compressed chunk
     var omFileLength: Int {
         switch self {
         case .icon, .iconEps:
-            return 180+1 + 3*24
+            return 180 + 1 + 3 * 24
         case .iconEu, .iconEuEps:
-            return 120+1 + 3*24
+            return 120 + 1 + 3 * 24
         case .iconD2, .iconD2Eps:
-            return 48+1 + 3*24
+            return 48 + 1 + 3 * 24
         case .iconD2_15min:
-            return 48*4 + 3*24
+            return 48 * 4 + 3 * 24
         }
     }
-    
+
     /// All available pressure levels for the current domain
     var levels: [Int] {
         switch self {
         case .icon:
-            return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950,      1000]
+            return [30, 50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000]
         case .iconEu:
-            return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950,      1000] // disabled: 775, 825, 875
+            return [    50, 70, 100, 150, 200, 250, 300, 400, 500, 600, 700, 800, 850, 900, 925, 950, 1000] // disabled: 775, 825, 875
         case .iconD2:
-            return [                      200, 250, 300, 400, 500, 600, 700,      850,           950, 975, 1000]
+            return [                      200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
         case .iconD2_15min:
             return []
         case .iconEps:
@@ -91,22 +91,22 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return [] // 500, 700, 850, 950, 975, 1000
         }
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .icon:
-            return 6*3600
+            return 6 * 3600
         case .iconEu, .iconD2, .iconD2_15min:
-            return 3*3600
+            return 3 * 3600
         case .iconEps:
-            return 12*3600
+            return 12 * 3600
         case .iconEuEps:
-            return 6*3600
+            return 6 * 3600
         case .iconD2Eps:
-            return 3*3600
+            return 3 * 3600
         }
     }
-    
+
     /// Number of available forecast steps differs from run
     /// E.g. icon global 0z has 180 as a last value, but 6z only 120
     func getDownloadForecastSteps(run: Int) -> [Int] {
@@ -134,7 +134,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             // side runs
             return Array(0...30)
         case .iconD2_15min:
-            return Array(0...48*4-1)
+            return Array(0...48 * 4 - 1)
         case .iconD2Eps:
             fallthrough
         case .iconD2:
@@ -164,7 +164,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 1214, ny: 745, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         }
     }
-    
+
     /// name in the filenames
     var region: String {
         switch self {
@@ -177,7 +177,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         case .iconD2: return "germany"
         }
     }
-    
+
     /// model level standard heights, full levels
     /// icon wind level 1-90 88=98m, 87-174m
     /// icon-eu 1-60 58,57
@@ -200,7 +200,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return 65
         }
     }
-    
+
     /// ICON uses 1.5°C melting point temperature: https://gitlab.dkrz.de/icon/icon-model/-/blob/release-2024.01-public/src/atm_phy_nwp/mo_nh_interface_nwp.f90?ref_type=heads#L2232
     static let tMelt = Float(1.5)
 }

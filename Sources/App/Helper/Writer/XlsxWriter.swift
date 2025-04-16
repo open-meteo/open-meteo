@@ -1,11 +1,10 @@
 import Foundation
 import Vapor
 
-
 extension ForecastapiResult {
     func toXlsxResponse(timestamp: Timestamp) throws -> Response {
         let multiLocation = results.count > 1
-        
+
         let sheet = try XlsxWriter()
         sheet.startRow()
         if multiLocation {
@@ -18,7 +17,7 @@ extension ForecastapiResult {
         sheet.write("timezone")
         sheet.write("timezone_abbreviation")
         sheet.endRow()
-        
+
         for location in results {
             sheet.startRow()
             guard let first = location.results.first else {
@@ -50,13 +49,12 @@ extension ForecastapiResult {
         for location in results {
             try location.daily?().writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
-        
+
         let data = sheet.write(timestamp: timestamp)
         let response = Response(body: .init(buffer: data))
         response.headers.replaceOrAdd(name: .contentType, value: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").xlsx\"")
         return response
-
     }
 }
 

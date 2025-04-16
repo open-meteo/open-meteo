@@ -7,15 +7,15 @@ import OmFileFormat
 enum IconWaveDomain: String, CaseIterable, GenericDomain {
     case gwam
     case ewam
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .gwam:
@@ -24,26 +24,26 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
             return .dwd_ewam
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
     }
-    
+
     /// Number of time steps in each time series optimised file. 5 days more than each run.
     var omFileLength: Int {
-        let dtHours = dtSeconds/3600
+        let dtHours = dtSeconds / 3600
         return countForecastHours + 5 * 24 / dtHours
     }
-    
+
     var dtSeconds: Int {
         switch self {
         case .gwam:
-            return 3*3600
+            return 3 * 3600
         case .ewam:
             return 3600
         }
     }
-    
+
     var grid: Gridable {
         switch self {
         case .gwam:
@@ -52,16 +52,16 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 526, ny: 721, latMin: 30, lonMin: -10.5, dx: 0.1, dy: 0.05)
         }
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .gwam:
-            return 12*3600
+            return 12 * 3600
         case .ewam:
-            return 12*3600
+            return 12 * 3600
         }
     }
-    
+
     /// Number of actual forecast timesteps per run
     var countForecastHours: Int {
         switch self {
@@ -74,8 +74,8 @@ enum IconWaveDomain: String, CaseIterable, GenericDomain {
 }
 
 enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
-    //case windspeed_10m // Disabled, because already available in better quality in regular domains
-    //case winddirection_10m
+    // case windspeed_10m // Disabled, because already available in better quality in regular domains
+    // case winddirection_10m
     case wave_height
     case wave_period
     case wave_direction
@@ -87,23 +87,23 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
     case swell_wave_period
     case swell_wave_peak_period
     case swell_wave_direction
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     /// Name used on the dwd open data server
     var dwdName: String {
         switch self {
@@ -135,7 +135,7 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
             return "mdts"
         }
     }
-    
+
     /// Si unit
     var unit: SiUnit {
         switch self {
@@ -167,7 +167,7 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
             return .degreeDirection
         }
     }
-    
+
     var scalefactor: Float {
         let period: Float = 20 // 0.05s resolution
         let height: Float = 50 // 0.02m resolution
@@ -201,7 +201,7 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
             return direction
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         /*case .windspeed_10m:

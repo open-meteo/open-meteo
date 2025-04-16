@@ -134,12 +134,11 @@ extension EnsemblePressureVariableType: FlatBuffersVariable {
     }
 }
 
-
 extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
     typealias HourlyVariable = EnsembleSurfaceVariable
 
     typealias HourlyPressureType = EnsemblePressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
 
     typealias DailyVariable = ForecastVariableDaily

@@ -1,16 +1,15 @@
 import Foundation
 
 struct IconReader: GenericReaderDerived, GenericReaderProtocol {
-    
     typealias Domain = IconDomains
     typealias Variable = IconVariable
     typealias Derived = IconVariableDerived
     typealias MixingVar = VariableOrDerived<IconVariable, IconVariableDerived>
 
     let reader: GenericReaderCached<IconDomains, Variable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -18,13 +17,13 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func get(variable: VariableOrDerived<IconVariable, IconVariableDerived>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch variable {
         case .raw(let raw):
@@ -54,31 +53,31 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 // Original ICON direct radiation data may contain small negative values like -0.2.
                 // Limit to 0. See https://github.com/open-meteo/open-meteo/issues/932
                 let direct = try reader.get(variable: .surface(.direct_radiation), time: time)
-                return DataAndUnit(direct.data.map({max($0,0)}), direct.unit)
+                return DataAndUnit(direct.data.map({ max($0, 0) }), direct.unit)
             }
-            
+
             // ICON-EPS stores total shortwave radiation in diffuse_radiation
             // It would be possible to only use `shortwave_radiation`, but this would invalidate all archives
-            if reader.domain == .iconEps,surface == .diffuse_radiation {
+            if reader.domain == .iconEps, surface == .diffuse_radiation {
                 let ghi = try reader.get(variable: raw, time: time)
                 let direct = try reader.get(variable: .surface(.direct_radiation), time: time)
-                return DataAndUnit(zip(ghi.data, direct.data).map({max($0-$1,0)}), ghi.unit)
+                return DataAndUnit(zip(ghi.data, direct.data).map({ max($0 - $1, 0) }), ghi.unit)
             }
-            
+
             // no dedicated rain field in ICON EU EPS
             if reader.domain == .iconEuEps, surface == .rain {
                 let precipitation = try get(raw: .precipitation, time: time).data
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, time: time).data
-                return DataAndUnit(zip(precipitation, snow_gsp).map({$0 - $1}), .millimetre)
+                return DataAndUnit(zip(precipitation, snow_gsp).map({ $0 - $1 }), .millimetre)
             }
-            
+
             // no dedicated rain field in ICON EPS and no snow, use temperautre
             if reader.domain == .iconEps, surface == .rain {
                 let precipitation = try get(raw: .precipitation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
-                return DataAndUnit(zip(precipitation, temperature).map({$0 * ($1 <= 0 ? 0 : 1)}), .millimetre)
+                return DataAndUnit(zip(precipitation, temperature).map({ $0 * ($1 <= 0 ? 0 : 1) }), .millimetre)
             }
-            
+
             // EPS models do not have weather codes
             if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weather_code {
                 let cloudcover = try get(raw: .cloud_cover, time: time).data
@@ -100,23 +99,23 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     modelDtSeconds: time.dtSeconds), .wmoCode
                 )
             }
-            
+
             // In case elevation correction of more than 100m is necessary, always calculate snow manually with a hard cut at 0°C
             if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
                 // in case temperature > 0°C, remove snow
                 if surface == .snowfall_water_equivalent {
                     let snowfall = try reader.get(variable: .surface(.snowfall_water_equivalent), time: time).data
                     let temperature = try get(raw: .temperature_2m, time: time).data
-                    return DataAndUnit(zip(snowfall, temperature).map({$0 * ($1 >= 0 ? 0 : 1)}), .millimetre)
+                    return DataAndUnit(zip(snowfall, temperature).map({ $0 * ($1 >= 0 ? 0 : 1) }), .millimetre)
                 }
                 // in case temperature <0°C, convert add snow to rain
                 if surface == .rain {
                     let rain = try reader.get(variable: .surface(.rain), time: time).data
                     let snowfall = try reader.get(variable: .surface(.snowfall_water_equivalent), time: time).data
                     let temperature = try get(raw: .temperature_2m, time: time).data
-                    return DataAndUnit(zip(zip(rain, snowfall), temperature).map({$0.0 + max(0, $0.1 * ($1 >= 0 ? 1 : 0))}), .millimetre)
+                    return DataAndUnit(zip(zip(rain, snowfall), temperature).map({ $0.0 + max(0, $0.1 * ($1 >= 0 ? 1 : 0)) }), .millimetre)
                 }
-                
+
                 // Correct snow/rain in weather code according to temperature
                 if surface == .weather_code {
                     var weatherCode = try reader.get(variable: .surface(.weather_code), time: time).data
@@ -133,15 +132,15 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 }
             }
         }
-        
+
         // icon global and EU lack level 975
         if reader.domain != .iconD2, case let .pressure(pressure) = raw, pressure.level == 975  {
             return try self.interpolatePressureLevel(variable: pressure.variable, level: pressure.level, lowerLevel: 950, upperLevel: 1000, time: time)
         }
-        
+
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: IconVariable, time: TimerangeDtAndSettings) throws {
         // icon-d2 has no levels 800, 900, 925
         if reader.domain == .iconD2, case let .pressure(pressure) = raw  {
@@ -160,7 +159,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             default: break
             }
         }
-        
+
         if case let .surface(surface) = raw {
             // ICON-EPS stores total shortwave radiation in diffuse_radiation
             if reader.domain == .iconEps, surface == .diffuse_radiation {
@@ -168,21 +167,21 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 try reader.prefetchData(variable: .surface(.direct_radiation), time: time)
                 return
             }
-            
+
             // no dedicated rain field in ICON EU EPS
             if reader.domain == .iconEuEps, surface == .rain {
                 try reader.prefetchData(variable: .surface(.precipitation), time: time)
                 try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
                 return
             }
-            
+
             // no dedicated rain field in ICON EPS and no snow, use temperautre
             if reader.domain == .iconEps, surface == .rain {
                 try reader.prefetchData(variable: .surface(.precipitation), time: time)
                 try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
                 return
             }
-            
+
             // EPS models do not have weather codes
             if [.iconEuEps, .iconEps, .iconD2Eps].contains(reader.domain), surface == .weather_code {
                 try reader.prefetchData(variable: .surface(.precipitation), time: time)
@@ -201,7 +200,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 }
                 return
             }
-            
+
             // In case elevation correction of more than 100m is necessary, always calculate snow manually with a hard cut at 0°C
             if abs(reader.modelElevation.numeric - reader.targetElevation) > 100 {
                 // in case temperature > 0°C, remove snow
@@ -217,7 +216,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
                     return
                 }
-                
+
                 // Correct snow/rain in weather code according to temperature
                 if surface == .weather_code {
                     try reader.prefetchData(variable: .surface(.weather_code), time: time)
@@ -226,7 +225,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 }
             }
         }
-        
+
         // icon global and EU lack level 975
         if reader.domain != .iconD2, case let .pressure(pressure) = raw, pressure.level == 975  {
             let variable = pressure.variable
@@ -234,58 +233,58 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             try reader.prefetchData(variable: .pressure(IconPressureVariable(variable: variable, level: 1000)), time: time)
             return
         }
-        
+
         return try reader.prefetchData(variable: raw, time: time)
     }
-     
+
     /// TODO: duplicated code in meteofrance controller
     private func interpolatePressureLevel(variable: IconPressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         let lower = try get(raw: .pressure(IconPressureVariable(variable: variable, level: lowerLevel)), time: time)
         let upper = try get(raw: .pressure(IconPressureVariable(variable: variable, level: upperLevel)), time: time)
-        
+
         switch variable {
         case .temperature:
             // temperature/pressure is linear, therefore
             // perform linear interpolation between 2 points
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
+            return DataAndUnit(zip(lower.data, upper.data).map { l, h -> Float in
                 return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
             }, lower.unit)
         case .wind_u_component:
             fallthrough
         case .wind_v_component:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
+            return DataAndUnit(zip(lower.data, upper.data).map { l, h -> Float in
                 return l + Float(level - lowerLevel) * (h - l) / Float(upperLevel - lowerLevel)
             }, lower.unit)
         case .geopotential_height:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
+            return DataAndUnit(zip(lower.data, upper.data).map { l, h -> Float in
                 let lP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: l)
                 let hP = Meteorology.pressureLevelHpA(altitudeAboveSeaLevelMeters: h)
                 let adjPressure = lP + Float(level - lowerLevel) * (hP - lP) / Float(upperLevel - lowerLevel)
                 return Meteorology.altitudeAboveSeaLevelMeters(pressureLevelHpA: adjPressure)
             }, lower.unit)
         case .relative_humidity:
-            return DataAndUnit(zip(lower.data, upper.data).map { (l, h) -> Float in
+            return DataAndUnit(zip(lower.data, upper.data).map { l, h -> Float in
                 return (l + h) / 2
             }, lower.unit)
         }
     }
-    
+
     func prefetchData(raw: IconSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func prefetchData(raw: IconPressureVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.pressure(raw)), time: time)
     }
-    
+
     func get(raw: IconSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func get(raw: IconPressureVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.pressure(raw)), time: time)
     }
-    
+
     func prefetchData(derived: IconVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let variable):
@@ -451,8 +450,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
-    
-    
+
     func get(derived: IconVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variable):
@@ -462,7 +460,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_10m:
                 let u = try get(raw: .wind_u_component_10m, time: time).data
                 let v = try get(raw: .wind_v_component_10m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u, v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .wind_direction_10m:
                 fallthrough
@@ -476,7 +474,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_80m:
                 let u = try get(raw: .wind_u_component_80m, time: time).data
                 let v = try get(raw: .wind_v_component_80m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u, v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .wind_direction_80m:
                 fallthrough
@@ -490,7 +488,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_120m:
                 let u = try get(raw: .wind_u_component_120m, time: time).data
                 let v = try get(raw: .wind_v_component_120m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u, v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .wind_direction_120m:
                 fallthrough
@@ -504,7 +502,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_180m:
                 let u = try get(raw: .wind_u_component_180m, time: time).data
                 let v = try get(raw: .wind_v_component_180m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u, v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .wind_direction_180m:
                 fallthrough
@@ -535,8 +533,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .vapor_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .direct_normal_irradiance:
                 let dhi = try get(raw: .direct_radiation, time: time).data
                 let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
@@ -547,8 +545,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let windspeed = try get(derived: .surface(.windspeed_10m), time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
@@ -564,7 +562,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                     return DataAndUnit(snowfall, SiUnit.centimetre)
                 }
                 let snow_gsp = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snowfall = snow_gsp.map({$0 * 0.7})
+                let snowfall = snow_gsp.map({ $0 * 0.7 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relative_humidity_2m, time: time)
@@ -650,7 +648,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let diffuseRadiation = try get(raw: .diffuse_radiation, time: time).data
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
-                
+
             case .surface_temperature:
                 return try get(raw: .soil_temperature_0cm, time: time)
             }
@@ -662,7 +660,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed:
                 let u = try get(raw: IconPressureVariable(variable: .wind_u_component, level: level), time: time)
                 let v = try get(raw: IconPressureVariable(variable: .wind_v_component, level: level), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                let speed = zip(u.data, v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
             case .wind_direction:
                 fallthrough
@@ -681,7 +679,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 fallthrough
             case .cloudcover:
                 let rh = try get(raw: IconPressureVariable(variable: .relative_humidity, level: level), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level)) }), .percentage)
             case .relativehumidity:
                 return try get(raw: IconPressureVariable(variable: .relative_humidity, level: level), time: time)
             }
@@ -691,7 +689,7 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
 
 struct IconMixer: GenericReaderMixer {
     let reader: [IconReader]
-    
+
     static func makeReader(domain: IconReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> IconReader? {
         return try IconReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
