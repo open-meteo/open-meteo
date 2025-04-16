@@ -587,7 +587,7 @@ struct SolarPositionAlgorithm {
         (0, -1, 1, 2, 2),
         (2, -1, -1, 2, 2),
         (0, 0, 3, 2, 2),
-        (2, -1, 0, 2, 2),
+        (2, -1, 0, 2, 2)
     ]
 
     let PE_TERMS: [(Double, Double, Double, Double)] = [
@@ -653,7 +653,7 @@ struct SolarPositionAlgorithm {
         (-3, 0, 0, 0),
         (-3, 0, 0, 0),
         (-3, 0, 0, 0),
-        (-3, 0, 0, 0),
+        (-3, 0, 0, 0)
     ]
 }
 

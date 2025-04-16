@@ -16,7 +16,7 @@ disabled_rules:
 #  - todo
 #  - type_body_length
 #  - opening_brace
-  - trailing_comma
+#  - trailing_comma
   - closure_parameter_position
   - for_where
   - implicit_getter

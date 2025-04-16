@@ -318,7 +318,7 @@ struct KnmiDownload: AsyncCommand {
                     outDirectionVariable: KnmiSurfaceVariable.wind_direction_300m,
                     writer: writer,
                     trueNorth: trueNorth
-                ),
+                )
             ].flatMap({ $0 })
             let windPressureHandles = try await Set(winds.data.compactMap({ $0.key.variable.level.asIsobaricInhPa })).asyncFlatMap({hPa in
                 try await winds.calculateWindSpeed(

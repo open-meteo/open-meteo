@@ -256,7 +256,7 @@ struct DmiDownload: AsyncCommand {
                     try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth),
                     try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth),
                     try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth),
-                    try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth),
+                    try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth)
                 ].flatMap({ $0 })
 
                 if generateElevationFile {

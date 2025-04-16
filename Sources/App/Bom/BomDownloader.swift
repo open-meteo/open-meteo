@@ -150,7 +150,7 @@ struct DownloadBomCommand: AsyncCommand {
         let map: [(level: Float, speed: BomVariable, direction: BomVariable)] = [
             (36.664, .wind_speed_40m, .wind_direction_40m),
             (76.664, .wind_speed_80m, .wind_direction_80m),
-            (130, .wind_speed_120m, .wind_direction_120m),
+            (130, .wind_speed_120m, .wind_direction_120m)
         ]
         let handles = try await map.mapConcurrent(nConcurrent: concurrent) { map -> [GenericVariableHandle] in
             logger.info("Calculate wind level \(map.level)")
@@ -213,7 +213,7 @@ struct DownloadBomCommand: AsyncCommand {
             ("vwnd10m", nil),
             ("accum_conv_snow", nil),
             ("accum_ls_snow", nil),
-            ("dewpt_scrn", nil),
+            ("dewpt_scrn", nil)
             // ("cld_phys_thunder_p", nil)
         ]
 

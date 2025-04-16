@@ -307,7 +307,7 @@ extension MfWaveDomain {
             let type = isHindcast ? "hcst" : "fcst"
             // glo12_rg_6h-i_20250206-18h_3D-thetao_fcst_R20250207.nc
             return [
-                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-thetao_anfc_0.083deg_PT6H-i_202406/\(r.year)/\(rMM)/glo12_rg_6h-i_\(step.format_YYYYMMdd)-\(step.hh)h_3D-thetao_\(type)_R\(run.format_YYYYMMdd).nc",
+                "\(server)GLOBAL_ANALYSISFORECAST_PHY_001_024/cmems_mod_glo_phy-thetao_anfc_0.083deg_PT6H-i_202406/\(r.year)/\(rMM)/glo12_rg_6h-i_\(step.format_YYYYMMdd)-\(step.hh)h_3D-thetao_\(type)_R\(run.format_YYYYMMdd).nc"
             ]
         }
     }
