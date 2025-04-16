@@ -5,18 +5,17 @@ included:
 disabled_rules:
   - file_length
   - private_over_fileprivate
-#  - cyclomatic_complexity
-#  - function_body_length
-#  - function_parameter_count
-#  - identifier_name
-#  - inclusive_language
-#  - large_tuple
-#  - line_length
-#  - nesting
-#  - todo
-#  - type_body_length
-#  - opening_brace
-#  - trailing_comma
+  - no_fallthrough_only
+  - cyclomatic_complexity
+  - function_body_length
+  - function_parameter_count
+  - identifier_name
+  - inclusive_language
+  - large_tuple
+  - line_length
+  - nesting
+  - todo
+  - type_body_length
   - closure_parameter_position
   - for_where
   - implicit_getter
