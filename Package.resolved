@@ -256,8 +256,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftNetCDF.git",
       "state" : {
-        "revision" : "8ade11d1494d2661a14b624966e8966c6e36e426",
-        "version" : "1.1.2"
+        "revision" : "ad96f78495c297c3b3b472155e0fbe2ca7354b0d",
+        "version" : "1.1.3"
       }
     },
     {
