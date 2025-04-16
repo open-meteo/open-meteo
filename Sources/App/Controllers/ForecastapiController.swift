@@ -673,12 +673,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return CmaDomain.grapes_global
         case .bom_access_global:
             return BomDomain.access_global
-        case .arpae_cosmo_2i:
-            return ArpaeDomain.cosmo_2i
-        case .arpae_cosmo_2i_ruc:
-            return ArpaeDomain.cosmo_2i_ruc
-        case .arpae_cosmo_5m:
-            return ArpaeDomain.cosmo_5m
         default:
             return nil
         }

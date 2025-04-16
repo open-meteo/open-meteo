@@ -130,7 +130,7 @@ enum DomainRegistry: String, CaseIterable {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
     
-    func getDomain() -> GenericDomain {
+    func getDomain() -> GenericDomain? {
         switch self {
         case .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
@@ -278,12 +278,9 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoFranceDomain.arome_france_15min
         case .meteofrance_arome_france_hd_15min:
             return MeteoFranceDomain.arome_france_hd_15min
-        case .arpae_cosmo_2i:
-            return ArpaeDomain.cosmo_2i
-        case .arpae_cosmo_2i_ruc:
-            return ArpaeDomain.cosmo_2i_ruc
-        case .arpae_cosmo_5m:
-            return ArpaeDomain.cosmo_5m
+        case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
+            /// Deprecated since 2025-04-05
+            return nil
         case .ncep_gfs_graphcast025:
             return GfsGraphCastDomain.graphcast025
         case .ecmwf_wam025:

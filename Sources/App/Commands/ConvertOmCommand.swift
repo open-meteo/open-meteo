@@ -49,7 +49,10 @@ struct ConvertOmCommand: Command {
                 logger.warning("Transpose flag is currently not supported for OM3 conversion")
             }
             logger.info("Converting OM file to v3 with domain: \(domain). Outfile will be: \(outfile)")
-            try convertOmv3(src: signature.infile, dest: outfile, grid: domainObj.getDomain().grid)
+            guard let grid = domainObj.getDomain()?.grid else {
+                fatalError("Did not get domain grid")
+            }
+            try convertOmv3(src: signature.infile, dest: outfile, grid: grid)
             return
         } else if format == "netcdf" {
             // Handle conversion to NetCDF
@@ -91,7 +94,10 @@ struct ConvertOmCommand: Command {
     /// Handle 2D data conversion to NetCDF
     private func convertToNetCDF2D(data: [Float], dimensions: [UInt64], ncFile: Group, transpose: Bool, domain: String?, logger: Logger) throws {
         if let domain = domain {
-            let grid = try DomainRegistry.load(rawValue: domain).getDomain().grid
+            let domainObj = try DomainRegistry.load(rawValue: domain)
+            guard let grid = domainObj.getDomain()?.grid else {
+                fatalError("Did not get domain grid")
+            }
             let ny = grid.ny
             let nx = grid.nx
             let nt = Int(dimensions[1])

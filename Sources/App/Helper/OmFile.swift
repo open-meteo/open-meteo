@@ -267,9 +267,12 @@ struct OmFileSplitter {
         }
         
         let nIndexTime = indexTime.count
+        guard let actualDomain = domain.getDomain() else {
+            fatalError("Did not get domain")
+        }
         
         /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
-        let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain.getDomain(), nMembers: nMembers, nTime: 1)
+        let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: actualDomain, nMembers: nMembers, nTime: 1)
         var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nTimePerFile * nMembers)
         
         for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(spatialChunks.y)) {
