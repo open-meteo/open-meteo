@@ -334,6 +334,12 @@ extension Variable {
             return MfWaveVariable.swell_wave_period
         case "VMDR_SW1":
             return MfWaveVariable.swell_wave_direction
+        case "VHM0_SW2":
+            return MfWaveVariable.secondary_swell_wave_height
+        case "VTM01_SW2":
+            return MfWaveVariable.secondary_swell_wave_period
+        case "VMDR_SW2":
+            return MfWaveVariable.secondary_swell_wave_direction
         case "utotal":
             return MfCurrentVariable.ocean_u_current
         case "vtotal":

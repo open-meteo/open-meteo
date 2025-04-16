@@ -40,6 +40,12 @@ extension MarineVariable: FlatBuffersVariable {
             return .init(variable: .invertBarometerHeight)
         case .sea_surface_temperature:
             return .init(variable: .seaSurfaceTemperature)
+        case .secondary_swell_wave_height:
+            return .init(variable: .secondarySwellWaveHeight)
+        case .secondary_swell_wave_period:
+            return .init(variable: .secondarySwellWavePeriod)
+        case .secondary_swell_wave_direction:
+            return .init(variable: .secondarySwellWaveDirection)
         }
     }
 }
