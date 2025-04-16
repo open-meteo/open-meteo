@@ -133,21 +133,13 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .gfs05_ens:
-            fallthrough
-        case .gfs025_ens, .gfswave025_ens:
-            fallthrough
-        case .gfs013:
-            fallthrough
-        case .gfs025, .gfswave025, .gfswave016:
+        case .gfs05_ens, .gfs025_ens, .gfswave025_ens, .gfs013, .gfs025, .gfswave025, .gfswave016:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
             return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
         // case .nam_conus:
             // NAM has a delay of 1:40 hours after initialisation. Cronjob starts at 1:40
             // return ((t.hour - 1 + 24) % 24) / 6 * 6
-        case .hrrr_conus_15min:
-            fallthrough
-        case .hrrr_conus:
+        case .hrrr_conus_15min, .hrrr_conus:
             // HRRR has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
             return t.with(hour: t.hour)
         }
@@ -172,13 +164,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
                 return Array(stride(from: 390, through: 840, by: 6))
             }
             return Array(stride(from: 0, to: 240, by: 3)) + Array(stride(from: 240, through: 384, by: 6))
-        case .gfs025_ens:
-            fallthrough
-        case .gfswave025_ens:
+        case .gfs025_ens, .gfswave025_ens:
             return Array(stride(from: 0, through: 240, by: 3))
-        case .gfs013:
-            fallthrough
-        case .gfs025:
+        case .gfs013, .gfs025:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
         // case .nam_conus:
             // return Array(0...60)
@@ -228,13 +216,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs05_ens:
             return (840 + 4 * 24) / 3 + 1 // 313
-        case .gfs025_ens:
-            fallthrough
         // case .nam_conus:
             // return 60 + 4*24
-        case .gfs013:
-            fallthrough
-        case .gfs025:
+        case .gfs013, .gfs025, .gfs025_ens:
             return 384 + 1 + 4 * 24
         case .hrrr_conus:
             return 48 + 1 + 4 * 24
@@ -254,9 +238,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs013:
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536 - 1) / 2, lonMin: -180, dx: 360 / 3072, dy: 0.11714935)
-        case .gfs025_ens:
-            fallthrough
-        case .gfs025, .gfswave025, .gfswave025_ens:
+        case .gfs025_ens, .gfs025, .gfswave025, .gfswave025_ens:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         /*case .nam_conus:
             /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
@@ -265,9 +247,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfswave016:
             /// 0.166° resolution
             return RegularGrid(nx: 2160, ny: 406, latMin: -15, lonMin: -180, dx: 360 / 2160, dy: (52.5 + 15) / (406 - 1))
-        case .hrrr_conus_15min:
-            fallthrough
-        case .hrrr_conus:
+        case .hrrr_conus_15min, .hrrr_conus:
             /*
              (key: "Nx", value: "1799")
              (key: "Ny", value: "1059")

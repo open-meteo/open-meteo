@@ -44,7 +44,7 @@ fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable:
         guard let first = run.first else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        guard run.first(where: { $0.time.dtSeconds != first.time.dtSeconds }) == nil else {
+        guard !run.contains(where: { $0.time.dtSeconds != first.time.dtSeconds }) else {
             throw ForecastapiError.cannotReturnModelsWithDiffernetTimeIntervals
         }
         return ApiSectionString(name: first.name, time: first.time, columns: run.flatMap { $0.columns })

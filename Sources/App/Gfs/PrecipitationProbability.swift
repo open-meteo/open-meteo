@@ -39,7 +39,7 @@ enum ProbabilityVariable: String, CaseIterable, GenericVariable, GenericVariable
 /**
  Create readers for various models
  */
-struct ProbabilityReader {
+enum ProbabilityReader {
     /// Read probabilities from GFS ensemble models 0.25° and 0.5°
     static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderMixerSameDomain<GenericReader<GfsDomain, ProbabilityVariable>> {
         return GenericReaderMixerSameDomain(reader: [

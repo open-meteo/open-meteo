@@ -233,7 +233,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             case .precipitation:
                 // precipitation not available for ensemble
                 return nil
-                case .rain, .snowfall_water_equivalent:
+            case .rain, .snowfall_water_equivalent:
                 if forecastHour >= 57 {
                     /// Only has 1 hourly aggregations, but timeintervals are actually 3 or 6 hourly
                     return nil
@@ -367,8 +367,8 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
+        case .temperature_2m, .surface_temperature:
+            return true
         default:
             return false
         }
@@ -487,7 +487,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
             break
-            case .uk_deterministic_2km:
+        case .uk_deterministic_2km:
             if variable == .vertical_velocity {
                 return nil
             }

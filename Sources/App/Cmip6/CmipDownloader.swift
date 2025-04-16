@@ -106,9 +106,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         case .CMCC_CM2_VHR4:
             return "CMCC-CM2-VHR4"
         case .FGOALS_f3_H:
-            fallthrough
         // case .FGOALS_f3_H_highresSST:
-        //    return "FGOALS-f3-H"
+            return "FGOALS-f3-H"
         case .HiRAM_SIT_HR:
             return "HiRAM-SIT-HR"
         case .MRI_AGCM3_2_S:
@@ -131,9 +130,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         case .CMCC_CM2_VHR4:
             return "gn"
         case .FGOALS_f3_H:
-            fallthrough
         // case .FGOALS_f3_H_highresSST:
-        //    return "gr"
+            return "gr"
         case .HiRAM_SIT_HR:
             return "gn"
         case .MRI_AGCM3_2_S:
@@ -154,9 +152,8 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         case .CMCC_CM2_VHR4:
             return "CMCC"
         case .FGOALS_f3_H:
-            fallthrough
         // case .FGOALS_f3_H_highresSST:
-        //    return "CAS"
+            return "CAS"
         case .HiRAM_SIT_HR:
             return "AS-RCEC"
         case .MRI_AGCM3_2_S:
@@ -460,31 +457,13 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
                 return "20211028"
             }
             switch self {
-            case .wind_speed_10m_mean:
-                fallthrough
-            case .cloud_cover_mean:
-                fallthrough
-            case .pressure_msl_mean:
-                fallthrough
-            case .shortwave_radiation_sum:
+            case .wind_speed_10m_mean, .cloud_cover_mean, .pressure_msl_mean, .shortwave_radiation_sum:
                 return isFuture ? "20211116" : "20211029"
-            case .relative_humidity_2m_mean:
-                fallthrough
-            case .precipitation_sum:
+            case .relative_humidity_2m_mean, .precipitation_sum:
                 return isFuture ? "20211116" : "20211028"
-            case .temperature_2m_max:
-                fallthrough
-            case .temperature_2m_min:
-                fallthrough
-            case .temperature_2m_mean:
+            case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
                 /*fallthrough
-            case .pressure_msl:
-                fallthrough
-            case .relative_humidity_2m_max:
-                fallthrough
-            case .relative_humidity_2m_min:
-                fallthrough
-            case .relative_humidity_2m_mean:*/
+            case .pressure_msl, .relative_humidity_2m_max, .relative_humidity_2m_min, .relative_humidity_2m_mean:*/
                 return isFuture ? "20211115" : "20211117"
             default:
                 fatalError("Version not set")
@@ -830,17 +809,11 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         }
 
         switch self {
-        case .temperature_2m_min:
-            fallthrough
-        case .temperature_2m_max:
-            fallthrough
-        case .temperature_2m_mean:
+        case .temperature_2m_min, .temperature_2m_max, .temperature_2m_mean:
             return (1, -273.15)
         case .pressure_msl_mean:
             return (1 / 100, 0)
-        case .precipitation_sum:
-            fallthrough
-        case .snowfall_water_equivalent_sum:
+        case .precipitation_sum, .snowfall_water_equivalent_sum:
             return (3600 * 24, 0)
         case .soil_moisture_0_to_10cm_mean:
             return (0.001 / 0.10, 0) // 10cm depth

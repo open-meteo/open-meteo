@@ -170,9 +170,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant, .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
                 try prefetchData(variable: .direct_radiation, time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)
@@ -219,9 +217,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                fallthrough
-            case .winddirection, .wind_direction:
+            case .windspeed, .wind_speed, .winddirection, .wind_direction:
                 try prefetchData(raw: .pressure(KmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(KmaPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dewpoint, .dew_point, .relativehumidity:

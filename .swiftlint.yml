@@ -24,6 +24,7 @@ disabled_rules:
   - blanket_disable_command
   - orphaned_doc_comment
   - force_try
+  - multiline_parameters_brackets
 
 analyzer_rules:
   # - explicit_self

@@ -514,19 +514,13 @@ extension IconDomains {
     fileprivate var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .iconEps:
-            fallthrough
-        case .icon:
+        case .iconEps, .icon:
             // Icon has a delay of 2-3 hours after initialisation  with 4 runs a day
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
-        case .iconEuEps:
-            fallthrough
-        case .iconEu:
+        case .iconEuEps, .iconEu:
             // Icon-eu has a delay of 2:40 hours after initialisation with 8 runs a day
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 3 * 3)
-        case .iconD2Eps:
-            fallthrough
-        case .iconD2:
+        case .iconD2Eps, .iconD2:
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
             return t.with(hour: t.hour / 3 * 3)
         case .iconD2_15min:

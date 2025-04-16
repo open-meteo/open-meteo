@@ -131,19 +131,7 @@ enum WeatherCode: Int {
     /// True if weather code is an precipitation event. Thunderstorm, return false as they may only indicate potential
     var isPrecipitationEvent: Bool {
         switch self {
-        case .lightDrizzle, .moderateDrizzle, .denseDrizzle:
-            fallthrough
-        case .lightFreezingDrizzle, .moderateOrDenseFreezingDrizzle:
-            fallthrough
-        case .lightRain, .moderateRain, .heavyRain:
-            fallthrough
-        case .lightFreezingRain, .moderateOrHeavyFreezingRain:
-            fallthrough
-        case .slightSnowfall, .moderateSnowfall, .heavySnowfall, .snowGrains:
-            fallthrough
-        case .slightRainShowers, .moderateRainShowers, .heavyRainShowers:
-            fallthrough
-        case .slightSnowShowers, .heavySnowShowers:
+        case .lightDrizzle, .moderateDrizzle, .denseDrizzle, .lightFreezingDrizzle, .moderateOrDenseFreezingDrizzle, .lightRain, .moderateRain, .heavyRain, .lightFreezingRain, .moderateOrHeavyFreezingRain, .slightSnowfall, .moderateSnowfall, .heavySnowfall, .snowGrains, .slightRainShowers, .moderateRainShowers, .heavyRainShowers, .slightSnowShowers, .heavySnowShowers:
             return true
         default:
             return false

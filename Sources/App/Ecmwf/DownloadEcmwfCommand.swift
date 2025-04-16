@@ -576,9 +576,7 @@ extension EcmwfDomain {
         let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
-        case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble:
-            fallthrough
-        case .ifs04, . ifs025, .wam025:
+        case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
         case .aifs025, .aifs025_single:

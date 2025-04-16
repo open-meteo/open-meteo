@@ -1,7 +1,7 @@
 import Vapor
 // import Leaf
 
-struct OpenMeteo {
+enum OpenMeteo {
     /// Data directory with trailing slash
     static var dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {

@@ -61,183 +61,129 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let u = try get(raw: .wind_u_component_100m, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_speed_1000hPa:
-            fallthrough
-        case .windspeed_1000hPa:
+        case .wind_speed_1000hPa, .windspeed_1000hPa:
             let v = try get(raw: .wind_v_component_1000hPa, time: time)
             let u = try get(raw: .wind_u_component_1000hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_925hPa:
-            fallthrough
-        case .windspeed_925hPa:
+        case .wind_speed_925hPa, .windspeed_925hPa:
             let v = try get(raw: .wind_v_component_925hPa, time: time)
             let u = try get(raw: .wind_u_component_925hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_850hPa:
-            fallthrough
-        case .windspeed_850hPa:
+        case .wind_speed_850hPa, .windspeed_850hPa:
             let v = try get(raw: .wind_v_component_850hPa, time: time)
             let u = try get(raw: .wind_u_component_850hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_700hPa:
-            fallthrough
-        case .windspeed_700hPa:
+        case .wind_speed_700hPa, .windspeed_700hPa:
             let v = try get(raw: .wind_v_component_700hPa, time: time)
             let u = try get(raw: .wind_u_component_700hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_600hPa:
-            fallthrough
-        case .windspeed_600hPa:
+        case .wind_speed_600hPa, .windspeed_600hPa:
             let v = try get(raw: .wind_v_component_600hPa, time: time)
             let u = try get(raw: .wind_u_component_600hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_500hPa:
-            fallthrough
-        case .windspeed_500hPa:
+        case .wind_speed_500hPa, .windspeed_500hPa:
             let v = try get(raw: .wind_v_component_500hPa, time: time)
             let u = try get(raw: .wind_u_component_500hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_400hPa:
-            fallthrough
-        case .windspeed_400hPa:
+        case .wind_speed_400hPa, .windspeed_400hPa:
             let v = try get(raw: .wind_v_component_400hPa, time: time)
             let u = try get(raw: .wind_u_component_400hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_300hPa:
-            fallthrough
-        case .windspeed_300hPa:
+        case .wind_speed_300hPa, .windspeed_300hPa:
             let v = try get(raw: .wind_v_component_300hPa, time: time)
             let u = try get(raw: .wind_u_component_300hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_250hPa:
-            fallthrough
-        case .windspeed_250hPa:
+        case .wind_speed_250hPa, .windspeed_250hPa:
             let v = try get(raw: .wind_v_component_250hPa, time: time)
             let u = try get(raw: .wind_u_component_250hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_200hPa:
-            fallthrough
-        case .windspeed_200hPa:
+        case .wind_speed_200hPa, .windspeed_200hPa:
             let v = try get(raw: .wind_v_component_200hPa, time: time)
             let u = try get(raw: .wind_u_component_200hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_100hPa:
-            fallthrough
-        case .windspeed_100hPa:
+        case .wind_speed_100hPa, .windspeed_100hPa:
             let v = try get(raw: .wind_v_component_100hPa, time: time)
             let u = try get(raw: .wind_u_component_100hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_speed_50hPa:
-            fallthrough
-        case .windspeed_50hPa:
+        case .wind_speed_50hPa, .windspeed_50hPa:
             let v = try get(raw: .wind_v_component_50hPa, time: time)
             let u = try get(raw: .wind_u_component_50hPa, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_direction_1000hPa:
-            fallthrough
-        case .winddirection_1000hPa:
+        case .wind_direction_1000hPa, .winddirection_1000hPa:
             let v = try get(raw: .wind_v_component_1000hPa, time: time)
             let u = try get(raw: .wind_u_component_1000hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_925hPa:
-            fallthrough
-        case .winddirection_925hPa:
+        case .wind_direction_925hPa, .winddirection_925hPa:
             let v = try get(raw: .wind_v_component_925hPa, time: time)
             let u = try get(raw: .wind_u_component_925hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_850hPa:
-            fallthrough
-        case .winddirection_850hPa:
+        case .wind_direction_850hPa, .winddirection_850hPa:
             let v = try get(raw: .wind_v_component_850hPa, time: time)
             let u = try get(raw: .wind_u_component_850hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_700hPa:
-            fallthrough
-        case .winddirection_700hPa:
+        case .wind_direction_700hPa, .winddirection_700hPa:
             let v = try get(raw: .wind_v_component_700hPa, time: time)
             let u = try get(raw: .wind_u_component_700hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_600hPa:
-            fallthrough
-        case .winddirection_600hPa:
+        case .wind_direction_600hPa, .winddirection_600hPa:
             let v = try get(raw: .wind_v_component_600hPa, time: time)
             let u = try get(raw: .wind_u_component_600hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_500hPa:
-            fallthrough
-        case .winddirection_500hPa:
+        case .wind_direction_500hPa, .winddirection_500hPa:
             let v = try get(raw: .wind_v_component_500hPa, time: time)
             let u = try get(raw: .wind_u_component_500hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_400hPa:
-            fallthrough
-        case .winddirection_400hPa:
+        case .wind_direction_400hPa, .winddirection_400hPa:
             let v = try get(raw: .wind_v_component_400hPa, time: time)
             let u = try get(raw: .wind_u_component_400hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_300hPa:
-            fallthrough
-        case .winddirection_300hPa:
+        case .wind_direction_300hPa, .winddirection_300hPa:
             let v = try get(raw: .wind_v_component_300hPa, time: time)
             let u = try get(raw: .wind_u_component_300hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_250hPa:
-            fallthrough
-        case .winddirection_250hPa:
+        case .wind_direction_250hPa, .winddirection_250hPa:
             let v = try get(raw: .wind_v_component_250hPa, time: time)
             let u = try get(raw: .wind_u_component_250hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_200hPa:
-            fallthrough
-        case .winddirection_200hPa:
+        case .wind_direction_200hPa, .winddirection_200hPa:
             let v = try get(raw: .wind_v_component_200hPa, time: time)
             let u = try get(raw: .wind_u_component_200hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_100hPa:
-            fallthrough
-        case .winddirection_100hPa:
+        case .wind_direction_100hPa, .winddirection_100hPa:
             let v = try get(raw: .wind_v_component_100hPa, time: time)
             let u = try get(raw: .wind_u_component_100hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_50hPa:
-            fallthrough
-        case .winddirection_50hPa:
+        case .wind_direction_50hPa, .winddirection_50hPa:
             let v = try get(raw: .wind_v_component_50hPa, time: time)
             let u = try get(raw: .wind_u_component_50hPa, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .soil_temperature_0_to_10cm:
-            fallthrough
-        case .soil_temperature_0_10cm:
-            fallthrough
-        case .soil_temperature_0_7cm:
+        case .soil_temperature_0_to_10cm, .soil_temperature_0_10cm, .soil_temperature_0_7cm:
             return try get(raw: .soil_temperature_0_to_7cm, time: time)
-        case .weather_code:
-            fallthrough
-        case .weathercode:
+        case .weather_code, .weathercode:
             let cloudcover = try get(raw: .cloud_cover, time: time).data
             let precipitation = try get(raw: .precipitation, time: time).data
             let snowfall = try get(derived: .snowfall, time: time).data
@@ -254,64 +200,40 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 categoricalFreezingRain: nil,
                 modelDtSeconds: time.dtSeconds), .wmoCode
             )
-        case .cloud_cover_1000hPa:
-            fallthrough
-        case .cloudcover_1000hPa:
+        case .cloud_cover_1000hPa, .cloudcover_1000hPa:
             let rh = try get(raw: .relative_humidity_1000hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 1000) }), .percentage)
-        case .cloud_cover_925hPa:
-            fallthrough
-        case .cloudcover_925hPa:
+        case .cloud_cover_925hPa, .cloudcover_925hPa:
             let rh = try get(raw: .relative_humidity_925hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 925) }), .percentage)
-        case .cloud_cover_850hPa:
-            fallthrough
-        case .cloudcover_850hPa:
+        case .cloud_cover_850hPa, .cloudcover_850hPa:
             let rh = try get(raw: .relative_humidity_850hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 850) }), .percentage)
-        case .cloud_cover_700hPa:
-            fallthrough
-        case .cloudcover_700hPa:
+        case .cloud_cover_700hPa, .cloudcover_700hPa:
             let rh = try get(raw: .relative_humidity_700hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 700) }), .percentage)
-        case .cloud_cover_600hPa:
-            fallthrough
-        case .cloudcover_600hPa:
+        case .cloud_cover_600hPa, .cloudcover_600hPa:
             let rh = try get(raw: .relative_humidity_600hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 600) }), .percentage)
-        case .cloud_cover_500hPa:
-            fallthrough
-        case .cloudcover_500hPa:
+        case .cloud_cover_500hPa, .cloudcover_500hPa:
             let rh = try get(raw: .relative_humidity_500hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 500) }), .percentage)
-        case .cloud_cover_400hPa:
-            fallthrough
-        case .cloudcover_400hPa:
+        case .cloud_cover_400hPa, .cloudcover_400hPa:
             let rh = try get(raw: .relative_humidity_400hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 400) }), .percentage)
-        case .cloud_cover_300hPa:
-            fallthrough
-        case .cloudcover_300hPa:
+        case .cloud_cover_300hPa, .cloudcover_300hPa:
             let rh = try get(raw: .relative_humidity_300hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 300) }), .percentage)
-        case .cloud_cover_250hPa:
-            fallthrough
-        case .cloudcover_250hPa:
+        case .cloud_cover_250hPa, .cloudcover_250hPa:
             let rh = try get(raw: .relative_humidity_250hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 250) }), .percentage)
-        case .cloud_cover_200hPa:
-            fallthrough
-        case .cloudcover_200hPa:
+        case .cloud_cover_200hPa, .cloudcover_200hPa:
             let rh = try get(raw: .relative_humidity_200hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 200) }), .percentage)
-        case .cloud_cover_100hPa:
-            fallthrough
-        case .cloudcover_100hPa:
+        case .cloud_cover_100hPa, .cloudcover_100hPa:
             let rh = try get(raw: .relative_humidity_100hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 100) }), .percentage)
-        case .cloudcover_50hPa:
-            fallthrough
-        case .cloud_cover_50hPa:
+        case .cloudcover_50hPa, .cloud_cover_50hPa:
             let rh = try get(raw: .relative_humidity_50hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50) }), .percentage)
         case .snowfall:
@@ -389,89 +311,61 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return try get(raw: .relative_humidity_300hPa, time: time)
         case .relativehumidity_50hPa:
             return try get(raw: .relative_humidity_50hPa, time: time)
-        case .dew_point_1000hPa:
-            fallthrough
-        case .dewpoint_1000hPa:
+        case .dew_point_1000hPa, .dewpoint_1000hPa:
             let temperature = try get(raw: .temperature_1000hPa, time: time)
             let rh = try get(raw: .relative_humidity_1000hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_925hPa:
-            fallthrough
-        case .dewpoint_925hPa:
+        case .dew_point_925hPa, .dewpoint_925hPa:
             let temperature = try get(raw: .temperature_925hPa, time: time)
             let rh = try get(raw: .relative_humidity_925hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_850hPa:
-            fallthrough
-        case .dewpoint_850hPa:
+        case .dew_point_850hPa, .dewpoint_850hPa:
             let temperature = try get(raw: .temperature_850hPa, time: time)
             let rh = try get(raw: .relative_humidity_850hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_700hPa:
-            fallthrough
-        case .dewpoint_700hPa:
+        case .dew_point_700hPa, .dewpoint_700hPa:
             let temperature = try get(raw: .temperature_700hPa, time: time)
             let rh = try get(raw: .relative_humidity_700hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_600hPa:
-            fallthrough
-        case .dewpoint_600hPa:
+        case .dew_point_600hPa, .dewpoint_600hPa:
             let temperature = try get(raw: .temperature_600hPa, time: time)
             let rh = try get(raw: .relative_humidity_600hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_500hPa:
-            fallthrough
-        case .dewpoint_500hPa:
+        case .dew_point_500hPa, .dewpoint_500hPa:
             let temperature = try get(raw: .temperature_500hPa, time: time)
             let rh = try get(raw: .relative_humidity_500hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_400hPa:
-            fallthrough
-        case .dewpoint_400hPa:
+        case .dew_point_400hPa, .dewpoint_400hPa:
             let temperature = try get(raw: .temperature_400hPa, time: time)
             let rh = try get(raw: .relative_humidity_400hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_300hPa:
-            fallthrough
-        case .dewpoint_300hPa:
+        case .dew_point_300hPa, .dewpoint_300hPa:
             let temperature = try get(raw: .temperature_300hPa, time: time)
             let rh = try get(raw: .relative_humidity_300hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_250hPa:
-            fallthrough
-        case .dewpoint_250hPa:
+        case .dew_point_250hPa, .dewpoint_250hPa:
             let temperature = try get(raw: .temperature_250hPa, time: time)
             let rh = try get(raw: .relative_humidity_250hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_200hPa:
-            fallthrough
-        case .dewpoint_200hPa:
+        case .dew_point_200hPa, .dewpoint_200hPa:
             let temperature = try get(raw: .temperature_200hPa, time: time)
             let rh = try get(raw: .relative_humidity_200hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_100hPa:
-            fallthrough
-        case .dewpoint_100hPa:
+        case .dew_point_100hPa, .dewpoint_100hPa:
             let temperature = try get(raw: .temperature_100hPa, time: time)
             let rh = try get(raw: .relative_humidity_100hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .dew_point_50hPa:
-            fallthrough
-        case .dewpoint_50hPa:
+        case .dew_point_50hPa, .dewpoint_50hPa:
             let temperature = try get(raw: .temperature_50hPa, time: time)
             let rh = try get(raw: .relative_humidity_50hPa, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-        case .soil_temperature_0cm:
-            fallthrough
-        case .skin_temperature:
+        case .soil_temperature_0cm, .skin_temperature:
             return try get(raw: .surface_temperature, time: time)
         case .surface_air_pressure:
             return try get(raw: .surface_pressure, time: time)
         case .relativehumidity_2m:
             return try get(raw: .relative_humidity_2m, time: time)
-        case .dew_point_2m:
-            fallthrough
-        case .dewpoint_2m:
+        case .dew_point_2m, .dewpoint_2m:
             let temperature = try get(raw: .temperature_2m, time: time)
             let rh = try get(raw: .relative_humidity_2m, time: time)
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
@@ -481,9 +375,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let relhum = try get(derived: .relativehumidity_2m, time: time).data
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: swrad), .celsius)
-        case .vapour_pressure_deficit:
-            fallthrough
-        case .vapor_pressure_deficit:
+        case .vapour_pressure_deficit, .vapor_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let rh = try get(derived: .relativehumidity_2m, time: time).data
             let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
@@ -561,188 +453,108 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
         case .windspeed_10m, .wind_speed_10m:
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
-        case .wind_speed_1000hPa:
-            fallthrough
-        case .windspeed_1000hPa:
+        case .wind_speed_1000hPa, .windspeed_1000hPa:
             try prefetchData(raw: .wind_v_component_1000hPa, time: time)
             try prefetchData(raw: .wind_u_component_1000hPa, time: time)
-        case .wind_speed_925hPa:
-            fallthrough
-        case .windspeed_925hPa:
+        case .wind_speed_925hPa, .windspeed_925hPa:
             try prefetchData(raw: .wind_v_component_925hPa, time: time)
             try prefetchData(raw: .wind_u_component_925hPa, time: time)
-        case .wind_speed_850hPa:
-            fallthrough
-        case .windspeed_850hPa:
+        case .wind_speed_850hPa, .windspeed_850hPa:
             try prefetchData(raw: .wind_v_component_850hPa, time: time)
             try prefetchData(raw: .wind_u_component_850hPa, time: time)
-        case .wind_speed_700hPa:
-            fallthrough
-        case .windspeed_700hPa:
+        case .wind_speed_700hPa, .windspeed_700hPa:
             try prefetchData(raw: .wind_v_component_700hPa, time: time)
             try prefetchData(raw: .wind_u_component_700hPa, time: time)
-        case .wind_speed_600hPa:
-            fallthrough
-        case .windspeed_600hPa:
+        case .wind_speed_600hPa, .windspeed_600hPa:
             try prefetchData(raw: .wind_v_component_600hPa, time: time)
             try prefetchData(raw: .wind_u_component_600hPa, time: time)
-        case .wind_speed_500hPa:
-            fallthrough
-        case .windspeed_500hPa:
+        case .wind_speed_500hPa, .windspeed_500hPa:
             try prefetchData(raw: .wind_v_component_500hPa, time: time)
             try prefetchData(raw: .wind_u_component_500hPa, time: time)
-        case .wind_speed_400hPa:
-            fallthrough
-        case .windspeed_400hPa:
+        case .wind_speed_400hPa, .windspeed_400hPa:
             try prefetchData(raw: .wind_v_component_400hPa, time: time)
             try prefetchData(raw: .wind_u_component_400hPa, time: time)
-        case .wind_speed_300hPa:
-            fallthrough
-        case .windspeed_300hPa:
+        case .wind_speed_300hPa, .windspeed_300hPa:
             try prefetchData(raw: .wind_v_component_300hPa, time: time)
             try prefetchData(raw: .wind_u_component_300hPa, time: time)
-        case .wind_speed_250hPa:
-            fallthrough
-        case .windspeed_250hPa:
+        case .wind_speed_250hPa, .windspeed_250hPa:
             try prefetchData(raw: .wind_v_component_250hPa, time: time)
             try prefetchData(raw: .wind_u_component_250hPa, time: time)
-        case .wind_speed_200hPa:
-            fallthrough
-        case .windspeed_200hPa:
+        case .wind_speed_200hPa, .windspeed_200hPa:
             try prefetchData(raw: .wind_v_component_200hPa, time: time)
             try prefetchData(raw: .wind_u_component_200hPa, time: time)
-        case .wind_speed_100hPa:
-            fallthrough
-        case .windspeed_100hPa:
+        case .wind_speed_100hPa, .windspeed_100hPa:
             try prefetchData(raw: .wind_v_component_100hPa, time: time)
             try prefetchData(raw: .wind_u_component_100hPa, time: time)
-        case .wind_speed_50hPa:
-            fallthrough
-        case .windspeed_50hPa:
+        case .wind_speed_50hPa, .windspeed_50hPa:
             try prefetchData(raw: .wind_v_component_50hPa, time: time)
             try prefetchData(raw: .wind_u_component_50hPa, time: time)
-        case .wind_direction_10m:
-            fallthrough
-        case .winddirection_10m:
+        case .wind_direction_10m, .winddirection_10m:
             try prefetchData(raw: .wind_u_component_10m, time: time)
             try prefetchData(raw: .wind_v_component_10m, time: time)
-        case .wind_direction_1000hPa:
-            fallthrough
-        case .winddirection_1000hPa:
+        case .wind_direction_1000hPa, .winddirection_1000hPa:
             try prefetchData(raw: .wind_v_component_1000hPa, time: time)
             try prefetchData(raw: .wind_u_component_1000hPa, time: time)
-        case .wind_direction_925hPa:
-            fallthrough
-        case .winddirection_925hPa:
+        case .wind_direction_925hPa, .winddirection_925hPa:
             try prefetchData(raw: .wind_v_component_925hPa, time: time)
             try prefetchData(raw: .wind_u_component_925hPa, time: time)
-        case .wind_direction_850hPa:
-            fallthrough
-        case .winddirection_850hPa:
+        case .wind_direction_850hPa, .winddirection_850hPa:
             try prefetchData(raw: .wind_v_component_850hPa, time: time)
             try prefetchData(raw: .wind_u_component_850hPa, time: time)
-        case .wind_direction_700hPa:
-            fallthrough
-        case .winddirection_700hPa:
+        case .wind_direction_700hPa, .winddirection_700hPa:
             try prefetchData(raw: .wind_v_component_700hPa, time: time)
             try prefetchData(raw: .wind_u_component_700hPa, time: time)
-        case .wind_direction_600hPa:
-            fallthrough
-        case .winddirection_600hPa:
+        case .wind_direction_600hPa, .winddirection_600hPa:
             try prefetchData(raw: .wind_v_component_600hPa, time: time)
             try prefetchData(raw: .wind_u_component_600hPa, time: time)
-        case .wind_direction_500hPa:
-            fallthrough
-        case .winddirection_500hPa:
+        case .wind_direction_500hPa, .winddirection_500hPa:
             try prefetchData(raw: .wind_v_component_500hPa, time: time)
             try prefetchData(raw: .wind_u_component_500hPa, time: time)
-        case .wind_direction_400hPa:
-            fallthrough
-        case .winddirection_400hPa:
+        case .wind_direction_400hPa, .winddirection_400hPa:
             try prefetchData(raw: .wind_v_component_400hPa, time: time)
             try prefetchData(raw: .wind_u_component_400hPa, time: time)
-        case .wind_direction_300hPa:
-            fallthrough
-        case .winddirection_300hPa:
+        case .wind_direction_300hPa, .winddirection_300hPa:
             try prefetchData(raw: .wind_v_component_300hPa, time: time)
             try prefetchData(raw: .wind_u_component_300hPa, time: time)
-        case .wind_direction_250hPa:
-            fallthrough
-        case .winddirection_250hPa:
+        case .wind_direction_250hPa, .winddirection_250hPa:
             try prefetchData(raw: .wind_v_component_250hPa, time: time)
             try prefetchData(raw: .wind_u_component_250hPa, time: time)
-        case .wind_direction_200hPa:
-            fallthrough
-        case .winddirection_200hPa:
+        case .wind_direction_200hPa, .winddirection_200hPa:
             try prefetchData(raw: .wind_v_component_200hPa, time: time)
             try prefetchData(raw: .wind_u_component_200hPa, time: time)
-        case .wind_direction_100hPa:
-            fallthrough
-        case .winddirection_100hPa:
+        case .wind_direction_100hPa, .winddirection_100hPa:
             try prefetchData(raw: .wind_v_component_100hPa, time: time)
             try prefetchData(raw: .wind_u_component_100hPa, time: time)
-        case .wind_direction_50hPa:
-            fallthrough
-        case .winddirection_50hPa:
+        case .wind_direction_50hPa, .winddirection_50hPa:
             try prefetchData(raw: .wind_v_component_50hPa, time: time)
             try prefetchData(raw: .wind_u_component_50hPa, time: time)
-        case .soil_temperature_0_to_10cm:
-            fallthrough
-        case .soil_temperature_0_10cm:
-            fallthrough
-        case .soil_temperature_0_7cm:
+        case .soil_temperature_0_to_10cm, .soil_temperature_0_10cm, .soil_temperature_0_7cm:
             try prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
-        case .cloud_cover_1000hPa:
-            fallthrough
-        case .cloudcover_1000hPa:
+        case .cloud_cover_1000hPa, .cloudcover_1000hPa:
             try prefetchData(raw: .relative_humidity_1000hPa, time: time)
-        case .cloud_cover_925hPa:
-            fallthrough
-        case .cloudcover_925hPa:
+        case .cloud_cover_925hPa, .cloudcover_925hPa:
             try prefetchData(raw: .relative_humidity_925hPa, time: time)
-        case .cloud_cover_850hPa:
-            fallthrough
-        case .cloudcover_850hPa:
+        case .cloud_cover_850hPa, .cloudcover_850hPa:
             try prefetchData(raw: .relative_humidity_850hPa, time: time)
-        case .cloud_cover_700hPa:
-            fallthrough
-        case .cloudcover_700hPa:
+        case .cloud_cover_700hPa, .cloudcover_700hPa:
             try prefetchData(raw: .relative_humidity_700hPa, time: time)
-        case .cloud_cover_600hPa:
-            fallthrough
-        case .cloudcover_600hPa:
+        case .cloud_cover_600hPa, .cloudcover_600hPa:
             try prefetchData(raw: .relative_humidity_600hPa, time: time)
-        case .cloud_cover_500hPa:
-            fallthrough
-        case .cloudcover_500hPa:
+        case .cloud_cover_500hPa, .cloudcover_500hPa:
             try prefetchData(raw: .relative_humidity_500hPa, time: time)
-        case .cloud_cover_400hPa:
-            fallthrough
-        case .cloudcover_400hPa:
+        case .cloud_cover_400hPa, .cloudcover_400hPa:
             try prefetchData(raw: .relative_humidity_400hPa, time: time)
-        case .cloud_cover_300hPa:
-            fallthrough
-        case .cloudcover_300hPa:
+        case .cloud_cover_300hPa, .cloudcover_300hPa:
             try prefetchData(raw: .relative_humidity_300hPa, time: time)
-        case .cloud_cover_250hPa:
-            fallthrough
-        case .cloudcover_250hPa:
+        case .cloud_cover_250hPa, .cloudcover_250hPa:
             try prefetchData(raw: .relative_humidity_250hPa, time: time)
-        case .cloud_cover_200hPa:
-            fallthrough
-        case .cloudcover_200hPa:
+        case .cloud_cover_200hPa, .cloudcover_200hPa:
             try prefetchData(raw: .relative_humidity_200hPa, time: time)
-        case .cloud_cover_100hPa:
-            fallthrough
-        case .cloudcover_100hPa:
+        case .cloud_cover_100hPa, .cloudcover_100hPa:
             try prefetchData(raw: .relative_humidity_100hPa, time: time)
-        case .cloud_cover_50hPa:
-            fallthrough
-        case .cloudcover_50hPa:
+        case .cloud_cover_50hPa, .cloudcover_50hPa:
             try prefetchData(raw: .relative_humidity_50hPa, time: time)
-        case .weather_code:
-            fallthrough
-        case .weathercode:
+        case .weather_code, .weathercode:
             try prefetchData(raw: .cloud_cover, time: time)
             try prefetchData(derived: .snowfall, time: time)
             try prefetchData(raw: .precipitation, time: time)
@@ -796,77 +608,49 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .relative_humidity_100hPa, time: time)
         case .relativehumidity_50hPa:
             try prefetchData(raw: .relative_humidity_50hPa, time: time)
-        case .dew_point_1000hPa:
-            fallthrough
-        case .dewpoint_1000hPa:
+        case .dew_point_1000hPa, .dewpoint_1000hPa:
             try prefetchData(raw: .temperature_1000hPa, time: time)
             try prefetchData(raw: .relative_humidity_1000hPa, time: time)
-        case .dew_point_925hPa:
-            fallthrough
-        case .dewpoint_925hPa:
+        case .dew_point_925hPa, .dewpoint_925hPa:
             try prefetchData(raw: .temperature_925hPa, time: time)
             try prefetchData(raw: .relative_humidity_925hPa, time: time)
-        case .dew_point_850hPa:
-            fallthrough
-        case .dewpoint_850hPa:
+        case .dew_point_850hPa, .dewpoint_850hPa:
             try prefetchData(raw: .temperature_850hPa, time: time)
             try prefetchData(raw: .relative_humidity_850hPa, time: time)
-        case .dew_point_700hPa:
-            fallthrough
-        case .dewpoint_700hPa:
+        case .dew_point_700hPa, .dewpoint_700hPa:
             try prefetchData(raw: .temperature_700hPa, time: time)
             try prefetchData(raw: .relative_humidity_700hPa, time: time)
-        case .dew_point_600hPa:
-            fallthrough
-        case .dewpoint_600hPa:
+        case .dew_point_600hPa, .dewpoint_600hPa:
             try prefetchData(raw: .temperature_600hPa, time: time)
             try prefetchData(raw: .relative_humidity_600hPa, time: time)
-        case .dew_point_500hPa:
-            fallthrough
-        case .dewpoint_500hPa:
+        case .dew_point_500hPa, .dewpoint_500hPa:
             try prefetchData(raw: .temperature_500hPa, time: time)
             try prefetchData(raw: .relative_humidity_500hPa, time: time)
-        case .dew_point_400hPa:
-            fallthrough
-        case .dewpoint_400hPa:
+        case .dew_point_400hPa, .dewpoint_400hPa:
             try prefetchData(raw: .temperature_400hPa, time: time)
             try prefetchData(raw: .relative_humidity_400hPa, time: time)
-        case .dew_point_300hPa:
-            fallthrough
-        case .dewpoint_300hPa:
+        case .dew_point_300hPa, .dewpoint_300hPa:
             try prefetchData(raw: .temperature_300hPa, time: time)
             try prefetchData(raw: .relative_humidity_300hPa, time: time)
-        case .dew_point_250hPa:
-            fallthrough
-        case .dewpoint_250hPa:
+        case .dew_point_250hPa, .dewpoint_250hPa:
             try prefetchData(raw: .temperature_250hPa, time: time)
             try prefetchData(raw: .relative_humidity_250hPa, time: time)
-        case .dew_point_200hPa:
-            fallthrough
-        case .dewpoint_200hPa:
+        case .dew_point_200hPa, .dewpoint_200hPa:
             try prefetchData(raw: .temperature_200hPa, time: time)
             try prefetchData(raw: .relative_humidity_200hPa, time: time)
-        case .dew_point_100hPa:
-            fallthrough
-        case .dewpoint_100hPa:
+        case .dew_point_100hPa, .dewpoint_100hPa:
             try prefetchData(raw: .temperature_100hPa, time: time)
             try prefetchData(raw: .relative_humidity_100hPa, time: time)
-        case .dew_point_50hPa:
-            fallthrough
-        case .dewpoint_50hPa:
+        case .dew_point_50hPa, .dewpoint_50hPa:
             try prefetchData(raw: .temperature_50hPa, time: time)
             try prefetchData(raw: .relative_humidity_50hPa, time: time)
-        case .skin_temperature:
-            fallthrough
-        case .soil_temperature_0cm:
+        case .skin_temperature, .soil_temperature_0cm:
             try prefetchData(raw: .surface_temperature, time: time)
         case .surface_air_pressure:
             try prefetchData(raw: .surface_pressure, time: time)
         case .relativehumidity_2m:
             try prefetchData(raw: .relative_humidity_2m, time: time)
-        case .dew_point_2m:
-            fallthrough
-        case .dewpoint_2m:
+        case .dew_point_2m, .dewpoint_2m:
             try prefetchData(raw: .relative_humidity_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
         case .apparent_temperature:
@@ -874,9 +658,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(derived: .windspeed_10m, time: time)
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .vapour_pressure_deficit:
-            fallthrough
-        case .vapor_pressure_deficit:
+        case .vapour_pressure_deficit, .vapor_pressure_deficit:
             try prefetchData(derived: .relativehumidity_2m, time: time)
             try prefetchData(raw: .temperature_2m, time: time)
         case .wet_bulb_temperature_2m:

@@ -56,25 +56,13 @@ struct GloFasDownloader: AsyncCommand {
         let domain = try GloFasDomain.load(rawValue: signature.domain)
 
         switch domain {
-        case .consolidatedv3:
-            fallthrough
-        case .intermediate:
-            fallthrough
-        case .intermediatev3:
-            fallthrough
-        case .consolidated:
+        case .consolidatedv3, .intermediate, .intermediatev3, .consolidated:
             guard let cdskey = signature.cdskey else {
                 fatalError("cds key is required")
             }
             let timeInterval = try signature.getTimeinterval()
             try await downloadTimeIntervalConsolidated(application: context.application, timeinterval: timeInterval, cdskey: cdskey, domain: domain)
-        case .seasonalv3:
-            fallthrough
-        case .forecast:
-            fallthrough
-        case .seasonal:
-            fallthrough
-        case .forecastv3:
+        case .seasonalv3, .forecast, .seasonal, .forecastv3:
             let runAuto = domain.isForecast ? Timestamp.now().with(hour: 0) : Timestamp.now().with(day: 1)
             let run = try signature.date.map(IsoDate.init)?.toTimestamp() ?? runAuto
 
@@ -297,30 +285,16 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
 
     var grid: Gridable {
         switch self {
-        case .consolidated:
-            fallthrough
-        case .intermediate:
-            fallthrough
-        case .seasonal:
-            fallthrough
-        case .forecast:
+        case .consolidated, .intermediate, .seasonal, .forecast:
             return RegularGrid(nx: 7200, ny: 3000, latMin: -60, lonMin: -180, dx: 0.05, dy: 0.05)
-        case .consolidatedv3:
-            fallthrough
-        case .intermediatev3:
-            fallthrough
-        case .seasonalv3:
-            fallthrough
-        case .forecastv3:
+        case .consolidatedv3, .intermediatev3, .seasonalv3, .forecastv3:
             return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
         }
     }
 
     var isForecast: Bool {
         switch self {
-        case .forecast:
-            fallthrough
-        case .forecastv3:
+        case .forecast, .forecastv3:
             return true
         default: return false
         }
@@ -335,19 +309,11 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .seasonal:
             fatalError("should never be called")
-        case .forecast:
-            fallthrough
-        case .intermediate:
-            fallthrough
-        case .consolidated:
+        case .forecast, .intermediate, .consolidated:
             return "version_4_0"
-        case .forecastv3:
-            fallthrough
-        case .seasonalv3:
+        case .forecastv3, .seasonalv3:
             fatalError("should never be called")
-        case.intermediatev3:
-            fallthrough
-        case .consolidatedv3:
+        case.intermediatev3, .consolidatedv3:
             return "version_3_1"
         }
     }
@@ -355,34 +321,18 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     /// `intermediate` or `consolidated`
     var productType: String {
         switch self {
-        case .consolidatedv3:
-            fallthrough
-        case .consolidated:
+        case .consolidatedv3, .consolidated:
             return "consolidated"
-        case .forecast:
-            fallthrough
-        case .seasonal:
-            fallthrough
-        case .seasonalv3:
-            fallthrough
-        case .forecastv3:
+        case .forecast, .seasonal, .seasonalv3, .forecastv3:
             fatalError("should never be called")
-        case .intermediatev3:
-            fallthrough
-        case .intermediate:
+        case .intermediatev3, .intermediate:
             return "intermediate"
         }
     }
 
     var omFileLength: Int {
         switch self {
-        case .consolidatedv3:
-            fallthrough
-        case .intermediate:
-            fallthrough
-        case .intermediatev3:
-            fallthrough
-        case .consolidated:
+        case .consolidatedv3, .intermediate, .intermediatev3, .consolidated:
             return 100 // 100 days per file
         case .forecastv3:
             return 60

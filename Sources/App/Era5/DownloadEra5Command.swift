@@ -254,7 +254,7 @@ struct DownloadEra5Command: AsyncCommand {
             try await client.shutdown()
         }
 
-        try Self.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted().map { $0 }, createNetCdf: createNetCdf)
+        try Self.processElevationLsmGrib(domain: domain, files: Array([tempDownloadGribFile, tempDownloadGribFile2, tempDownloadGribFile3].compacted()), createNetCdf: createNetCdf)
 
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
         if let tempDownloadGribFile2 {
@@ -321,14 +321,32 @@ struct DownloadEra5Command: AsyncCommand {
     func downloadDailyFiles(application: Application, cdskey: String, email: String?, timeinterval: TimerangeDt, domain: CdsDomain, variables: [GenericVariable], concurrent: Int, forceUpdate: Bool) async throws -> [GenericVariableHandle] {
         switch domain {
         case .era5_land, .era5, .era5_ocean, .era5_ensemble:
-            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent, forceUpdate: forceUpdate)
+            let variables = variables.map {
+                guard let v = $0 as? Era5Variable else {
+                    fatalError("Wrong variable type")
+                }
+                return v
+            }
+            return try await downloadDailyEra5Files(application: application, cdskey: cdskey, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: forceUpdate)
         case .cerra:
-            return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables as! [CerraVariable], concurrent: concurrent)
+            let variables = variables.map {
+                guard let v = $0 as? CerraVariable else {
+                    fatalError("Wrong variable type")
+                }
+                return v
+            }
+            return try await downloadDailyFilesCerra(application: application, cdskey: cdskey, timeinterval: timeinterval, variables: variables, concurrent: concurrent)
         case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
             guard let email else {
                 fatalError("email required")
             }
-            return try await downloadDailyEcmwfIfsFiles(application: application, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables as! [Era5Variable], concurrent: concurrent, forceUpdate: forceUpdate)
+            let variables = variables.map {
+                guard let v = $0 as? Era5Variable else {
+                    fatalError("Wrong variable type")
+                }
+                return v
+            }
+            return try await downloadDailyEcmwfIfsFiles(application: application, key: cdskey, email: email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: forceUpdate)
         case .era5_daily, .era5_land_daily:
             fatalError()
         }
@@ -525,7 +543,7 @@ struct DownloadEra5Command: AsyncCommand {
                 query = EcmwfQuery(
                     date: timestamp.iso8601_YYYY_MM_dd,
                     param: variables.map { $0.marsGribCode },
-                    step: (1...12).map({ $0 }),
+                    step: Array(1...12),
                     stream: "oper",
                     time: ["00:00:00", "12:00:00"],
                     type: "fc"
@@ -535,7 +553,7 @@ struct DownloadEra5Command: AsyncCommand {
                 query = EcmwfQuery(
                     date: timestamp.iso8601_YYYY_MM_dd,
                     param: variables.map { $0.marsGribCode },
-                    step: stride(from: 0, through: 12, by: 3).map({ $0 }),
+                    step: Array(stride(from: 0, through: 12, by: 3)),
                     stream: "lwda",
                     time: ["06:00:00", "18:00:00"],
                     type: "fc"

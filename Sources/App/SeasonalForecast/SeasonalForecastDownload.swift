@@ -196,7 +196,7 @@ fileprivate extension Array2DFastTime {
     }
 }
 
-fileprivate struct GribFile {
+fileprivate enum GribFile {
     static func readAndConvert(logger: Logger, gribName: String, member: Int, domain: SeasonalForecastDomain, multiply: Float = 1, add: Float = 0) throws -> [String: Array2DFastTime] {
         logger.info("Reading grib '\(gribName)' for member \(member)")
         let startReadGrib = DispatchTime.now()

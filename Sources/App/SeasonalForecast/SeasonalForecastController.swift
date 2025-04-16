@@ -46,9 +46,7 @@ extension SeasonalForecastReader {
             try prefetchData(variable: variable, time: time)
         case .derived(let variable):
             switch variable {
-            case .windspeed_10m, .wind_speed_10m:
-                fallthrough
-            case .winddirection_10m, .wind_direction_10m:
+            case .windspeed_10m, .wind_speed_10m, .winddirection_10m, .wind_direction_10m:
                 try prefetchData(variable: .wind_u_component_10m, time: time)
                 try prefetchData(variable: .wind_v_component_10m, time: time)
             case .cloudcover:
@@ -96,9 +94,7 @@ extension SeasonalForecastReader {
             try prefetchData(variable: .showers, time: time)
         case .shortwave_radiation_sum:
             try prefetchData(variable: .shortwave_radiation, time: time)
-        case .windspeed_10m_max, .wind_speed_10m_max:
-            fallthrough
-        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
+        case .windspeed_10m_max, .wind_speed_10m_max, .winddirection_10m_dominant, .wind_direction_10m_dominant:
             try prefetchData(variable: .wind_u_component_10m, time: time)
             try prefetchData(variable: .wind_v_component_10m, time: time)
         case .precipitation_hours:

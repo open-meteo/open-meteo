@@ -146,9 +146,7 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant, .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
                 try prefetchData(variable: .direct_radiation, time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)

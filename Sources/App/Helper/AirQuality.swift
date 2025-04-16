@@ -1,7 +1,7 @@
 import Foundation
 
 /// European Air Quality index: https://www.eea.europa.eu/themes/air/air-quality-index in the right legend press "About the European Air Quality Index"
-struct EuropeanAirQuality {
+enum EuropeanAirQuality {
     static let no2HourlyThresholds: [Float] = [0, 40, 90, 120, 230, 340]
     static let o3HourlyThresholds: [Float] = [0, 50, 100, 130, 240, 380]
     static let so2HourlyThresholds: [Float] = [0, 100, 200, 350, 500, 750]
@@ -35,7 +35,7 @@ struct EuropeanAirQuality {
 }
 
 /// https://en.wikipedia.org/wiki/Air_quality_index#United_States
-struct UnitedStatesAirQuality {
+enum UnitedStatesAirQuality {
     static let o3_HourlyThresholds: [Float] = [.nan, .nan, 125, 165, 205, 405, 505, 605]
     static let o3_8HourlyThresholds: [Float] = [0, 55, 70, 85, 105, 200, .nan, .nan]
 

@@ -121,8 +121,7 @@ extension IconWaveDomain {
     fileprivate var lastRun: Int {
         let t = Timestamp.now()
         switch self {
-        case .ewam: fallthrough
-        case .gwam:
+        case .ewam, .gwam:
             // Wave models have a delay of 3-4 hours after initialisation
             return ((t.hour - 3 + 24) % 24) / 12 * 12
         }

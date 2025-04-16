@@ -127,7 +127,9 @@ struct CdoIconGlobal {
         weightsFile = "\(workDirectory)weights_icogl2world_0125.nc"
         let fm = FileManager.default
 
-        let grid = domain.grid as! RegularGrid
+        guard let grid = domain.grid as? RegularGrid else {
+            fatalError("Wrong grid type")
+        }
 
         if fm.fileExists(atPath: gridFile) && fm.fileExists(atPath: weightsFile) {
             return

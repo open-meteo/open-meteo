@@ -101,21 +101,9 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .cloud_cover_high: return 1
         case .relative_humidity_2m: return 1
         case .precipitation: return 10
-        case .wind_speed_10m:
-            fallthrough
-        case .wind_speed_40m:
-            fallthrough
-        case .wind_speed_80m:
-            fallthrough
-        case .wind_speed_120m:
+        case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
             return 10
-        case .wind_direction_10m:
-            fallthrough
-        case .wind_direction_40m:
-            fallthrough
-        case .wind_direction_80m:
-            fallthrough
-        case .wind_direction_120m:
+        case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return 1
         case .surface_temperature: return 20
         case .soil_temperature_0_to_10cm: return 20
@@ -159,21 +147,9 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
-        case .wind_speed_10m:
-            fallthrough
-        case .wind_speed_40m:
-            fallthrough
-        case .wind_speed_80m:
-            fallthrough
-        case .wind_speed_120m:
+        case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
             return .hermite(bounds: nil)
-        case .wind_direction_10m:
-            fallthrough
-        case .wind_direction_40m:
-            fallthrough
-        case .wind_direction_80m:
-            fallthrough
-        case .wind_direction_120m:
+        case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return .linearDegrees
         case .surface_temperature:
             return .hermite(bounds: nil)
@@ -247,17 +223,7 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .surface_temperature:
-            fallthrough
-        case .soil_temperature_0_to_10cm:
-            fallthrough
-        case .soil_temperature_10_to_35cm:
-            fallthrough
-        case .soil_temperature_35_to_100cm:
-            fallthrough
-        case .soil_temperature_100_to_300cm:
-            fallthrough
-        case .temperature_2m:
+        case .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_35cm, .soil_temperature_35_to_100cm, .soil_temperature_100_to_300cm, .temperature_2m:
             return true
         default:
             return false

@@ -701,9 +701,7 @@ enum TargetGridDomain: String, CaseIterable {
 
     var genericDomain: GenericDomain {
         switch self {
-        case .era5_interpolated_10km:
-            fallthrough
-        case .era5_land:
+        case .era5_interpolated_10km, .era5_land:
             return CdsDomain.era5_land
         case .imerg:
             return SatelliteDomain.imerg_daily

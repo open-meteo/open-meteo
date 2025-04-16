@@ -71,9 +71,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
 
     func gribName(domain: GemDomain) -> String? {
         switch domain {
-        case .gem_global:
-            fallthrough
-        case .gem_regional:
+        case .gem_global, .gem_regional:
             switch self {
             case .temperature_2m:
                 return "TMP_TGL_2"
@@ -270,21 +268,9 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return 10
         case .pressure_msl:
             return 10
-        case .wind_speed_10m:
-            fallthrough
-        case .wind_speed_40m:
-            fallthrough
-        case .wind_speed_80m:
-            fallthrough
-        case .wind_speed_120m:
+        case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
             return 10
-        case .wind_direction_10m:
-            fallthrough
-        case .wind_direction_40m:
-            fallthrough
-        case .wind_direction_80m:
-            fallthrough
-        case .wind_direction_120m:
+        case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return 1
         case .soil_temperature_0_to_10cm:
             return 20
@@ -315,15 +301,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
 
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_40m:
-            fallthrough
-        case .temperature_80m:
-            fallthrough
-        case .temperature_120m:
-            fallthrough
-        case .soil_temperature_0_to_10cm:
+        case .temperature_2m, .temperature_40m, .temperature_80m, .temperature_120m, .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)
@@ -354,21 +332,9 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
-        case .wind_speed_10m:
-            fallthrough
-        case .wind_speed_40m:
-            fallthrough
-        case .wind_speed_80m:
-            fallthrough
-        case .wind_speed_120m:
+        case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
             return .hermite(bounds: nil)
-        case .wind_direction_10m:
-            fallthrough
-        case .wind_direction_40m:
-            fallthrough
-        case .wind_direction_80m:
-            fallthrough
-        case .wind_direction_120m:
+        case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return .linearDegrees
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
@@ -407,23 +373,9 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             return .celsius
         case .relative_humidity_2m:
             return .percentage
-        case .wind_speed_10m:
-            fallthrough
-        case .wind_speed_40m:
-            fallthrough
-        case .wind_speed_80m:
-            fallthrough
-        case .wind_speed_120m:
-            fallthrough
-        case .wind_gusts_10m:
+        case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m, .wind_gusts_10m:
             return .metrePerSecond
-        case .wind_direction_10m:
-            fallthrough
-        case .wind_direction_40m:
-            fallthrough
-        case .wind_direction_80m:
-            fallthrough
-        case .wind_direction_120m:
+        case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return .degreeDirection
         case .showers:
             return .millimetre
@@ -442,15 +394,7 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .soil_temperature_0_to_10cm:
-            fallthrough
-        case .temperature_2m:
-            fallthrough
-        case .temperature_40m:
-            fallthrough
-        case .temperature_80m:
-            fallthrough
-        case .temperature_120m:
+        case .soil_temperature_0_to_10cm, .temperature_2m, .temperature_40m, .temperature_80m, .temperature_120m:
             return true
         default:
             return false

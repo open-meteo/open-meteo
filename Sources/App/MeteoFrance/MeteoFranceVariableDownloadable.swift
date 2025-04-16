@@ -97,13 +97,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
         case .arpege_europe:
             switch self {
                 /// upper level variables after hour 48 only 3 hourly data
-            case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
-                fallthrough
-            case .wind_v_component_20m, .wind_v_component_50m, .wind_v_component_100m, .wind_v_component_150m, .wind_v_component_200m:
-                fallthrough
-            case .wind_u_component_20m, .wind_u_component_50m, .wind_u_component_100m, .wind_u_component_150m, .wind_u_component_200m:
-                fallthrough
-            case .cape:
+            case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m, .wind_v_component_20m, .wind_v_component_50m, .wind_v_component_100m, .wind_v_component_150m, .wind_v_component_200m, .wind_u_component_20m, .wind_u_component_50m, .wind_u_component_100m, .wind_u_component_150m, .wind_u_component_200m, .cape:
                 if forecastHour % 3 != 0 && forecastHour > 48 {
                     return false
                 }
@@ -208,7 +202,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
                 return true
             case .snowfall_water_equivalent:
                 return true
-           case .wind_gusts_10m:
+            case .wind_gusts_10m:
                 return true
             case .relative_humidity_2m:
                 return true
@@ -240,17 +234,7 @@ extension MeteoFranceSurfaceVariable: MeteoFranceVariableDownloadable {
 
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
-            fallthrough
-        case .temperature_2m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m, .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)

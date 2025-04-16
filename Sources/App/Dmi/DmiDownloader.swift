@@ -118,7 +118,9 @@ struct DmiDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let grid = domain.grid
+        guard let grid = domain.grid as? ProjectionGrid<LambertConformalConicProjection> else {
+            fatalError("Wrong grid")
+        }
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
@@ -130,7 +132,7 @@ struct DmiDownload: AsyncCommand {
 
         let generateElevationFile = !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath())
         // Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
-        let trueNorth = (grid as! ProjectionGrid<LambertConformalConicProjection>).getTrueNorthDirection()
+        let trueNorth = grid.getTrueNorthDirection()
         var previous = GribDeaverager()
         let timerange = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600)
 

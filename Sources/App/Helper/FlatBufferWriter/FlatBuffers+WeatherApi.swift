@@ -90,9 +90,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .snowfall, previousDay: previousDay)
         case .snowfall_water_equivalent:
             return .init(variable: .snowfallWaterEquivalent, previousDay: previousDay)
-        case .soil_moisture_0_1cm:
-            fallthrough
-        case .soil_moisture_0_to_1cm:
+        case .soil_moisture_0_1cm, .soil_moisture_0_to_1cm:
             return .init(variable: .soilMoisture, depth: 0, depthTo: 1, previousDay: previousDay)
         case .soil_moisture_0_to_100cm:
             return .init(variable: .soilMoisture, depth: 0, depthTo: 100, previousDay: previousDay)
@@ -106,19 +104,13 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .soilMoisture, depth: 100, depthTo: 255, previousDay: previousDay)
         case .soil_moisture_10_to_40cm:
             return .init(variable: .soilMoisture, depth: 10, depthTo: 40, previousDay: previousDay)
-        case .soil_moisture_1_3cm:
-            fallthrough
-        case .soil_moisture_1_to_3cm:
+        case .soil_moisture_1_3cm, .soil_moisture_1_to_3cm:
             return .init(variable: .soilMoisture, depth: 1, depthTo: 3, previousDay: previousDay)
-        case .soil_moisture_27_81cm:
-            fallthrough
-        case .soil_moisture_27_to_81cm:
+        case .soil_moisture_27_81cm, .soil_moisture_27_to_81cm:
             return .init(variable: .soilMoisture, depth: 27, depthTo: 81, previousDay: previousDay)
         case .soil_moisture_28_to_100cm:
             return .init(variable: .soilMoisture, depth: 28, depthTo: 100, previousDay: previousDay)
-        case .soil_moisture_3_9cm:
-            fallthrough
-        case .soil_moisture_3_to_9cm:
+        case .soil_moisture_3_9cm, .soil_moisture_3_to_9cm:
             return .init(variable: .soilMoisture, depth: 3, depthTo: 9, previousDay: previousDay)
         case .soil_moisture_40_to_100cm:
             return .init(variable: .soilMoisture, depth: 40, depthTo: 100, previousDay: previousDay)
@@ -616,9 +608,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .bestMatch
         case .gfs_seamless:
             return .gfsSeamless
-        case .gfs_mix:
-            fallthrough
-        case .gfs_global:
+        case .gfs_mix, .gfs_global:
             return .gfsGlobal
         case .gfs_hrrr:
             return .gfsHrrr
@@ -634,15 +624,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .meteofranceAromeFrance
         case .meteofrance_arome_france_hd:
             return .meteofranceAromeFranceHd
-        case .jma_seamless:
-           fallthrough
-        case .jma_mix:
+        case .jma_seamless, .jma_mix:
             return .jmaSeamless
         case .jma_msm:
             return .jmaMsm
-        case .jms_gsm:
-            fallthrough
-        case .jma_gsm:
+        case .jms_gsm, .jma_gsm:
             return .jmaGsm
         case .gem_seamless:
             return .gemSeamless
@@ -652,9 +638,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .gemGlobal
         case .gem_hrdps_continental:
             return .gemHrdpsContinental
-        case .icon_mix:
-            fallthrough
-        case .icon_seamless:
+        case .icon_mix, .icon_seamless:
             return .iconSeamless
         case .icon_global:
             return .iconGlobal

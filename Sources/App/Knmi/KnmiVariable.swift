@@ -179,9 +179,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
+        case .temperature_2m, .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return true
         default:
             return false

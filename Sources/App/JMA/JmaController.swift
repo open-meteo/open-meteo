@@ -129,18 +129,10 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .shortwave_radiation, time: time)
             case .relativehumidity_2m:
                 try prefetchData(raw: .relative_humidity_2m, time: time)
-            case .wind_speed_10m:
-                fallthrough
-            case .windspeed_10m:
-                fallthrough
-            case .wind_direction_10m:
-                fallthrough
-            case .winddirection_10m:
+            case .wind_speed_10m, .windspeed_10m, .wind_direction_10m, .winddirection_10m:
                 try prefetchData(raw: .wind_u_component_10m, time: time)
                 try prefetchData(raw: .wind_v_component_10m, time: time)
-            case .vapour_pressure_deficit:
-                fallthrough
-            case .vapor_pressure_deficit:
+            case .vapour_pressure_deficit, .vapor_pressure_deficit:
                 try prefetchData(raw: .temperature_2m, time: time)
                 try prefetchData(raw: .relative_humidity_2m, time: time)
             case .et0_fao_evapotranspiration:
@@ -156,30 +148,12 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 break
             case .terrestrial_radiation_instant:
                 break
-            case .dew_point_2m:
-                fallthrough
-            case .dewpoint_2m:
+            case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(raw: .temperature_2m, time: time)
                 try prefetchData(raw: .relative_humidity_2m, time: time)
-            case .diffuse_radiation:
-                fallthrough
-            case .diffuse_radiation_instant:
-                fallthrough
-            case .direct_normal_irradiance:
-                fallthrough
-            case .direct_normal_irradiance_instant:
-                fallthrough
-            case .direct_radiation:
-                fallthrough
-            case .direct_radiation_instant:
-                fallthrough
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .shortwave_radiation_instant:
+            case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant, .shortwave_radiation_instant:
                 try prefetchData(raw: .shortwave_radiation, time: time)
-            case .weather_code:
-                fallthrough
-            case .weathercode:
+            case .weather_code, .weathercode:
                 try prefetchData(raw: .cloud_cover, time: time)
                 try prefetchData(variable: .derived(.surface(.snowfall)), time: time)
                 try prefetchData(raw: .precipitation, time: time)
@@ -209,25 +183,13 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .wind_speed:
-                fallthrough
-            case .windspeed:
-                fallthrough
-            case .wind_direction:
-                fallthrough
-            case .winddirection:
+            case .wind_speed, .windspeed, .wind_direction, .winddirection:
                 try prefetchData(raw: .pressure(JmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(JmaPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-            case .dew_point:
-                fallthrough
-            case .dewpoint:
+            case .dew_point, .dewpoint:
                 try prefetchData(raw: .pressure(JmaPressureVariable(variable: .temperature, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(JmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
-            case .cloud_cover:
-                fallthrough
-            case .cloudcover:
-                fallthrough
-            case .relativehumidity:
+            case .cloud_cover, .cloudcover, .relativehumidity:
                 try prefetchData(raw: .pressure(JmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }
         }
@@ -237,16 +199,12 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         switch derived {
         case .surface(let variableDerivedSurface):
             switch variableDerivedSurface {
-            case .wind_speed_10m:
-                fallthrough
-            case .windspeed_10m:
+            case .wind_speed_10m, .windspeed_10m:
                 let u = try get(raw: .wind_u_component_10m, time: time).data
                 let v = try get(raw: .wind_v_component_10m, time: time).data
                 let speed = zip(u, v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
-            case .wind_direction_10m:
-                fallthrough
-            case .winddirection_10m:
+            case .wind_direction_10m, .winddirection_10m:
                 let u = try get(raw: .wind_u_component_10m, time: time).data
                 let v = try get(raw: .wind_v_component_10m, time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
@@ -257,9 +215,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let relhum = try get(raw: .relative_humidity_2m, time: time).data
                 let radiation = try get(raw: .shortwave_radiation, time: time).data
                 return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: radiation), .celsius)
-            case .vapour_pressure_deficit:
-                fallthrough
-            case .vapor_pressure_deficit:
+            case .vapour_pressure_deficit, .vapor_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
                 let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
@@ -290,9 +246,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 /// Use center averaged
                 let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 return DataAndUnit(solar, .wattPerSquareMetre)
-            case .dew_point_2m:
-                fallthrough
-            case .dewpoint_2m:
+            case .dew_point_2m, .dewpoint_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
@@ -324,9 +278,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let diff = try get(derived: .surface(.diffuse_radiation), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-            case .weather_code:
-                fallthrough
-            case .weathercode:
+            case .weather_code, .weathercode:
                 let cloudcover = try get(raw: .cloud_cover, time: time).data
                 let precipitation = try get(raw: .precipitation, time: time).data
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
@@ -384,29 +336,21 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .wind_speed:
-                fallthrough
-            case .windspeed:
+            case .wind_speed, .windspeed:
                 let u = try get(raw: .pressure(JmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 let v = try get(raw: .pressure(JmaPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
                 let speed = zip(u.data, v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
-            case .wind_direction:
-                fallthrough
-            case .winddirection:
+            case .wind_direction, .winddirection:
                 let u = try get(raw: .pressure(JmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
                 let v = try get(raw: .pressure(JmaPressureVariable(variable: .wind_v_component, level: v.level)), time: time).data
                 let direction = Meteorology.windirectionFast(u: u, v: v)
                 return DataAndUnit(direction, .degreeDirection)
-            case .dew_point:
-                fallthrough
-            case .dewpoint:
+            case .dew_point, .dewpoint:
                 let temperature = try get(raw: .pressure(JmaPressureVariable(variable: .temperature, level: v.level)), time: time)
                 let rh = try get(raw: .pressure(JmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-            case .cloud_cover:
-                fallthrough
-            case .cloudcover:
+            case .cloud_cover, .cloudcover:
                 let rh = try get(raw: .pressure(JmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
                 return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .relativehumidity:

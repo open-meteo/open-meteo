@@ -8,7 +8,7 @@ import Foundation
 /// QM and QDM based on https://link.springer.com/article/10.1007/s00382-020-05447-4
 /// QDM paper https://journals.ametsoc.org/view/journals/clim/28/17/jcli-d-14-00754.1.xml
 /// Loosly based on https://github.com/btschwertfeger/BiasAdjustCXX/blob/master/src/CMethods.cxx
-struct QuantileDeltaMappingBiasCorrection {
+enum QuantileDeltaMappingBiasCorrection {
     enum ChangeType {
         /// Correct offset. E.g. temperature
         case absoluteChage(bounds: ClosedRange<Float>?)
@@ -554,7 +554,7 @@ extension Bins: RandomAccessCollection {
     }
 }
 
-struct Interpolations {
+enum Interpolations {
     @inlinable static func linear(a: Float, b: Float, fraction: Float) -> Float {
         return a * (1 - fraction) + b * fraction
     }

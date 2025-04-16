@@ -83,19 +83,7 @@ struct GfsDownload: AsyncCommand {
         let variables: [any GfsVariableDownloadable]
 
         switch domain {
-        case .gfs05_ens:
-            fallthrough
-        case .gfs025_ens:
-            fallthrough
-        case .gfs013:
-            fallthrough
-        case .hrrr_conus_15min:
-            fallthrough
-        case .hrrr_conus:
-            fallthrough
-        // case .nam_conus:
-        //    fallthrough
-        case .gfs025:
+        case .gfs05_ens, .gfs025_ens, .gfs013, .hrrr_conus_15min, .hrrr_conus, .gfs025:
             let onlyVariables: [any GfsVariableDownloadable]? = try signature.onlyVariables.map {
                 try $0.split(separator: ",").map {
                     if let variable = GfsPressureVariable(rawValue: String($0)) {
@@ -118,7 +106,7 @@ struct GfsDownload: AsyncCommand {
 
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
-            case .gfswave025, .gfswave025_ens, .gfswave016:
+        case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws)
             let nConcurrent = signature.concurrent ?? 1

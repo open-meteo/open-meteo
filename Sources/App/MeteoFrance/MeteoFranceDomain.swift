@@ -112,9 +112,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .arpege_europe_probabilities, .arpege_world_probabilities:
-            fallthrough
-        case .arpege_europe, .arpege_world:
+        case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_europe, .arpege_world:
             // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
         case .arome_france, .arome_france_hd:
@@ -127,9 +125,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
 
     var timeoutHours: Double {
         switch self {
-        case .arpege_europe_probabilities, .arpege_world_probabilities:
-            fallthrough
-        case .arpege_europe, .arpege_world:
+        case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_europe, .arpege_world:
             // Arpege has sometimes larger delays
             return 7.5
         case .arome_france, .arome_france_hd:
@@ -261,9 +257,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
 
     var family: Family {
         switch self {
-        case .arpege_europe_probabilities, .arpege_world_probabilities:
-            fallthrough
-        case .arpege_world, .arpege_europe:
+        case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_world, .arpege_europe:
             return .arpege
         case .arome_france, .arome_france_hd:
             return .arome
@@ -454,35 +448,9 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return 10
         case .wind_u_component_10m:
             return 10
-        case .wind_v_component_20m:
-            fallthrough
-        case .wind_u_component_20m:
-            fallthrough
-        case .wind_v_component_50m:
-            fallthrough
-        case .wind_u_component_50m:
-            fallthrough
-        case .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_150m:
-            fallthrough
-        case .wind_u_component_150m:
-            fallthrough
-        case .wind_v_component_200m:
-            fallthrough
-        case .wind_u_component_200m:
+        case .wind_v_component_20m, .wind_u_component_20m, .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m, .wind_u_component_150m, .wind_v_component_200m, .wind_u_component_200m:
             return 10
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return 20
         }
     }
@@ -517,35 +485,9 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return .solar_backwards_averaged
         case .cape:
             return .hermite(bounds: 0...10e9)
-        case .wind_v_component_20m:
-            fallthrough
-        case .wind_u_component_20m:
-            fallthrough
-        case .wind_v_component_50m:
-            fallthrough
-        case .wind_u_component_50m:
-            fallthrough
-        case .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_150m:
-            fallthrough
-        case .wind_u_component_150m:
-            fallthrough
-        case .wind_v_component_200m:
-            fallthrough
-        case .wind_u_component_200m:
+        case .wind_v_component_20m, .wind_u_component_20m, .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m, .wind_u_component_150m, .wind_v_component_200m, .wind_u_component_200m:
             return .hermite(bounds: nil)
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return .hermite(bounds: nil)
         }
     }
@@ -580,52 +522,16 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return .metrePerSecond
         case .wind_u_component_10m:
             return .metrePerSecond
-        case .wind_v_component_20m:
-            fallthrough
-        case .wind_u_component_20m:
-            fallthrough
-        case .wind_v_component_50m:
-            fallthrough
-        case .wind_u_component_50m:
-            fallthrough
-        case .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_150m:
-            fallthrough
-        case .wind_u_component_150m:
-            fallthrough
-        case .wind_v_component_200m:
-            fallthrough
-        case .wind_u_component_200m:
+        case .wind_v_component_20m, .wind_u_component_20m, .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m, .wind_u_component_150m, .wind_v_component_200m, .wind_u_component_200m:
             return .metrePerSecond
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return .celsius
         }
     }
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_2m, .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return true
         default:
             return false
@@ -669,9 +575,7 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:

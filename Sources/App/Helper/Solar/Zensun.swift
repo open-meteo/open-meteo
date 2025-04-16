@@ -3,7 +3,7 @@ import Foundation
 /// Solar position calculations based on zensun
 /// See https://gist.github.com/sangholee1990/eb3d997a9b28ace2dbcab6a45fd7c178#file-visualization_using_sun_position-pro-L306
 /// Revised using NREL Solar Posiition Altorithm SPA
-public struct Zensun {
+public enum Zensun {
     /// Watt per square meter
     public static let solarConstant = Float(1367.7)
 

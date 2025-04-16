@@ -59,8 +59,8 @@ struct ConvertOmCommand: Command {
             guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
                 throw ConvertOmError("Not a float array")
             }
-            let dimensions = om.getDimensions().map { $0 }
-            let chunks = om.getChunkDimensions().map { $0 }
+            let dimensions = Array(om.getDimensions())
+            let chunks = Array(om.getChunkDimensions())
             logger.info("File dimensions: \(dimensions), chunks: \(chunks)")
 
             let data = try om.read()

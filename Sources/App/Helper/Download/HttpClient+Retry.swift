@@ -35,12 +35,12 @@ extension HTTPClient {
      Retry HTTP requests on error
      */
     func executeRetry(_ request: HTTPClientRequest,
-                       logger: Logger,
-                       deadline: Date = .minutes(60),
-                       timeoutPerRequest: TimeAmount = .seconds(30),
-                       backoffFactor: TimeAmount = .milliseconds(1000),
-                       backoffMaximum: TimeAmount = .seconds(30),
-                       error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse {
+                      logger: Logger,
+                      deadline: Date = .minutes(60),
+                      timeoutPerRequest: TimeAmount = .seconds(30),
+                      backoffFactor: TimeAmount = .milliseconds(1000),
+                      backoffMaximum: TimeAmount = .seconds(30),
+                      error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
         var n = 0

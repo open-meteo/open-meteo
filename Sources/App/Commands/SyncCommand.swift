@@ -168,7 +168,7 @@ struct SyncCommand: AsyncCommand {
                         }
                         let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
                         let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        return filtered.map({ $0 })
+                        return Array(filtered)
                     }.flatMap({ $0 })
 
                     /// Download all files

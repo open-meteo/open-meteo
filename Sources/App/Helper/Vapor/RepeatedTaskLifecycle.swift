@@ -13,8 +13,8 @@ final class RepeatedTaskLifecycle: LifecycleHandler {
     private let taskFn: @Sendable (Application) async throws -> Void
 
     public init(initialDelay: TimeAmount,
-                 delay: TimeAmount,
-                 _ task: @escaping @Sendable (Application) async throws -> Void) {
+                delay: TimeAmount,
+                _ task: @escaping @Sendable (Application) async throws -> Void) {
         self.backgroundWatcher = .init(nil)
         self.initialDelay = initialDelay
         self.delay = delay
@@ -47,8 +47,8 @@ final class RepeatedTaskLifecycle: LifecycleHandler {
 extension Application.Lifecycle {
     /// Repeat a background task every
     mutating func repeatedTask(initialDelay: TimeAmount,
-                      delay: TimeAmount,
-                      _ task: @escaping @Sendable (Application) async throws -> Void) {
+                               delay: TimeAmount,
+                               _ task: @escaping @Sendable (Application) async throws -> Void) {
         self.use(RepeatedTaskLifecycle(
             initialDelay: initialDelay,
             delay: delay,

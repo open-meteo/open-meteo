@@ -308,21 +308,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .surface_temperature:
-            fallthrough
-        case .soil_temperature_0_to_10cm:
-            fallthrough
-        case .soil_temperature_10_to_40cm:
-            fallthrough
-        case .soil_temperature_40_to_100cm:
-            fallthrough
-        case .soil_temperature_100_to_200cm:
-            fallthrough
-        case .temperature_2m:
-            fallthrough
-        case .temperature_80m:
-            fallthrough
-        case .temperature_100m:
+        case .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_40cm, .soil_temperature_40_to_100cm, .soil_temperature_100_to_200cm, .temperature_2m, .temperature_80m, .temperature_100m:
             return true
         default:
             return false
@@ -368,9 +354,7 @@ struct GfsPressureVariable: PressureVariableRespresentable, GenericVariable, Has
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:

@@ -126,9 +126,7 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                fallthrough
-            case .winddirection, .wind_direction:
+            case .windspeed, .wind_speed, .winddirection, .wind_direction:
                 try prefetchData(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dewpoint, .dew_point:

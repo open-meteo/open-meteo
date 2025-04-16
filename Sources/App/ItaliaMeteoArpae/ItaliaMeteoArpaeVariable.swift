@@ -357,44 +357,44 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
 
     var unit: SiUnit {
         switch self {
-            case .temperature_2m: return .celsius
-            case .cloud_cover: return .percentage
-            case .cloud_cover_low: return .percentage
-            case .cloud_cover_mid: return .percentage
-            case .cloud_cover_high: return .percentage
-            case .precipitation: return .millimetre
-            case .weather_code: return .wmoCode
-            case .wind_speed_10m: return .metrePerSecond
-            case .wind_direction_10m: return .degreeDirection
-            case .soil_temperature_0cm: return .celsius
-            case .soil_temperature_6cm: return .celsius
-            case .soil_temperature_18cm: return .celsius
-            case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm: return .celsius
-            case .soil_moisture_0_to_1cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_1_to_3cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_3_to_9cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_9_to_27cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm: return .cubicMetrePerCubicMetre
-            case .snow_depth: return .metre
-            case .showers: return .millimetre
-            case .rain: return .millimetre
-            case .wind_gusts_10m: return .metrePerSecond
-            case .freezing_level_height: return .metre
-            case .relative_humidity_2m: return .percentage
-            case .shortwave_radiation: return .wattPerSquareMetre
-            case .snowfall_water_equivalent: return .millimetre
-            case .direct_radiation: return .wattPerSquareMetre
-            case .pressure_msl: return .hectopascal
-            case .cape:
-                return .joulePerKilogram
-            case .lightning_potential:
-                return .joulePerKilogram
-            case .snowfall_height:
-                return .metre
-            case .convective_inhibition:
-                return .joulePerKilogram
-            case .total_column_integrated_water_vapour:
-                return .kilogramPerSquareMetre
+        case .temperature_2m: return .celsius
+        case .cloud_cover: return .percentage
+        case .cloud_cover_low: return .percentage
+        case .cloud_cover_mid: return .percentage
+        case .cloud_cover_high: return .percentage
+        case .precipitation: return .millimetre
+        case .weather_code: return .wmoCode
+        case .wind_speed_10m: return .metrePerSecond
+        case .wind_direction_10m: return .degreeDirection
+        case .soil_temperature_0cm: return .celsius
+        case .soil_temperature_6cm: return .celsius
+        case .soil_temperature_18cm: return .celsius
+        case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm: return .celsius
+        case .soil_moisture_0_to_1cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_1_to_3cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_3_to_9cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_9_to_27cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm: return .cubicMetrePerCubicMetre
+        case .snow_depth: return .metre
+        case .showers: return .millimetre
+        case .rain: return .millimetre
+        case .wind_gusts_10m: return .metrePerSecond
+        case .freezing_level_height: return .metre
+        case .relative_humidity_2m: return .percentage
+        case .shortwave_radiation: return .wattPerSquareMetre
+        case .snowfall_water_equivalent: return .millimetre
+        case .direct_radiation: return .wattPerSquareMetre
+        case .pressure_msl: return .hectopascal
+        case .cape:
+            return .joulePerKilogram
+        case .lightning_potential:
+            return .joulePerKilogram
+        case .snowfall_height:
+            return .metre
+        case .convective_inhibition:
+            return .joulePerKilogram
+        case .total_column_integrated_water_vapour:
+            return .kilogramPerSquareMetre
         }
     }
 

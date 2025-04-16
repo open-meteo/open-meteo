@@ -1,7 +1,7 @@
 import Foundation
 import CHelper
 
-struct Meteorology {
+enum Meteorology {
     /// Calculate windspeed from u/v components
     @inlinable static func windspeed(u: Float, v: Float) -> Float {
         return sqrt(u * u + v * v)

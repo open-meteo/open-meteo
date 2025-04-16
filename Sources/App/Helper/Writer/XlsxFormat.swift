@@ -208,7 +208,7 @@ fileprivate extension Data {
     }
 }
 
-public struct ZipWriter {
+public enum ZipWriter {
     /// compressed input data must be gzip compressed with correct gzip headers
     public static func zip(files: [(path: String, compressed: ByteBuffer)], timestamp: Timestamp = .now()) -> ByteBuffer {
         let totalSize = files.reduce(22, {

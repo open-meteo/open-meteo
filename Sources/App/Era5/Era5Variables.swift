@@ -268,25 +268,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
         if domain == .era5_land {
             switch self {
-            case .temperature_2m:
-                fallthrough
-            case .dew_point_2m:
-                fallthrough
-            case .soil_temperature_0_to_7cm:
-                fallthrough
-            case .soil_temperature_7_to_28cm:
-                fallthrough
-            case .soil_temperature_28_to_100cm:
-                fallthrough
-            case .soil_temperature_100_to_255cm:
-                fallthrough
-            case .soil_moisture_0_to_7cm:
-                fallthrough
-            case .soil_moisture_7_to_28cm:
-                fallthrough
-            case .soil_moisture_28_to_100cm:
-                fallthrough
-            case .soil_moisture_100_to_255cm:
+            case .temperature_2m, .dew_point_2m, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
                 return true
             default: return false
             }
@@ -363,11 +345,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
 
     var unit: SiUnit {
         switch self {
-        case .wind_u_component_100m, .wind_u_component_100m_spread: fallthrough
-        case .wind_v_component_100m, .wind_v_component_100m_spread: fallthrough
-        case .wind_u_component_10m, .wind_u_component_10m_spread: fallthrough
-        case .wind_v_component_10m, .wind_v_component_10m_spread: fallthrough
-        case .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
+        case .wind_u_component_100m, .wind_u_component_100m_spread, .wind_v_component_100m, .wind_v_component_100m_spread, .wind_u_component_10m, .wind_u_component_10m_spread, .wind_v_component_10m, .wind_v_component_10m_spread, .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
         case .dew_point_2m: return .celsius
         case .temperature_2m: return .celsius
         case .cloud_cover, .cloud_cover_spread: return .percentage

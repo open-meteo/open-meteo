@@ -47,11 +47,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
         case .direct_radiation: return true
         case .diffuse_radiation: return true
         case .weather_code: return true
-        case .snowfall_water_equivalent: fallthrough
-        case .snowfall_convective_water_equivalent: fallthrough
-        case .precipitation: fallthrough
-        case .showers: fallthrough
-        case .rain: return true
+        case .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .precipitation, .showers, .rain: return true
         case .updraft: return true
         default: return false
         }
@@ -66,7 +62,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                     // Put regular shortwave radiation into this field
                     return ("asob_s", "single-level", nil)
                 }
-                case .pressure_msl:
+            case .pressure_msl:
                 if domain == .iconEps || domain == .iconEuEps {
                     // use surface pressure instead of sea level pressure
                     return ("ps", "single-level", nil)
@@ -77,7 +73,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
                 break
             case .temperature_2m:
                 break
-                case .relative_humidity_2m:
+            case .relative_humidity_2m:
                 if domain == .iconEps {
                     // use dewpoint, because relative humidity is only 6 hourly
                     return ("td_2m", "single-level", nil)
@@ -93,41 +89,13 @@ extension IconSurfaceVariable: IconVariableDownloadable {
             case .wind_v_component_10m:
                 break
                 // all variables below are not in the global EPS model
-            case .wind_u_component_80m:
-                fallthrough
-            case .wind_v_component_80m:
-                fallthrough
-            case .temperature_80m:
-                fallthrough
-            case .wind_gusts_10m:
-                fallthrough
-            case .snowfall_convective_water_equivalent:
-                fallthrough
-            case .snowfall_water_equivalent:
-                fallthrough
-                case .cape:
+            case .wind_u_component_80m, .wind_v_component_80m, .temperature_80m, .wind_gusts_10m, .snowfall_convective_water_equivalent, .snowfall_water_equivalent, .cape:
                 if domain == .iconEps {
                     return nil // not in global
                 }
 
                 // all variables below are only in the D2 EPS model
-            case .wind_u_component_120m:
-                fallthrough
-            case .wind_v_component_120m:
-                fallthrough
-            case .temperature_120m:
-                fallthrough
-            case .wind_u_component_180m:
-                fallthrough
-            case .wind_v_component_180m:
-                fallthrough
-            case .rain:
-                fallthrough
-            case .showers:
-                fallthrough
-            case .snow_depth:
-                fallthrough
-                case .temperature_180m:
+            case .wind_u_component_120m, .wind_v_component_120m, .temperature_120m, .wind_u_component_180m, .wind_v_component_180m, .rain, .showers, .snow_depth, .temperature_180m:
                 if domain != .iconD2Eps {
                     return nil
                 }
@@ -223,14 +191,7 @@ extension IconSurfaceVariable: IconVariableDownloadable {
 
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m: fallthrough
-        case .temperature_80m: fallthrough
-        case .temperature_120m: fallthrough
-        case .temperature_180m: fallthrough
-        case .soil_temperature_0cm: fallthrough
-        case .soil_temperature_6cm: fallthrough
-        case .soil_temperature_18cm: fallthrough
-        case .soil_temperature_54cm:
+        case .temperature_2m, .temperature_80m, .temperature_120m, .temperature_180m, .soil_temperature_0cm, .soil_temperature_6cm, .soil_temperature_18cm, .soil_temperature_54cm:
             return (1, -273.15) // Temperature is stored in kelvin. Convert to celsius
         case .pressure_msl:
             return (1 / 100, 0) // convert to hPa

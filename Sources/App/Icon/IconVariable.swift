@@ -30,9 +30,7 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -254,11 +252,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
         case .pressure_msl: return 10
         case .snowfall_convective_water_equivalent: return 10
         case .snowfall_water_equivalent: return 10
-        case .temperature_80m:
-            fallthrough
-        case .temperature_120m:
-            fallthrough
-        case .temperature_180m:
+        case .temperature_80m, .temperature_120m, .temperature_180m:
             return 10
         case .cape:
             return 0.1

@@ -82,7 +82,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let useGribPackagesDownload = signature.useGribPackages && domain.mfApiPackagesSurface != []
+        let useGribPackagesDownload = signature.useGribPackages && !domain.mfApiPackagesSurface.isEmpty
 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, maxForecastHour: signature.maxForecastHour) : useGribPackagesDownload ?

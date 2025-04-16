@@ -135,9 +135,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .direct_radiation, time: time)
         case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-            fallthrough
-        case .diffuse_radiation, .diffuse_radiation_instant:
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation, .diffuse_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
         case .weathercode:

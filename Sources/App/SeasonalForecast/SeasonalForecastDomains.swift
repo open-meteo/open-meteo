@@ -246,13 +246,7 @@ enum CfsVariable: String, CaseIterable, GenericVariable {
 
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
-        case .soil_moisture_0_to_10cm:
-            fallthrough
-        case .soil_moisture_10_to_40cm:
-            fallthrough
-        case .soil_moisture_40_to_100cm:
-            fallthrough
-        case .soil_moisture_100_to_200cm:
+        case .soil_moisture_0_to_10cm, .soil_moisture_10_to_40cm, .soil_moisture_40_to_100cm, .soil_moisture_100_to_200cm:
             return true
         default:
             return false

@@ -149,7 +149,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: 168, by: 6)).map({ run.add(hours: $0) })
         case .uk_deterministic_2km:
             // every 3 hours, 55 hours otherwise 13 hours
-            return TimerangeDt(start: run, nTime: run.hour % 3 == 0 ? 55 : 13, dtSeconds: 3600).map({ $0 })
+            return Array(TimerangeDt(start: run, nTime: run.hour % 3 == 0 ? 55 : 13, dtSeconds: 3600))
         case .global_ensemble_20km:
             let through = run.hour % 12 == 6 ? 180 : 198
             return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: through, by: 6)).map({ run.add(hours: $0) })

@@ -11,7 +11,7 @@ extension AsyncSequence where Element == ByteBuffer {
     }
 }
 
-struct GribAsyncStreamHelper {
+enum GribAsyncStreamHelper {
     /// Detect a range of bytes in a byte stream if there is a grib header and returns it
     /// Note: The required length to decode a GRIB message is not checked of the input buffer
     static func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int, gribVersion: Int)? {

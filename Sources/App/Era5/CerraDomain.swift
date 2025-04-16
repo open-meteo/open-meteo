@@ -91,19 +91,13 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .relative_humidity_2m, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .dew_point_2m:
-            fallthrough
-        case .dewpoint_2m:
+        case .dew_point_2m, .dewpoint_2m:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relative_humidity_2m, time: time)
-        case .vapour_pressure_deficit:
-            fallthrough
-        case .vapor_pressure_deficit:
+        case .vapour_pressure_deficit, .vapor_pressure_deficit:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relative_humidity_2m, time: time)
-        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-            fallthrough
-        case .diffuse_radiation:
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
         case .et0_fao_evapotranspiration:
@@ -116,9 +110,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(raw: .pressure_msl, time: time)
         case .snowfall:
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
-        case .cloud_cover:
-            fallthrough
-        case .cloudcover:
+        case .cloud_cover, .cloudcover:
             try prefetchData(raw: .cloud_cover_low, time: time)
             try prefetchData(raw: .cloud_cover_mid, time: time)
             try prefetchData(raw: .cloud_cover_high, time: time)
@@ -127,9 +119,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .rain:
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(raw: .snowfall_water_equivalent, time: time)
-        case .weather_code:
-            fallthrough
-        case .weathercode:
+        case .weather_code, .weathercode:
             try prefetchData(derived: .cloudcover, time: time)
             try prefetchData(raw: .precipitation, time: time)
             try prefetchData(derived: .snowfall, time: time)
@@ -184,9 +174,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
     func get(derived: CerraVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
-        case .dew_point_2m:
-            fallthrough
-        case .dewpoint_2m:
+        case .dew_point_2m, .dewpoint_2m:
             let relhum = try get(raw: .relative_humidity_2m, time: time)
             let temperature = try get(raw: .temperature_2m, time: time)
             return DataAndUnit(zip(temperature.data, relhum.data).map(Meteorology.dewpoint), temperature.unit)
@@ -196,9 +184,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let relhum = try get(raw: .relative_humidity_2m, time: time).data
             let radiation = try get(raw: .shortwave_radiation, time: time).data
             return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: radiation), .celsius)
-        case .vapour_pressure_deficit:
-            fallthrough
-        case .vapor_pressure_deficit:
+        case .vapour_pressure_deficit, .vapor_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let dewpoint = try get(derived: .dewpoint_2m, time: time).data
             return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
@@ -222,9 +208,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let temperature = try get(raw: .temperature_2m, time: time).data
             let pressure = try get(raw: .pressure_msl, time: time)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: targetElevation), pressure.unit)
-        case .cloud_cover:
-            fallthrough
-        case .cloudcover:
+        case .cloud_cover, .cloudcover:
             let low = try get(raw: .cloud_cover_low, time: time).data
             let mid = try get(raw: .cloud_cover_mid, time: time).data
             let high = try get(raw: .cloud_cover_high, time: time).data
@@ -244,9 +228,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 return max($0.0 - $0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
-        case .weather_code:
-            fallthrough
-        case .weathercode:
+        case .weather_code, .weathercode:
             let cloudcover = try get(derived: .cloudcover, time: time).data
             let precipitation = try get(raw: .precipitation, time: time).data
             let snowfall = try get(derived: .snowfall, time: time).data
@@ -443,13 +425,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
 
     var isAccumulatedSinceModelStart: Bool {
         switch self {
-        case .shortwave_radiation:
-            fallthrough
-        case .direct_radiation:
-            fallthrough
-        case .precipitation:
-            fallthrough
-        case .snowfall_water_equivalent:
+        case .shortwave_radiation, .direct_radiation, .precipitation, .snowfall_water_equivalent:
             return true
         default:
             return false
@@ -458,8 +434,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
 
     var isHeightLevel: Bool {
         switch self {
-        case .wind_speed_100m: fallthrough
-        case .wind_direction_100m: return true
+        case .wind_speed_100m, .wind_direction_100m: return true
         default: return false
         }
     }
@@ -468,8 +443,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
     var netCdfScaling: (offest: Double, scalefactor: Double)? {
         switch self {
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
-        case .shortwave_radiation: fallthrough // joules to watt
-        case .direct_radiation: return (0, 1 / 3600)
+        case .shortwave_radiation, .direct_radiation: return (0, 1 / 3600) // joules to watt
         case .albedo: return (0, 100)
         case .snow_depth: return (0, 1 / 100) // cm to metre. GRIB files show metre, but it is cm
         default: return nil
@@ -526,9 +500,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
 
     var unit: SiUnit {
         switch self {
-        case .wind_speed_10m: fallthrough
-        case .wind_speed_100m: fallthrough
-        case .wind_gusts_10m: return .metrePerSecond
+        case .wind_speed_10m, .wind_speed_100m, .wind_gusts_10m: return .metrePerSecond
         case .wind_direction_10m: return .degreeDirection
         case .wind_direction_100m: return .degreeDirection
         case .relative_humidity_2m: return .percentage

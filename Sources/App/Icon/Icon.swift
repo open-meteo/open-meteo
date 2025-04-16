@@ -135,9 +135,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return Array(0...30)
         case .iconD2_15min:
             return Array(0...48 * 4 - 1)
-        case .iconD2Eps:
-            fallthrough
-        case .iconD2:
+        case .iconD2Eps, .iconD2:
             return Array(0...48)
         }
     }
@@ -148,9 +146,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)
         case .iconEu:
             return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
-        case .iconD2_15min:
-            fallthrough
-        case .iconD2:
+        case .iconD2_15min, .iconD2:
             return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
         case .iconEps:
             // R03B06 avg 26.5 km
@@ -168,13 +164,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// name in the filenames
     var region: String {
         switch self {
-        case .iconEps: fallthrough
-        case .icon: return "global"
-        case .iconEuEps: fallthrough
-        case .iconEu: return "europe"
-        case .iconD2Eps: fallthrough
-        case .iconD2_15min: fallthrough
-        case .iconD2: return "germany"
+        case .iconEps, .icon: return "global"
+        case .iconEuEps, .iconEu: return "europe"
+        case .iconD2Eps, .iconD2_15min, .iconD2: return "germany"
         }
     }
 
@@ -184,19 +176,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// icon-d2 1-65.... 63=78m, 62=126m
     var numberOfModelFullLevels: Int {
         switch self {
-        case .iconEps:
-            fallthrough
-        case .icon:
+        case .iconEps, .icon:
             return 120 // was 90
-        case .iconEuEps:
-            fallthrough
-        case .iconEu:
+        case .iconEuEps, .iconEu:
             return 74 // was 60
-        case .iconD2Eps:
-            fallthrough
-        case .iconD2_15min:
-            fallthrough
-        case .iconD2:
+        case .iconD2Eps, .iconD2_15min, .iconD2:
             return 65
         }
     }

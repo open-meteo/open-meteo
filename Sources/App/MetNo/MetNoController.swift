@@ -53,27 +53,9 @@ struct MetNoReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .dewpoint_2m, .dew_point_2m:
             try prefetchData(raw: .temperature_2m, time: time)
             try prefetchData(raw: .relative_humidity_2m, time: time)
-        case .diffuse_radiation:
-            fallthrough
-        case .diffuse_radiation_instant:
-            fallthrough
-        case .direct_normal_irradiance:
-            fallthrough
-        case .direct_normal_irradiance_instant:
-            fallthrough
-        case .direct_radiation:
-            fallthrough
-        case .direct_radiation_instant:
-            fallthrough
-        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-            fallthrough
-        case .shortwave_radiation_instant:
+        case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant, .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
-        /*case .cloudcover_low:
-            fallthrough
-        case .cloudcover_mid:
-            fallthrough
-        case .cloudcover_high:
+        /*case .cloudcover_low, .cloudcover_mid, .cloudcover_high:
             try prefetchData(raw: .cloudcover, time: time)*/
         case .snowfall:
             try prefetchData(raw: .temperature_2m, time: time)
