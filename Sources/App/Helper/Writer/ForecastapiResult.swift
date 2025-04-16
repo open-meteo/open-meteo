@@ -1,4 +1,3 @@
-
 import Foundation
 import Vapor
 import FlatBuffers
@@ -13,10 +12,10 @@ protocol ModelFlatbufferSerialisable: RawRepresentableString {
     associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
     associatedtype HourlyHeightType: FlatBuffersVariable, RawRepresentable, Equatable
     associatedtype DailyVariable: FlatBuffersVariable
-    
+
     /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
     static var memberOffset: Int { get }
-    
+
     var flatBufferModel: openmeteo_sdk_Model { get }
 }
 
@@ -26,16 +25,15 @@ extension ModelFlatbufferSerialisable {
     }
 }
 
-
 fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable: RawRepresentableString> {
     let model: Model
     let section: () throws -> ApiSection<Variable>
-    
+
     static func run(sections: [Self]) throws -> ApiSectionString {
         let run = try sections.compactMap({ m in
             let h = try m.section()
             return ApiSectionString(name: h.name, time: h.time, columns: h.columns.flatMap { c in
-                return c.variables.enumerated().map { (member, data) in
+                return c.variables.enumerated().map { member, data in
                     let member = member + Model.memberOffset
                     let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
                     let variable = sections.count > 1 ? "\(variableAndMember)_\(m.model.rawValue)" : variableAndMember
@@ -46,17 +44,17 @@ fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable:
         guard let first = run.first else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        guard run.first(where: {$0.time.dtSeconds != first.time.dtSeconds }) == nil else {
+        guard !run.contains(where: { $0.time.dtSeconds != first.time.dtSeconds }) else {
             throw ForecastapiError.cannotReturnModelsWithDiffernetTimeIntervals
         }
-        return ApiSectionString(name: first.name, time: first.time, columns: run.flatMap { $0.columns})
+        return ApiSectionString(name: first.name, time: first.time, columns: run.flatMap { $0.columns })
     }
 }
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
     func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
-    
+
     var numberOfLocations: Int { get }
 }
 
@@ -65,11 +63,11 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
-    
+
     var numberOfLocations: Int {
         results.count
     }
-    
+
     /// Number of variables times number of somains. Used to rate limiting
     let nVariablesTimesDomains: Int
 
@@ -78,23 +76,23 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         self.results = results
         self.nVariablesTimesDomains = nVariablesTimesDomains
     }
-    
+
     struct PerLocation: Sendable {
         let timezone: TimezoneWithOffset
         let time: TimerangeLocal
         let locationId: Int
         let results: [PerModel]
-        
+
         var utc_offset_seconds: Int {
             timezone.utcOffsetSeconds
         }
-        
+
         func runAllSections() throws -> [ApiSectionString] {
-            return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({$0})
+            return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({ $0 })
         }
-        
+
         var current: (() throws -> ApiSectionSingle<String>)? {
-            let run = results.compactMap({ m in m.current.map{ (model: m.model, section: $0)} })
+            let run = results.compactMap({ m in m.current.map { (model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
@@ -109,13 +107,13 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
                 guard let first = run.first else {
                     throw ForecastapiError.noDataAvilableForThisLocation
                 }
-                return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: run.flatMap { $0.columns})
+                return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: run.flatMap { $0.columns })
             }
         }
-        
+
         /// Merge all hourly sections and prefix with the domain name if required
         var hourly: (() throws -> ApiSectionString)? {
-            let run = results.compactMap({ m in m.hourly.map{ ModelAndSection(model: m.model, section: $0)} })
+            let run = results.compactMap({ m in m.hourly.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
@@ -123,9 +121,9 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
                 try ModelAndSection.run(sections: run)
             }
         }
-        
+
         var daily: (() throws -> ApiSectionString)? {
-            let run = results.compactMap({ m in m.daily.map{ ModelAndSection(model: m.model, section: $0)} })
+            let run = results.compactMap({ m in m.daily.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
@@ -134,7 +132,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
         }
         var sixHourly: (() throws -> ApiSectionString)? {
-            let run = results.compactMap({ m in m.sixHourly.map{ ModelAndSection(model: m.model, section: $0)} })
+            let run = results.compactMap({ m in m.sixHourly.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
@@ -143,7 +141,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
         }
         var minutely15: (() throws -> ApiSectionString)? {
-            let run = results.compactMap({ m in m.minutely15.map{ ModelAndSection(model: m.model, section: $0)} })
+            let run = results.compactMap({ m in m.minutely15.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
@@ -152,22 +150,22 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
         }
     }
-    
+
     struct PerModel {
         let model: Model
         let latitude: Float
         let longitude: Float
-        
+
         /// Desired elevation from a DEM. Used in statistical downscaling
         let elevation: Float?
-        
-        let prefetch: (() throws -> ())
+
+        let prefetch: (() throws -> Void)
         let current: (() throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
         let hourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
         let daily: (() throws -> ApiSection<Model.DailyVariable>)?
         let sixHourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
         let minutely15: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        
+
         /// e.g. `52.52N13.42E38m`
         var formatedCoordinatesFilename: String {
             let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
@@ -175,21 +173,21 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
         }
     }
-    
+
     struct PressureVariableAndLevel {
         let variable: Model.HourlyPressureType
         let level: Int
-        
+
         init(_ variable: Model.HourlyPressureType, _ level: Int) {
             self.variable = variable
             self.level = level
         }
     }
-    
+
     struct HeightVariableAndLevel {
         let variable: Model.HourlyHeightType
         let level: Int
-        
+
         init(_ variable: Model.HourlyHeightType, _ level: Int) {
             self.variable = variable
             self.level = level
@@ -201,7 +199,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         init?(rawValue: String) {
             fatalError()
         }
-        
+
         var rawValue: String {
             switch self {
             case .surface(let v):
@@ -212,11 +210,11 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
                 return "\(v.variable.rawValue)_\(v.level)m"
             }
         }
-        
+
         case surface(Model.HourlyVariable)
         case pressure(PressureVariableAndLevel)
         case height(HeightVariableAndLevel)
-        
+
         func getFlatBuffersMeta() -> FlatBufferVariableMeta {
             switch self {
             case .surface(let hourlyVariable):
@@ -243,7 +241,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
         }
     }
-    
+
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
@@ -269,7 +267,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
         }.get()
     }
-    
+
     /// Calculate excess weight of an API query. The following factors are considered:
     /// - 14 days of data are considered a weight of 1
     /// - 10 weather variables are a weight of 1
@@ -296,7 +294,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 enum ApiArray {
     case float([Float])
     case timestamp([Timestamp])
-    
+
     var count: Int {
         switch self {
         case .float(let a):
@@ -306,7 +304,6 @@ enum ApiArray {
         }
     }
 }
-
 
 struct ApiColumn<Variable> {
     let variable: Variable
@@ -342,7 +339,6 @@ struct ApiSection<Variable> {
     let columns: [ApiColumn<Variable>]
 }
 
-
 struct ApiSectionString {
     // e.g. hourly or daily
     let name: String
@@ -369,19 +365,19 @@ enum ForecastResultFormat: String, Codable {
 struct BufferAndWriter {
     let writer: BodyStreamWriter
     var buffer: ByteBuffer
-    
+
     @inlinable init(writer: BodyStreamWriter) {
         self.writer = writer
-        self.buffer = ByteBufferAllocator().buffer(capacity: 4*1024)
+        self.buffer = ByteBufferAllocator().buffer(capacity: 4 * 1024)
     }
-    
+
     /// Check if enough data has been written to the buffer and flush if required
     @inlinable mutating func flushIfRequired() async throws {
-        if buffer.writerIndex > 3*1024 {
+        if buffer.writerIndex > 3 * 1024 {
             try await flush()
         }
     }
-    
+
     @inlinable mutating func flush() async throws {
         guard buffer.writerIndex > 0 else {
             return
@@ -391,14 +387,12 @@ struct BufferAndWriter {
         try await writer.eventLoop.flatSubmit { writer.write(.buffer(bufferCopy)) }.get()
         buffer.moveWriterIndex(to: 0)
     }
-    
+
     @inlinable mutating func end() async throws {
         let writer = writer
         try await writer.eventLoop.flatSubmit { writer.write(.end) }.get()
     }
 }
-
-
 
 extension Timestamp {
     func formated(format: Timeformat, utc_offset_seconds: Int, quotedString: Bool) -> String {
@@ -422,7 +416,7 @@ extension Sequence where Element == Timestamp {
             var itterator = self.makeIterator()
             var t = tm()
             var dateCalculated = Int.min
-            
+
             if onlyDate {
                 return AnyIterator<String> {
                     guard let element = itterator.next()?.add(utc_offset_seconds) else {
@@ -434,7 +428,7 @@ extension Sequence where Element == Timestamp {
                     return element.iso8601_YYYY_MM_dd
                 }
             }
-            
+
             return AnyIterator<String> {
                 guard let element = itterator.next()?.add(utc_offset_seconds) else {
                     return nil
@@ -444,10 +438,10 @@ extension Sequence where Element == Timestamp {
                     dateCalculated = time - time.moduloPositive(86400)
                     gmtime_r(&time, &t)
                 }
-                let year = Int(t.tm_year+1900)
-                let month = Int(t.tm_mon+1)
+                let year = Int(t.tm_year + 1900)
+                let month = Int(t.tm_mon + 1)
                 let day = Int(t.tm_mday)
-                
+
                 let hour = time.moduloPositive(86400) / 3600
                 let minute = time.moduloPositive(3600) / 60
                 if quotedString {
@@ -455,11 +449,10 @@ extension Sequence where Element == Timestamp {
                 } else {
                     return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2))"
                 }
-                
             }
         }
     }
-    
+
     /// Optimised time itteration function
     func itterate(format: Timeformat, utc_offset_seconds: Int, quotedString: Bool, onlyDate: Bool) -> AnySequence<String> {
         switch format {

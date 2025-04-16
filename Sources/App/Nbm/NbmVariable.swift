@@ -1,6 +1,5 @@
 import Foundation
 
-
 /**
  List of all surface NBM variables to download
  */
@@ -25,7 +24,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case ice_pellets_probability
     case snowfall_probability
     case surface_temperature
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -39,15 +38,15 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m: return 20
@@ -59,7 +58,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .surface_temperature: return 20
         case .snowfall: return 100
         case .wind_gusts_10m: return 10
-        //case .pressure_msl: return 10
+        // case .pressure_msl: return 10
         case .shortwave_radiation: return 1
         case .cape: return 0.1
         case .visibility: return 0.05 // 50 meter
@@ -67,7 +66,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 1
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -98,7 +97,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .linear
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .temperature_2m, .surface_temperature: return .celsius
@@ -116,7 +115,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .percentage
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -140,35 +139,32 @@ enum NbmPressureVariableType: String, CaseIterable, RawRepresentableString {
     case vertical_velocity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct NbmPressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: NbmPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -181,7 +177,7 @@ struct NbmPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -200,7 +196,7 @@ struct NbmPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -219,7 +215,7 @@ struct NbmPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .metrePerSecondNotUnitConverted
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

@@ -1,6 +1,5 @@
 import Foundation
 
-
 enum EumetsatLsaSafVariableDerived: String, GenericVariableMixable {
     case terrestrial_radiation
     case terrestrial_radiation_instant
@@ -12,24 +11,23 @@ enum EumetsatLsaSafVariableDerived: String, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 }
 
-
 struct EumetsatLsaSafReader: GenericReaderDerived, GenericReaderProtocol {
     let reader: GenericReaderCached<EumetsatLsaSafDomain, Variable>
-    
+
     let options: GenericReaderOptions
-    
+
     typealias Domain = EumetsatLsaSafDomain
-    
+
     typealias Variable = EumetsatLsaSafVariable
-    
+
     typealias Derived = EumetsatLsaSafVariableDerived
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -37,21 +35,21 @@ struct EumetsatLsaSafReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func prefetchData(raw: EumetsatLsaSafVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func get(raw: EumetsatLsaSafVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .terrestrial_radiation:
@@ -97,7 +95,7 @@ struct EumetsatLsaSafReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }
-    
+
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .terrestrial_radiation, .terrestrial_radiation_instant:

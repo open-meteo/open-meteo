@@ -1,7 +1,6 @@
 import Foundation
 
 protocol EcmwfVariableDownloadable: GenericVariable {
-    
 }
 
 enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, GenericVariableMixable {
@@ -9,8 +8,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     case wave_height
     case wave_period
     case wave_period_peak
-    
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .wave_height:
@@ -21,7 +19,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return .linearDegrees
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .wave_height:
@@ -45,27 +43,27 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return direction
         }
     }
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-        
+
     var omFileName: (file: String, level: Int) {
         return (nameInFiles, 0)
     }
-    
+
     var nameInFiles: String {
         return rawValue
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var gribName: String? {
         // mp2    Mean zero-crossing wave period
         switch self {
@@ -80,7 +78,6 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         }
     }
 }
-
 
 /// Represent a ECMWF variable as available in the grib2 files
 /// Only AIFS has additional levels 100, 400 and 600
@@ -233,26 +230,25 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     case divergence_of_wind_200hPa
     case divergence_of_wind_100hPa
     case divergence_of_wind_50hPa
-    
+
     case wind_gusts_10m
-    
+
     // Cloudcover is calculated while downloading
     case cloud_cover
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
-    
+
     /// Generated while downloading
     case relative_humidity_2m
-    
-    
+
     enum DownloadOrProcess {
         /// Only download the selected variable, bu to not create a om database
         case downloadOnly
         /// Download and reate database
         case downloadAndProcess
     }
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -262,221 +258,64 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .shortwave_radiation: return true
         case .wind_v_component_10m, .wind_u_component_10m: return true
         case .wind_v_component_100m, .wind_u_component_100m: return true
-        //case .weather_code: return true
+        // case .weather_code: return true
         default: return false
         }
     }
-    
+
     /// If true, download
     var includeInEnsemble: DownloadOrProcess? {
         switch self {
-        case .precipitation:
-            fallthrough
-        case .runoff:
-            fallthrough
-        case .soil_temperature_0_to_7cm:
-            fallthrough
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm:
-            fallthrough
-        case .surface_temperature:
-            fallthrough
-        case .relative_humidity_2m:
-            fallthrough
-        case .surface_pressure:
-            fallthrough
-        case .shortwave_radiation:
-            fallthrough
-        case .cape:
-            fallthrough
-        case .pressure_msl:
-            fallthrough
-        case .wind_v_component_10m, .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_10m, .wind_u_component_100m:
-            fallthrough
-        case .wind_gusts_10m:
-            fallthrough
-        case .temperature_2m:
-            fallthrough
-        case .cloud_cover:
-            fallthrough
-        case .temperature_500hPa, .temperature_850hPa:
-            fallthrough
-        case .geopotential_height_500hPa, .geopotential_height_850hPa:
+        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .surface_pressure, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
             return .downloadAndProcess
-        case .relative_humidity_925hPa, .relative_humidity_1000hPa:
-            fallthrough
-        case .relative_humidity_850hPa:
-            fallthrough
-        case .relative_humidity_700hPa:
-            fallthrough
-        case .relative_humidity_500hPa:
-            fallthrough
-        case .relative_humidity_300hPa:
-            fallthrough
-        case .relative_humidity_250hPa:
-            fallthrough
-        case .relative_humidity_200hPa:
-            fallthrough
-        case .relative_humidity_600hPa:
-            fallthrough
-        case .relative_humidity_400hPa:
-            fallthrough
-        case .relative_humidity_100hPa:
-            fallthrough
-        case .relative_humidity_50hPa:
+        case .relative_humidity_925hPa, .relative_humidity_1000hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_500hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_600hPa, .relative_humidity_400hPa, .relative_humidity_100hPa, .relative_humidity_50hPa:
             return .downloadOnly
         default: return nil
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
-            fallthrough
-        case .temperature_2m, .temperature_2m_max, .temperature_2m_min, .surface_pressure:
+        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_max, .temperature_2m_min, .surface_pressure:
             return true
         default:
             return false
         }
     }
-    
+
     static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
-    
+
     var omFileName: (file: String, level: Int) {
         return (nameInFiles, 0)
     }
-    
+
     var nameInFiles: String {
         return rawValue
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .precipitation_type: return .dimensionless
-        case .precipitation: fallthrough
-        case .snowfall_water_equivalent, .showers: fallthrough
-        case .runoff: return .millimetre
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
-        case .surface_temperature: return .celsius
-        case .geopotential_height_1000hPa: fallthrough
-        case .geopotential_height_925hPa: fallthrough
-        case .geopotential_height_850hPa: fallthrough
-        case .geopotential_height_700hPa: fallthrough
-        case .geopotential_height_600hPa: fallthrough
-        case .geopotential_height_500hPa: fallthrough
-        case .geopotential_height_400hPa: fallthrough
-        case .geopotential_height_300hPa: fallthrough
-        case .geopotential_height_250hPa: fallthrough
-        case .geopotential_height_200hPa: fallthrough
-        case .geopotential_height_100hPa: fallthrough
-        case .geopotential_height_50hPa: return .metre
-        case .wind_v_component_1000hPa: fallthrough
-        case .wind_v_component_925hPa: fallthrough
-        case .wind_v_component_850hPa: fallthrough
-        case .wind_v_component_700hPa: fallthrough
-        case .wind_v_component_600hPa: fallthrough
-        case .wind_v_component_500hPa: fallthrough
-        case .wind_v_component_400hPa: fallthrough
-        case .wind_v_component_300hPa: fallthrough
-        case .wind_v_component_250hPa: fallthrough
-        case .wind_v_component_200hPa: fallthrough
-        case .wind_v_component_100hPa: fallthrough
-        case .wind_v_component_50hPa: fallthrough
-        case .wind_u_component_1000hPa: fallthrough
-        case .wind_u_component_925hPa: fallthrough
-        case .wind_u_component_850hPa: fallthrough
-        case .wind_u_component_600hPa: fallthrough
-        case .wind_u_component_700hPa: fallthrough
-        case .wind_u_component_500hPa: fallthrough
-        case .wind_u_component_400hPa: fallthrough
-        case .wind_u_component_300hPa: fallthrough
-        case .wind_u_component_250hPa: fallthrough
-        case .wind_u_component_200hPa: fallthrough
-        case .wind_u_component_100hPa: fallthrough
-        case .wind_u_component_50hPa: return .metrePerSecond
-        case .vertical_velocity_1000hPa: fallthrough
-        case .vertical_velocity_925hPa: fallthrough
-        case .vertical_velocity_850hPa: fallthrough
-        case .vertical_velocity_600hPa: fallthrough
-        case .vertical_velocity_700hPa: fallthrough
-        case .vertical_velocity_500hPa: fallthrough
-        case .vertical_velocity_400hPa: fallthrough
-        case .vertical_velocity_300hPa: fallthrough
-        case .vertical_velocity_250hPa: fallthrough
-        case .vertical_velocity_200hPa: fallthrough
-        case .vertical_velocity_100hPa: fallthrough
-        case .vertical_velocity_50hPa: return .metrePerSecondNotUnitConverted
-        case .temperature_1000hPa: fallthrough
-        case .temperature_925hPa: fallthrough
-        case .temperature_850hPa: fallthrough
-        case .temperature_700hPa: fallthrough
-        case .temperature_600hPa: fallthrough
-        case .temperature_500hPa: fallthrough
-        case .temperature_400hPa: fallthrough
-        case .temperature_300hPa: fallthrough
-        case .temperature_250hPa: fallthrough
-        case .temperature_200hPa: fallthrough
-        case .temperature_100hPa: fallthrough
-        case .temperature_50hPa: return .celsius
-        case .relative_humidity_1000hPa: fallthrough
-        case .relative_humidity_925hPa: fallthrough
-        case .relative_humidity_850hPa: fallthrough
-        case .relative_humidity_700hPa: fallthrough
-        case .relative_humidity_600hPa: fallthrough
-        case .relative_humidity_500hPa: fallthrough
-        case .relative_humidity_400hPa: fallthrough
-        case .relative_humidity_300hPa: fallthrough
-        case .relative_humidity_250hPa: fallthrough
-        case .relative_humidity_200hPa: fallthrough
-        case .relative_humidity_100hPa: fallthrough
-        case .relative_humidity_50hPa: return .percentage
+        case .precipitation, .snowfall_water_equivalent, .showers, .runoff: return .millimetre
+        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .surface_temperature: return .celsius
+        case .geopotential_height_1000hPa, .geopotential_height_925hPa, .geopotential_height_850hPa, .geopotential_height_700hPa, .geopotential_height_600hPa, .geopotential_height_500hPa, .geopotential_height_400hPa, .geopotential_height_300hPa, .geopotential_height_250hPa, .geopotential_height_200hPa, .geopotential_height_100hPa, .geopotential_height_50hPa: return .metre
+        case .wind_v_component_1000hPa, .wind_v_component_925hPa, .wind_v_component_850hPa, .wind_v_component_700hPa, .wind_v_component_600hPa, .wind_v_component_500hPa, .wind_v_component_400hPa, .wind_v_component_300hPa, .wind_v_component_250hPa, .wind_v_component_200hPa, .wind_v_component_100hPa, .wind_v_component_50hPa, .wind_u_component_1000hPa, .wind_u_component_925hPa, .wind_u_component_850hPa, .wind_u_component_600hPa, .wind_u_component_700hPa, .wind_u_component_500hPa, .wind_u_component_400hPa, .wind_u_component_300hPa, .wind_u_component_250hPa, .wind_u_component_200hPa, .wind_u_component_100hPa, .wind_u_component_50hPa: return .metrePerSecond
+        case .vertical_velocity_1000hPa, .vertical_velocity_925hPa, .vertical_velocity_850hPa, .vertical_velocity_600hPa, .vertical_velocity_700hPa, .vertical_velocity_500hPa, .vertical_velocity_400hPa, .vertical_velocity_300hPa, .vertical_velocity_250hPa, .vertical_velocity_200hPa, .vertical_velocity_100hPa, .vertical_velocity_50hPa: return .metrePerSecondNotUnitConverted
+        case .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_100hPa, .temperature_50hPa: return .celsius
+        case .relative_humidity_1000hPa, .relative_humidity_925hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_600hPa, .relative_humidity_500hPa, .relative_humidity_400hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_100hPa, .relative_humidity_50hPa: return .percentage
         case .surface_pressure: return .hectopascal
         case .pressure_msl: return .hectopascal
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         case .wind_v_component_10m: return .metrePerSecond
         case .wind_u_component_10m: return .metrePerSecond
-        case .specific_humidity_1000hPa: fallthrough
-        case .specific_humidity_925hPa: fallthrough
-        case .specific_humidity_850hPa: fallthrough
-        case .specific_humidity_700hPa: fallthrough
-        case .specific_humidity_600hPa: fallthrough
-        case .specific_humidity_500hPa: fallthrough
-        case .specific_humidity_400hPa: fallthrough
-        case .specific_humidity_300hPa: fallthrough
-        case .specific_humidity_250hPa: fallthrough
-        case .specific_humidity_200hPa: fallthrough
-        case .specific_humidity_100hPa: fallthrough
-        case .specific_humidity_50hPa: return .gramPerKilogram
+        case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_50hPa: return .gramPerKilogram
         case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return .celsius
-        case .relative_vorticity_1000hPa: fallthrough
-        case .relative_vorticity_925hPa: fallthrough
-        case .relative_vorticity_850hPa: fallthrough
-        case .relative_vorticity_700hPa: fallthrough
-        case .relative_vorticity_600hPa: fallthrough
-        case .relative_vorticity_500hPa: fallthrough
-        case .relative_vorticity_400hPa: fallthrough
-        case .relative_vorticity_300hPa: fallthrough
-        case .relative_vorticity_250hPa: fallthrough
-        case .relative_vorticity_200hPa: fallthrough
-        case .relative_vorticity_100hPa: fallthrough
-        case .relative_vorticity_50hPa: return .perSecond
-        case .divergence_of_wind_1000hPa: fallthrough
-        case .divergence_of_wind_925hPa: fallthrough
-        case .divergence_of_wind_850hPa: fallthrough
-        case .divergence_of_wind_700hPa: fallthrough
-        case .divergence_of_wind_600hPa: fallthrough
-        case .divergence_of_wind_500hPa: fallthrough
-        case .divergence_of_wind_400hPa: fallthrough
-        case .divergence_of_wind_300hPa: fallthrough
-        case .divergence_of_wind_250hPa: fallthrough
-        case .divergence_of_wind_200hPa: fallthrough
-        case .divergence_of_wind_100hPa: fallthrough
-        case .divergence_of_wind_50hPa: return .perSecond
+        case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return .perSecond
+        case .divergence_of_wind_1000hPa, .divergence_of_wind_925hPa, .divergence_of_wind_850hPa, .divergence_of_wind_700hPa, .divergence_of_wind_600hPa, .divergence_of_wind_500hPa, .divergence_of_wind_400hPa, .divergence_of_wind_300hPa, .divergence_of_wind_250hPa, .divergence_of_wind_200hPa, .divergence_of_wind_100hPa, .divergence_of_wind_50hPa: return .perSecond
         case .cloud_cover:
             return .percentage
         case .cloud_cover_low:
@@ -503,12 +342,11 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return .metrePerSecond
         }
     }
-    
+
     /// pressure level in hPa or meter in the grib files
     var level: Int? {
         switch self {
-        case .precipitation, .precipitation_type, .snowfall_water_equivalent, .showers: fallthrough
-        case .runoff: return nil
+        case .precipitation, .precipitation_type, .snowfall_water_equivalent, .showers, .runoff: return nil
         case .soil_temperature_0_to_7cm: return 1
         case .soil_temperature_7_to_28cm: return 2
         case .soil_temperature_28_to_100cm: return 3
@@ -660,7 +498,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return nil
         }
     }
-    
+
     var gribName: String? {
         switch self {
         case .precipitation_type: return "ptype"
@@ -706,18 +544,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .wind_u_component_200hPa: return "u"
         case .wind_u_component_100hPa: return "u"
         case .wind_u_component_50hPa: return "u"
-        case .vertical_velocity_1000hPa: fallthrough
-        case .vertical_velocity_925hPa: fallthrough
-        case .vertical_velocity_850hPa: fallthrough
-        case .vertical_velocity_600hPa: fallthrough
-        case .vertical_velocity_700hPa: fallthrough
-        case .vertical_velocity_500hPa: fallthrough
-        case .vertical_velocity_400hPa: fallthrough
-        case .vertical_velocity_300hPa: fallthrough
-        case .vertical_velocity_250hPa: fallthrough
-        case .vertical_velocity_200hPa: fallthrough
-        case .vertical_velocity_100hPa: fallthrough
-        case .vertical_velocity_50hPa: return "w"
+        case .vertical_velocity_1000hPa, .vertical_velocity_925hPa, .vertical_velocity_850hPa, .vertical_velocity_600hPa, .vertical_velocity_700hPa, .vertical_velocity_500hPa, .vertical_velocity_400hPa, .vertical_velocity_300hPa, .vertical_velocity_250hPa, .vertical_velocity_200hPa, .vertical_velocity_100hPa, .vertical_velocity_50hPa: return "w"
         case .temperature_1000hPa: return "t"
         case .temperature_925hPa: return "t"
         case .temperature_850hPa: return "t"
@@ -800,7 +627,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return "2r"
         case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
             return "vsw"
-        //case .soil_moisture_7_to_28cm:
+        // case .soil_moisture_7_to_28cm:
         //    return "swvl2"
         case .cape:
             return "mucape"
@@ -814,128 +641,28 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return "10fg"
         }
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .precipitation_type: return 1
-        case .precipitation, .snowfall_water_equivalent, .showers: fallthrough
-        case .runoff: return 10
+        case .precipitation, .snowfall_water_equivalent, .showers, .runoff: return 10
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 20
         case .surface_temperature: return 20
-        case .geopotential_height_1000hPa: fallthrough
-        case .geopotential_height_925hPa: fallthrough
-        case .geopotential_height_850hPa: fallthrough
-        case .geopotential_height_700hPa: fallthrough
-        case .geopotential_height_600hPa: fallthrough
-        case .geopotential_height_500hPa: fallthrough
-        case .geopotential_height_400hPa: fallthrough
-        case .geopotential_height_300hPa: fallthrough
-        case .geopotential_height_250hPa: fallthrough
-        case .geopotential_height_200hPa: fallthrough
-        case .geopotential_height_100hPa: fallthrough
-        case .geopotential_height_50hPa: return 1
-        case .wind_v_component_1000hPa: fallthrough
-        case .wind_v_component_925hPa: fallthrough
-        case .wind_v_component_850hPa: fallthrough
-        case .wind_v_component_700hPa: fallthrough
-        case .wind_v_component_600hPa: fallthrough
-        case .wind_v_component_500hPa: fallthrough
-        case .wind_v_component_400hPa: fallthrough
-        case .wind_v_component_300hPa: fallthrough
-        case .wind_v_component_250hPa: fallthrough
-        case .wind_v_component_200hPa: fallthrough
-        case .wind_v_component_100hPa: fallthrough
-        case .wind_v_component_50hPa: return 10
-        case .wind_u_component_1000hPa: fallthrough
-        case .wind_u_component_925hPa: fallthrough
-        case .wind_u_component_850hPa: fallthrough
-        case .wind_u_component_700hPa: fallthrough
-        case .wind_u_component_600hPa: fallthrough
-        case .wind_u_component_500hPa: fallthrough
-        case .wind_u_component_400hPa: fallthrough
-        case .wind_u_component_300hPa: fallthrough
-        case .wind_u_component_250hPa: fallthrough
-        case .wind_u_component_200hPa: fallthrough
-        case .wind_u_component_100hPa: fallthrough
-        case .wind_u_component_50hPa: return 10
-        case .vertical_velocity_1000hPa: fallthrough
-        case .vertical_velocity_925hPa: fallthrough
-        case .vertical_velocity_850hPa: fallthrough
-        case .vertical_velocity_600hPa: fallthrough
-        case .vertical_velocity_700hPa: fallthrough
-        case .vertical_velocity_500hPa: fallthrough
-        case .vertical_velocity_400hPa: fallthrough
-        case .vertical_velocity_300hPa: fallthrough
-        case .vertical_velocity_250hPa: fallthrough
-        case .vertical_velocity_200hPa: fallthrough
-        case .vertical_velocity_100hPa: fallthrough
-        case .vertical_velocity_50hPa: return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level ?? 0)))
-        case .temperature_1000hPa: fallthrough
-        case .temperature_925hPa: fallthrough
-        case .temperature_850hPa: fallthrough
-        case .temperature_700hPa: fallthrough
-        case .temperature_600hPa: fallthrough
-        case .temperature_500hPa: fallthrough
-        case .temperature_400hPa: fallthrough
-        case .temperature_300hPa: fallthrough
-        case .temperature_250hPa: fallthrough
-        case .temperature_200hPa: fallthrough
-        case .temperature_100hPa: fallthrough
-        case .temperature_50hPa: return 20
-        case .relative_humidity_1000hPa: fallthrough
-        case .relative_humidity_925hPa: fallthrough
-        case .relative_humidity_850hPa: fallthrough
-        case .relative_humidity_700hPa: fallthrough
-        case .relative_humidity_600hPa: fallthrough
-        case .relative_humidity_500hPa: fallthrough
-        case .relative_humidity_400hPa: fallthrough
-        case .relative_humidity_300hPa: fallthrough
-        case .relative_humidity_250hPa: fallthrough
-        case .relative_humidity_200hPa: fallthrough
-        case .relative_humidity_100hPa: fallthrough
-        case .relative_humidity_50hPa: return 1
+        case .geopotential_height_1000hPa, .geopotential_height_925hPa, .geopotential_height_850hPa, .geopotential_height_700hPa, .geopotential_height_600hPa, .geopotential_height_500hPa, .geopotential_height_400hPa, .geopotential_height_300hPa, .geopotential_height_250hPa, .geopotential_height_200hPa, .geopotential_height_100hPa, .geopotential_height_50hPa: return 1
+        case .wind_v_component_1000hPa, .wind_v_component_925hPa, .wind_v_component_850hPa, .wind_v_component_700hPa, .wind_v_component_600hPa, .wind_v_component_500hPa, .wind_v_component_400hPa, .wind_v_component_300hPa, .wind_v_component_250hPa, .wind_v_component_200hPa, .wind_v_component_100hPa, .wind_v_component_50hPa: return 10
+        case .wind_u_component_1000hPa, .wind_u_component_925hPa, .wind_u_component_850hPa, .wind_u_component_700hPa, .wind_u_component_600hPa, .wind_u_component_500hPa, .wind_u_component_400hPa, .wind_u_component_300hPa, .wind_u_component_250hPa, .wind_u_component_200hPa, .wind_u_component_100hPa, .wind_u_component_50hPa: return 10
+        case .vertical_velocity_1000hPa, .vertical_velocity_925hPa, .vertical_velocity_850hPa, .vertical_velocity_600hPa, .vertical_velocity_700hPa, .vertical_velocity_500hPa, .vertical_velocity_400hPa, .vertical_velocity_300hPa, .vertical_velocity_250hPa, .vertical_velocity_200hPa, .vertical_velocity_100hPa, .vertical_velocity_50hPa: return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level ?? 0)))
+        case .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_100hPa, .temperature_50hPa: return 20
+        case .relative_humidity_1000hPa, .relative_humidity_925hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_600hPa, .relative_humidity_500hPa, .relative_humidity_400hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_100hPa, .relative_humidity_50hPa: return 1
         case .surface_pressure: return 10
         case .pressure_msl: return 10
         case .total_column_integrated_water_vapour: return 10
         case .wind_v_component_10m, .wind_u_component_100m: return 10
         case .wind_u_component_10m, .wind_v_component_100m: return 10
-        case .specific_humidity_1000hPa: fallthrough
-        case .specific_humidity_925hPa: fallthrough
-        case .specific_humidity_850hPa: fallthrough
-        case .specific_humidity_700hPa: fallthrough
-        case .specific_humidity_600hPa: fallthrough
-        case .specific_humidity_500hPa: fallthrough
-        case .specific_humidity_400hPa: fallthrough
-        case .specific_humidity_300hPa: fallthrough
-        case .specific_humidity_250hPa: fallthrough
-        case .specific_humidity_200hPa: fallthrough
-        case .specific_humidity_100hPa: fallthrough
-        case .specific_humidity_50hPa: return 100
+        case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_50hPa: return 100
         case .temperature_2m, .temperature_2m_min, .temperature_2m_max: return 20
-        case .relative_vorticity_1000hPa: fallthrough
-        case .relative_vorticity_925hPa: fallthrough
-        case .relative_vorticity_850hPa: fallthrough
-        case .relative_vorticity_700hPa: fallthrough
-        case .relative_vorticity_600hPa: fallthrough
-        case .relative_vorticity_500hPa: fallthrough
-        case .relative_vorticity_400hPa: fallthrough
-        case .relative_vorticity_300hPa: fallthrough
-        case .relative_vorticity_250hPa: fallthrough
-        case .relative_vorticity_200hPa: fallthrough
-        case .relative_vorticity_100hPa: fallthrough
-        case .relative_vorticity_50hPa: return 100
-        case .divergence_of_wind_1000hPa: fallthrough
-        case .divergence_of_wind_925hPa: fallthrough
-        case .divergence_of_wind_850hPa: fallthrough
-        case .divergence_of_wind_700hPa: fallthrough
-        case .divergence_of_wind_600hPa: fallthrough
-        case .divergence_of_wind_500hPa: fallthrough
-        case .divergence_of_wind_400hPa: fallthrough
-        case .divergence_of_wind_300hPa: fallthrough
-        case .divergence_of_wind_250hPa: fallthrough
-        case .divergence_of_wind_200hPa: fallthrough
-        case .divergence_of_wind_100hPa: fallthrough
-        case .divergence_of_wind_50hPa: return 100
+        case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return 100
+        case .divergence_of_wind_1000hPa, .divergence_of_wind_925hPa, .divergence_of_wind_850hPa, .divergence_of_wind_700hPa, .divergence_of_wind_600hPa, .divergence_of_wind_500hPa, .divergence_of_wind_400hPa, .divergence_of_wind_300hPa, .divergence_of_wind_250hPa, .divergence_of_wind_200hPa, .divergence_of_wind_100hPa, .divergence_of_wind_50hPa: return 100
         case .cloud_cover:
             return 1
         case .cloud_cover_low:
@@ -958,74 +685,33 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return 10
         }
     }
-    
+
     func multiplyAdd(domain: EcmwfDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
-        case .surface_temperature: fallthrough
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
-        case .temperature_1000hPa: fallthrough
-        case .temperature_925hPa: fallthrough
-        case .temperature_850hPa: fallthrough
-        case .temperature_700hPa: fallthrough
-        case .temperature_600hPa: fallthrough
-        case .temperature_500hPa: fallthrough
-        case .temperature_400hPa: fallthrough
-        case .temperature_300hPa: fallthrough
-        case .temperature_250hPa: fallthrough
-        case .temperature_200hPa: fallthrough
-        case .temperature_100hPa: fallthrough
-        case .temperature_50hPa: fallthrough
-        case .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
+        case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_100hPa, .temperature_50hPa, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 0)
+            return (1 / 100, 0)
         case .surface_pressure:
-            return (1/100, 0)
+            return (1 / 100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
             if domain == .aifs025_single {
                 // AIFS Single is already kg/m2
                 return (1, 0)
             }
             return (1000, 0) // meters to millimeter
-        case .specific_humidity_1000hPa: fallthrough
-        case .specific_humidity_925hPa: fallthrough
-        case .specific_humidity_850hPa: fallthrough
-        case .specific_humidity_700hPa: fallthrough
-        case .specific_humidity_600hPa: fallthrough
-        case .specific_humidity_500hPa: fallthrough
-        case .specific_humidity_400hPa: fallthrough
-        case .specific_humidity_300hPa: fallthrough
-        case .specific_humidity_250hPa: fallthrough
-        case .specific_humidity_200hPa: fallthrough
-        case .specific_humidity_100hPa: fallthrough
-        case .specific_humidity_50hPa:
+        case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_50hPa:
             return (1000, 0)
-        case .shortwave_radiation: return (1/Float(dtSeconds), 0) // joules to watt
+        case .shortwave_radiation: return (1 / Float(dtSeconds), 0) // joules to watt
         default:
             return nil
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
-        case .precipitation, .showers, .snowfall_water_equivalent: fallthrough
-        case .runoff: return .backwards_sum
-        case .cloud_cover: fallthrough
-        case .cloud_cover_low: fallthrough
-        case .cloud_cover_mid: fallthrough
-        case .cloud_cover_high: fallthrough
-        case .relative_humidity_1000hPa: fallthrough
-        case .relative_humidity_925hPa: fallthrough
-        case .relative_humidity_850hPa: fallthrough
-        case .relative_humidity_700hPa: fallthrough
-        case .relative_humidity_600hPa: fallthrough
-        case .relative_humidity_500hPa: fallthrough
-        case .relative_humidity_400hPa: fallthrough
-        case .relative_humidity_300hPa: fallthrough
-        case .relative_humidity_250hPa: fallthrough
-        case .relative_humidity_200hPa: fallthrough
-        case .relative_humidity_100hPa: fallthrough
-        case .relative_humidity_50hPa: return .hermite(bounds: 0...100)
+        case .precipitation, .showers, .snowfall_water_equivalent, .runoff: return .backwards_sum
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .relative_humidity_1000hPa, .relative_humidity_925hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_600hPa, .relative_humidity_500hPa, .relative_humidity_400hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_100hPa, .relative_humidity_50hPa: return .hermite(bounds: 0...100)
         case .shortwave_radiation: return .solar_backwards_averaged
         case .wind_gusts_10m: return .hermite(bounds: 0...1000)
         case .temperature_2m_min, .temperature_2m_max: return .backwards
@@ -1170,12 +856,12 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case rain
     case showers
     case wet_bulb_temperature_2m
-    
+
     case cloudcover
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
-    
+
     case terrestrial_radiation
     case terrestrial_radiation_instant
     case direct_normal_irradiance
@@ -1187,7 +873,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }

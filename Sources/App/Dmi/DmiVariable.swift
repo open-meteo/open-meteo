@@ -12,7 +12,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case cloud_cover_2m
     case pressure_msl
     case relative_humidity_2m
-    
+
     case cloud_base
     case cloud_top
 
@@ -23,7 +23,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_speed_250m
     case wind_speed_350m
     case wind_speed_450m
-    
+
     /// Wind direction has been corrected due to grid projection
     case wind_direction_10m
     case wind_direction_50m
@@ -32,28 +32,28 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case wind_direction_250m
     case wind_direction_350m
     case wind_direction_450m
-    
+
     case temperature_50m
     case temperature_100m
     case temperature_150m
     case temperature_250m
-    
+
     case snowfall_water_equivalent
     case precipitation
-    
-    //case snow_depth_water_equivalent
-    
+
+    // case snow_depth_water_equivalent
+
     case wind_gusts_10m
 
     case shortwave_radiation
     case direct_radiation
-    
+
     case surface_temperature
     case convective_inhibition
     case cape
     case visibility
     case freezing_level_height
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -72,15 +72,15 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -105,7 +105,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 10
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return 20
-        //case .snow_depth_water_equivalent:
+        // case .snow_depth_water_equivalent:
         //    return 10
         case .convective_inhibition:
             return 1
@@ -119,7 +119,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 0.05 // 20 metre
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -132,7 +132,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...100)
         case .precipitation:
             return .backwards_sum
-        case .snowfall_water_equivalent: //, .snow_depth_water_equivalent:
+        case .snowfall_water_equivalent: // , .snow_depth_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
@@ -156,7 +156,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...10e9)
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -165,7 +165,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .percentage
         case .relative_humidity_2m:
             return .percentage
-        case .precipitation: //, .snow_depth_water_equivalent:
+        case .precipitation: // , .snow_depth_water_equivalent:
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond
@@ -193,12 +193,10 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .metre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
+        case .temperature_2m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:
             return true
         default:
             return false
@@ -217,35 +215,32 @@ enum DmiPressureVariableType: String, CaseIterable {
     case relative_humidity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct DmiPressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: DmiPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -254,7 +249,7 @@ struct DmiPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -269,7 +264,7 @@ struct DmiPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .hermite(bounds: 0...100)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -284,7 +279,7 @@ struct DmiPressureVariable: PressureVariableRespresentable, GenericVariable, Has
             return .percentage
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

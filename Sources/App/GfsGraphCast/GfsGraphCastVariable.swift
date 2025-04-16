@@ -11,12 +11,12 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
-    
+
     case pressure_msl
-    
+
     case wind_v_component_10m
     case wind_u_component_10m
-    
+
     case precipitation
 
     var storePreviousForecast: Bool {
@@ -29,26 +29,26 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 0)
+            return (1 / 100, 0)
         default:
             return nil
         }
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m: return 20
@@ -62,7 +62,7 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
         case .pressure_msl: return 10
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m:
@@ -85,7 +85,7 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .temperature_2m: return .celsius
@@ -99,7 +99,7 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
         case .pressure_msl: return .hectopascal
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
         case .temperature_2m:
@@ -129,15 +129,15 @@ enum GfsGraphCastPressureVariableType: String, CaseIterable {
 struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable, GfsGraphCastVariableDownloadable {
     let variable: GfsGraphCastPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:
@@ -148,20 +148,18 @@ struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, G
             return nil
         }
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -174,7 +172,7 @@ struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, G
             fatalError("should never be written to disk")
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -193,7 +191,7 @@ struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, G
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -212,7 +210,7 @@ struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, G
             return .gramPerKilogram
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

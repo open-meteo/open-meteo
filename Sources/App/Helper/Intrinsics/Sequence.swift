@@ -11,7 +11,7 @@ extension Sequence {
         var groups = [(key: Group, values: [Element])]()
         for element in self {
             let key = try criterion(_: element)
-            if let keyIndex = groups.firstIndex(where: {$0.key == key}) {
+            if let keyIndex = groups.firstIndex(where: { $0.key == key }) {
                 groups[keyIndex] = (key, groups[keyIndex].values + [element])
             } else {
                 groups.append((key: key, values: [element]))

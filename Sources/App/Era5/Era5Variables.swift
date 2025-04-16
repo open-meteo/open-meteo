@@ -1,6 +1,5 @@
 import Foundation
 
-
 enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated {
     case temperature_2m
     case wind_u_component_100m
@@ -30,12 +29,12 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case direct_radiation
     case boundary_layer_height
     case total_column_integrated_water_vapour
-    
+
     case wave_height
     case wave_direction
     case wave_period
     case wave_peak_period
-    
+
     case temperature_2m_spread
     case wind_u_component_100m_spread
     case wind_v_component_100m_spread
@@ -63,7 +62,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case direct_radiation_spread
     case boundary_layer_height_spread
     case total_column_integrated_water_vapour_spread
-    
+
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String? {
         switch self {
@@ -102,7 +101,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         default: return nil
         }
     }
-    
+
     func netCdfScaling(domain: CdsDomain) -> (offset: Float, scalefactor: Float)? {
         switch self {
         case .temperature_2m: return (-273.15, 1) // kelvin to celsius
@@ -117,18 +116,18 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .soil_temperature_7_to_28cm: return (-273.15, 1)
         case .soil_temperature_28_to_100cm: return (-273.15, 1)
         case .soil_temperature_100_to_255cm: return (-273.15, 1)
-        case .shortwave_radiation, .shortwave_radiation_spread: return (0, 1/Float(domain.dtSeconds)) // joules to watt
+        case .shortwave_radiation, .shortwave_radiation_spread: return (0, 1 / Float(domain.dtSeconds)) // joules to watt
         case .precipitation, .precipitation_spread: return (0, 1000) // meter to millimeter
-        case .direct_radiation, .direct_radiation_spread: return (0, 1/Float(domain.dtSeconds))
+        case .direct_radiation, .direct_radiation_spread: return (0, 1 / Float(domain.dtSeconds))
         default:
             return nil
         }
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     /// Scalefactor to compress data
     var scalefactor: Float {
         switch self {
@@ -169,7 +168,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return 10
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m, .temperature_2m_spread:
@@ -234,18 +233,18 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .hermite(bounds: nil)
         }
     }
-    
+
     func availableForDomain(domain: CdsDomain) -> Bool {
         if self.rawValue.contains("_spread") {
             return false
         }
-        
+
         /// Snow depth is only directly available in era5-land
         /// Others have to download snow depth water equivalent and density separately (not implemented)
         if self == .snow_depth {
             return domain == .era5_land
         }
-        
+
         // Waves are only available for ERA5 ocean at 0.5° resolution
         switch self {
         case .wave_height, .wave_period, .wave_direction, .wave_peak_period:
@@ -255,7 +254,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
                 return false
             }
         }
-        
+
         if domain == .ecmwf_ifs_analysis_long_window || domain == .ecmwf_ifs_analysis {
             switch self {
             case .wind_gusts_10m, .snowfall_water_equivalent, .snow_depth, .shortwave_radiation, .direct_radiation, .boundary_layer_height, .precipitation:
@@ -265,36 +264,18 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
                 return true
             }
         }
-        
+
         // Note: ERA5-Land wind, pressure, snowfall, radiation and precipitation are only linearly interpolated from ERA5
         if domain == .era5_land {
             switch self {
-            case .temperature_2m:
-                fallthrough
-            case .dew_point_2m:
-                fallthrough
-            case .soil_temperature_0_to_7cm:
-                fallthrough
-            case .soil_temperature_7_to_28cm:
-                fallthrough
-            case .soil_temperature_28_to_100cm:
-                fallthrough
-            case .soil_temperature_100_to_255cm:
-                fallthrough
-            case .soil_moisture_0_to_7cm:
-                fallthrough
-            case .soil_moisture_7_to_28cm:
-                fallthrough
-            case .soil_moisture_28_to_100cm:
-                fallthrough
-            case .soil_moisture_100_to_255cm:
+            case .temperature_2m, .dew_point_2m, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
                 return true
             default: return false
             }
         }
         return true
     }
-    
+
     var marsGribCode: String {
         switch self {
         case .temperature_2m:
@@ -361,14 +342,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             fatalError("Not supported")
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
-        case .wind_u_component_100m, .wind_u_component_100m_spread: fallthrough
-        case .wind_v_component_100m, .wind_v_component_100m_spread: fallthrough
-        case .wind_u_component_10m, .wind_u_component_10m_spread: fallthrough
-        case .wind_v_component_10m, .wind_v_component_10m_spread: fallthrough
-        case .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
+        case .wind_u_component_100m, .wind_u_component_100m_spread, .wind_v_component_100m, .wind_v_component_100m_spread, .wind_u_component_10m, .wind_u_component_10m_spread, .wind_v_component_10m, .wind_v_component_10m_spread, .wind_gusts_10m, .wind_gusts_10m_spread: return .metrePerSecond
         case .dew_point_2m: return .celsius
         case .temperature_2m: return .celsius
         case .cloud_cover, .cloud_cover_spread: return .percentage
@@ -402,17 +379,17 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .kilogramPerSquareMetre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return self == .temperature_2m || self == .dew_point_2m ||
             self == .soil_temperature_0_to_7cm || self == .soil_temperature_7_to_28cm ||
             self == .soil_temperature_28_to_100cm || self == .soil_temperature_100_to_255cm
     }
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     static func fromGrib(attributes: GribAttributes) -> Self? {
         if attributes.dataType == "es" {
             switch attributes.shortName {
@@ -447,7 +424,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
                 return nil
             }
         }
-        
+
         switch attributes.shortName {
         case "2t": return .temperature_2m
         case "tcc": return .cloud_cover
@@ -484,9 +461,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return nil
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
 }

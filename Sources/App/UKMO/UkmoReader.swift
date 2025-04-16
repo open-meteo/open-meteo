@@ -1,16 +1,15 @@
 import Foundation
 import Vapor
 
-
 enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
     case dewpoint_2m
     case dew_point_2m
-    
+
     case windspeed_10m
     case winddirection_10m
-    
+
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation_instant
@@ -19,7 +18,7 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    //case evapotranspiration
+    // case evapotranspiration
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
@@ -38,7 +37,7 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -63,7 +62,7 @@ enum UkmoPressureVariableDerivedType: String, CaseIterable {
 struct UkmoPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: UkmoPressureVariableDerivedType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -75,19 +74,19 @@ typealias UkmoVariableCombined = VariableOrDerived<UkmoVariable, UkmoVariableDer
 
 struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = UkmoDomain
-    
+
     typealias Variable = UkmoVariable
-    
+
     typealias Derived = UkmoVariableDerived
-    
+
     typealias MixingVar = UkmoVariableCombined
-    
+
     let reader: GenericReaderCached<UkmoDomain, UkmoVariable>
-    
+
     let options: GenericReaderOptions
-    
+
     let domain: UkmoDomain
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -96,14 +95,14 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
         self.domain = domain
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
         self.domain = domain
     }
-    
+
     func get(raw: UkmoVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         if domain == .global_deterministic_10km, case let .surface(variable) = raw {
             // Global domain does not have amounts for showers and snowfall.
@@ -114,10 +113,10 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rain = try get(raw: .rain, time: time).data
                 let precipitation = try get(raw: .precipitation, time: time).data
-                return variable == .showers ? 
+                return variable == .showers ?
                     DataAndUnit(zip(temperature, zip(precipitation, rain)).map({
                         $0 > 0 ? $1.0 - $1.1 : 0
-                    }), .millimetre) : 
+                    }), .millimetre) :
                     DataAndUnit(zip(temperature, zip(precipitation, rain)).map({
                         $0 <= 0 ? $1.0 - $1.1 : 0
                     }), .millimetre)
@@ -126,7 +125,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
         }
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: UkmoVariable, time: TimerangeDtAndSettings) throws {
         if domain == .global_deterministic_10km, case let .surface(variable) = raw {
             // Global domain does not have amounts for showers and snowfall.
@@ -143,15 +142,15 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
         }
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func prefetchData(variable: UkmoSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
-    
+
     func get(raw: UkmoSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func prefetchData(derived: UkmoVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
@@ -183,9 +182,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .diffuse_radiation, .diffuse_radiation_instant:
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation, .diffuse_radiation_instant:
                 try prefetchData(variable: .direct_radiation, time: time)
                 try prefetchData(variable: .shortwave_radiation, time: time)
             case .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant, .shortwave_radiation_instant:
@@ -194,7 +191,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 try prefetchData(variable: .cloud_cover, time: time)
                 try prefetchData(variable: .rain, time: time)
                 try prefetchData(variable: .snowfall_water_equivalent, time: time)
-                //try prefetchData(variable: .cape, time: time)
+                // try prefetchData(variable: .cape, time: time)
                 try prefetchData(variable: .wind_gusts_10m, time: time)
                 try prefetchData(variable: .visibility, time: time)
             case .is_day:
@@ -233,7 +230,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
-    
+
     func get(derived: UkmoVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
@@ -251,23 +248,23 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:
                 let snowfall_water_equivalent = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snowfall = snowfall_water_equivalent.map({$0 * 0.7})
+                let snowfall = snowfall_water_equivalent.map({ $0 * 0.7 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relative_humidity_2m, time: time)
@@ -334,7 +331,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
             case .showers:
                 let precipitation = try get(raw: .rain, time: time)
-                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+                return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
@@ -376,7 +373,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover, .cloud_cover:
                 let rh = try get(raw: .pressure(.init(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .relativehumidity:
                 return try get(raw: .pressure(UkmoPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

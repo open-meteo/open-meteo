@@ -15,7 +15,7 @@ enum DomainRegistry: String, CaseIterable {
     case meteofrance_wave
     case meteofrance_currents
     case meteofrance_sea_surface_temperature
-    
+
     case cams_europe
     case cams_global
     case cams_global_greenhouse_gases
@@ -23,7 +23,7 @@ enum DomainRegistry: String, CaseIterable {
     case cams_europe_reanalysis_validated
     case cams_europe_reanalysis_validated_pre2020
     case cams_europe_reanalysis_validated_pre2018
-    
+
     case copernicus_dem90
     case copernicus_cerra
     case copernicus_era5
@@ -32,12 +32,12 @@ enum DomainRegistry: String, CaseIterable {
     case copernicus_era5_land
     case copernicus_era5_land_daily
     case copernicus_era5_ocean
-    
+
     case cmc_gem_gdps
     case cmc_gem_geps
     case cmc_gem_hrdps
     case cmc_gem_rdps
-    
+
     case ncep_gfs013
     case ncep_gfs025
     case ncep_gfswave025
@@ -51,7 +51,7 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_gfs_graphcast025
     case ncep_nbm_conus
     case ncep_nbm_alaska
-    
+
     case glofas_consolidated_v4
     case glofas_consolidated_v3
     case glofas_forecast_v4
@@ -60,7 +60,7 @@ enum DomainRegistry: String, CaseIterable {
     case glofas_intermediate_v3
     case glofas_seasonal_v3
     case glofas_seasonal_v4
-    
+
     case dwd_icon
     case dwd_icon_eu
     case dwd_icon_d2
@@ -70,7 +70,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_d2_eps
     case dwd_ewam
     case dwd_gwam
-    
+
     case ecmwf_ifs
     case ecmwf_ifs04
     case ecmwf_ifs04_ensemble
@@ -83,19 +83,19 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_ifs_analysis
     case ecmwf_ifs_analysis_long_window
     case ecmwf_ifs_long_window
-    
+
     case jma_msm
     case jma_gsm
 
     case metno_nordic_pp
-    
+
     case nasa_imerg_daily
-    
+
     case cma_grapes_global
-    
+
     case bom_access_global
     case bom_access_global_ensemble
-    
+
     case cmip_CMCC_CM2_VHR4
     case cmip_EC_Earth3P_HR
     case cmip_FGOALS_f3_H
@@ -103,33 +103,33 @@ enum DomainRegistry: String, CaseIterable {
     case cmip_MPI_ESM1_2_XR
     case cmip_MRI_AGCM3_2_S
     case cmip_NICAM16_8S
-    
+
     case arpae_cosmo_2i
     case arpae_cosmo_2i_ruc
     case arpae_cosmo_5m
-    
+
     case knmi_harmonie_arome_europe
     case knmi_harmonie_arome_netherlands
     case dmi_harmonie_arome_europe
-    
+
     case ukmo_global_deterministic_10km
     case ukmo_global_ensemble_20km
     case ukmo_uk_deterministic_2km
-    
+
     case eumetsat_sarah3_30min
     case jma_jaxa_himawari_10min
     case eumetsat_lsa_saf_msg_15min
     case eumetsat_lsa_saf_iodc_15min
-    
+
     case kma_gdps
     case kma_ldps
-    
+
     case italia_meteo_arpae_icon_2i
-    
+
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
-    
+
     func getDomain() -> GenericDomain? {
         switch self {
         case .meteofrance_arome_france0025:

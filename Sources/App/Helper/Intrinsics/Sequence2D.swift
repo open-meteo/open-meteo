@@ -4,7 +4,7 @@ import Foundation
 struct Sequence2D<S1: Sequence, S2: Sequence> {
     let y: S1
     let x: S2
-    
+
     init(_ y: S1, _ x: S2) {
         self.y = y
         self.x = x
@@ -32,14 +32,14 @@ struct Iterator2D<Y: Sequence, X: Sequence>: IteratorProtocol {
     var y: Y.Element?
     var xIterator: X.Iterator
     let xSequence: X
-    
+
     init(_ y: Y, _ x: X) {
         self.yIterator = y.makeIterator()
         self.y = yIterator.next()
         self.xIterator = x.makeIterator()
         self.xSequence = x
     }
-    
+
     mutating func next() -> (y: Y.Element, x: X.Element)? {
         guard let y else {
             return nil

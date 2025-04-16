@@ -1,7 +1,6 @@
 import Foundation
 import Vapor
 
-
 enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case dewpoint_2m
@@ -33,7 +32,7 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case weather_code
     case is_day
     case wet_bulb_temperature_2m
-    
+
     case relativehumidity_2m
     case cloudcover
     case windspeed_10m
@@ -45,9 +44,9 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case windspeed_120m
     case winddirection_120m
     case windgusts_10m
-    
+
     case sunshine_duration
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -72,7 +71,7 @@ enum GemPressureVariableDerivedType: String, CaseIterable {
 struct GemPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: GemPressureVariableDerivedType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -84,17 +83,17 @@ typealias GemVariableCombined = VariableOrDerived<GemVariable, GemVariableDerive
 
 struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     typealias MixingVar = GemVariableCombined
-    
+
     typealias Domain = GemDomain
-    
+
     typealias Variable = GemVariable
-    
+
     typealias Derived = GemVariableDerived
-    
+
     let reader: GenericReaderCached<GemDomain, Variable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -102,13 +101,13 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
@@ -118,14 +117,10 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try prefetchData(raw: .surface(.wind_speed_10m), time: time)
                 try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
                 try prefetchData(raw: .surface(.shortwave_radiation), time: time)
-            case .dew_point_2m:
-                fallthrough
-            case .dewpoint_2m:
+            case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
                 try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
-            case .vapour_pressure_deficit:
-                fallthrough
-            case .vapor_pressure_deficit:
+            case .vapour_pressure_deficit, .vapor_pressure_deficit:
                 try prefetchData(raw: .surface(.temperature_2m), time: time)
                 try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
             case .et0_fao_evapotranspiration:
@@ -140,21 +135,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 break
             case .terrestrial_radiation_instant:
                 break
-            case .diffuse_radiation:
-                fallthrough
-            case .diffuse_radiation_instant:
-                fallthrough
-            case .direct_normal_irradiance:
-                fallthrough
-            case .direct_normal_irradiance_instant:
-                fallthrough
-            case .direct_radiation:
-                fallthrough
-            case .direct_radiation_instant:
-                fallthrough
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .shortwave_radiation_instant:
+            case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant, .shortwave_radiation_instant:
                 try prefetchData(raw: .surface(.shortwave_radiation), time: time)
             case .snowfall:
                 try prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
@@ -164,27 +145,19 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 if reader.domain != .gem_global_ensemble {
                     try prefetchData(raw: .surface(.showers), time: time)
                 }
-            case .cloud_cover_low:
-                fallthrough
-            case .cloudcover_low:
+            case .cloud_cover_low, .cloudcover_low:
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 1000)), time: time)
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 950)), time: time)
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 850)), time: time)
-            case .cloud_cover_mid:
-                fallthrough
-            case .cloudcover_mid:
+            case .cloud_cover_mid, .cloudcover_mid:
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 700)), time: time)
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 600)), time: time)
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 500)), time: time)
-            case .cloud_cover_high:
-                fallthrough
-            case .cloudcover_high:
+            case .cloud_cover_high, .cloudcover_high:
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 400)), time: time)
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 300)), time: time)
                 try prefetchData(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 200)), time: time)
-            case .weather_code:
-                fallthrough
-            case .weathercode:
+            case .weather_code, .weathercode:
                 try prefetchData(raw: .surface(.cloud_cover), time: time)
                 try prefetchData(raw: .surface(.precipitation), time: time)
                 try prefetchData(derived: .surface(.snowfall), time: time)
@@ -223,14 +196,10 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .dew_point:
-                fallthrough
-            case .dewpoint:
+            case .dew_point, .dewpoint:
                 try prefetchData(raw: .pressure(GemPressureVariable(variable: .temperature, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(GemPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
-            case .cloud_cover:
-                fallthrough
-            case .cloudcover:
+            case .cloud_cover, .cloudcover:
                 try prefetchData(raw: .pressure(GemPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             case .windspeed:
                 try prefetchData(raw: .pressure(GemPressureVariable(variable: .wind_speed, level: v.level)), time: time)
@@ -241,7 +210,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }
         }
     }
-    
+
     func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
@@ -252,21 +221,19 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let relhum = try get(raw: .surface(.relative_humidity_2m), time: time).data
                 let radiation = try get(raw: .surface(.shortwave_radiation), time: time).data
                 return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: radiation), .celsius)
-            case .vapour_pressure_deficit:
-                fallthrough
-            case .vapor_pressure_deficit:
+            case .vapour_pressure_deficit, .vapor_pressure_deficit:
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
                 let rh = try get(raw: .surface(.relative_humidity_2m), time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .surface(.shortwave_radiation), time: time).data
                 let temperature = try get(raw: .surface(.temperature_2m), time: time).data
                 let windspeed = try get(raw: .surface(.wind_speed_10m), time: time).data
                 let rh = try get(raw: .surface(.relative_humidity_2m), time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
@@ -311,9 +278,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let diff = try get(derived: .surface(.diffuse_radiation), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
                 return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-            case .dew_point_2m:
-                fallthrough
-            case .dewpoint_2m:
+            case .dew_point_2m, .dewpoint_2m:
                 let temperature = try get(raw: .surface(.temperature_2m), time: time)
                 let rh = try get(raw: .surface(.relative_humidity_2m), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
@@ -329,35 +294,27 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                     return DataAndUnit(zip(total, snowwater).map(-), .millimetre)
                 }
                 let showers = try get(raw: .surface(.showers), time: time).data
-                let rain = zip(zip(total, snowwater), showers).map { (arg0, showers) in
+                let rain = zip(zip(total, snowwater), showers).map { arg0, showers in
                     let (total, snowwater) = arg0
                     return max(total - snowwater - showers, 0)
                 }
                 return DataAndUnit(rain, .millimetre)
-            case .cloud_cover_low:
-                fallthrough
-            case .cloudcover_low:
+            case .cloud_cover_low, .cloudcover_low:
                 let cl0 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 1000)), time: time)
                 let cl1 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 950)), time: time)
                 let cl2 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 850)), time: time)
                 return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percentage)
-            case .cloud_cover_mid:
-                fallthrough
-            case .cloudcover_mid:
+            case .cloud_cover_mid, .cloudcover_mid:
                 let cl0 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 700)), time: time)
                 let cl1 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 600)), time: time)
                 let cl2 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 500)), time: time)
                 return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percentage)
-            case .cloud_cover_high:
-                fallthrough
-            case .cloudcover_high:
+            case .cloud_cover_high, .cloudcover_high:
                 let cl0 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 400)), time: time)
                 let cl1 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 300)), time: time)
                 let cl2 = try get(derived: .pressure(GemPressureVariableDerived(variable: .cloudcover, level: 200)), time: time)
                 return DataAndUnit(zip(zip(cl0.data, cl1.data).map(max), cl2.data).map(max), .percentage)
-            case .weather_code:
-                fallthrough
-            case .weathercode:
+            case .weather_code, .weathercode:
                 let cloudcover = try get(raw: .surface(.cloud_cover), time: time).data
                 let precipitation = try get(raw: .surface(.precipitation), time: time).data
                 let snowfall = try get(derived: .surface(.snowfall), time: time).data
@@ -421,17 +378,13 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .dew_point:
-                fallthrough
-            case .dewpoint:
+            case .dew_point, .dewpoint:
                 let temperature = try get(raw: .pressure(GemPressureVariable(variable: .temperature, level: v.level)), time: time)
                 let rh = try get(raw: .pressure(GemPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
-            case .cloud_cover:
-                fallthrough
-            case .cloudcover:
+            case .cloud_cover, .cloudcover:
                 let rh = try get(raw: .pressure(GemPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .windspeed:
                 return try get(raw: .pressure(GemPressureVariable(variable: .wind_speed, level: v.level)), time: time)
             case .winddirection:
@@ -445,7 +398,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
 struct GemMixer: GenericReaderMixer {
     let reader: [GemReader]
-    
+
     static func makeReader(domain: GemReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GemReader? {
         return try GemReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }

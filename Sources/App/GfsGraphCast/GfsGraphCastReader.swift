@@ -1,5 +1,3 @@
-
-
 enum GfsGraphCastVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case windspeed_10m
     case winddirection_10m
@@ -16,7 +14,7 @@ enum GfsGraphCastVariableDerivedSurface: String, CaseIterable, GenericVariableMi
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -43,7 +41,7 @@ enum GfsGraphCastPressureVariableDerivedType: String, CaseIterable {
 struct GfsGraphCastPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: GfsGraphCastPressureVariableDerivedType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -55,17 +53,17 @@ typealias GfsGraphCastVariableCombined = VariableOrDerived<GfsGraphCastVariable,
 
 struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = GfsGraphCastDomain
-    
+
     typealias Variable = GfsGraphCastVariable
-    
+
     typealias Derived = GfsGraphCastVariableDerived
-    
+
     typealias MixingVar = GfsGraphCastVariableCombined
-    
+
     let reader: GenericReaderCached<GfsGraphCastDomain, GfsGraphCastVariable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -73,29 +71,29 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func get(raw: GfsGraphCastVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: GfsGraphCastVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func prefetchData(variable: GfsGraphCastSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
-    
+
     func get(raw: GfsGraphCastSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func prefetchData(derived: GfsGraphCastVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
@@ -128,9 +126,7 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                fallthrough
-            case .winddirection, .wind_direction:
+            case .windspeed, .wind_speed, .winddirection, .wind_direction:
                 try prefetchData(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dewpoint, .dew_point:
@@ -143,7 +139,7 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
-    
+
     func get(derived: GfsGraphCastVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
@@ -151,7 +147,7 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_10m, .wind_speed_10m:
                 let u = try get(raw: .wind_u_component_10m, time: time).data
                 let v = try get(raw: .wind_v_component_10m, time: time).data
-                let speed = zip(u,v).map(Meteorology.windspeed)
+                let speed = zip(u, v).map(Meteorology.windspeed)
                 return DataAndUnit(speed, .metrePerSecond)
             case .winddirection_10m, .wind_direction_10m:
                 let u = try get(raw: .wind_u_component_10m, time: time).data
@@ -198,14 +194,14 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, precipitation.data).map({ $1 * ($0 >= 0 ? 1 : 0) }), .millimetre)
             case .showers:
                 let precipitation = try get(raw: .precipitation, time: time)
-                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+                return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
             }
         case .pressure(let v):
             switch v.variable {
             case .windspeed, .wind_speed:
                 let u = try get(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 let v = try get(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                let speed = zip(u.data, v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
             case .winddirection, .wind_direction:
                 let u = try get(raw: .pressure(GfsGraphCastPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
@@ -218,7 +214,7 @@ struct GfsGraphCastReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover, .cloud_cover:
                 let rh = try get(raw: .pressure(GfsGraphCastPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .relativehumidity:
                 return try get(raw: .pressure(GfsGraphCastPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

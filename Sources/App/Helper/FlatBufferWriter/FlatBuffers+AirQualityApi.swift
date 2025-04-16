@@ -2,7 +2,6 @@ import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
-
 extension CamsVariable: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -79,17 +78,11 @@ extension CamsVariableDerived: FlatBuffersVariable {
             return .init(variable: .europeanAqiPm2p5)
         case .european_aqi_pm10:
             return .init(variable: .europeanAqiPm10)
-        case .european_aqi_nitrogen_dioxide:
-            fallthrough
-        case .european_aqi_no2:
+        case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
             return .init(variable: .europeanAqiNitrogenDioxide)
-        case .european_aqi_ozone:
-            fallthrough
-        case .european_aqi_o3:
+        case .european_aqi_ozone, .european_aqi_o3:
             return .init(variable: .europeanAqiOzone)
-        case .european_aqi_sulphur_dioxide:
-            fallthrough
-        case .european_aqi_so2:
+        case .european_aqi_sulphur_dioxide, .european_aqi_so2:
             return .init(variable: .europeanAqiSulphurDioxide)
         case .us_aqi:
             return .init(variable: .usAqi)
@@ -97,21 +90,13 @@ extension CamsVariableDerived: FlatBuffersVariable {
             return .init(variable: .usAqiPm2p5)
         case .us_aqi_pm10:
             return .init(variable: .usAqiPm10)
-        case .us_aqi_nitrogen_dioxide:
-            fallthrough
-        case .us_aqi_no2:
+        case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
             return .init(variable: .usAqiNitrogenDioxide)
-        case .us_aqi_ozone:
-            fallthrough
-        case .us_aqi_o3:
+        case .us_aqi_ozone, .us_aqi_o3:
             return .init(variable: .usAqiOzone)
-        case .us_aqi_sulphur_dioxide:
-            fallthrough
-        case .us_aqi_so2:
+        case .us_aqi_sulphur_dioxide, .us_aqi_so2:
             return .init(variable: .usAqiSulphurDioxide)
-        case .us_aqi_carbon_monoxide:
-            fallthrough
-        case .us_aqi_co:
+        case .us_aqi_carbon_monoxide, .us_aqi_co:
             return .init(variable: .usAqiCarbonMonoxide)
         case .is_day:
             return .init(variable: .isDay)
@@ -121,13 +106,13 @@ extension CamsVariableDerived: FlatBuffersVariable {
 
 extension CamsQuery.Domain: ModelFlatbufferSerialisable {
     typealias HourlyVariable = CamsReader.MixingVar
-    
+
     typealias HourlyPressureType = ForecastPressureVariableType
-    
+
     typealias HourlyHeightType = ForecastHeightVariableType
-    
+
     typealias DailyVariable = ForecastVariableDaily
-    
+
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .auto:

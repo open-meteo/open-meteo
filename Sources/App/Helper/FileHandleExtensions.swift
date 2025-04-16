@@ -6,16 +6,16 @@ extension FileHandle {
         // This field contains the number of hard links to the file.
         return fileStats().st_nlink == 0
     }
-    
+
     public func fileSize() -> Int {
         return Int(fileStats().st_size)
     }
-    
+
     public func fileSizeAndModificationTime() -> (size: Int, modificationTime: Date, creationTime: Date) {
         let stats = fileStats()
         return (Int(stats.st_size), stats.modificationTime, stats.creationTime)
     }
-    
+
     /// Return file `stat` structure
     public func fileStats() -> stat {
         var stats = stat()
@@ -26,7 +26,6 @@ extension FileHandle {
         return stats
     }
 }
-
 
 public enum FileHandleError: Error {
     case cannotMoveFile(from: String, to: String, errno: Int32, error: String)
@@ -40,13 +39,13 @@ extension FileManager {
             throw FileHandleError.cannotMoveFile(from: from, to: to, errno: errno, error: error)
         }
     }
-    
+
     public func removeItemIfExists(at: String) throws {
         if fileExists(atPath: at) {
             try removeItem(atPath: at)
         }
     }
-    
+
     /// Return file `stat` structure
     public func fileStats(at: String) -> stat? {
         var stats = stat()
@@ -61,7 +60,7 @@ extension FileManager {
         }
         return stats
     }
-    
+
     /// Get modification and creation time
     public func fileSizeAndModificationTime(at: String) -> (size: Int, modificationTime: Date, creationTime: Date)? {
         guard let stats = fileStats(at: at) else {
@@ -69,11 +68,11 @@ extension FileManager {
         }
         return (Int(stats.st_size), stats.modificationTime, stats.creationTime)
     }
-    
+
     /// Wait until the file was not updated for at least 60 seconds. If the file does not exist, do nothing
     public func waitIfFileWasRecentlyModified(at: String, waitTimeMinutes: Int = 15) {
         // Wait up to 15 minutes
-        for _ in 0 ..< (waitTimeMinutes*6) {
+        for _ in 0 ..< (waitTimeMinutes * 6) {
             guard let mTime = FileManager.default.fileStats(at: at)?.modificationTime,
                     mTime > Date().addingTimeInterval(-60) else {
                 break
@@ -96,7 +95,7 @@ extension stat {
         #endif
         return Date(timeIntervalSince1970: seconds + nanosends / 1_000_000)
     }
-    
+
     /// Creation time of the file / inode
     public var creationTime: Date {
         #if os(Linux)

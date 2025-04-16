@@ -1,6 +1,5 @@
 import Foundation
 
-
 enum WeatherCode: Int {
     case clearSky = 0
     case mainlyClear = 1
@@ -30,21 +29,19 @@ enum WeatherCode: Int {
     case thunderstormSlightOrModerate = 95
     case thunderstormStrong = 96
     case thunderstormHeavy = 99
-    
-    
+
     /// Calculate weather interpretation code
     /// http://www.cosmo-model.org/content/model/documentation/newsLetters/newsLetter06/cnl6_hoffmann.pdf
     /// https://www.dwd.de/DE/leistungen/pbfb_verlag_promet/pdf_promethefte/28_1_2_pdf.pdf?__blob=publicationFile&v=8
     public static func calculate(cloudcover: Float, precipitation: Float, convectivePrecipitation: Float?, snowfallCentimeters: Float, gusts: Float?, cape: Float?, liftedIndex: Float?, visibilityMeters: Float?, categoricalFreezingRain: Float?, modelDtSeconds: Int) -> WeatherCode? {
-        
         guard cloudcover.isFinite, precipitation.isFinite, snowfallCentimeters.isFinite else {
             return nil
         }
-        
+
         let modelDtHours = Float(modelDtSeconds) / 3600
-        
-        //let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / modelDtHours) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / modelDtHours) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
-        
+
+        // let thunderstromStrength: WeatherCode = ((gusts ?? 0) >= 18/3.6 || (precipitation / modelDtHours) >= 10) ? .thunderstormStrong : ((gusts ?? 0 >= 29/3.6) || (precipitation / modelDtHours) >= 25) ? .thunderstormStrong : .thunderstormSlightOrModerate
+
         if let cape, cape >= 3000 {
             if let liftedIndex {
                 if liftedIndex <= -5 {
@@ -54,7 +51,7 @@ enum WeatherCode: Int {
                 return .thunderstormSlightOrModerate
             }
         }
-        
+
         if let categoricalFreezingRain, categoricalFreezingRain >= 1 {
             switch precipitation / modelDtHours {
             case 0.01..<0.5: return .lightFreezingDrizzle
@@ -66,7 +63,7 @@ enum WeatherCode: Int {
             default: break
             }
         }
-        
+
         if (convectivePrecipitation ?? 0) > 0 || (cape ?? 0) >= 800 {
             switch snowfallCentimeters / modelDtHours {
             case 0.01..<0.2: return .slightSnowShowers
@@ -81,14 +78,14 @@ enum WeatherCode: Int {
             default: break
             }
         }
-        
+
         switch snowfallCentimeters / modelDtHours {
         case 0.01..<0.2: return .slightSnowfall
         case 0.2..<0.8: return .moderateSnowfall
         case 0.8...: return .heavySnowfall
         default: break
         }
-        
+
         switch precipitation / modelDtHours {
         case 0.01..<0.5: return .lightDrizzle
         case 0.5..<1.0: return .moderateDrizzle
@@ -98,11 +95,11 @@ enum WeatherCode: Int {
         case 7.6...: return .heavyRain
         default: break
         }
-        
+
         if let visibilityMeters, visibilityMeters <= 1000 {
             return .fog
         }
-        
+
         switch cloudcover {
         case 0..<20: return .clearSky
         case 20..<50: return .mainlyClear
@@ -110,12 +107,11 @@ enum WeatherCode: Int {
         case 80...: return .overcast
         default: break
         }
-        
+
         return nil
     }
-    
+
     public static func calculate(cloudcover: [Float], precipitation: [Float], convectivePrecipitation: [Float]?, snowfallCentimeters: [Float], gusts: [Float]?, cape: [Float]?, liftedIndex: [Float]?, visibilityMeters: [Float]?, categoricalFreezingRain: [Float]?, modelDtSeconds: Int) -> [Float] {
-        
         return cloudcover.indices.map { i in
             return calculate(
                 cloudcover: cloudcover[i],
@@ -128,32 +124,20 @@ enum WeatherCode: Int {
                 visibilityMeters: visibilityMeters?[i],
                 categoricalFreezingRain: categoricalFreezingRain?[i],
                 modelDtSeconds: modelDtSeconds
-            ).map({Float($0.rawValue)}) ?? .nan
+            ).map({ Float($0.rawValue) }) ?? .nan
         }
     }
-    
+
     /// True if weather code is an precipitation event. Thunderstorm, return false as they may only indicate potential
     var isPrecipitationEvent: Bool {
         switch self {
-        case .lightDrizzle, .moderateDrizzle, .denseDrizzle:
-            fallthrough
-        case .lightFreezingDrizzle, .moderateOrDenseFreezingDrizzle:
-            fallthrough
-        case .lightRain, .moderateRain, .heavyRain:
-            fallthrough
-        case .lightFreezingRain, .moderateOrHeavyFreezingRain:
-            fallthrough
-        case .slightSnowfall, .moderateSnowfall, .heavySnowfall, .snowGrains:
-            fallthrough
-        case .slightRainShowers, .moderateRainShowers,.heavyRainShowers:
-            fallthrough
-        case .slightSnowShowers, .heavySnowShowers:
+        case .lightDrizzle, .moderateDrizzle, .denseDrizzle, .lightFreezingDrizzle, .moderateOrDenseFreezingDrizzle, .lightRain, .moderateRain, .heavyRain, .lightFreezingRain, .moderateOrHeavyFreezingRain, .slightSnowfall, .moderateSnowfall, .heavySnowfall, .snowGrains, .slightRainShowers, .moderateRainShowers, .heavyRainShowers, .slightSnowShowers, .heavySnowShowers:
             return true
         default:
             return false
         }
     }
-    
+
     /// DWD ICON weather codes show rain although precipitation is 0
     /// Similar for snow at +2°C or more
     func correctDwdIconWeatherCode(temperature_2m: Float, precipitation: Float, snowfallHeightAboveGrid: Bool) -> WeatherCode {
@@ -161,7 +145,7 @@ enum WeatherCode: Int {
             // Weather code shows drizzle, but no precipitation, demote to overcast
             return .overcast
         }
-        
+
         if temperature_2m >= 2 || snowfallHeightAboveGrid {
             // Weather code may show snow, although temperature is high
             switch self {
@@ -175,7 +159,7 @@ enum WeatherCode: Int {
                 break
             }
         }
-        
+
         if temperature_2m < -1 {
             switch self {
             case .lightRain:
@@ -188,10 +172,10 @@ enum WeatherCode: Int {
                 break
             }
         }
-        
+
         return self
     }
-    
+
     // If temperature smaller or greated 0°C, set or unset snow
     func correctSnowRainHardCutOff(temperature_2m: Float) -> Self {
         if temperature_2m > 0 {

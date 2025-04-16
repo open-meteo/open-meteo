@@ -2,11 +2,10 @@ import Foundation
 import OpenMeteoSdk
 import Vapor
 
-
 public struct ForecastapiController: RouteCollection {
     /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
     static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-    
+
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
@@ -21,9 +20,9 @@ public struct ForecastapiController: RouteCollection {
         )
         categoriesRoute.getAndPost("era5", use: era5.query)
         categoriesRoute.getAndPost("archive", use: era5.query)
-        
+
         categoriesRoute.getAndPost("forecast", use: WeatherApiController(
-            historyStartDate: Timestamp(2016, 1, 1), 
+            historyStartDate: Timestamp(2016, 1, 1),
             defaultModel: .best_match,
             alias: ["historical-forecast-api", "previous-runs-api"]).query
         )
@@ -70,7 +69,7 @@ public struct ForecastapiController: RouteCollection {
             has15minutely: false,
             defaultModel: .arpae_cosmo_seamless).query
         )
-        
+
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
         categoriesRoute.getAndPost("seasonal", use: SeasonalForecastController().query)
@@ -81,7 +80,6 @@ public struct ForecastapiController: RouteCollection {
     }
 }
 
-
 struct WeatherApiController {
     let forecastDay: Int
     let forecastDaysMax: Int
@@ -91,7 +89,7 @@ struct WeatherApiController {
     let defaultModel: MultiDomains
     let subdomain: String
     let alias: [String]
-    
+
     init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = []) {
         self.forecastDay = forecastDay
         self.forecastDaysMax = forecastDaysMax
@@ -102,17 +100,17 @@ struct WeatherApiController {
         self.subdomain = subdomain
         self.alias = alias
     }
-    
+
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter(subdomain, alias: alias) { host, params in
             /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
             let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
             let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
             let forecastDayDefault = isHistoricalForecastApi ? 1 : self.forecastDay
-            
+
             let currentTime = Timestamp.now()
             let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)
-            
+
             let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
             let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
             let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
@@ -124,17 +122,17 @@ struct WeatherApiController {
             let nParamsCurrent = paramsCurrent?.count ?? 0
             let nParamsDaily = paramsDaily?.count ?? 0
             let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
-            
+
             /// Prepare readers based on geometry
             /// Readers are returned as a callback to release memory after data has been retrieved
             let prepared = try GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
-            
+
             let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try prepared.map { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600/4), nTime: 1, dtSeconds: 3600/4)
-                
+                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
+
                 let readers: [ForecastapiResult<MultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
                     guard let reader = try readerAndDomain.reader() else {
                         return nil
@@ -143,7 +141,7 @@ struct WeatherApiController {
                     let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
                     let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                     let domain = readerAndDomain.domain
-                    
+
                     return .init(
                         model: domain,
                         latitude: reader.modelLat,
@@ -197,7 +195,7 @@ struct WeatherApiController {
                         },
                         daily: paramsDaily.map { dailyVariables in
                             return {
-                                var riseSet: (rise: [Timestamp], set: [Timestamp])? = nil
+                                var riseSet: (rise: [Timestamp], set: [Timestamp])?
                                 return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<ForecastVariableDaily> in
                                     if variable == .sunrise || variable == .sunset {
                                         // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
@@ -213,7 +211,7 @@ struct WeatherApiController {
                                         let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: reader.modelLat)
                                         return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                     }
-                                    
+
                                     guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
                                         return ApiColumn(variable: variable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.dailyRead.count))])
                                     }
@@ -260,7 +258,6 @@ extension ForecastVariable {
     }
 }
 
-
 /**
  Automatic domain selection rules:
  - If HRRR domain matches, use HRRR+GFS+ICON
@@ -282,7 +279,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gfs_hrrr
     case gfs_graphcast025
     case ncep_nbm_conus
-    
+
     case meteofrance_seamless
     case meteofrance_mix
     case meteofrance_arpege_seamless
@@ -297,35 +294,35 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case arome_seamless
     case arome_france
     case arome_france_hd
-    
+
     case jma_seamless
     case jma_mix
     case jma_msm
     case jms_gsm
     case jma_gsm
-    
+
     case gem_seamless
     case gem_global
     case gem_regional
     case gem_hrdps_continental
-    
+
     case icon_seamless
     case icon_mix
     case icon_global
     case icon_eu
     case icon_d2
-    
+
     case ecmwf_ifs04
     case ecmwf_ifs025
     case ecmwf_aifs025
     case ecmwf_aifs025_single
-    
+
     case metno_nordic
-    
+
     case cma_grapes_global
-    
+
     case bom_access_global
-    
+
     case archive_best_match
     case era5_seamless
     case era5
@@ -336,36 +333,35 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ecmwf_ifs_analysis
     case ecmwf_ifs_analysis_long_window
     case ecmwf_ifs_long_window
-    
+
     case arpae_cosmo_seamless
     case arpae_cosmo_2i
     case arpae_cosmo_2i_ruc
     case arpae_cosmo_5m
-    
+
     case knmi_harmonie_arome_europe
     case knmi_harmonie_arome_netherlands
     case dmi_harmonie_arome_europe
     case knmi_seamless
     case dmi_seamless
     case metno_seamless
-    
+
     case ukmo_seamless
     case ukmo_global_deterministic_10km
     case ukmo_uk_deterministic_2km
-    
+
     case satellite_radiation_seamless
     case eumetsat_sarah3
     case eumetsat_lsa_saf_msg
     case eumetsat_lsa_saf_iodc
     case jma_jaxa_himawari
-    
+
     case kma_seamless
     case kma_gdps
     case kma_ldps
-    
+
     case italia_meteo_arpae_icon_2i
 
-    
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol] {
@@ -376,7 +372,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             }
             let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             let iconProbabilities = try ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            
+
             guard let gfs: any GenericReaderProtocol = try GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
             }
@@ -414,7 +410,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return Array([gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
             }
             // For Northern Europe and Iceland use DMI Harmonie
-            if (44..<66).contains(lat), let dmiEurope = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options){
+            if (44..<66).contains(lat), let dmiEurope = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
                 let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -426,21 +422,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return Array([gfsProbabilites, nbmProbabilities, icon, gfs, hrrr].compacted())
             }
             // For Japan use JMA MSM with ICON. Does not use global JMA model because of poor resolution
-            if (22.4+5..<47.65-5).contains(lat), (120+5..<150-5).contains(lon), let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            if (22.4 + 5..<47.65 - 5).contains(lat), (120 + 5..<150 - 5).contains(lon), let jma_msm = try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 return [gfsProbabilites, iconProbabilities, gfs, icon, jma_msm]
             }
-            
+
             // Remaining eastern europe
             if let iconEu = try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 return [gfsProbabilites, iconProbabilities, gfs, icon, iconEu]
             }
-            
+
             // Northern africa
             if let arpege_europe = try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let arpegeProbabilities: (any GenericReaderProtocol)? = try ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-                return [gfsProbabilites, iconProbabilities, arpegeProbabilities, gfs, icon, arpege_europe].compactMap({$0})
+                return [gfsProbabilites, iconProbabilities, arpegeProbabilities, gfs, icon, arpege_europe].compactMap({ $0 })
             }
-            
+
             // Remaining parts of the world
             return [gfsProbabilites, iconProbabilities, gfs, icon]
         case .gfs_mix, .gfs_seamless:
@@ -448,34 +444,34 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode) as any GenericReaderProtocol,
                 try ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode) as (any GenericReaderProtocol)?,
                 try GfsReader(domains: [.gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({$0})
+            ].compactMap({ $0 })
         case .gfs_global:
             let gfsProbabilites = try ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return [gfsProbabilites] + (try GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return [gfsProbabilites] + (try GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .gfs025:
-            return try GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs013:
-            return try GfsReader(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GfsReader(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs_hrrr:
             return [
                 try ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode) as (any GenericReaderProtocol)?,
                 try GfsReader(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({$0})
+            ].compactMap({ $0 })
         case .gfs_graphcast025:
-            return try GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return ([arpegeProbabilities] + (try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({$0})
+            return ([arpegeProbabilities] + (try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
         case .meteofrance_arpege_seamless, .arpege_seamless:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return ([arpegeProbabilities] + (try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({$0})
+            return ([arpegeProbabilities] + (try MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
         case .meteofrance_arome_seamless, .arome_seamless:
             return try MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_arpege_world, .arpege_world:
-            return try MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_arpege_europe, .arpege_europe:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return ([arpegeProbabilities] + (try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])).compactMap({$0})
+            return ([arpegeProbabilities] + (try MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])).compactMap({ $0 })
         case .meteofrance_arome_france, .arome_france:
             // Note: AROME PI 15min is not used for consistency here
             return try MeteoFranceMixer(domains: [.arome_france], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
@@ -485,42 +481,42 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .jma_mix, .jma_seamless:
             return try JmaMixer(domains: [.gsm, .msm], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .jma_msm:
-            return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .jms_gsm, .jma_gsm:
-            return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .icon_seamless, .icon_mix:
             let iconProbabilities = try ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             return [iconProbabilities] + (try IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .icon_global:
             let iconProbabilities = try ProbabilityReader.makeIconGlobalReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return [iconProbabilities] + (try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return [iconProbabilities] + (try IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .icon_eu:
             let iconProbabilities = try ProbabilityReader.makeIconEuReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return (iconProbabilities.flatMap({[$0]}) ?? []) + (try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return (iconProbabilities.flatMap({ [$0] }) ?? []) + (try IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .icon_d2:
             let iconProbabilities = try ProbabilityReader.makeIconD2Reader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return (iconProbabilities.flatMap({[$0]}) ?? []) + (try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+            return (iconProbabilities.flatMap({ [$0] }) ?? []) + (try IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .ecmwf_ifs04:
-            return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs025:
             let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return [probabilities] + (try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return [probabilities] + (try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .ecmwf_aifs025:
-            return try EcmwfReader(domain: .aifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try EcmwfReader(domain: .aifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_aifs025_single:
-            return try EcmwfReader(domain: .aifs025_single, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try EcmwfReader(domain: .aifs025_single, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .metno_nordic:
-            return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gem_seamless:
             let probabilities = try ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             return [probabilities] + (try GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .gem_global:
             let probabilities = try ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return [probabilities] + (try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return [probabilities] + (try GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .gem_regional:
-            return try GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gem_hrdps_continental:
-            return try GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .archive_best_match:
             return [try Era5Factory.makeArchiveBestMatch(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5_seamless:
@@ -531,38 +527,38 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .era5_land:
             return [try Era5Factory.makeReader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .cerra:
-            return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs:
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .cma_grapes_global:
-            return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global:
             let probabilities = try ProbabilityReader.makeBomReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
-            return [probabilities] + (try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
+            return [probabilities] + (try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
             throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .knmi_harmonie_arome_europe:
-            return try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .knmi_harmonie_arome_netherlands:
-            return try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .dmi_harmonie_arome_europe:
-            return try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .knmi_seamless:
             let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             let knmiNetherlands: (any GenericReaderProtocol)? = try KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let knmiEurope = try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, ecmwf, knmiEurope, knmiNetherlands].compactMap({$0})
+            return [probabilities, ecmwf, knmiEurope, knmiNetherlands].compactMap({ $0 })
         case .dmi_seamless:
             let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             let dmiEurope: (any GenericReaderProtocol)? = try DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, ecmwf, dmiEurope].compactMap({$0})
+            return [probabilities, ecmwf, dmiEurope].compactMap({ $0 })
         case .metno_seamless:
             let probabilities = try ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             let metno: (any GenericReaderProtocol)? = try MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ecmwf = try EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, ecmwf, metno].compactMap({$0})
+            return [probabilities, ecmwf, metno].compactMap({ $0 })
         case .ecmwf_ifs_analysis_long_window:
             return [try Era5Factory.makeReader(domain: .ecmwf_ifs_analysis_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ecmwf_ifs_analysis:
@@ -574,55 +570,55 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .ukmo_seamless:
             let ukmoGlobal: (any GenericReaderProtocol)? = try UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoGlobal, ukmoUk].compactMap({$0})
+            return [ukmoGlobal, ukmoUk].compactMap({ $0 })
         case .ukmo_global_deterministic_10km:
             let ukmoGlobal: (any GenericReaderProtocol)? = try UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoGlobal].compactMap({$0})
+            return [ukmoGlobal].compactMap({ $0 })
         case .ukmo_uk_deterministic_2km:
             let ukmoUk = try UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [ukmoUk].compactMap({$0})
+            return [ukmoUk].compactMap({ $0 })
         case .ncep_nbm_conus:
-            return try NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+            return try NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .eumetsat_sarah3:
             let sarah3 = try EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sarah3].compactMap({$0})
+            return [sarah3].compactMap({ $0 })
         case .jma_jaxa_himawari:
             let sat = try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({$0})
+            return [sat].compactMap({ $0 })
         case .eumetsat_lsa_saf_msg:
             let sat = try EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({$0})
+            return [sat].compactMap({ $0 })
         case .eumetsat_lsa_saf_iodc:
             let sat = try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({$0})
+            return [sat].compactMap({ $0 })
         case .satellite_radiation_seamless:
             if (-60..<50).contains(lon) { // MSG on 0°
-                return [try EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+                return [try EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
             }
             if (50..<90).contains(lon) { // IODC on 41.5°
-                return [try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+                return [try EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
             }
             if (90...).contains(lon) { // Himawari on 140°
-                return [try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({$0})
+                return [try JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
             }
             // TODO GOES east + west
             return []
         case .kma_seamless:
             let ldps = try KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let gdps = try KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [gdps, ldps].compactMap({$0})
+            return [gdps, ldps].compactMap({ $0 })
         case .kma_gdps:
             let reader = try KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [reader].compactMap({$0})
+            return [reader].compactMap({ $0 })
         case .kma_ldps:
             let reader = try KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [reader].compactMap({$0})
+            return [reader].compactMap({ $0 })
         case .italia_meteo_arpae_icon_2i:
             let reader = try ItaliaMeteoArpaeReader(domain: .icon_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [reader].compactMap({$0})
+            return [reader].compactMap({ $0 })
         }
     }
-    
+
     var genericDomain: (any GenericDomain)? {
         switch self {
         case .gfs025:
@@ -677,7 +673,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         }
     }
-    
+
     func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)? {
         switch self {
         case .gfs025:
@@ -734,7 +730,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         }
     }
-    
+
     var countEnsembleMember: Int {
         return 1
     }
@@ -744,10 +740,9 @@ enum ModelError: AbortError {
     var status: NIOHTTP1.HTTPResponseStatus {
         return .badRequest
     }
-    
+
     case domainInitFailed(domain: String)
 }
-
 
 /// Define all available surface weather variables
 enum ForecastSurfaceVariable: String, GenericVariableMixable {
@@ -757,7 +752,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case windspeed
     /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
     case winddirection
-    
+
     case wet_bulb_temperature_2m
     case apparent_temperature
     case cape
@@ -954,8 +949,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case ice_pellets_probability
     case snowfall_probability
     case albedo
-    
-    
+
     case wind_speed_10m_spread
     case wind_speed_100m_spread
     case wind_direction_10m_spread
@@ -982,7 +976,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case precipitation_spread
     case direct_radiation_spread
     case boundary_layer_height_spread
-    
+
     /// Some variables are kept for backwards compatibility
     var remapped: Self {
         switch self {
@@ -999,7 +993,6 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
         }
     }
 
-    
     /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
@@ -1038,7 +1031,7 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
     case cloudcover
     case cloud_cover
     case vertical_velocity
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -1047,7 +1040,7 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
 struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariableMixable {
     let variable: ForecastPressureVariableType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -1067,7 +1060,7 @@ enum ForecastHeightVariableType: String, GenericVariableMixable {
     case cloudcover
     case cloud_cover
     case vertical_velocity
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -1076,7 +1069,7 @@ enum ForecastHeightVariableType: String, GenericVariableMixable {
 struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixable {
     let variable: ForecastHeightVariableType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -1191,8 +1184,7 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case wet_bulb_temperature_2m_max
     case wet_bulb_temperature_2m_mean
     case wet_bulb_temperature_2m_min
-    
-    
+
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
         case .temperature_2m_max:

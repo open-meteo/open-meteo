@@ -1,7 +1,6 @@
 import Foundation
 import Vapor
 
-
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
@@ -9,7 +8,7 @@ extension ForecastapiResult {
             writer.submit(concurrencySlot: concurrencySlot) {
                 var b = BufferAndWriter(writer: writer)
                 let multiLocation = results.count > 1
-                
+
                 if results.count == 1, let location = results.first, let first = location.results.first {
                     b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                     let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
@@ -42,7 +41,6 @@ extension ForecastapiResult {
                 try await b.flush()
                 try await b.end()
             }
-            
         }, count: -1))
 
         response.headers.replaceOrAdd(name: .contentType, value: "text/csv; charset=utf-8")
@@ -60,13 +58,13 @@ extension ApiSectionSingle {
             } else {
                 b.buffer.writeString("time")
             }
-            
+
             for e in columns {
                 b.buffer.writeString(",\(e.variable) (\(e.unit.abbreviation))")
             }
             b.buffer.writeString("\n")
         }
-        
+
         let time = self.time.formated(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false)
         if let location_id {
             b.buffer.writeString("\(location_id),")
@@ -84,7 +82,6 @@ extension ApiSectionSingle {
     }
 }
 
-
 extension ApiSectionString {
     /// Write a single API section into the output buffer
     fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
@@ -95,13 +92,13 @@ extension ApiSectionString {
             } else {
                 b.buffer.writeString("time")
             }
-            
+
             for e in columns {
                 b.buffer.writeString(",\(e.variable) (\(e.unit.abbreviation))")
             }
             b.buffer.writeString("\n")
         }
-        
+
         for (i, time) in time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: time.dtSeconds == 86400).enumerated() {
             if let location_id {
                 b.buffer.writeString("\(location_id),")

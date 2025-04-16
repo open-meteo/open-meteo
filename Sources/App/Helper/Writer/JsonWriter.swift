@@ -13,7 +13,7 @@ extension BodyStreamWriter {
                     apiConcurrencyLimiter.release(slot: concurrencySlot)
                 }
             }
-            try await task() 
+            try await task()
         }
             .flatMapError({ error in
                 return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
@@ -33,7 +33,7 @@ extension ForecastapiResult {
      */
     func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?) throws -> Response {
         // First excution outside stream, to capture potential errors better
-        //var first = try self.first?()
+        // var first = try self.first?()
         let response = Response(body: .init(stream: { writer in
             writer.submit(concurrencySlot: concurrencySlot) {
                 var b = BufferAndWriter(writer: writer)
@@ -46,7 +46,7 @@ extension ForecastapiResult {
                     try await first.streamJsonResponse(to: &b)
                 }
                 first = nil*/
-                for (i,location) in results.enumerated() {
+                for (i, location) in results.enumerated() {
                     if i != 0 {
                         b.buffer.writeString(",")
                     }
@@ -73,7 +73,7 @@ extension ForecastapiResult.PerLocation {
         let sections = try runAllSections()
         let current = try first.current?()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
-        
+
         b.buffer.writeString("""
         {"latitude":\(first.latitude),"longitude":\(first.longitude),"generationtime_ms":\(generationTimeMs),"utc_offset_seconds":\(utc_offset_seconds),"timezone":"\(timezone.identifier)","timezone_abbreviation":"\(timezone.abbreviation)"
         """)
@@ -83,7 +83,7 @@ extension ForecastapiResult.PerLocation {
         if locationId != 0 {
             b.buffer.writeString(",\"location_id\":\(locationId)")
         }
-        
+
         if let current {
             b.buffer.writeString(",\"\(current.name)_units\":")
             b.buffer.writeString("{")
@@ -112,7 +112,7 @@ extension ForecastapiResult.PerLocation {
             b.buffer.writeString("}")
             try await b.flushIfRequired()
         }
-        
+
         /// process sections like hourly or daily
         for section in sections {
             b.buffer.writeString(",\"\(section.name)_units\":")
@@ -131,7 +131,7 @@ extension ForecastapiResult.PerLocation {
             b.buffer.writeString(",\"\(section.name)\":")
             b.buffer.writeString("{")
             b.buffer.writeString("\"time\":[")
-            
+
             // Write time axis
             var firstValue = true
             for time in section.time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: section.time.dtSeconds == 86400) {
@@ -144,7 +144,7 @@ extension ForecastapiResult.PerLocation {
                 try await b.flushIfRequired()
             }
             b.buffer.writeString("]")
-            
+
             /// Write data
             for e in section.columns {
                 b.buffer.writeString(",")

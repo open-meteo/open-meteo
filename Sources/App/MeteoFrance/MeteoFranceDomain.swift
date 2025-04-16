@@ -1,7 +1,6 @@
 import Foundation
 import OmFileFormat
 
-
 /**
 Docs https://mf-models-on-aws.org/en/doc
  
@@ -29,21 +28,21 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     case arpege_world
     case arome_france
     case arome_france_hd
-    
+
     case arome_france_15min
     case arome_france_hd_15min
-    
+
     case arpege_europe_probabilities
     case arpege_world_probabilities
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .arpege_europe:
@@ -64,7 +63,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return .meteofrance_arpege_world025_probabilities
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         switch self {
         case .arome_france_15min:
@@ -79,7 +78,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return domainRegistry
         }
     }
-    
+
     var dtSeconds: Int {
         switch self {
         case .arpege_europe, .arpege_world:
@@ -89,33 +88,31 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arome_france_15min, .arome_france_hd_15min:
             return 900
         case .arpege_europe_probabilities, .arpege_world_probabilities:
-            return 3*3600
+            return 3 * 3600
         }
     }
     var isGlobal: Bool {
         return self == .arpege_world
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .arpege_europe, .arpege_world:
-            return 6*3600
+            return 6 * 3600
         case .arome_france, .arome_france_hd:
-            return 3*3600
+            return 3 * 3600
         case .arome_france_15min, .arome_france_hd_15min:
             return 3600
         case .arpege_europe_probabilities, .arpege_world_probabilities:
-            return 12*3600
+            return 12 * 3600
         }
     }
-    
+
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .arpege_europe_probabilities, .arpege_world_probabilities:
-            fallthrough
-        case .arpege_europe, .arpege_world:
+        case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_europe, .arpege_world:
             // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00
             return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
         case .arome_france, .arome_france_hd:
@@ -125,12 +122,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return t.with(hour: t.hour)
         }
     }
-    
+
     var timeoutHours: Double {
         switch self {
-        case .arpege_europe_probabilities, .arpege_world_probabilities:
-            fallthrough
-        case .arpege_europe, .arpege_world:
+        case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_europe, .arpege_world:
             // Arpege has sometimes larger delays
             return 7.5
         case .arome_france, .arome_france_hd:
@@ -140,7 +135,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return 1.5
         }
     }
-    
+
     var mfApiName: String {
         switch self {
         case .arpege_europe:
@@ -159,7 +154,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             fatalError()
         }
     }
-    
+
     var mfApiGridName: String {
         switch self {
         case .arpege_europe, .arpege_europe_probabilities:
@@ -176,7 +171,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return ""
         }
     }
-    
+
     var mfApiPackageTimes: [String] {
         switch self {
         case .arpege_europe:
@@ -184,9 +179,9 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         case .arpege_world:
             return ["000H024H", "025H048H", "049H072H", "073H102H"]
         case .arome_france:
-            return ["00H06H","07H12H","13H18H","19H24H","25H30H","31H36H","37H42H","43H48H","49H51H"]
+            return ["00H06H", "07H12H", "13H18H", "19H24H", "25H30H", "31H36H", "37H42H", "43H48H", "49H51H"]
         case .arome_france_hd:
-            return (0...51).map{"\($0.zeroPadded(len: 2))H"}
+            return (0...51).map { "\($0.zeroPadded(len: 2))H" }
         case .arome_france_15min:
             return []
         case .arome_france_hd_15min:
@@ -195,7 +190,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             fatalError()
         }
     }
-    
+
     var mfApiPackagesSurface: [String] {
         switch self {
         case .arpege_europe, .arpege_world:
@@ -212,7 +207,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             fatalError()
         }
     }
-    
+
     var mfApiPackagesPressure: [String] {
         switch self {
         case .arpege_europe:
@@ -231,12 +226,12 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             fatalError()
         }
     }
-    
+
     enum Family: String {
         case arpege
         case arome
         case aromepi
-        
+
         var mfApiDDP: String {
             switch self {
             case .arpege:
@@ -247,7 +242,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
                 return ""
             }
         }
-        
+
         var mfApiProductName: String {
             switch self {
             case .arpege:
@@ -259,12 +254,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             }
         }
     }
-    
+
     var family: Family {
         switch self {
-        case .arpege_europe_probabilities, .arpege_world_probabilities:
-            fallthrough
-        case .arpege_world, .arpege_europe:
+        case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_world, .arpege_europe:
             return .arpege
         case .arome_france, .arome_france_hd:
             return .arome
@@ -272,7 +265,7 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return .aromepi
         }
     }
-    
+
     var mfSubsetGrid: String {
         switch self {
         case .arpege_europe:
@@ -290,23 +283,23 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .arpege_world:
             if run == 12 {
-                return Array(stride(from: 0, through: 48*3600, by: 3600)) + Array(stride(from: 51*3600, through: 114*3600, by: 3*3600))
+                return Array(stride(from: 0, through: 48 * 3600, by: 3600)) + Array(stride(from: 51 * 3600, through: 114 * 3600, by: 3 * 3600))
             }
-            return Array(stride(from: 0, through: 48*3600, by: 3600)) + Array(stride(from: 51*3600, through: 102*3600, by: 3*3600))
+            return Array(stride(from: 0, through: 48 * 3600, by: 3600)) + Array(stride(from: 51 * 3600, through: 102 * 3600, by: 3 * 3600))
         case .arpege_europe:
             if run == 12 {
-                return Array(stride(from: 0, through: 114*3600, by: 3600))
+                return Array(stride(from: 0, through: 114 * 3600, by: 3600))
             }
-            return Array(stride(from: 0, through: 102*3600, by: 3600))
+            return Array(stride(from: 0, through: 102 * 3600, by: 3600))
         case .arome_france, .arome_france_hd:
-            return Array(stride(from: 0, through: 51*3600, by: 3600))
+            return Array(stride(from: 0, through: 51 * 3600, by: 3600))
         case .arome_france_15min, .arome_france_hd_15min:
-            return Array(stride(from: 0, through: 6*3600, by: 900))
+            return Array(stride(from: 0, through: 6 * 3600, by: 900))
         case .arpege_europe_probabilities, .arpege_world_probabilities:
-            return Array(stride(from: 3*3600, through: (run == 6 ? 90 : 102)*3600, by: 3*3600))
+            return Array(stride(from: 3 * 3600, through: (run == 6 ? 90 : 102) * 3600, by: 3 * 3600))
         }
     }
-    
+
     /// pressure levels
     var levels: [Int] {
         switch self {
@@ -325,23 +318,23 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
             return []
         }
     }
-    
+
     var omFileLength: Int {
         switch self {
         case .arpege_europe:
-            return 114 + 3*24
+            return 114 + 3 * 24
         case .arpege_world:
-            return 114 + 4*24
+            return 114 + 4 * 24
         case .arome_france, .arome_france_hd:
-            return 36 + 3*24
+            return 36 + 3 * 24
         case .arome_france_15min, .arome_france_hd_15min:
             // 6 h forecast a 15min = 24 steps per update
             return 24 * 2
         case .arpege_europe_probabilities, .arpege_world_probabilities:
-            return (102 + 4*24)/3
+            return (102 + 4 * 24) / 3
         }
     }
-    
+
     var grid: Gridable {
         switch self {
         case .arpege_europe, .arpege_europe_probabilities:
@@ -367,10 +360,10 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
     case cloud_cover_high
     case pressure_msl
     case relative_humidity_2m
-    
+
     case wind_v_component_10m
     case wind_u_component_10m
-    
+
     /**
      Avaibility of upper level variables (U. VGRD, RH, TMP):
      - Arome HD, `HP1`, 20, 50 and 100 m (no TMP)
@@ -387,24 +380,24 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
     case wind_u_component_150m
     case wind_v_component_200m
     case wind_u_component_200m
-    
+
     case temperature_20m
     case temperature_50m
     case temperature_100m
     case temperature_150m
     case temperature_200m
-    
+
     /// accumulated since forecast start
     case precipitation
-   
+
     case snowfall_water_equivalent
-    
+
     case wind_gusts_10m
 
     case shortwave_radiation
-   
+
     case cape
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -416,15 +409,15 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m:
@@ -455,39 +448,13 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return 10
         case .wind_u_component_10m:
             return 10
-        case .wind_v_component_20m:
-            fallthrough
-        case .wind_u_component_20m:
-            fallthrough
-        case .wind_v_component_50m:
-            fallthrough
-        case .wind_u_component_50m:
-            fallthrough
-        case .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_150m:
-            fallthrough
-        case .wind_u_component_150m:
-            fallthrough
-        case .wind_v_component_200m:
-            fallthrough
-        case .wind_u_component_200m:
+        case .wind_v_component_20m, .wind_u_component_20m, .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m, .wind_u_component_150m, .wind_v_component_200m, .wind_u_component_200m:
             return 10
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return 20
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m:
@@ -518,39 +485,13 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return .solar_backwards_averaged
         case .cape:
             return .hermite(bounds: 0...10e9)
-        case .wind_v_component_20m:
-            fallthrough
-        case .wind_u_component_20m:
-            fallthrough
-        case .wind_v_component_50m:
-            fallthrough
-        case .wind_u_component_50m:
-            fallthrough
-        case .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_150m:
-            fallthrough
-        case .wind_u_component_150m:
-            fallthrough
-        case .wind_v_component_200m:
-            fallthrough
-        case .wind_u_component_200m:
+        case .wind_v_component_20m, .wind_u_component_20m, .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m, .wind_u_component_150m, .wind_v_component_200m, .wind_u_component_200m:
             return .hermite(bounds: nil)
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .temperature_2m:
@@ -581,52 +522,16 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
             return .metrePerSecond
         case .wind_u_component_10m:
             return .metrePerSecond
-        case .wind_v_component_20m:
-            fallthrough
-        case .wind_u_component_20m:
-            fallthrough
-        case .wind_v_component_50m:
-            fallthrough
-        case .wind_u_component_50m:
-            fallthrough
-        case .wind_v_component_100m:
-            fallthrough
-        case .wind_u_component_100m:
-            fallthrough
-        case .wind_v_component_150m:
-            fallthrough
-        case .wind_u_component_150m:
-            fallthrough
-        case .wind_v_component_200m:
-            fallthrough
-        case .wind_u_component_200m:
+        case .wind_v_component_20m, .wind_u_component_20m, .wind_v_component_50m, .wind_u_component_50m, .wind_v_component_100m, .wind_u_component_100m, .wind_v_component_150m, .wind_u_component_150m, .wind_v_component_200m, .wind_u_component_200m:
             return .metrePerSecond
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return .celsius
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_20m:
-            fallthrough
-        case .temperature_50m:
-            fallthrough
-        case .temperature_100m:
-            fallthrough
-        case .temperature_150m:
-            fallthrough
-        case .temperature_200m:
+        case .temperature_2m, .temperature_20m, .temperature_50m, .temperature_100m, .temperature_150m, .temperature_200m:
             return true
         default:
             return false
@@ -645,35 +550,32 @@ enum MeteoFrancePressureVariableType: String, CaseIterable {
     case relative_humidity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: MeteoFrancePressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -682,7 +584,7 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -697,7 +599,7 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .hermite(bounds: 0...100)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -712,7 +614,7 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
             return .percentage
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

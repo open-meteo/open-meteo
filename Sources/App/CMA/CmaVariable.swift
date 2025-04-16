@@ -13,10 +13,10 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case cloud_cover_high
     case pressure_msl
     case relative_humidity_2m
-    
+
     case shortwave_radiation
     case shortwave_radiation_clear_sky
-    
+
     case wind_v_component_10m
     case wind_u_component_10m
     case wind_v_component_30m
@@ -38,7 +38,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case wind_v_component_200m
     case wind_u_component_200m
     case wind_gusts_10m
-    
+
     case precipitation
     case precipitation_type
     case showers
@@ -49,17 +49,17 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
     case convective_inhibition
     case lifted_index
     case visibility
-    
+
     case soil_temperature_0_to_10cm
     case soil_temperature_10_to_40cm
     case soil_temperature_40_to_100cm
     case soil_temperature_100_to_200cm
-    
+
     case soil_moisture_0_to_10cm
     case soil_moisture_10_to_40cm
     case soil_moisture_40_to_100cm
     case soil_moisture_100_to_200cm
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -75,7 +75,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
         case .soil_moisture_0_to_10cm: return true
@@ -86,7 +86,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         default: return false
         }
     }
-    
+
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m, .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_40cm, .soil_temperature_40_to_100cm, .soil_temperature_100_to_200cm:
@@ -94,18 +94,18 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         case .snowfall:
             return (100, 0)
         case .shortwave_radiation, .shortwave_radiation_clear_sky:
-            return (1/10000, 0)
+            return (1 / 10000, 0)
         case .pressure_msl:
-            return (1/100, 0)
+            return (1 / 100, 0)
         default:
             return nil
         }
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m: return 20
@@ -161,7 +161,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
             return 10
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m:
@@ -262,7 +262,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
             return .backwards_sum
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .temperature_2m: return .celsius
@@ -318,20 +318,10 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
             return .centimetre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
-        case .surface_temperature:
-            fallthrough
-        case .soil_temperature_0_to_10cm:
-            fallthrough
-        case .soil_temperature_10_to_40cm:
-            fallthrough
-        case .soil_temperature_40_to_100cm:
-            fallthrough
-        case .soil_temperature_100_to_200cm:
-            fallthrough
-        case .temperature_2m:
+        case .surface_temperature, .soil_temperature_0_to_10cm, .soil_temperature_10_to_40cm, .soil_temperature_40_to_100cm, .soil_temperature_100_to_200cm, .temperature_2m:
             return true
         default:
             return false
@@ -358,15 +348,15 @@ enum CmaPressureVariableType: String, CaseIterable {
 struct CmaPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable, CmaVariableDownloadable {
     let variable: CmaPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:
@@ -375,20 +365,18 @@ struct CmaPressureVariable: PressureVariableRespresentable, Hashable, GenericVar
             return nil
         }
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
         case .temperature:
             // Use scalefactor of 2 for everything higher than 300 hPa
             return (2..<10).interpolated(atFraction: (300..<1000).fraction(of: Float(level)))
-        case .wind_u_component:
-            fallthrough
-        case .wind_v_component:
+        case .wind_u_component, .wind_v_component:
             // Use scalefactor 3 for levels higher than 500 hPa.
             return (3..<10).interpolated(atFraction: (500..<1000).fraction(of: Float(level)))
         case .geopotential_height:
@@ -401,7 +389,7 @@ struct CmaPressureVariable: PressureVariableRespresentable, Hashable, GenericVar
             return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -420,7 +408,7 @@ struct CmaPressureVariable: PressureVariableRespresentable, Hashable, GenericVar
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -439,7 +427,7 @@ struct CmaPressureVariable: PressureVariableRespresentable, Hashable, GenericVar
             return .metrePerSecondNotUnitConverted
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

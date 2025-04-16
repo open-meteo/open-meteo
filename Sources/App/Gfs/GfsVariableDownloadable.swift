@@ -188,7 +188,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             guard let timestep else {
                 return nil
             }
-            let avg15 = timestep == 0 ? "anl" : "\(timestep-15)-\(timestep) min ave fcst"
+            let avg15 = timestep == 0 ? "anl" : "\(timestep - 15)-\(timestep) min ave fcst"
             let fcst = timestep == 0 ? "anl" : "\(timestep) min fcst"
             switch self {
             case .temperature_2m:
@@ -344,7 +344,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             }
         }
     }
-    
+
     func skipHour0(for domain: GfsDomain) -> Bool {
         if domain == .hrrr_conus_15min {
             switch self {
@@ -366,27 +366,18 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
         case .diffuse_radiation: return true
         case .uv_index: return true
         case .uv_index_clear_sky: return true
-        case .cloud_cover: fallthrough // cloud cover not available in hour 0 in GFS013
-        case .cloud_cover_low: fallthrough
-        case .cloud_cover_mid: fallthrough
-        case .cloud_cover_high: return domain == .gfs013 || domain == .gfs025_ens || domain == .gfs05_ens
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high: return domain == .gfs013 || domain == .gfs025_ens || domain == .gfs05_ens // cloud cover not available in hour 0 in GFS013
         default: return false
         }
     }
-    
+
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_80m:
-            fallthrough
-        case .temperature_100m:
+        case .temperature_2m, .temperature_80m, .temperature_100m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1/100, 0)
-        case .surface_temperature:
-            fallthrough
-        case .soil_temperature_0_to_10cm:
+            return (1 / 100, 0)
+        case .surface_temperature, .soil_temperature_0_to_10cm:
             return (1, -273.15)
         case .soil_temperature_10_to_40cm:
             return (1, -273.15)
@@ -394,29 +385,17 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .soil_temperature_100_to_200cm:
             return (1, -273.15)
-        case .showers:
-            fallthrough
-        case .precipitation:
+        case .showers, .precipitation:
             switch domain {
             case .gfswave025, .gfswave025_ens, .gfswave016:
                 return nil
-            case .gfs013:
-                fallthrough
-            case .gfs025:
-                fallthrough
-            case .hrrr_conus_15min:
-                fallthrough
-            case .hrrr_conus:
+            case .gfs013, .gfs025, .hrrr_conus_15min, .hrrr_conus:
                 // precipitation rate per second to hourly precipitation
                 return (Float(domain.dtSeconds), 0)
-            case .gfs025_ens:
-                fallthrough
-            case .gfs05_ens:
+            case .gfs025_ens, .gfs05_ens:
                 return nil
             }
-        case .uv_index:
-            fallthrough
-        case .uv_index_clear_sky:
+        case .uv_index, .uv_index_clear_sky:
             // UVB to etyhemally UV factor 18.9 https://link.springer.com/article/10.1039/b312985c
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
@@ -460,11 +439,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             case .gfs025:
                 // Vertical Velocity (Geometric) [m/s]
                 return ":DZDT:\(level) mb:"
-            case .gfs05_ens:
-                fallthrough
-            case .hrrr_conus_15min:
-                fallthrough
-            case .hrrr_conus:
+            case .gfs05_ens, .hrrr_conus_15min, .hrrr_conus:
                 // Vertical Velocity (Pressure) [Pa/s]
                 // Converted later while downlading
                 return ":VVEL:\(level) mb:"
@@ -473,11 +448,11 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             }
         }
     }
-    
+
     func skipHour0(for domain: GfsDomain) -> Bool {
         return false
     }
-    
+
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         switch variable {
         case .temperature:

@@ -59,8 +59,8 @@ struct ConvertOmCommand: Command {
             guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
                 throw ConvertOmError("Not a float array")
             }
-            let dimensions = om.getDimensions().map { $0 }
-            let chunks = om.getChunkDimensions().map { $0 }
+            let dimensions = Array(om.getDimensions())
+            let chunks = Array(om.getChunkDimensions())
             logger.info("File dimensions: \(dimensions), chunks: \(chunks)")
 
             let data = try om.read()
@@ -188,7 +188,7 @@ struct ConvertOmCommand: Command {
         }
 
         let dimensionsOut = [ny, nx, nt]
-        let chunksOut = [1,chunks[0],chunks[1]]
+        let chunksOut = [1, chunks[0], chunks[1]]
         // TODO somehow 5x5 is larger than 1x25....
 
         /*let dataRaw = try reader.read(range: [0..<ny*nx, 0..<nt])
@@ -234,7 +234,7 @@ struct ConvertOmCommand: Command {
                     let yRange = yStart ..< min(yStart + chunksOut[0], ny)
                     let xRange = xStart ..< min(xStart + chunksOut[1], nx)
                     let tRange = tStart ..< min(tStart + chunksOut[2], nt)
-                    //print("chunk y=\(yRange) x=\(xRange) t=\(tRange)")
+                    // print("chunk y=\(yRange) x=\(xRange) t=\(tRange)")
 
                     var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for (row, y) in yRange.enumerated() {
@@ -254,7 +254,6 @@ struct ConvertOmCommand: Command {
                 }
             }
         }
-
 
         let variableMeta = try writer.finalise()
         print("Finalized Array")

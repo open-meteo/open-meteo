@@ -11,37 +11,37 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
     case cloud_cover_high
     case pressure_msl
     case relative_humidity_2m
-    
+
     case wind_speed_10m
     case wind_speed_50m
     case wind_speed_100m
     case wind_speed_200m
     case wind_speed_300m
-    
+
     /// Wind direction has been corrected due to grid projection
     case wind_direction_10m
     case wind_direction_50m
     case wind_direction_100m
     case wind_direction_200m
     case wind_direction_300m
-    
+
     case temperature_50m
     case temperature_100m
     case temperature_200m
     case temperature_300m
-    
+
     case snowfall_water_equivalent
     case rain
     case precipitation
-    
+
     case surface_temperature
     case visibility
     case snow_depth_water_equivalent
-    
+
     case wind_gusts_10m
 
     case shortwave_radiation
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -59,15 +59,15 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -104,7 +104,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return 0.05 // 50 meter
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -141,10 +141,10 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .linear
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
-        case .temperature_2m,.surface_temperature:
+        case .temperature_2m, .surface_temperature:
             return .celsius
         case .cloud_cover:
             return .percentage
@@ -176,12 +176,10 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
             return .metre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
-        case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
+        case .temperature_2m, .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return true
         default:
             return false
@@ -200,26 +198,25 @@ enum KnmiPressureVariableType: String, CaseIterable {
     case relative_humidity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: KnmiPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
@@ -237,7 +234,7 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
             return (0.2..<1).interpolated(atFraction: (0..<800).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -252,7 +249,7 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
             return .hermite(bounds: 0...100)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -267,7 +264,7 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
             return .percentage
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

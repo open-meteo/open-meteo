@@ -15,20 +15,20 @@ import OmFileFormat
 struct SatelliteDownloadCommand: AsyncCommand {
     /// 6k locations require around 200 MB memory for a yearly time-series
     static var nLocationsPerChunk = 6_000
-    
+
     struct Signature: CommandSignature {
         @Argument(name: "domain")
         var domain: String
-        
+
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download with format 20220101-20220131")
         var timeinterval: String?
-        
+
         @Option(name: "year", short: "y", help: "Download one year")
         var year: String?
-        
+
         /// Get the specified timerange in the command, or use the last 7 days as range
         func getTimeinterval() throws -> TimerangeDt {
-            let dt = 3600*24
+            let dt = 3600 * 24
             if let timeinterval = timeinterval {
                 return try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: dt)
             }
@@ -39,18 +39,18 @@ struct SatelliteDownloadCommand: AsyncCommand {
             return TimerangeDt(start: time0z.add(days: -1 * lastDays), to: time0z.add(days: 1), dtSeconds: dt)
         }
     }
-    
+
     var help: String {
         "Download satellite datasets"
     }
-    
+
     func run(using context: CommandContext, signature: Signature) async throws {
         fatalError("IMERG downloader not available anymore")
-        
-        //let logger  = context.application.logger
-        //try createImergMaster(logger: logger, domain: .imerg_daily)
+
+        // let logger  = context.application.logger
+        // try createImergMaster(logger: logger, domain: .imerg_daily)
     }
-    
+
     /*func createImergMaster(logger: Logger, domain: SatelliteDomain) throws {
         guard let master = domain.masterTimeRange else {
             fatalError("no master file defined")
@@ -74,7 +74,7 @@ struct SatelliteDownloadCommand: AsyncCommand {
             try generateBiasCorrectionFields(logger: logger, domain: domain, variables: [.precipitation_sum], time: masterTime)
         }
     }*/
-    
+
     /// Generate seasonal averages for bias corrections
     /*func generateBiasCorrectionFields(logger: Logger, domain: SatelliteDomain, variables: [SatelliteVariable], time: TimerangeDt) throws {
         logger.info("Calculating bias correction fields")
@@ -158,34 +158,34 @@ struct SatelliteDownloadCommand: AsyncCommand {
 
 enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVariable {
     case precipitation_sum
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         return 10
     }
-    
+
     var interpolation: ReaderInterpolation {
         return .backwards_sum
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .precipitation_sum:
             return .millimetre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -193,40 +193,40 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
 
 enum SatelliteDomain: String, CaseIterable, GenericDomain {
     case imerg_daily
-    
+
     var dtSeconds: Int {
         switch self {
         case .imerg_daily:
-            return 3600*24
+            return 3600 * 24
         }
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .imerg_daily:
             return .nasa_imerg_daily
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
     }
-    
+
     var hasYearlyFiles: Bool {
         return true
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
-        return Timestamp(2000,06,01) ..< Timestamp(2023, 1, 1)
+        return Timestamp(2000, 06, 01) ..< Timestamp(2023, 1, 1)
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .imerg_daily:
             0
         }
     }
-    
+
     /// Use store 14 days per om file
     var omFileLength: Int {
         // 24 hours over 21 days = 504 timesteps per file
@@ -235,29 +235,27 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         // In case for a 1 year API call, around 51 kb will have to be decompressed with 34 IO operations
         return 24 * 21
     }
-    
+
     var grid: Gridable {
         switch self {
         case .imerg_daily:
             return RegularGrid(nx: 3600, ny: 1800, latMin: -89.95, lonMin: -179.95, dx: 0.1, dy: 0.1)
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var interpolation: ReaderInterpolation {
         fatalError("Interpolation not required for cerra")
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
          return false
     }
 }
-
-

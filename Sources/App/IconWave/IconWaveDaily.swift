@@ -4,17 +4,17 @@ enum IconWaveVariableDaily: String, RawRepresentableString, DailyVariableCalcula
     case wave_height_max
     case wind_wave_height_max
     case swell_wave_height_max
-    
+
     case wave_direction_dominant
     case wind_wave_direction_dominant
     case swell_wave_direction_dominant
-    
+
     case wave_period_max
     case wind_wave_period_max
     case wind_wave_peak_period_max
     case swell_wave_period_max
     case swell_wave_peak_period_max
-    
+
     var aggregation: DailyAggregation<MarineVariable> {
         switch self {
         case .wave_height_max:

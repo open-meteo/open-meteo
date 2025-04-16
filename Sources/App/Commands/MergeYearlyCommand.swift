@@ -10,24 +10,24 @@ struct MergeYearlyCommand: AsyncCommand {
     var help: String {
         return "Merge database chunks into yearly files"
     }
-    
+
     struct Signature: CommandSignature {
         @Argument(name: "domain", help: "Domain e.g. ")
         var domain: String
-        
+
         @Argument(name: "years", help: "A singe year or a range of years. E.g. 2017-2020")
         var years: String
-        
+
         @Option(name: "variables", help: "Only process a list of coma separated variables")
         var variables: String?
-        
+
         @Flag(name: "force", help: "Generate yearly file, even if it already exists")
         var force: Bool
-        
+
         @Flag(name: "delete", help: "Delete the underlaying chunks")
         var delete: Bool
     }
-    
+
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         let registry = try DomainRegistry.load(rawValue: signature.domain)
@@ -35,18 +35,18 @@ struct MergeYearlyCommand: AsyncCommand {
         guard let domain = registry.getDomain() else {
             fatalError("Did not get domain object")
         }
-        
-        let variables: [String] = try signature.variables.map({$0.split(separator: ",").map(String.init)}) ?? FileManager.default.contentsOfDirectory(atPath: registry.directory).filter { !$0.contains(".") && $0 != "static" }
-        
+
+        let variables: [String] = try signature.variables.map({ $0.split(separator: ",").map(String.init) }) ?? FileManager.default.contentsOfDirectory(atPath: registry.directory).filter { !$0.contains(".") && $0 != "static" }
+
         for year in years {
             for variable in variables {
                 try Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force)
             }
         }
-        
+
         // Determinate chunks to be deleted (chunk fully covered in years range)
         let omFileLength = domain.omFileLength
-        let yearsTime = TimerangeDt(start: Timestamp(years.lowerBound,1,1), to: Timestamp(years.upperBound+1,1,1), dtSeconds: domain.dtSeconds)
+        let yearsTime = TimerangeDt(start: Timestamp(years.lowerBound, 1, 1), to: Timestamp(years.upperBound + 1, 1, 1), dtSeconds: domain.dtSeconds)
         let yearsIndex = yearsTime.toIndexTime()
         let fullyCoveredChunks = yearsIndex.lowerBound.divideRoundedUp(divisor: omFileLength) ..< yearsIndex.upperBound / omFileLength
         logger.info("Chunks within range \(fullyCoveredChunks) could be deleted now. If --delete is set, files will be deleted now")
@@ -61,22 +61,22 @@ struct MergeYearlyCommand: AsyncCommand {
             }
         }
     }
-    
+
     /// Generate a yearly file for a specified domain, variable and year
     static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool) throws {
         let registry = domain.domainRegistry
         logger.info("Processing variable \(variable) for year \(year)")
         let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
         let fileManager = FileManager.default
-        
+
         guard !fileManager.fileExists(atPath: yearlyFilePath) || force else {
             logger.info("Yearly file /\(variable)/year_\(year).om already exists. Skipping.")
             return
         }
-        
+
         let omFileLength = domain.omFileLength
         let dtSeconds = domain.dtSeconds
-        let yearTime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year+1, 1, 1), dtSeconds: dtSeconds)
+        let yearTime = TimerangeDt(start: Timestamp(year, 1, 1), to: Timestamp(year + 1, 1, 1), dtSeconds: dtSeconds)
         let grid = domain.grid
         let ny = UInt64(grid.ny)
         let nx = UInt64(grid.nx)
@@ -92,13 +92,13 @@ struct MergeYearlyCommand: AsyncCommand {
             guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
                 return nil
             }
-            let indexTime = chunkIndex*omFileLength ..< (chunkIndex+1)*omFileLength
+            let indexTime = chunkIndex * omFileLength ..< (chunkIndex + 1) * omFileLength
             return (reader, indexTime)
         }
         guard chunkFiles.count == chunkRange.count else {
             throw MergeYearlyError.notAllChunksAvailable
         }
-        
+
         /// Hardcoded to 6 locations times 21 days in 1-hourly timesteps (504) => 3024 elements
         let chunksOut: [UInt64] = [1, 6, 21 * 24]
         let dimensionsOut = [ny, nx, UInt64(yearTime.count)]
@@ -113,7 +113,7 @@ struct MergeYearlyCommand: AsyncCommand {
             scale_factor: chunkFiles.last!.file.scaleFactor,
             add_offset: chunkFiles.last!.file.addOffset
         )
-        
+
         let progress = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensionsOut.reduce(1, *)), name: "Convert")
         for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
             for xStart in stride(from: 0, to: nx, by: UInt64.Stride(chunksOut[1])) {
@@ -122,9 +122,9 @@ struct MergeYearlyCommand: AsyncCommand {
                     let xRange = xStart ..< min(xStart + chunksOut[1], nx)
                     let tRange = tStart ..< min(tStart + chunksOut[2], nt)
                     let chunkIndexTime = Int(tRange.lowerBound) + indexTime.lowerBound ..< Int(tRange.upperBound) + indexTime.lowerBound
-                    
+
                     var data = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
-                    //print("chunk y=\(yRange) x=\(xRange) t=\(tRange)")
+                    // print("chunk y=\(yRange) x=\(xRange) t=\(tRange)")
                     for chunk in chunkFiles {
                         guard let offsets = chunkIndexTime.intersect(fileTime: chunk.indexTime) else {
                             continue
@@ -169,7 +169,7 @@ struct MergeYearlyCommand: AsyncCommand {
         )
         try fileWriter.writeTrailer(rootVariable: variable)
         try writeFn.close()
-        
+
         /// Read data again to ensure the written data matches exactly
         guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self) else {
             throw MergeYearlyError.couldNotReadData
@@ -182,7 +182,7 @@ struct MergeYearlyCommand: AsyncCommand {
                     let xRange = xStart ..< min(xStart + chunksOut[1], nx)
                     let tRange = tStart ..< min(tStart + chunksOut[2], nt)
                     let chunkIndexTime = Int(tRange.lowerBound) + indexTime.lowerBound ..< Int(tRange.upperBound) + indexTime.lowerBound
-                    
+
                     var data = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for chunk in chunkFiles {
                         guard let offsets = chunkIndexTime.intersect(fileTime: chunk.indexTime) else {

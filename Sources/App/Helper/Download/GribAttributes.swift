@@ -25,10 +25,10 @@ struct GribAttributes {
     let perturbationNumber: Int?
     let parameterNumber: Int?
     let constituentType: Int?
-    
+
     /// For ERA5 ensemble, `em` mean and `es` spread
     let dataType: String?
-    
+
     enum LevelType: String {
         case surface
         case isobaricInhPa
@@ -41,7 +41,7 @@ struct GribAttributes {
         case depthBelowLand // ItaliaMeteo ARPAE
         case unknown // only KMA
     }
-    
+
     enum StepType: String {
         case accum
         case avg
@@ -51,7 +51,7 @@ struct GribAttributes {
         case diff
         case rms
     }
-    
+
     init(message: GribMessage) throws {
         shortName = try message.getOrThrow(attribute: "shortName")
         stepRange = try message.getOrThrow(attribute: "stepRange")
@@ -62,11 +62,11 @@ struct GribAttributes {
         self.stepType = stepType
         levelStr = try message.getOrThrow(attribute: "level")
         let typeOfLevelStr = try message.getOrThrow(attribute: "typeOfLevel")
-        guard let typeOfLevel = LevelType(rawValue:typeOfLevelStr) else {
+        guard let typeOfLevel = LevelType(rawValue: typeOfLevelStr) else {
             throw GribAttributeError.invalidLevelType(given: typeOfLevelStr)
         }
         self.typeOfLevel = typeOfLevel
-        
+
         parameterName = try message.getOrThrow(attribute: "parameterName")
         parameterUnits = try message.getOrThrow(attribute: "parameterUnits")
 
@@ -75,24 +75,23 @@ struct GribAttributes {
         paramId = message.getLong(attribute: "paramId") ?? 0
         perturbationNumber = message.getLong(attribute: "perturbationNumber")
         dataType = try message.getOrThrow(attribute: "dataType")
-        parameterNumber =  message.getLong(attribute: "parameterNumber")
-        constituentType =  message.getLong(attribute: "constituentType")
+        parameterNumber = message.getLong(attribute: "parameterNumber")
+        constituentType = message.getLong(attribute: "constituentType")
     }
 }
-
 
 extension GribMessage {
     func getAttributes() throws -> GribAttributes {
         return try GribAttributes(message: self)
     }
-    
+
     fileprivate func getOrThrow(attribute: String) throws -> String {
         guard let value = get(attribute: attribute) else {
             throw GribAttributeError.couldNotGetAttribute(attribute: attribute)
         }
         return value
     }
-    
+
     func getValidTimestamp() throws -> Timestamp {
         let validityTime = try getOrThrow(attribute: "validityTime")
         let validityDate = try getOrThrow(attribute: "validityDate")

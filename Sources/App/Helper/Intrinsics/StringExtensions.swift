@@ -11,4 +11,17 @@ extension String {
         }
         return (left, right)
     }
+
+    /// Convert to `Int` if possible
+    func toInt() -> Int? {
+        return Int(self)
+    }
+
+    /// Convert to `Timestamp` if possible
+    func toTimestamp() -> Timestamp? {
+        guard let timeIntervalSince1970 = toInt() else {
+            return nil
+        }
+        return Timestamp(timeIntervalSince1970)
+    }
 }

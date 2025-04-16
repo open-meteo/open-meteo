@@ -1,50 +1,49 @@
 import Foundation
 import SwiftEccodes
 
-
 extension GribMessage {
     fileprivate struct Coords {
         let i: Int, x: Int, y: Int, latitude: Float, longitude: Float
     }
-    
+
     func dumpAttributes() {
         for attribute in self.iterate(namespace: .all) {
             print(attribute)
         }
     }
-    
+
     /// Print debug grid information
     func debugGrid(grid: Gridable, flipLatidude: Bool, shift180Longitude: Bool) throws {
-        guard let nx = get(attribute: "Nx").map(Int.init) ?? nil else {
+        guard let nx = get(attribute: "Nx")?.toInt() else {
             fatalError("Could not get Nx")
         }
-        guard let ny = get(attribute: "Ny").map(Int.init) ?? nil else {
+        guard let ny = get(attribute: "Ny")?.toInt() else {
             fatalError("Could not get Ny")
         }
         guard nx == grid.nx, ny == grid.ny else {
             fatalError("GRIB dimensions (nx=\(grid.nx), ny=\(grid.ny)) do not match domain grid dimensions (nx=\(nx), ny=\(ny))")
         }
-        
+
         for atr in self.iterate(namespace: .geography) {
             print(atr)
         }
         /*if let proj = get(attribute: "projString") {
             print("Projection string: \(proj)")
         }*/
-        
+
         if let gridType = get(attribute: "gridType") {
             // https://rdrr.io/github/nawendt/gribr/src/R/grib_proj4str.R
             print("\(gridType)")
             print("latitudeOfSouthernPoleInDegrees \(get(attribute: "latitudeOfSouthernPoleInDegrees") ?? "nil")")
             print("longitudeOfSouthernPoleInDegrees \(get(attribute: "longitudeOfSouthernPoleInDegrees") ?? "nil")")
         }
-        
+
         var coords = [Coords]()
-        //var lat = 0.0
-        for (i,(latitude, longitude,_)) in try iterateCoordinatesAndValues().enumerated() {
+        // var lat = 0.0
+        for (i, (latitude, longitude, _)) in try iterateCoordinatesAndValues().enumerated() {
             let longitude = shift180Longitude ? longitude + 180 : longitude
             let lon = Float(longitude + 180).truncatingRemainder(dividingBy: 360) - 180
-            
+
             let c = Coords(i: i, x: i % nx, y: (i / nx), latitude: Float(latitude), longitude: lon)
             /*if c.x == 0 {
                 print(latitude - lat)
@@ -53,25 +52,25 @@ extension GribMessage {
             if c.x == 0, c.y == 0 {
                 coords.append(c)
             }
-            if c.x == nx-1, c.y == 0 {
+            if c.x == nx - 1, c.y == 0 {
                 coords.append(c)
             }
-            if c.x == 0, c.y == ny-1 {
+            if c.x == 0, c.y == ny - 1 {
                 coords.append(c)
             }
-            if c.x == nx-1, c.y == ny-1 {
+            if c.x == nx - 1, c.y == ny - 1 {
                 coords.append(c)
             }
-            
-            if i % (nx*ny/100) == 0 {
+
+            if i % (nx * ny / 100) == 0 {
                 coords.append(c)
             }
         }
-        
+
         for c in coords {
             print(c)
         }
-        
+
         print("Validating grid settings now")
         for c in coords {
             print(c)
@@ -93,6 +92,5 @@ extension GribMessage {
             }
             print("OK")
         }
-
     }
 }

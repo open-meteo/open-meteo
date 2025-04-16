@@ -1,7 +1,6 @@
 import Foundation
 import Vapor
 
-
 enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
@@ -9,7 +8,7 @@ enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariab
     case dew_point_2m
     case windspeed_10m
     case winddirection_10m
-    
+
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation_instant
@@ -18,7 +17,7 @@ enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariab
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    //case evapotranspiration
+    // case evapotranspiration
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
@@ -36,7 +35,7 @@ enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariab
     case windgusts_10m
     case sunshine_duration
     case surface_temperature
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -61,7 +60,7 @@ enum ItaliaMeteoArpaePressureVariableDerivedType: String, CaseIterable {
 struct ItaliaMeteoArpaePressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: ItaliaMeteoArpaePressureVariableDerivedType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -73,17 +72,17 @@ typealias ItaliaMeteoArpaeVariableCombined = VariableOrDerived<ItaliaMeteoArpaeV
 
 struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = ItaliaMeteoArpaeDomain
-    
+
     typealias Variable = ItaliaMeteoArpaeVariable
-    
+
     typealias Derived = ItaliaMeteoArpaeVariableDerived
-    
+
     typealias MixingVar = ItaliaMeteoArpaeVariableCombined
-    
+
     let reader: GenericReaderCached<ItaliaMeteoArpaeDomain, ItaliaMeteoArpaeVariable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -91,29 +90,29 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func get(raw: ItaliaMeteoArpaeVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: ItaliaMeteoArpaeVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func prefetchData(variable: ItaliaMeteoArpaeSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
-    
+
     func get(raw: ItaliaMeteoArpaeSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func prefetchData(derived: ItaliaMeteoArpaeVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
@@ -147,9 +146,7 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant, .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
                 try prefetchData(variable: .direct_radiation, time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)
@@ -192,7 +189,7 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
-    
+
     func get(derived: ItaliaMeteoArpaeVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
@@ -210,23 +207,23 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:
                 let snowfall_water_equivalent = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snowfall = snowfall_water_equivalent.map({$0 * 0.7})
+                let snowfall = snowfall_water_equivalent.map({ $0 * 0.7 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relative_humidity_2m, time: time)
@@ -318,7 +315,7 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover, .cloud_cover:
                 let rh = try get(raw: .pressure(.init(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .relativehumidity:
                 return try get(raw: .pressure(ItaliaMeteoArpaePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

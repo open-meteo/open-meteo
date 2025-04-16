@@ -2,12 +2,11 @@ import Foundation
 import CZlib
 import NIOCore
 
-
 /// Create a simple excel sheet with exactly one sheet and the bare minimum to make it work in office applications
 /// Please note that XLSX only support up to 16k columns
 public final class XlsxWriter {
     let sheet_xml: GzipStream
-    
+
     static var workbook_xml: ByteBuffer {
         let workbook_xml = try! GzipStream(level: 6, chunkCapacity: 512)
         workbook_xml.write("""
@@ -16,7 +15,7 @@ public final class XlsxWriter {
         """)
         return workbook_xml.finish()
     }
-    
+
     static var workbook_xml_rels: ByteBuffer {
         let workbook_xml_rels = try! GzipStream(level: 6, chunkCapacity: 512)
         workbook_xml_rels.write("""
@@ -25,7 +24,7 @@ public final class XlsxWriter {
         """)
         return workbook_xml_rels.finish()
     }
-    
+
     static var rels: ByteBuffer {
         let rels = try! GzipStream(level: 6, chunkCapacity: 512)
         rels.write("""
@@ -34,7 +33,7 @@ public final class XlsxWriter {
         """)
         return rels.finish()
     }
-    
+
     static var content_type: ByteBuffer {
         let content_type = try! GzipStream(level: 6, chunkCapacity: 512)
         content_type.write( """
@@ -43,7 +42,7 @@ public final class XlsxWriter {
         """)
         return content_type.finish()
     }
-    
+
     static var styles_xml: ByteBuffer {
         let styles_xml = try! GzipStream(level: 6, chunkCapacity: 512)
         styles_xml.write("""
@@ -52,7 +51,7 @@ public final class XlsxWriter {
         """)
         return styles_xml.finish()
     }
-    
+
     public init() throws {
         sheet_xml = try GzipStream(level: 6, chunkCapacity: 4096)
         sheet_xml.write( """
@@ -60,25 +59,25 @@ public final class XlsxWriter {
         <worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheetData>
         """)
     }
-    
+
     public func startRow() {
         sheet_xml.write("<row>")
     }
-    
+
     public func endRow() {
         sheet_xml.write("</row>")
     }
-    
+
     public func write(_ int: Int) {
         sheet_xml.write("<c><v>\(int)</v></c>")
     }
-    
+
     /// Write unix timestamp with iso8601 formated date
     public func writeTimestamp(_ timestamp: Timestamp) {
         let excelTime = Double(timestamp.timeIntervalSince1970) / 86400 + (70 * 365 + 19)
         sheet_xml.write("<c s=\"1\"><v>\(excelTime)</v></c>")
     }
-    
+
     /// Write Float
     /// See https://docs.microsoft.com/en-us/dotnet/api/documentformat.openxml.spreadsheet.cell
     public func write(_ float: Float, significantDigits: Int) {
@@ -88,15 +87,15 @@ public final class XlsxWriter {
             sheet_xml.write("<c><v>\(String(format: "%.\(significantDigits)f", float))</v></c>")
         }
     }
-    
+
     /// Write string
     public func write(_ string: String) {
         sheet_xml.write("<c t=\"inlineStr\"><is><t>\(string)</t></is></c>")
     }
-    
+
     func write(timestamp: Timestamp = .now()) -> ByteBuffer {
         sheet_xml.write("</sheetData></worksheet>")
-        
+
         return ZipWriter.zip(files: [
             (path: "[Content_Types].xml", compressed: Self.content_type),
             (path: "xl/workbook.xml", compressed: Self.workbook_xml),
@@ -119,7 +118,7 @@ enum ZipStreamError: Error {
 public final class GzipStream {
     var zstream: UnsafeMutablePointer<z_stream>
     var writebuffer: ByteBuffer
-    
+
     public init(level: Int32 = 6, chunkCapacity: Int = 4096) throws {
         zstream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
         zstream.pointee.zalloc = nil
@@ -144,9 +143,9 @@ public final class GzipStream {
             zstream.pointee.total_out = 0
         }
     }
-    
+
     public func write(_ str: String) {
-        str.withContiguousStorageIfAvailable { body -> Void in
+        str.withContiguousStorageIfAvailable { body in
             compress(data: UnsafeRawBufferPointer(body), flush: Z_NO_FLUSH)
         } ?? {
             var str = str
@@ -155,13 +154,13 @@ public final class GzipStream {
             })
         }()
     }
-    
+
     /// flush and return data
     public func finish() -> ByteBuffer {
         compress(data: nil, flush: Z_FINISH)
         return writebuffer
     }
-     
+
     /// compress
     func compress(data: UnsafeRawBufferPointer?, flush: Int32) {
         if let data = data {
@@ -189,13 +188,12 @@ public final class GzipStream {
             }
         } while zstream.pointee.avail_out == 0
     }
-    
+
     deinit {
         deflateEnd(zstream)
         zstream.deallocate()
     }
 }
-
 
 fileprivate extension Data {
     mutating func append(_ value: UInt32) {
@@ -210,22 +208,22 @@ fileprivate extension Data {
     }
 }
 
-public struct ZipWriter {
+public enum ZipWriter {
     /// compressed input data must be gzip compressed with correct gzip headers
     public static func zip(files: [(path: String, compressed: ByteBuffer)], timestamp: Timestamp = .now()) -> ByteBuffer {
         let totalSize = files.reduce(22, {
             $0 + $1.path.count * 2 + $1.compressed.writerIndex - 18 + 30 + 46
         })
         var out = ByteBufferAllocator().buffer(capacity: totalSize)
-        
+
         let date = timestamp.toComponents()
         let modificationDate = UInt16(date.day) | ((UInt16(date.month) << 5)) | ((UInt16(date.year - 1980) << 9))
         let modificationTime = UInt16(timestamp.second) | ((UInt16(timestamp.minute) << 5)) | ((UInt16(timestamp.hour) << 11))
-        
+
         // print local file header and compressed data
         var localHeaderOffsets = [Int]()
         localHeaderOffsets.reserveCapacity(files.count)
-        
+
         for (path, compressed) in files {
             localHeaderOffsets.append(out.writerIndex)
             out.writeInteger(UInt32(0x04034b50), endianness: .little) // local fileheader signature
@@ -234,18 +232,18 @@ public struct ZipWriter {
             out.writeData([(compressed.getInteger(at: 2) as UInt8?)!, 0]) // compression method, lzma
             out.writeInteger(modificationTime, endianness: .little)
             out.writeInteger(modificationDate, endianness: .little)
-            out.writeInteger((compressed.getInteger(at: compressed.writerIndex-8) as UInt32?)!) // crc
+            out.writeInteger((compressed.getInteger(at: compressed.writerIndex - 8) as UInt32?)!) // crc
             out.writeInteger(UInt32(compressed.writerIndex - 10 - 8), endianness: .little) // compressed size
-            out.writeInteger((compressed.getInteger(at: compressed.writerIndex-4) as UInt32?)!) // uncompressed size
+            out.writeInteger((compressed.getInteger(at: compressed.writerIndex - 4) as UInt32?)!) // uncompressed size
             out.writeInteger(UInt16(path.count), endianness: .little) // filename length
             out.writeInteger(UInt16(0x0000), endianness: .little) // extra field length
             out.writeString(path) // filename
-            var payload = compressed.getSlice(at: 10, length: compressed.writerIndex-8-10)!
+            var payload = compressed.getSlice(at: 10, length: compressed.writerIndex - 8 - 10)!
             out.writeBuffer(&payload) // compressed payload without header
         }
-        
+
         let centralDirOffset = out.writerIndex
-        
+
         // print central directory header
         for (i, (path, compressed)) in files.enumerated() {
             out.writeInteger(UInt32(0x02014b50), endianness: .little) // signature
@@ -255,9 +253,9 @@ public struct ZipWriter {
             out.writeData([(compressed.getInteger(at: 2) as UInt8?)!, 0]) // compression method, lzma
             out.writeInteger(modificationTime, endianness: .little)
             out.writeInteger(modificationDate, endianness: .little)
-            out.writeInteger((compressed.getInteger(at: compressed.writerIndex-8) as UInt32?)!) // crc
+            out.writeInteger((compressed.getInteger(at: compressed.writerIndex - 8) as UInt32?)!) // crc
             out.writeInteger(UInt32(compressed.writerIndex - 10 - 8), endianness: .little) // compressed size
-            out.writeInteger((compressed.getInteger(at: compressed.writerIndex-4) as UInt32?)!) // uncompressed size
+            out.writeInteger((compressed.getInteger(at: compressed.writerIndex - 4) as UInt32?)!) // uncompressed size
             out.writeInteger(UInt16(path.count), endianness: .little) // filename length
             out.writeInteger(UInt16(0x0000), endianness: .little) // extra field length
             out.writeInteger(UInt16(0x0000), endianness: .little) // comment length
@@ -267,9 +265,9 @@ public struct ZipWriter {
             out.writeInteger(UInt32(localHeaderOffsets[i]), endianness: .little)
             out.writeString(path) // filename
         }
-        
+
         let centralDirSize = out.writerIndex - centralDirOffset
-        
+
         // end central directory
         out.writeInteger(UInt32(0x06054b50), endianness: .little) // sig
         out.writeInteger(UInt16(0x0000), endianness: .little) // number of disks
@@ -279,7 +277,7 @@ public struct ZipWriter {
         out.writeInteger(UInt32(centralDirSize), endianness: .little)
         out.writeInteger(UInt32(centralDirOffset), endianness: .little)
         out.writeInteger(UInt16(0x00), endianness: .little) // zip comment length
-        
+
         precondition(totalSize == out.writerIndex)
         return out
     }

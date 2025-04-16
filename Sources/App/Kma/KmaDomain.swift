@@ -1,14 +1,13 @@
 import Foundation
 
-
 enum KmaDomain: String, GenericDomain, CaseIterable {
     case gdps
     case ldps
-    
+
     var grid: Gridable {
         switch self {
         case .gdps:
-            return RegularGrid(nx: 2560, ny: 1920, latMin: -90+180/1920/2, lonMin: -180+360/2560/2, dx: 360/2560, dy: 180/1920)
+            return RegularGrid(nx: 2560, ny: 1920, latMin: -90 + 180 / 1920 / 2, lonMin: -180 + 360 / 2560 / 2, dx: 360 / 2560, dy: 180 / 1920)
         case .ldps:
             /**
              # Lambert Conformal (can be secant or tangent, conical or bipolar)  (grib2/tables/4/3.1.table)
@@ -49,7 +48,7 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
             )
         }
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .gdps:
@@ -58,28 +57,28 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
             return .kma_ldps
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
     }
-    
+
     var dtSeconds: Int {
         switch self {
         case .gdps:
-            return 3*3600
+            return 3 * 3600
         case .ldps:
-            return 1*3600
+            return 1 * 3600
         }
     }
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var omFileLength: Int {
         switch self {
         case .gdps:
@@ -90,18 +89,18 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
             return 48 + 24
         }
     }
-    
+
     var ensembleMembers: Int {
         return 1
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .gdps, .ldps:
-            return 6*3600
+            return 6 * 3600
         }
     }
-    
+
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {

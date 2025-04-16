@@ -2,7 +2,6 @@ import Foundation
 import NIO
 import CBz2lib
 
-
 extension AsyncSequence where Element == ByteBuffer {
     /// Decompress incoming data using BZIP2
     func decompressBzip2() -> Bzip2AsyncDecompress<Self> {
@@ -15,7 +14,7 @@ extension AsyncSequence where Element == ByteBuffer {
  */
 struct Bzip2AsyncDecompress<T: AsyncSequence>: AsyncSequence where T.Element == ByteBuffer {
     public typealias Element = AsyncIterator.Element
-    
+
     let sequence: T
 
     public final class AsyncIterator: AsyncIteratorProtocol {
@@ -28,7 +27,7 @@ struct Bzip2AsyncDecompress<T: AsyncSequence>: AsyncSequence where T.Element == 
             self.writebuffer = ByteBuffer()
             self.bz2 = bz_stream()
             writebuffer.reserveCapacity(minimumWritableBytes: 4096)
-            
+
             let error = BZ2_bzDecompressInit(&bz2, 0, 0)
             guard error == BZ_OK else {
                 fatalError("BZ2_bzDecompressInit failed \(error)")
@@ -60,7 +59,7 @@ struct Bzip2AsyncDecompress<T: AsyncSequence>: AsyncSequence where T.Element == 
                 }
             })
         }
-        
+
         deinit {
             let error = BZ2_bzDecompressEnd(&self.bz2)
             guard error == BZ_OK else {

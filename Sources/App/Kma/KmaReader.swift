@@ -1,7 +1,6 @@
 import Foundation
 import Vapor
 
-
 enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
@@ -9,7 +8,7 @@ enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case dew_point_2m
     case windspeed_10m
     case winddirection_10m
-    
+
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation_instant
@@ -18,7 +17,7 @@ enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    //case evapotranspiration
+    // case evapotranspiration
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
@@ -38,7 +37,7 @@ enum KmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -65,7 +64,7 @@ enum KmaPressureVariableDerivedType: String, CaseIterable {
 struct KmaPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: KmaPressureVariableDerivedType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -77,17 +76,17 @@ typealias KmaVariableCombined = VariableOrDerived<KmaVariable, KmaVariableDerive
 
 struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = KmaDomain
-    
+
     typealias Variable = KmaVariable
-    
+
     typealias Derived = KmaVariableDerived
-    
+
     typealias MixingVar = KmaVariableCombined
-    
+
     let reader: GenericReaderCached<KmaDomain, KmaVariable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -95,28 +94,28 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func get(raw: KmaVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch raw {
         case .surface(let variable):
             if reader.domain == .ldps && variable == .showers {
                 /// Set showers to 0 for LDPS domain
-                let showers = try reader.get(variable: .surface(.precipitation), time: time).data.map({max($0,0)})
+                let showers = try reader.get(variable: .surface(.precipitation), time: time).data.map({ max($0, 0) })
                 return DataAndUnit(showers, .millimetre)
             }
-        case .pressure(_):
+        case .pressure:
             break
         }
 
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: KmaVariable, time: TimerangeDtAndSettings) throws {
         switch raw {
         case .surface(let variable):
@@ -124,20 +123,20 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 /// Set showers to 0 for LDPS domain
                 try reader.prefetchData(variable: .surface(.precipitation), time: time)
             }
-        case .pressure(_):
+        case .pressure:
             break
         }
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func prefetchData(variable: KmaSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
-    
+
     func get(raw: KmaSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func prefetchData(derived: KmaVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
@@ -171,9 +170,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant, .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
                 try prefetchData(variable: .direct_radiation, time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)
@@ -220,9 +217,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                fallthrough
-            case .winddirection, .wind_direction:
+            case .windspeed, .wind_speed, .winddirection, .wind_direction:
                 try prefetchData(raw: .pressure(KmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(KmaPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dewpoint, .dew_point, .relativehumidity:
@@ -233,7 +228,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
-    
+
     func get(derived: KmaVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
@@ -251,23 +246,23 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:
                 let snowfall_water_equivalent = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snowfall = snowfall_water_equivalent.map({$0 * 0.7})
+                let snowfall = snowfall_water_equivalent.map({ $0 * 0.7 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relative_humidity_2m, time: time)
@@ -359,7 +354,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
                 if reader.domain == .gdps {
                     let showers = try get(raw: .showers, time: time)
-                    return DataAndUnit(zip(precip.data, zip(snoweq.data, showers.data)).map({$0 - $1.0 - $1.1}), precip.unit)
+                    return DataAndUnit(zip(precip.data, zip(snoweq.data, showers.data)).map({ $0 - $1.0 - $1.1 }), precip.unit)
                 }
                 return DataAndUnit(zip(precip.data, snoweq.data).map(-), precip.unit)
             case .global_tilted_irradiance:
@@ -378,7 +373,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed, .wind_speed:
                 let u = try get(raw: .pressure(KmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 let v = try get(raw: .pressure(KmaPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                let speed = zip(u.data, v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
             case .winddirection, .wind_direction:
                 let u = try get(raw: .pressure(KmaPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
@@ -391,7 +386,7 @@ struct KmaReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover, .cloud_cover:
                 let rh = try get(raw: .pressure(.init(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .relativehumidity:
                 return try get(raw: .pressure(KmaPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

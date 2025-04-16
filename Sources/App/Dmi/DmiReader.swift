@@ -1,7 +1,6 @@
 import Foundation
 import Vapor
 
-
 enum DmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case apparent_temperature
     case relativehumidity_2m
@@ -11,7 +10,7 @@ enum DmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case winddirection_10m
     case windspeed_100m
     case winddirection_100m
-    
+
     /// Is using 100m wind
     case windspeed_80m
     case winddirection_80m
@@ -21,7 +20,7 @@ enum DmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     /// Is using 150m wind
     case windspeed_180m
     case winddirection_180m
-    
+
     /// Is using 100m wind
     case wind_speed_80m
     case wind_direction_80m
@@ -43,7 +42,7 @@ enum DmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    //case evapotranspiration
+    // case evapotranspiration
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
@@ -63,7 +62,7 @@ enum DmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -90,7 +89,7 @@ enum DmiPressureVariableDerivedType: String, CaseIterable {
 struct DmiPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: DmiPressureVariableDerivedType
     let level: Int
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -102,17 +101,17 @@ typealias DmiVariableCombined = VariableOrDerived<DmiVariable, DmiVariableDerive
 
 struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = DmiDomain
-    
+
     typealias Variable = DmiVariable
-    
+
     typealias Derived = DmiVariableDerived
-    
+
     typealias MixingVar = DmiVariableCombined
-    
+
     let reader: GenericReaderCached<DmiDomain, DmiVariable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -120,29 +119,29 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func get(raw: DmiVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: DmiVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func prefetchData(variable: DmiSurfaceVariable, time: TimerangeDtAndSettings) throws {
         try prefetchData(variable: .raw(.surface(variable)), time: time)
     }
-    
+
     func get(raw: DmiSurfaceVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try get(variable: .raw(.surface(raw)), time: time)
     }
-    
+
     func prefetchData(derived: DmiVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .surface(let surface):
@@ -184,9 +183,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .dew_point_2m, .dewpoint_2m:
                 try prefetchData(variable: .temperature_2m, time: time)
                 try prefetchData(variable: .relative_humidity_2m, time: time)
-            case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-                fallthrough
-            case .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
+            case .global_tilted_irradiance, .global_tilted_irradiance_instant, .direct_normal_irradiance, .direct_radiation_instant, .direct_normal_irradiance_instant:
                 try prefetchData(variable: .direct_radiation, time: time)
             case .shortwave_radiation_instant:
                 try prefetchData(variable: .shortwave_radiation, time: time)
@@ -231,9 +228,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             }
         case .pressure(let v):
             switch v.variable {
-            case .windspeed, .wind_speed:
-                fallthrough
-            case .winddirection, .wind_direction:
+            case .windspeed, .wind_speed, .winddirection, .wind_direction:
                 try prefetchData(raw: .pressure(DmiPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 try prefetchData(raw: .pressure(DmiPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dewpoint, .dew_point, .relativehumidity:
@@ -244,7 +239,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             }
         }
     }
-    
+
     func get(derived: DmiVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .surface(let variableDerivedSurface):
@@ -256,15 +251,15 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed_80m, .wind_speed_80m:
                 let data = try get(raw: .wind_speed_100m, time: time)
                 let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 80)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+                return DataAndUnit(data.data.map { $0 * scalefactor }, data.unit)
             case .windspeed_120m, .wind_speed_120m:
                 let data = try get(raw: .wind_speed_100m, time: time)
                 let scalefactor = Meteorology.scaleWindFactor(from: 100, to: 120)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+                return DataAndUnit(data.data.map { $0 * scalefactor }, data.unit)
             case .windspeed_180m, .wind_speed_180m:
                 let data = try get(raw: .wind_speed_150m, time: time)
                 let scalefactor = Meteorology.scaleWindFactor(from: 150, to: 180)
-                return DataAndUnit(data.data.map{$0*scalefactor}, data.unit)
+                return DataAndUnit(data.data.map { $0 * scalefactor }, data.unit)
             case .winddirection_10m:
                 return try get(raw: .wind_direction_10m, time: time)
             case .winddirection_80m, .wind_direction_80m, .winddirection_100m, .winddirection_120m, .wind_direction_120m:
@@ -280,23 +275,23 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+                return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
             case .et0_fao_evapotranspiration:
                 let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
                 let swrad = try get(raw: .shortwave_radiation, time: time).data
                 let temperature = try get(raw: .temperature_2m, time: time).data
                 let windspeed = try get(raw: .wind_speed_10m, time: time).data
                 let rh = try get(raw: .relative_humidity_2m, time: time).data
-                let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-                
+                let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
                 let et0 = swrad.indices.map { i in
                     return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:
                 let snowfall_water_equivalent = try get(raw: .snowfall_water_equivalent, time: time).data
-                let snowfall = snowfall_water_equivalent.map({$0 * 0.7})
+                let snowfall = snowfall_water_equivalent.map({ $0 * 0.7 })
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .relativehumidity_2m:
                 return try get(raw: .relative_humidity_2m, time: time)
@@ -369,7 +364,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 return try get(raw: .temperature_150m, time: time)
             case .showers:
                 let precipitation = try get(raw: .precipitation, time: time)
-                return DataAndUnit(precipitation.data.map({min($0, 0)}), precipitation.unit)
+                return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
             case .wet_bulb_temperature_2m:
                 let temperature = try get(raw: .temperature_2m, time: time)
                 let rh = try get(raw: .relative_humidity_2m, time: time)
@@ -408,7 +403,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
             case .windspeed, .wind_speed:
                 let u = try get(raw: .pressure(DmiPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
                 let v = try get(raw: .pressure(DmiPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
-                let speed = zip(u.data,v.data).map(Meteorology.windspeed)
+                let speed = zip(u.data, v.data).map(Meteorology.windspeed)
                 return DataAndUnit(speed, u.unit)
             case .winddirection, .wind_direction:
                 let u = try get(raw: .pressure(DmiPressureVariable(variable: .wind_u_component, level: v.level)), time: time).data
@@ -421,7 +416,7 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
             case .cloudcover, .cloud_cover:
                 let rh = try get(raw: .pressure(.init(variable: .relative_humidity, level: v.level)), time: time)
-                return DataAndUnit(rh.data.map({Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level))}), .percentage)
+                return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) }), .percentage)
             case .relativehumidity:
                 return try get(raw: .pressure(DmiPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }

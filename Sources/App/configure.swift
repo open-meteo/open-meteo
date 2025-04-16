@@ -1,7 +1,7 @@
 import Vapor
-//import Leaf
+// import Leaf
 
-struct OpenMeteo {
+enum OpenMeteo {
     /// Data directory with trailing slash
     static var dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
@@ -12,7 +12,7 @@ struct OpenMeteo {
         }
         return  "./data/"
     }()
-    
+
     /// Temporary directory with trailing slash
     static var tempDirectory = {
         if let dir = Environment.get("TEMP_DIRECTORY") {
@@ -23,12 +23,12 @@ struct OpenMeteo {
         }
         return dataDirectory
     }()
-    
+
     /// Maximum number of locations for multi point requests
     static var numberOfLocationsMaximum: Int = {
         return (Environment.get("LOCATIONS_LIMIT").map(Int.init) ?? 1000) ?? 1000
     }()
-    
+
     /// Cache all data access using spare files in this directory
     /*static var cacheDirectory = {
         return Environment.get("CACHE_DIRECTORY")
@@ -39,7 +39,7 @@ extension Application {
     fileprivate struct HttpClientKey: StorageKey, LockKey {
         typealias Value = HTTPClient
     }
-    
+
     /// Get dedicated HTTPClient instance with a dedicated threadpool
     var dedicatedHttpClient: HTTPClient {
         let lock = self.locks.lock(for: HttpClientKey.self)
@@ -54,7 +54,7 @@ extension Application {
         }
         return new
     }
-    
+
     /// Create a new HTTP client instance. `shutdown` must be called after using it
     func makeNewHttpClient(httpVersion: HTTPClient.Configuration.HTTPVersion = .automatic, redirectConfiguration: HTTPClient.Configuration.RedirectConfiguration? = nil) -> HTTPClient {
         // try again with very high timeouts, so only the curl internal timers are used
@@ -63,7 +63,7 @@ extension Application {
             timeout: .init(connect: .seconds(30), read: .minutes(5)),
             connectionPool: .init(idleTimeout: .minutes(10)))
         configuration.httpVersion = httpVersion
-        
+
         return HTTPClient(
             eventLoopGroupProvider: .shared(eventLoopGroup),
             configuration: configuration,
@@ -74,7 +74,7 @@ extension Application {
 // configures your application
 public func configure(_ app: Application) throws {
     TimeZone.ReferenceType.default = TimeZone(abbreviation: "GMT")!
-    
+
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
         allowedMethods: [.GET, .POST, /*.PUT,*/ .OPTIONS /*, .DELETE, .PATCH*/],
@@ -120,29 +120,29 @@ public func configure(_ app: Application) throws {
     app.commands.use(ConvertOmCommand(), as: "convert-om")
 
     app.http.server.configuration.hostname = "0.0.0.0"
-    
+
     // https://github.com/vapor/vapor/pull/2677
     app.http.server.configuration.supportPipelining = false
-    
+
     app.http.server.configuration.responseCompression = .enabled(initialByteBufferCapacity: 4096)
-    
+
     // Higher backlog value to handle more connections
     app.http.server.configuration.backlog = 4096
 
     if let defaultMaxBodySize = Environment.get("MAX_BODY_SIZE") {
         app.routes.defaultMaxBodySize = ByteCount(stringLiteral: defaultMaxBodySize)
     }
-    
-    //app.logger.logLevel = .debug
 
-    //app.views.use(.leaf)
-    
+    // app.logger.logLevel = .debug
+
+    // app.views.use(.leaf)
+
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(10),
         ApiKeyManager.update
     )
-    
+
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(2),
@@ -153,7 +153,7 @@ public func configure(_ app: Application) throws {
         delay: .seconds(2),
         MetaFileManager.instance.backgroundTask
     )
-    
+
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(Int64(60 - Timestamp.now().second)),
         delay: .seconds(60)

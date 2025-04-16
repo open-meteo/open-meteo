@@ -1,21 +1,20 @@
 import Foundation
 
-
 struct Array3D {
     var data: [Float]
-    
+
     /// slowest
     let dim0: Int
     let dim1: Int
     /// Fastest dim
     let dim2: Int
-    
+
     var count: Int {
         return dim0 * dim1 * dim2
     }
-    
+
     public init(data: [Float], dim0: Int, dim1: Int, dim2: Int) {
-        if (data.count != dim0 * dim1 * dim2) {
+        if data.count != dim0 * dim1 * dim2 {
             fatalError("Wrong Array3D dimensions. dim0=\(dim0) dim1=\(dim1) dim2=\(dim2) count=\(data.count)")
         }
         self.data = data
@@ -23,14 +22,14 @@ struct Array3D {
         self.dim1 = dim1
         self.dim2 = dim2
     }
-    
+
     public init(repeating: Float, dim0: Int, dim1: Int, dim2: Int) {
         self.data = [Float](repeating: repeating, count: dim0 * dim1 * dim2)
         self.dim0 = dim0
         self.dim1 = dim1
         self.dim2 = dim2
     }
-    
+
     @inlinable subscript(d0: Int, d1: Int, d2: Int) -> Float {
         get {
             assert(d0 < dim0, "dim0 subscript invalid: \(d0) with dim0=\(dim0)")
@@ -52,9 +51,9 @@ public struct Array3DFastTime {
     public let nLocations: Int
     public let nLevel: Int
     public let nTime: Int
-    
+
     public init(data: [Float], nLocations: Int, nLevel: Int, nTime: Int) {
-        if (data.count != nLocations * nTime * nLevel) {
+        if data.count != nLocations * nTime * nLevel {
             fatalError("Wrong Array2DFastTime dimensions. nLocations=\(nLocations) nLevel=\(nLevel) nTime=\(nTime) count=\(data.count)")
         }
         self.data = data
@@ -62,14 +61,14 @@ public struct Array3DFastTime {
         self.nLevel = nLevel
         self.nTime = nTime
     }
-    
+
     public init(nLocations: Int, nLevel: Int, nTime: Int) {
         self.data = .init(repeating: .nan, count: nLocations * nTime * nLevel)
         self.nLocations = nLocations
         self.nTime = nTime
         self.nLevel = nLevel
     }
-    
+
     @inlinable subscript(location: Int, level: Int, time: Int) -> Float {
         get {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
@@ -84,7 +83,7 @@ public struct Array3DFastTime {
             data[location * nTime * nLevel + level * nTime + time] = newValue
         }
     }
-    
+
     @inlinable subscript(location: Int, level: Int, time: Range<Int>) -> ArraySlice<Float> {
         get {
             precondition(location < nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
@@ -99,7 +98,7 @@ public struct Array3DFastTime {
             data[time.add(location * nTime * nLevel + level * nTime)] = newValue
         }
     }
-    
+
     /// One spatial field into time-series array
     @inlinable subscript(location: Range<Int>, level: Int, time: Int) -> [Float] {
         get {
@@ -123,7 +122,7 @@ public struct Array3DFastTime {
             }
         }
     }
-    
+
     @inlinable subscript(location: Range<Int>, level: Int, time: Range<Int>) -> ArraySlice<Float> {
         get {
             precondition(location.upperBound <= nLocations, "location subscript invalid: \(location) with nLocations=\(nLocations)")
@@ -142,11 +141,11 @@ public struct Array3DFastTime {
             precondition(time.upperBound <= nTime, "time subscript invalid: \(nTime) with nTime=\(nTime)")
             precondition(newValue.count == location.count, "Array and location count do not match")
             for loc in location {
-                data[time.add(loc * nTime * nLevel + level * nTime)] = newValue[(time.count * loc ..< time.count * (loc+1)).add(newValue.startIndex)]
+                data[time.add(loc * nTime * nLevel + level * nTime)] = newValue[(time.count * loc ..< time.count * (loc + 1)).add(newValue.startIndex)]
             }
         }
     }
-    
+
     /// One spatial field into time-series array
     @inlinable subscript(location: Range<Int>, level: Int, time: Int) -> ArraySlice<Float> {
         get {

@@ -1,4 +1,3 @@
-
 /**
  Type erase AnySequence
  See https://forums.swift.org/t/anyasyncsequence/50828/4
@@ -27,7 +26,6 @@ struct AnyAsyncSequence<Element>: AsyncSequence {
         }
     }
 
-
     init<S: AsyncSequence>(seq: S) where S.Element == Element {
         _makeAsyncIterator = {
             AnyAsyncIterator(itr: seq.makeAsyncIterator())
@@ -37,13 +35,10 @@ struct AnyAsyncSequence<Element>: AsyncSequence {
     func makeAsyncIterator() -> AnyAsyncIterator<Element> {
         return _makeAsyncIterator()
     }
-
 }
 
 extension AsyncSequence {
-
     func eraseToAnyAsyncSequence() -> AnyAsyncSequence<Element> {
         AnyAsyncSequence(seq: self)
     }
-
 }

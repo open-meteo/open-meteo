@@ -21,7 +21,7 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-    
+
     case et0_fao_evapotranspiration
     case vapour_pressure_deficit
     case vapor_pressure_deficit
@@ -39,15 +39,15 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-    
+
     case soil_temperature_10_to_45cm
     case soil_temperature_40_to_100cm
     case soil_temperature_100_to_200cm
-    
+
     case soil_moisture_10_to_40cm
     case soil_moisture_40_to_100cm
     case soil_moisture_100_to_200cm
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -57,17 +57,17 @@ typealias BomVariableCombined = VariableOrDerived<BomVariable, BomVariableDerive
 
 struct BomReader: GenericReaderDerived, GenericReaderProtocol {
     typealias Domain = BomDomain
-    
+
     typealias Variable = BomVariable
-    
+
     typealias Derived = BomVariableDerived
-    
+
     typealias MixingVar = BomVariableCombined
-    
+
     let reader: GenericReaderCached<BomDomain, BomVariable>
-    
+
     let options: GenericReaderOptions
-    
+
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
         guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -75,21 +75,21 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
-    
+
     func get(raw: BomVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         return try reader.get(variable: raw, time: time)
     }
-    
+
     func prefetchData(raw: BomVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
-    
+
     func prefetchData(derived: BomVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .apparent_temperature:
@@ -135,9 +135,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .direct_radiation, time: time)
         case .shortwave_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
-        case .global_tilted_irradiance, .global_tilted_irradiance_instant:
-            fallthrough
-        case .diffuse_radiation, .diffuse_radiation_instant:
+        case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation, .diffuse_radiation_instant:
             try prefetchData(raw: .shortwave_radiation, time: time)
             try prefetchData(raw: .direct_radiation, time: time)
         case .weathercode:
@@ -181,7 +179,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .soil_moisture_100_to_300cm, time: time)
         }
     }
-    
+
     func get(derived: BomVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .windspeed_10m:
@@ -209,15 +207,15 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
         case .vapor_pressure_deficit, .vapour_pressure_deficit:
             let temperature = try get(raw: .temperature_2m, time: time).data
             let rh = try get(raw: .relative_humidity_2m, time: time).data
-            let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
-            return DataAndUnit(zip(temperature,dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
+            let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+            return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             let swrad = try get(raw: .shortwave_radiation, time: time).data
             let temperature = try get(raw: .temperature_2m, time: time).data
             let windspeed = try get(raw: .wind_speed_10m, time: time).data
             let rh = try get(raw: .relative_humidity_2m, time: time).data
-            let dewpoint = zip(temperature,rh).map(Meteorology.dewpoint)
+            let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
             let et0 = swrad.indices.map { i in
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
             }
@@ -290,10 +288,10 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             let precipitation = try get(raw: .precipitation, time: time)
             let showers = try get(raw: .showers, time: time)
             let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
-            return DataAndUnit(zip(precipitation.data, zip(snoweq.data, showers.data)).map({max($0 - $1.0 - $1.1, 0)}), precipitation.unit)
+            return DataAndUnit(zip(precipitation.data, zip(snoweq.data, showers.data)).map({ max($0 - $1.0 - $1.1, 0) }), precipitation.unit)
         case .snowfall:
             let snoweq = try get(raw: .snowfall_water_equivalent, time: time)
-            return DataAndUnit(snoweq.data.map{$0*0.7}, .centimetre)
+            return DataAndUnit(snoweq.data.map { $0 * 0.7 }, .centimetre)
         case .soil_temperature_10_to_45cm:
             return try get(raw: .soil_temperature_10_to_35cm, time: time)
         case .soil_temperature_40_to_100cm:

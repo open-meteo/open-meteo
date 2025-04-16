@@ -1,7 +1,6 @@
 import Foundation
 import OmFileFormat
 
-
 /// CAMS Air quality domain definitions for Europe and global domains
 enum CamsDomain: String, GenericDomain, CaseIterable {
     case cams_global
@@ -12,11 +11,11 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
     /// Used a diferent grid before 2020. Off by 1.
     /// Data from 2018 until 2019 included
     case cams_europe_reanalysis_validated_pre2020
-    
+
     /// Used a diferent grid before 2017.         lon = 701 ; lat = 401 ;
     /// Data from 2013 until 2017 included
     case cams_europe_reanalysis_validated_pre2018
-    
+
     /// count of forecast hours
     var forecastHours: Int {
         switch self {
@@ -26,10 +25,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return 97
         case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             // Downloaded in 1 month files
-            return 14*24
+            return 14 * 24
         }
     }
-    
+
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {
         let t = Timestamp.now()
@@ -45,7 +44,7 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return t
         }
     }
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .cams_global:
@@ -64,43 +63,43 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return .cams_europe_reanalysis_validated_pre2018
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
     }
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var dtSeconds: Int {
         switch self {
         case .cams_global_greenhouse_gases:
-            return 3*3600
+            return 3 * 3600
         default:
             return 3600
         }
     }
-    
+
     var omFileLength: Int {
-        return (forecastHours + 4*24) / dtHours
+        return (forecastHours + 4 * 24) / dtHours
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .cams_global:
-            return 12*3600
+            return 12 * 3600
         case .cams_europe, .cams_global_greenhouse_gases:
-            return 24*3600
+            return 24 * 3600
         case .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018:
             return 0
         }
     }
-    
+
     var grid: Gridable {
         switch self {
         case .cams_global:
@@ -141,7 +140,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case mugwort_pollen
     case olive_pollen
     case ragweed_pollen
-    
+
     case formaldehyde
     case glyoxal
     case non_methane_volatile_organic_compounds
@@ -153,15 +152,15 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
     case pm2_5_total_organic_matter
     case sea_salt_aerosol
     case nitrogen_monoxide
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .uv_index, .uv_index_clear_sky:
@@ -170,15 +169,15 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return .hermite(bounds: 0...Float.infinity)
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var unit: SiUnit {
         switch self {
         case .pm10:
@@ -243,7 +242,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return .microgramsPerCubicMetre
         }
     }
-    
+
     /// Scalefator for time-series files
     var scalefactor: Float {
         switch self {
@@ -309,7 +308,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return 10
         }
     }
-    
+
     /// Name of the variable in the CDS API, if available
     func getCamsEuMeta() -> (apiName: String, gribName: String, reanalysisFileName: String?)? {
         switch self {
@@ -408,13 +407,13 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return nil
         }
     }
-    
+
     func getCamsGlobalMeta() -> (gribname: String, isMultiLevel: Bool, scalefactor: Float)? {
         /// Air density on surface level. See https://confluence.ecmwf.int/display/UDOC/L60+model+level+definitions
         /// 1013.25/(288.09*287)*100
         let airDensitySurface: Float = 1.223803
         let massMixingToUgm3 = airDensitySurface * 1e9
-        
+
         switch self {
         case .pm10:
             return ("pm10", false, 1e9)
@@ -478,7 +477,7 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
             return nil
         }
     }
-    
+
     func getCamsGlobalGreenhouseGasesMeta() -> (apiname: String, scalefactor: Float, gribShortName: String)? {
         let airDensitySurface: Float = 1.223803
         let massMixingToUgm3 = airDensitySurface * 1e9

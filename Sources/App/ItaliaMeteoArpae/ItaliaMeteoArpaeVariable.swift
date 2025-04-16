@@ -34,7 +34,7 @@ enum ItaliaMeteoArpaeVariablesDownload: String, CaseIterable {
     case WW
     case FI
     case OMEGA
-    
+
     var levels: [String] {
         switch self {
         case .ASOB_S, .ASWDIR_S, .H_SNOW, .LPI, .WW, .RAIN_CON, .RAIN_GSP, .SNOW_CON, .SNOW_GSP, .TOT_PREC, .TQV:
@@ -65,7 +65,7 @@ enum ItaliaMeteoArpaeVariablesDownload: String, CaseIterable {
             return ["heightAboveGround-10"]
         }
     }
-    
+
     var keepInMemory: Bool {
         switch self {
         case .RAIN_GSP, .RAIN_CON, .SNOW_CON, .SNOWLMT, .T_2M, .U, .U_10M, .T:
@@ -74,7 +74,7 @@ enum ItaliaMeteoArpaeVariablesDownload: String, CaseIterable {
             return false
         }
     }
-    
+
     func getGenericVariable(attributes: GribAttributes) -> GenericVariable? {
         switch self {
         case .ASOB_S:
@@ -156,32 +156,32 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     case cloud_cover_low
     case cloud_cover_mid
     case cloud_cover_high
-    
+
     case convective_inhibition
-    
+
     case pressure_msl
     case relative_humidity_2m
-    
+
     case wind_speed_10m
     case wind_direction_10m
-    
+
     case snowfall_water_equivalent
     case showers
     case precipitation
     case rain
-    
+
     case snow_depth
-    
+
     case weather_code
-        
+
     case wind_gusts_10m
 
     case shortwave_radiation
     case direct_radiation
-    
-    //case surface_temperature
+
+    // case surface_temperature
     case cape
-    
+
     /// Soil temperature
     case soil_temperature_0cm
     case soil_temperature_6cm
@@ -190,7 +190,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     case soil_temperature_162cm
     case soil_temperature_486cm
     case soil_temperature_1458cm
-    
+
     /// Soil moisture
     /// The model soil moisture data was converted from kg/m2 to m3/m3 by using the formula SM[m3/m3] = SM[kg/m2] * 0.001 * 1/d, where d is the thickness of the soil layer in meters. The factor 0.001 is due to the assumption that 1kg of water represents 1000cm3, which is 0.001m3.
     case soil_moisture_0_to_1cm
@@ -201,16 +201,16 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
     case soil_moisture_81_to_243cm
     case soil_moisture_243_to_729cm
     case soil_moisture_729_to_2187cm
-    
+
     /// LPI Lightning Potential Index . Scales form 0 to ~120
     case lightning_potential
-    
+
     /// Height of the 0◦ C isotherm above MSL. In case of multiple 0◦ C isotherms, HZEROCL contains the uppermost one.
     /// If the temperature is below 0◦ C throughout the entire atmospheric column, HZEROCL is set equal to the topography height (fill value).
     case freezing_level_height
     case snowfall_height
     case total_column_integrated_water_vapour
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -223,7 +223,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         default: return false
         }
     }
-    
+
     /// Soil moisture or snow depth are cumulative processes and have offsets if multiple models are mixed
     var requiresOffsetCorrectionForMixing: Bool {
         switch self {
@@ -236,11 +236,11 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         default: return false
         }
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m: return 20
@@ -283,7 +283,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
             return 10
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m:
@@ -354,50 +354,50 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
-            case .temperature_2m: return .celsius
-            case .cloud_cover: return .percentage
-            case .cloud_cover_low: return .percentage
-            case .cloud_cover_mid: return .percentage
-            case .cloud_cover_high: return .percentage
-            case .precipitation: return .millimetre
-            case .weather_code: return .wmoCode
-            case .wind_speed_10m: return .metrePerSecond
-            case .wind_direction_10m: return .degreeDirection
-            case .soil_temperature_0cm: return .celsius
-            case .soil_temperature_6cm: return .celsius
-            case .soil_temperature_18cm: return .celsius
-            case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm: return .celsius
-            case .soil_moisture_0_to_1cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_1_to_3cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_3_to_9cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_9_to_27cm: return .cubicMetrePerCubicMetre
-            case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm: return .cubicMetrePerCubicMetre
-            case .snow_depth: return .metre
-            case .showers: return .millimetre
-            case .rain: return .millimetre
-            case .wind_gusts_10m: return .metrePerSecond
-            case .freezing_level_height: return .metre
-            case .relative_humidity_2m: return .percentage
-            case .shortwave_radiation: return .wattPerSquareMetre
-            case .snowfall_water_equivalent: return .millimetre
-            case .direct_radiation: return .wattPerSquareMetre
-            case .pressure_msl: return .hectopascal
-            case .cape:
-                return .joulePerKilogram
-            case .lightning_potential:
-                return .joulePerKilogram
-            case .snowfall_height:
-                return .metre
-            case .convective_inhibition:
-                return .joulePerKilogram
-            case .total_column_integrated_water_vapour:
-                return .kilogramPerSquareMetre
+        case .temperature_2m: return .celsius
+        case .cloud_cover: return .percentage
+        case .cloud_cover_low: return .percentage
+        case .cloud_cover_mid: return .percentage
+        case .cloud_cover_high: return .percentage
+        case .precipitation: return .millimetre
+        case .weather_code: return .wmoCode
+        case .wind_speed_10m: return .metrePerSecond
+        case .wind_direction_10m: return .degreeDirection
+        case .soil_temperature_0cm: return .celsius
+        case .soil_temperature_6cm: return .celsius
+        case .soil_temperature_18cm: return .celsius
+        case .soil_temperature_54cm, .soil_temperature_162cm, .soil_temperature_486cm, .soil_temperature_1458cm: return .celsius
+        case .soil_moisture_0_to_1cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_1_to_3cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_3_to_9cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_9_to_27cm: return .cubicMetrePerCubicMetre
+        case .soil_moisture_27_to_81cm, .soil_moisture_81_to_243cm, .soil_moisture_243_to_729cm, .soil_moisture_729_to_2187cm: return .cubicMetrePerCubicMetre
+        case .snow_depth: return .metre
+        case .showers: return .millimetre
+        case .rain: return .millimetre
+        case .wind_gusts_10m: return .metrePerSecond
+        case .freezing_level_height: return .metre
+        case .relative_humidity_2m: return .percentage
+        case .shortwave_radiation: return .wattPerSquareMetre
+        case .snowfall_water_equivalent: return .millimetre
+        case .direct_radiation: return .wattPerSquareMetre
+        case .pressure_msl: return .hectopascal
+        case .cape:
+            return .joulePerKilogram
+        case .lightning_potential:
+            return .joulePerKilogram
+        case .snowfall_height:
+            return .metre
+        case .convective_inhibition:
+            return .joulePerKilogram
+        case .total_column_integrated_water_vapour:
+            return .kilogramPerSquareMetre
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return self == .temperature_2m || self == .soil_temperature_0cm || self == .soil_temperature_6cm ||
             self == .soil_temperature_18cm || self == .soil_temperature_54cm
@@ -416,26 +416,25 @@ enum ItaliaMeteoArpaePressureVariableType: String, CaseIterable {
     case vertical_velocity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct ItaliaMeteoArpaePressureVariable: PressureVariableRespresentable, GenericVariable, Hashable, GenericVariableMixable {
     let variable: ItaliaMeteoArpaePressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
@@ -455,7 +454,7 @@ struct ItaliaMeteoArpaePressureVariable: PressureVariableRespresentable, Generic
             return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -472,7 +471,7 @@ struct ItaliaMeteoArpaePressureVariable: PressureVariableRespresentable, Generic
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -489,7 +488,7 @@ struct ItaliaMeteoArpaePressureVariable: PressureVariableRespresentable, Generic
             return .metrePerSecondNotUnitConverted
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }

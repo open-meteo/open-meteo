@@ -7,7 +7,7 @@ extension Array where Element == Float {
         let backSeconds = -1 * timeOld.dtSeconds * (steps - 1)
         precondition(timeNew.dtSeconds % timeOld.dtSeconds == 0)
         switch type {
-        case .linear, .linearDegrees, .hermite(_), .backwards:
+        case .linear, .linearDegrees, .hermite, .backwards:
             // take instantanous value
             return timeNew.map({ t in
                 guard let i = timeOld.index(of: t) else {

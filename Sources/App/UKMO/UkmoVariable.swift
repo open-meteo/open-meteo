@@ -11,25 +11,25 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     case cloud_cover_high
     case cloud_cover_2m
     case cloud_base
-    //case cloud_top
-    
+    // case cloud_top
+
     case pressure_msl
     case relative_humidity_2m
-    
+
     case wind_speed_10m
     case wind_direction_10m
     case wind_gusts_10m
-    
+
     case precipitation
     case snowfall_water_equivalent
     case rain
     case hail
     case showers
     case freezing_level_height
-    
+
     case cape
     case convective_inhibition
-    
+
     case surface_temperature
     case visibility
     case snow_depth_water_equivalent
@@ -37,7 +37,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
     case shortwave_radiation
     case direct_radiation
     case uv_index
-    
+
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -52,15 +52,15 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         default: return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -95,7 +95,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return 0.05 // 50 meter
         case .cloud_cover_2m:
             return 1
-        case .cloud_base://, .cloud_top:
+        case .cloud_base:// , .cloud_top:
             return 0.05 // 20 metre
         case .precipitation:
             return 10
@@ -111,7 +111,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .uv_index: return 20
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -142,7 +142,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return .linearDegrees
         case .visibility:
             return .linear
-        case .cloud_base://, .cloud_top:
+        case .cloud_base:// , .cloud_top:
             return .hermite(bounds: 0...10e9)
         case .freezing_level_height:
             return .linear
@@ -154,10 +154,10 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return .hermite(bounds: 0...1000)
         }
     }
-    
+
     var unit: SiUnit {
         switch self {
-        case .temperature_2m,.surface_temperature:
+        case .temperature_2m, .surface_temperature:
             return .celsius
         case .cloud_cover, .cloud_cover_2m:
             return .percentage
@@ -185,7 +185,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return .percentage
         case .visibility:
             return .metre
-        case .cloud_base://, .cloud_top:
+        case .cloud_base:// , .cloud_top:
             return .metre
         case .freezing_level_height:
             return .metre
@@ -196,7 +196,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return .joulePerKilogram
         }
     }
-    
+
     func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km:
@@ -204,9 +204,9 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             case .showers, .snowfall_water_equivalent, .hail:
                 // Global has only instantanous rates for snow and showers
                 return nil
-            //case .shortwave_radiation:
+            // case .shortwave_radiation:
                 // global has only direct radiation, but not diffuse/total
-                //return nil
+                // return nil
             case .cloud_base:
                 return nil
             case .uv_index:
@@ -221,16 +221,15 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             case .showers, .hail:
                 // Global has only instantanous rates for snow and showers
                 return nil
-            //case .cloud_base:
+// case .cloud_base:
             //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
-            //case .freezing_level_height:
+            // case .freezing_level_height:
             //    return "height_ASL_at_freezing_level"
             case .shortwave_radiation, .direct_radiation:
                 // Radiation is only available until hour 30 for runs 6z and 18z
                 if run.hour % 12 == 6 && forecastHour >= 31 {
                     return nil
                 }
-                break
             case .precipitation:
                 // precipitation not available for ensemble
                 return nil
@@ -239,7 +238,6 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                     /// Only has 1 hourly aggregations, but timeintervals are actually 3 or 6 hourly
                     return nil
                 }
-                break
             case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .uv_index:
                 // Actually available, but not processed for ensembles
                 return nil
@@ -254,7 +252,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 break
             }
         }
-        
+
         switch self {
         case .cape:
             return "CAPE_surface"
@@ -285,7 +283,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .wind_gusts_10m:
             return "wind_gust_at_10m"
         case .precipitation:
-            //return "precipitation_rate"
+            // return "precipitation_rate"
             // hourly until 49, while rain is hourly until hour 57
             if domain == .global_deterministic_10km {
                 if forecastHour >= 150 {
@@ -336,7 +334,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return "radiation_flux_in_uv_downward_at_surface"
         }
     }
-    
+
     var skipHour0: Bool {
         switch self {
         case .precipitation, .rain, .hail, .snowfall_water_equivalent:
@@ -345,7 +343,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return false
         }
     }
-    
+
     var multiplyAdd: (offset: Float, scalefactor: Float)? {
         switch self {
         case .temperature_2m, .surface_temperature:
@@ -359,23 +357,23 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .uv_index:
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
-            return (0, 1/0.25)
+            return (0, 1 / 0.25)
         case .pressure_msl:
-            return (0, 1/100)
+            return (0, 1 / 100)
         default:
             return nil
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         switch self {
-        case .temperature_2m:
-            fallthrough
+        case .temperature_2m, .surface_temperature:
+            return true
         default:
             return false
         }
     }
-    
+
     func withLevel(level: Float) -> UkmoSurfaceVariable {
         return self
     }
@@ -393,26 +391,25 @@ enum UkmoPressureVariableType: String, CaseIterable {
     case vertical_velocity
 }
 
-
 /**
  A pressure level variable on a given level in hPa / mb
  */
 struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: UkmoPressureVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
@@ -432,7 +429,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level)))
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -449,7 +446,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             return .hermite(bounds: nil)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -466,15 +463,15 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             return .metrePerSecondNotUnitConverted
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var skipHour0: Bool {
         return false
     }
-    
+
     var multiplyAdd: (offset: Float, scalefactor: Float)? {
         switch variable {
         case .temperature:
@@ -485,7 +482,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             return nil
         }
     }
-    
+
     func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
@@ -494,9 +491,8 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             if variable == .vertical_velocity {
                 return nil
             }
-            break
         }
-        
+
         switch variable {
         case .temperature:
             return "temperature_on_pressure_levels"
@@ -512,7 +508,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             return "wind_vertical_velocity_on_pressure_levels"
         }
     }
-    
+
     func withLevel(level: Float) -> UkmoPressureVariable {
         return UkmoPressureVariable(variable: variable, level: Int(level))
     }
@@ -534,7 +530,7 @@ enum UkmoHeightVariableType: String, CaseIterable {
 struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadable, Hashable, GenericVariableMixable {
     let variable: UkmoHeightVariableType
     let level: Int
-    
+
     var storePreviousForecast: Bool {
         switch variable {
         case .wind_speed, .wind_direction:
@@ -543,15 +539,15 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return false
         }
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     var scalefactor: Float {
         // Upper level data are more dynamic and that is bad for compression. Use lower scalefactors
         switch variable {
@@ -565,7 +561,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return 1
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch variable {
         case .temperature:
@@ -578,7 +574,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return .hermite(bounds: 0...100)
         }
     }
-    
+
     var unit: SiUnit {
         switch variable {
         case .temperature:
@@ -591,15 +587,15 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return .percentage
         }
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var skipHour0: Bool {
         return false
     }
-    
+
     var multiplyAdd: (offset: Float, scalefactor: Float)? {
         switch variable {
         case .temperature:
@@ -610,7 +606,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return nil
         }
     }
-    
+
     func getNcFileName(domain: UkmoDomain, forecastHour: Int, run: Timestamp) -> String? {
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
@@ -629,7 +625,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return "cloud_amount_on_height_levels"
         }
     }
-    
+
     func withLevel(level: Float) -> UkmoHeightVariable {
         return UkmoHeightVariable(variable: variable, level: Int(level))
     }
@@ -639,7 +635,6 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
  Combined surface and pressure level variables with all definitions for downloading and API
  */
 typealias UkmoVariable = SurfacePressureAndHeightVariable<UkmoSurfaceVariable, UkmoPressureVariable, UkmoHeightVariable>
-
 
 protocol UkmoVariableDownloadable: GenericVariable {
     var skipHour0: Bool { get }

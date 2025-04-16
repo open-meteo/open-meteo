@@ -44,25 +44,24 @@ protocol ApiUnitsSelectable {
 struct DataAndUnit {
     let data: [Float]
     let unit: SiUnit
-    
+
     public init(_ data: [Float], _ unit: SiUnit) {
         self.data = data
         self.unit = unit
     }
-    
+
     /// Convert a given array to target units
     /// Note: Rounding is now done in the writers
     func convertAndRound<Query: ApiUnitsSelectable>(params: Query) -> DataAndUnit {
         var data = self.data
         var unit = self.unit
-        
+
         let windspeedUnit = params.windspeed_unit ?? params.wind_speed_unit ?? .kmh
         let temperatureUnit = params.temperature_unit
         let precipitationUnit = params.precipitation_unit ?? (params.length_unit == .imperial ? .inch : nil)
         if unit == .celsius && temperatureUnit == .fahrenheit {
-            
             for i in data.indices {
-                data[i] = (data[i] * 9/5) + 32
+                data[i] = (data[i] * 9 / 5) + 32
             }
             unit = .fahrenheit
         }

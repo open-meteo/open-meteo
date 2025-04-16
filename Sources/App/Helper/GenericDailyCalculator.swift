@@ -1,6 +1,5 @@
 import Foundation
 
-
 protocol DailyVariableCalculatable {
     associatedtype Variable
     var aggregation: DailyAggregation<Variable> { get }
@@ -16,7 +15,7 @@ enum DailyAggregation<WeatherVariable> {
     case precipitationHours(WeatherVariable)
     case dominantDirection(velocity: WeatherVariable, direction: WeatherVariable)
     case dominantDirectionComponents(u: WeatherVariable, v: WeatherVariable)
-    
+
     /// Return 0, 1 or 2 weahter variables which should be prefetched
     var variables: (WeatherVariable?, WeatherVariable?) {
         switch self {
@@ -56,7 +55,7 @@ enum DailyAggregation<WeatherVariable> {
 extension GenericReaderMulti {
     func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDtAndSettings) throws -> DataAndUnit? where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
-        
+
         switch variable.aggregation {
         case .none:
             return nil
@@ -85,12 +84,12 @@ extension GenericReaderMulti {
                 return nil
             }
             // 3600s only for hourly data of source
-            return DataAndUnit(data.data.map({$0*0.0036}).sum(by: 24).round(digits: 2), .megajoulePerSquareMetre)
+            return DataAndUnit(data.data.map({ $0 * 0.0036 }).sum(by: 24).round(digits: 2), .megajoulePerSquareMetre)
         case .precipitationHours(let variable):
             guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
-            return DataAndUnit(data.data.map({$0 > 0.001 ? 1 : 0}).sum(by: 24), .hours)
+            return DataAndUnit(data.data.map({ $0 > 0.001 ? 1 : 0 }).sum(by: 24), .hours)
         case .dominantDirection(velocity: let velocity, direction: let direction):
             guard let speed = try get(variable: velocity, time: time)?.data,
                 let direction = try get(variable: direction, time: time)?.data else {
@@ -108,7 +107,6 @@ extension GenericReaderMulti {
             return DataAndUnit(Meteorology.windirectionFast(u: u.sum(by: 24), v: v.sum(by: 24)), .degreeDirection)
         }
     }
-    
 
     func prefetchData<V: DailyVariableCalculatable>(variables: [V], time timeDaily: TimerangeDtAndSettings) throws where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)

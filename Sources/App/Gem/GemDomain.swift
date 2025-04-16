@@ -1,7 +1,6 @@
 import Foundation
 import OmFileFormat
 
-
 /**
  Definition of GEM domains from the Canadian Weather Service
  */
@@ -10,7 +9,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_regional
     case gem_hrdps_continental
     case gem_global_ensemble
-    
+
     var domainRegistry: DomainRegistry {
         switch self {
         case .gem_global:
@@ -23,29 +22,29 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return .cmc_gem_geps
         }
     }
-    
+
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry
     }
-    
+
     var hasYearlyFiles: Bool {
         return false
     }
-    
+
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
-    
+
     var dtSeconds: Int {
         switch self {
         case .gem_global:
-            return 3*3600
+            return 3 * 3600
         case .gem_regional:
             return 3600
         case .gem_hrdps_continental:
             return 3600
         case .gem_global_ensemble:
-            return 3*3600
+            return 3 * 3600
         }
     }
     var isGlobal: Bool {
@@ -60,15 +59,15 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return true
         }
     }
-    
+
     var updateIntervalSeconds: Int {
         switch self {
         case .gem_global:
-            return 12*3600
+            return 12 * 3600
         case .gem_regional, .gem_hrdps_continental:
-            return 6*3600
+            return 6 * 3600
         case .gem_global_ensemble:
-            return 12*3600
+            return 12 * 3600
         }
     }
 
@@ -79,20 +78,20 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_global:
             // First hours 3:40 h delay, second part 6.5 h delay
             // every 12 hours
-            return t.add(-3*3600).floor(toNearest: 12*3600)
+            return t.add(-3 * 3600).floor(toNearest: 12 * 3600)
         case .gem_regional:
             // Delay of 2:47 hours to init
             // every 6 hours
-            return t.add(-2*3600).floor(toNearest: 6*3600)
+            return t.add(-2 * 3600).floor(toNearest: 6 * 3600)
         case .gem_hrdps_continental:
             // Delay of 3:08 hours to init
             // every 6 hours
-            return t.add(-2*3600).floor(toNearest: 6*3600)
+            return t.add(-2 * 3600).floor(toNearest: 6 * 3600)
         case .gem_global_ensemble:
-            return t.add(-3*3600).floor(toNearest: 12*3600)
+            return t.add(-3 * 3600).floor(toNearest: 12 * 3600)
         }
     }
-    
+
     func getForecastHours(run: Timestamp) -> [Int] {
         switch self {
         case .gem_global:
@@ -106,13 +105,11 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, to: 192, by: 3)) + Array(stride(from: 192, through: through, by: 6))
         }
     }
-    
+
     /// pressure levels
     var levels: [Int] {
         switch self {
-        case .gem_global:
-            fallthrough
-        case .gem_regional:
+        case .gem_global, .gem_regional:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50, 30, 20, 10/*, 5, 1*/].reversed() // 5 and 1 not available for dewpoint
         case .gem_hrdps_continental:
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
@@ -121,7 +118,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
         }
     }
-    
+
     var ensembleMembers: Int {
         switch self {
         case .gem_global:
@@ -131,10 +128,10 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_hrdps_continental:
             return 1
         case .gem_global_ensemble:
-            return 20+1
+            return 20 + 1
         }
     }
-    
+
     func getUrl(run: Timestamp, hour: Int, gribName: String, server: String?) -> String {
         let h3 = hour.zeroPadded(len: 3)
         let yyyymmddhh = run.format_YYYYMMddHH
@@ -150,20 +147,20 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return "\(server)ensemble/geps/grib2/raw/\(run.hh)/\(h3)/CMC_geps-raw_\(gribName)_latlon0p5x0p5_\(yyyymmddhh)_P\(h3)_allmbrs.grib2"
         }
     }
-    
+
     var omFileLength: Int {
         switch self {
         case .gem_global:
             return 110
         case .gem_regional:
-            return 78+36
+            return 78 + 36
         case .gem_hrdps_continental:
-            return 48+36
+            return 48 + 36
         case .gem_global_ensemble:
-            return 384/3 + 48/3 // 144
+            return 384 / 3 + 48 / 3 // 144
         }
     }
-    
+
     var grid: Gridable {
         switch self {
         case .gem_global:

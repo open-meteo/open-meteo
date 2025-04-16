@@ -16,12 +16,12 @@ extension CamsQuery.Domain: GenericDomainProvider {
 
 extension CamsMixer: GenericReaderProvider {
     init?(domain: CamsQuery.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        guard let reader = try Self.init(domains: domain.camsDomains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+        guard let reader = try Self(domains: domain.camsDomains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         self = reader
     }
-    
+
     init?(domain: CamsQuery.Domain, gridpoint: Int, options: GenericReaderOptions) throws {
         switch domain {
         case .auto:
@@ -41,24 +41,24 @@ extension CamsMixer: GenericReaderProvider {
  */
 struct CamsController {
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter("air-quality-api") { host, params in
+        try await req.withApiParameter("air-quality-api") { _, params in
             let currentTime = Timestamp.now()
             let allowedRange = Timestamp(2013, 1, 1) ..< currentTime.add(86400 * 6)
-            
+
             let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
             let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
-            let domains = try (params.domains.map({[$0]}) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
-            
+            let domains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+
             let nVariables = (paramsHourly?.count ?? 0) * domains.count
-            
+
             let prepared = try CamsMixer.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
-            
+
             let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
-                
+
                 let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
                     guard let reader = try readerAndDomain.reader() else {
                         return nil
@@ -67,7 +67,7 @@ struct CamsController {
                     let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
                     let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
                     let domain = readerAndDomain.domain
-                    
+
                     let hourlyFn: (() throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
@@ -77,7 +77,7 @@ struct CamsController {
                             })
                         }
                     }
-                    
+
                     let currentFn: (() throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsCurrent.map { variables in
                         return {
                             return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.map { variable in
@@ -86,8 +86,8 @@ struct CamsController {
                             })
                         }
                     }
-                    
-                    return ForecastapiResult<CamsQuery.Domain>.PerModel.init(
+
+                    return ForecastapiResult<CamsQuery.Domain>.PerModel(
                         model: domain,
                         latitude: reader.modelLat,
                         longitude: reader.modelLon,
@@ -127,7 +127,7 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     case european_aqi_nitrogen_dioxide
     case european_aqi_ozone
     case european_aqi_sulphur_dioxide
-    
+
     case us_aqi
     case us_aqi_pm2_5
     case us_aqi_pm10
@@ -139,9 +139,9 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     case us_aqi_ozone
     case us_aqi_sulphur_dioxide
     case us_aqi_carbon_monoxide
-    
+
     case is_day
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -149,15 +149,15 @@ enum CamsVariableDerived: String, GenericVariableMixable {
 
 struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     typealias MixingVar = VariableOrDerived<CamsVariable, CamsVariableDerived>
-    
+
     typealias Domain = CamsDomain
-    
+
     typealias Variable = CamsVariable
-    
+
     typealias Derived = CamsVariableDerived
-    
+
     let reader: GenericReaderCached<CamsDomain, CamsVariable>
-    
+
     func get(derived: CamsVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         switch derived {
         case .european_aqi:
@@ -171,26 +171,20 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             })
             return DataAndUnit(max, .europeanAirQualityIndex)
         case .european_aqi_pm2_5:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
             let pm2_5 = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm2_5.map(EuropeanAirQuality.indexPm2_5), .europeanAirQualityIndex)
         case .european_aqi_pm10:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
             let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm10avg.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
-        case .european_aqi_nitrogen_dioxide:
-            fallthrough
-        case .european_aqi_no2:
+        case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
             return DataAndUnit(no2.map(EuropeanAirQuality.indexNo2), .europeanAirQualityIndex)
-        case .european_aqi_ozone:
-            fallthrough
-        case .european_aqi_o3:
+        case .european_aqi_ozone, .european_aqi_o3:
             let o3 = try get(raw: .ozone, time: time).data
             return DataAndUnit(o3.map(EuropeanAirQuality.indexO3), .europeanAirQualityIndex)
-        case .european_aqi_sulphur_dioxide:
-            fallthrough
-        case .european_aqi_so2:
+        case .european_aqi_sulphur_dioxide, .european_aqi_so2:
             let so2 = try get(raw: .sulphur_dioxide, time: time).data
             return DataAndUnit(so2.map(EuropeanAirQuality.indexSo2), .europeanAirQualityIndex)
         case .us_aqi:
@@ -205,47 +199,39 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             })
             return DataAndUnit(max, .usAirQualityIndex)
         case .us_aqi_pm2_5:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
             let pm2_5 = try get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm2_5.map(UnitedStatesAirQuality.indexPm2_5), .usAirQualityIndex)
         case .us_aqi_pm10:
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
             let pm10avg = try get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
             return DataAndUnit(pm10avg.map(UnitedStatesAirQuality.indexPm10), .usAirQualityIndex)
-        case .us_aqi_nitrogen_dioxide:
-            fallthrough
-        case .us_aqi_no2:
+        case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
             // need to convert from ugm3 to ppb
             let no2 = try get(raw: .nitrogen_dioxide, time: time).data
-            return DataAndUnit(no2.map({UnitedStatesAirQuality.indexNo2(no2: $0 / 1.88) }), .usAirQualityIndex)
-        case .us_aqi_ozone:
-            fallthrough
-        case .us_aqi_o3:
+            return DataAndUnit(no2.map({ UnitedStatesAirQuality.indexNo2(no2: $0 / 1.88) }), .usAirQualityIndex)
+        case .us_aqi_ozone, .us_aqi_o3:
             // need to convert from ugm3 to ppb
-            let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-8 * 3600))
             let o3 = try get(raw: .ozone, time: timeAhead).data
             let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8)
-            return DataAndUnit(zip(o3.dropFirst(8), o3avg).map({UnitedStatesAirQuality.indexO3(o3: $0.0 / 1.96, o3_8h_mean: $0.1 / 1.96)}), .usAirQualityIndex)
-        case .us_aqi_sulphur_dioxide:
-            fallthrough
-        case .us_aqi_so2:
+            return DataAndUnit(zip(o3.dropFirst(8), o3avg).map({ UnitedStatesAirQuality.indexO3(o3: $0.0 / 1.96, o3_8h_mean: $0.1 / 1.96) }), .usAirQualityIndex)
+        case .us_aqi_sulphur_dioxide, .us_aqi_so2:
             // need to convert from ugm3 to ppb
-            let timeAhead = time.with(start: time.range.lowerBound.add(-24*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
             let so2 = try get(raw: .sulphur_dioxide, time: timeAhead).data
             let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24)
-            return DataAndUnit(zip(so2.dropFirst(24), so2avg).map({UnitedStatesAirQuality.indexSo2(so2: $0.0 / 2.62, so2_24h_mean: $0.1 / 2.62)}), .usAirQualityIndex)
-        case .us_aqi_carbon_monoxide:
-            fallthrough
-        case .us_aqi_co:
+            return DataAndUnit(zip(so2.dropFirst(24), so2avg).map({ UnitedStatesAirQuality.indexSo2(so2: $0.0 / 2.62, so2_24h_mean: $0.1 / 2.62) }), .usAirQualityIndex)
+        case .us_aqi_carbon_monoxide, .us_aqi_co:
             // need to convert from ugm3 to ppm
-            let timeAhead = time.with(start: time.range.lowerBound.add(-8*3600))
+            let timeAhead = time.with(start: time.range.lowerBound.add(-8 * 3600))
             let co = try get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
-            return DataAndUnit(co.map({UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000)}), .usAirQualityIndex)
+            return DataAndUnit(co.map({ UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000) }), .usAirQualityIndex)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         }
     }
-    
+
     func prefetchData(derived: CamsVariableDerived, time: TimerangeDtAndSettings) throws {
         switch derived {
         case .european_aqi:
@@ -255,20 +241,14 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(derived: .european_aqi_o3, time: time)
             try prefetchData(derived: .european_aqi_so2, time: time)
         case .european_aqi_pm2_5:
-            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .european_aqi_pm10:
-            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24*3600)))
-        case .european_aqi_nitrogen_dioxide:
-            fallthrough
-        case .european_aqi_no2:
+            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+        case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
             try prefetchData(raw: .nitrogen_dioxide, time: time)
-        case .european_aqi_ozone:
-            fallthrough
-        case .european_aqi_o3:
+        case .european_aqi_ozone, .european_aqi_o3:
             try prefetchData(raw: .ozone, time: time)
-        case .european_aqi_sulphur_dioxide:
-            fallthrough
-        case .european_aqi_so2:
+        case .european_aqi_sulphur_dioxide, .european_aqi_so2:
             try prefetchData(raw: .sulphur_dioxide, time: time)
         case .us_aqi:
             try prefetchData(derived: .us_aqi_pm2_5, time: time)
@@ -278,25 +258,17 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try prefetchData(derived: .us_aqi_so2, time: time)
             try prefetchData(derived: .us_aqi_co, time: time)
         case .us_aqi_pm2_5:
-            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24*3600)))
+            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .us_aqi_pm10:
-            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24*3600)))
-        case .us_aqi_nitrogen_dioxide:
-            fallthrough
-        case .us_aqi_no2:
+            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+        case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
             try prefetchData(raw: .nitrogen_dioxide, time: time)
-        case .us_aqi_ozone:
-            fallthrough
-        case .us_aqi_o3:
-            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
-        case .us_aqi_sulphur_dioxide:
-            fallthrough
-        case .us_aqi_so2:
-            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24*3600)))
-        case .us_aqi_carbon_monoxide:
-            fallthrough
-        case .us_aqi_co:
-            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8*3600)))
+        case .us_aqi_ozone, .us_aqi_o3:
+            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8 * 3600)))
+        case .us_aqi_sulphur_dioxide, .us_aqi_so2:
+            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+        case .us_aqi_carbon_monoxide, .us_aqi_co:
+            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8 * 3600)))
         case .is_day:
             break
         }
@@ -313,14 +285,14 @@ extension Array where Element == Float {
     /// Resulting array will be `dt` elements shorter
     func slidingAverageDroppingFirstDt(dt: Int) -> [Float] {
         return (0 ..< Swift.max(self.count - dt, 0)).map { i in
-            return self[i..<Swift.min(i+dt, self.count)].reduce(0, +) / Float(dt)
+            return self[i..<Swift.min(i + dt, self.count)].reduce(0, +) / Float(dt)
         }
     }
 }
 
 struct CamsMixer: GenericReaderMixer {
     let reader: [CamsReader]
-    
+
     static func makeReader(domain: CamsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> CamsReader? {
         guard let reader = try GenericReader<CamsDomain, CamsVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
@@ -330,7 +302,6 @@ struct CamsMixer: GenericReaderMixer {
 }
 
 struct CamsQuery {
-
 }
 
 extension CamsQuery {
@@ -338,7 +309,7 @@ extension CamsQuery {
         case auto
         case cams_global
         case cams_europe
-        
+
         var camsDomains: [CamsDomain] {
             switch self {
             case .auto:

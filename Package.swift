@@ -38,7 +38,8 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.1.2"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.0.1"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")
+        //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.0")
     ] : []),
@@ -64,6 +65,7 @@ let package = Package(
             ] : []),
             cSettings: cFlags,
             swiftSettings: swiftFlags + (enableParquet ? [.define("ENABLE_PARQUET")] : [])
+            //plugins: [.plugin(name: "SwiftLintBuildToolPlugin", package: "SwiftLintPlugins")]
         ),
         .systemLibrary(
             name: "CZlib",
@@ -87,6 +89,6 @@ let package = Package(
         .testTarget(
             name: "AppTests",
             dependencies: [.target(name: "App")]
-        )
+        ),
     ]
 )

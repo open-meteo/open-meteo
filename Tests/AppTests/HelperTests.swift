@@ -2,26 +2,25 @@ import Foundation
 @testable import App
 import XCTest
 import NIO
-//import Vapor
-
+// import Vapor
 
 final class HelperTests: XCTestCase {
     func testMapStream() async {
-        let a = (0..<100).map{$0}
-        let res = try! await a.mapStream(nConcurrent: 4){
+        let a = (0..<100).map { $0 }
+        let res = try! await a.mapStream(nConcurrent: 4) {
             try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
             return $0
         }.collect()
         XCTAssertEqual(res, a)
-        
-        let a2 = (0..<5).map{$0}
-        let res2 = try! await a2.mapStream(nConcurrent: 10){
+
+        let a2 = (0..<5).map { $0 }
+        let res2 = try! await a2.mapStream(nConcurrent: 10) {
             try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
             return $0
         }.collect()
         XCTAssertEqual(res2, a2)
     }
-    
+
     func testIndexedCurl() {
         let index = """
             1:0:d=2022080800:UFLX:surface:anl:
@@ -44,18 +43,18 @@ final class HelperTests: XCTestCase {
         }
         XCTAssertEqual(range?.range, "104746-276986,344851-430542,564311-")
         XCTAssertEqual(range?.minSize, 257933)
-        
-        let range2 = index.split(separator: "\n").indexToRange { line in
+
+        let range2 = index.split(separator: "\n").indexToRange { _ in
             return true
         }
         XCTAssertEqual(range2?.range, "0-")
         XCTAssertEqual(range2?.minSize, 564311)
-        
-        let range3 = index.split(separator: "\n").indexToRange { line in
+
+        let range3 = index.split(separator: "\n").indexToRange { _ in
             return false
         }
         XCTAssertTrue(range3 == nil)
-        
+
         let range4 = index.split(separator: "\n").indexToRange { line in
             line.contains("TMP") || line.contains("UFLX")
         }
@@ -66,7 +65,7 @@ final class HelperTests: XCTestCase {
             line.contains(":")
         })*/
     }
-    
+
     func testDecodeEcmwfIndex() throws {
         var buffer = ByteBuffer()
         buffer.writeString("""
@@ -82,7 +81,7 @@ final class HelperTests: XCTestCase {
         let range = index.indexToRange()[0]
         XCTAssertEqual(range.range, "0-3857388")
         XCTAssertEqual(range.minSize, 3857388)
-        
+
         var buffer2 = ByteBuffer()
         buffer2.writeString("""
         {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "levtype": "sfc", "number": "21", "step": "102", "param": "tp", "_offset": 0, "_length": 812043}
@@ -98,7 +97,7 @@ final class HelperTests: XCTestCase {
         XCTAssertEqual(range2.range, "0-812043,812044-2639250,2639249-3248317,3248319-3857388")
         XCTAssertEqual(range2.minSize, 3857386)
     }
-    
+
     /*func testSpawn() async throws {
         let time = DispatchTime.now()
         async let a: () = try Process.spawn(cmd: "sleep", args: ["1"])
@@ -108,11 +107,11 @@ final class HelperTests: XCTestCase {
         let elapsedMs = Double((DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds) / 1_000_000)
         XCTAssertLessThan(elapsedMs, 1200)
     }*/
-    
+
     func testNativeSpawn() throws {
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["Hello"]), 0)
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["World"]), 0)
-        
+
         try "exit 70".write(toFile: "temp.sh", atomically: true, encoding: .utf8)
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "bash", args: ["temp.sh"]), 70)
         try FileManager.default.removeItem(atPath: "temp.sh")

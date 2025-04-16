@@ -4,7 +4,6 @@ import CBz2lib
 import SwiftEccodes
 import Logging
 
-
 extension AsyncSequence where Element == ByteBuffer {
     /// Decode incoming data to GRIB messges
     func decodeGrib() -> GribAsyncStream<Self> {
@@ -12,7 +11,7 @@ extension AsyncSequence where Element == ByteBuffer {
     }
 }
 
-struct GribAsyncStreamHelper {
+enum GribAsyncStreamHelper {
     /// Detect a range of bytes in a byte stream if there is a grib header and returns it
     /// Note: The required length to decode a GRIB message is not checked of the input buffer
     static func seekGrib(memory: UnsafeRawBufferPointer) -> (offset: Int, length: Int, gribVersion: Int)? {
@@ -20,7 +19,7 @@ struct GribAsyncStreamHelper {
         guard let base = memory.baseAddress else {
             return nil
         }
-        guard let offset = search.withCString({memory.firstRange(of: UnsafeRawBufferPointer(start: $0, count: strlen($0)))})?.lowerBound else {
+        guard let offset = search.withCString({ memory.firstRange(of: UnsafeRawBufferPointer(start: $0, count: strlen($0))) })?.lowerBound else {
             return nil
         }
         guard offset <= (1 << 40), offset + 16 <= memory.count else {
@@ -29,7 +28,7 @@ struct GribAsyncStreamHelper {
         /// GRIB version in 1 and 2 is always at byte 8
         /// https://codes.ecmwf.int/grib/format/grib2/sections/0/
         let edition = base.advanced(by: offset + 7).assumingMemoryBound(to: UInt8.self).pointee
-        
+
         switch edition {
         case 1:
             // 1-4 identifier = GRIB
@@ -45,8 +44,8 @@ struct GribAsyncStreamHelper {
                 let section1Length = base.advanced(by: sectionOffset).uint24
                 let flags = base.advanced(by: sectionOffset + 3 + 4).assumingMemoryBound(to: UInt8.self).pointee
                 sectionOffset += Int(section1Length)
-                //print("Section 1 length \(section1Length); flags \(flags)")
-                
+                // print("Section 1 length \(section1Length); flags \(flags)")
+
                 // Section 2
                 if flags & (1 << 7) != 0 {
                     guard memory.count >= sectionOffset + 3 else {
@@ -54,9 +53,9 @@ struct GribAsyncStreamHelper {
                     }
                     let section2Length = base.advanced(by: sectionOffset).uint24
                     sectionOffset += Int(section2Length)
-                    //print("Section 2 length \(section2Length)")
+                    // print("Section 2 length \(section2Length)")
                 }
-                
+
                 // Section 3
                 if flags & (1 << 6) != 0 {
                     guard memory.count >= sectionOffset + 3 else {
@@ -64,14 +63,14 @@ struct GribAsyncStreamHelper {
                     }
                     let section3Length = base.advanced(by: sectionOffset).uint24
                     sectionOffset += Int(section3Length)
-                    //print("Section 3 length \(section3Length)")
+                    // print("Section 3 length \(section3Length)")
                 }
-                
+
                 guard memory.count >= sectionOffset + 3 else {
                     return nil
                 }
                 let section4Length = base.advanced(by: sectionOffset).uint24
-                //print("Section 4 length \(section4Length)")
+                // print("Section 4 length \(section4Length)")
 
                 if section4Length < 120 {
                     // "Special Coding"
@@ -104,23 +103,22 @@ enum GribAsyncStreamError: Error {
     case didNotFindGibHeader
 }
 
-
 /**
  Decode incoming binary stream to grib messages
  */
 struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteBuffer {
     public typealias Element = AsyncIterator.Element
-    
+
     let sequence: T
 
     public final class AsyncIterator: AsyncIteratorProtocol {
         private var iterator: T.AsyncIterator
-        
+
         /// Collect enough bytes to decompress a single message
         private var buffer: ByteBuffer
-        
+
         /// Buffer mutliple messages to only return one at a time
-        private var messages: [GribMessage]? = nil
+        private var messages: [GribMessage]?
 
         fileprivate init(iterator: T.AsyncIterator) {
             self.iterator = iterator
@@ -132,20 +130,20 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
             if let next = messages?.popLast() {
                 return next
             }
-            
+
             while true {
                 // repeat until GRIB header is found
                 guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
                         return nil
                     }
-                    guard buffer.readableBytes < 64*1024 else {
+                    guard buffer.readableBytes < 64 * 1024 else {
                         throw GribAsyncStreamError.didNotFindGibHeader
                     }
                     buffer.writeImmutableBuffer(input)
                     continue
                 }
-                
+
                 // Repeat until enough data is available
                 while buffer.readableBytes < seek.offset + seek.length {
                     guard let input = try await self.iterator.next() else {
@@ -154,15 +152,15 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                     }
                     buffer.writeImmutableBuffer(input)
                 }
-                
+
                 // Deocode message with eccodes
                 messages = try buffer.readWithUnsafeReadableBytes({
-                    let range = seek.offset ..< Swift.min(seek.offset+seek.length, $0.count)
+                    let range = seek.offset ..< Swift.min(seek.offset + seek.length, $0.count)
                     let memory = UnsafeRawBufferPointer(rebasing: $0[range])
                     let messages = try SwiftEccodes.getMessages(memory: memory, multiSupport: true)
-                    return (seek.offset+seek.length, messages)
+                    return (seek.offset + seek.length, messages)
                 })
-                
+
                 buffer.discardReadBytes()
                 if let next = messages?.popLast() {
                     return next

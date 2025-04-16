@@ -10,23 +10,23 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
     case swell_wave_height
     case swell_wave_period
     case swell_wave_direction
-    
+
     var storePreviousForecast: Bool {
         return false
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-    
+
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
-    
+
     /// Si unit
     var unit: SiUnit {
         switch self {
@@ -50,7 +50,7 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
             return .degreeDirection
         }
     }
-    
+
     var scalefactor: Float {
         let period: Float = 20 // 0.05s resolution
         let height: Float = 50 // 0.02m resolution
@@ -76,7 +76,7 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
             return direction
         }
     }
-    
+
     var interpolation: ReaderInterpolation {
         switch self {
         case .wave_height:
@@ -124,11 +124,11 @@ extension GfsWaveVariable: GfsVariableDownloadable {
             return "SWDIR:1 in sequence:"
         }
     }
-    
+
     func skipHour0(for domain: GfsDomain) -> Bool {
         return false
     }
-    
+
     func multiplyAdd(domain: GfsDomain) -> (multiply: Float, add: Float)? {
         return nil
     }

@@ -14,7 +14,7 @@ final class ConcurrencyGroupLimiter {
     private var waiters: [(Int, CheckedContinuation<Void, Never>)] = []
 
     init() {}
-    
+
     func stats() -> (monitored_ips: Int, total_running: Int, queued_requests: Int) {
         lock.withLock {
             return (counts.count, counts.reduce(0, { $0 + $1.value }), waiters.count)
@@ -26,7 +26,7 @@ final class ConcurrencyGroupLimiter {
         guard let count = self.counts[slot] else {
             self.counts[slot] = 1
             lock.unlock()
-            //print("Single request slot \(slot)")
+            // print("Single request slot \(slot)")
             return
         }
         guard count < maxConcurrentHard else {
@@ -36,7 +36,7 @@ final class ConcurrencyGroupLimiter {
         counts[slot] = count + 1
         guard count < maxConcurrent else {
             await withCheckedContinuation {
-                //print("Queuing request slot \(slot)")
+                // print("Queuing request slot \(slot)")
                 waiters.append((slot, $0))
                 lock.unlock()
             }
@@ -51,17 +51,17 @@ final class ConcurrencyGroupLimiter {
             fatalError("Released slot \(slot) but it was not in use")
         }
         guard count > 1 else {
-            //print("All requests finished for slot \(slot)")
+            // print("All requests finished for slot \(slot)")
             self.counts.removeValue(forKey: slot)
             lock.unlock()
             return
         }
         self.counts[slot] = count - 1
-        guard let index = waiters.firstIndex(where: {$0.0 == slot}) else {
+        guard let index = waiters.firstIndex(where: { $0.0 == slot }) else {
             lock.unlock()
             return // no other requests are queued
         }
-        //print("Running queued request at slot \(slot)")
+        // print("Running queued request at slot \(slot)")
         let cont = waiters[index].1
         waiters.remove(at: index)
         lock.unlock()
