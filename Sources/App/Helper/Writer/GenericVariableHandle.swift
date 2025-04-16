@@ -104,7 +104,7 @@ struct GenericVariableHandle {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
-        let nLocations = grid.count
+        //let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
         
         for (_, handles) in handles.groupedPreservedOrder(by: {"\($0.variable.omFileName.file)"}) {
@@ -280,6 +280,12 @@ actor VariablePerMemberStorage<V: Hashable> {
     func get(_ variable: VariableAndMember) -> Array2D? {
         return data[variable]
     }
+    
+    func getAndForget(_ variable: VariableAndMember) -> Array2D? {
+        let value = data[variable]
+        data.removeValue(forKey: variable)
+        return value
+    }
 }
 
 
@@ -353,11 +359,14 @@ extension VariablePerMemberStorage {
 
 /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
 actor GribDeaverager {
-    var data: [String: (step: Int, data: [Float])]
+    var data: [Int: (step: Int, data: [Float])]
     
     /// Set new value and get previous value out
-    func set(variable: GenericVariable, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
-        let key = "\(variable)_member\(member)"
+    func set<V: Hashable>(variable: V, member: Int, step: Int, data d: [Float]) -> (step: Int, data: [Float])? {
+        var hash = Hasher()
+        hash.combine(variable)
+        hash.combine(member)
+        let key = hash.finalize()
         let previous = data[key]
         data[key] = (step, d)
         return previous
@@ -368,12 +377,12 @@ actor GribDeaverager {
         return .init(data: data)
     }
     
-    public init(data: [String : (step: Int, data: [Float])] = [String: (step: Int, data: [Float])]()) {
+    public init(data: [Int : (step: Int, data: [Float])] = .init()) {
         self.data = data
     }
     
     /// Returns false if step should be skipped
-    func deaccumulateIfRequired(variable: GenericVariable, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
+    func deaccumulateIfRequired<V: Hashable>(variable: V, member: Int, stepType: String, stepRange: String, grib2d: inout GribArray2D) async -> Bool {
         // Deaccumulate precipitation
         if stepType == "accum" {
             guard let (startStep, currentStep) = stepRange.splitTo2Integer(), startStep != currentStep else {

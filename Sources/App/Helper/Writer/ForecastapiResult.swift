@@ -61,7 +61,7 @@ protocol ForecastapiResponder {
 }
 
 /// Stores the API output for multiple locations
-struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, Sendable {
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
@@ -79,7 +79,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         self.nVariablesTimesDomains = nVariablesTimesDomains
     }
     
-    struct PerLocation {
+    struct PerLocation: Sendable {
         let timezone: TimezoneWithOffset
         let time: TimerangeLocal
         let locationId: Int

@@ -166,6 +166,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
         for hour in forecastHours {
             logger.info("Downloading hour \(hour)")
             let timestamp = run.add(hours: hour)
+            /// Delta time seconds considering irregular timesteps
+            let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
             if variables.isEmpty {
                 continue
@@ -279,7 +281,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 //fatalError()
                 
                 // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd(domain: domain) {
+                if let fma = variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
                 

@@ -54,10 +54,8 @@ This document lists all required cronjobs to download data. However, downloading
 # metno
 27 * * * * /usr/local/bin/openmeteo-api download-metno nordic_pp > ~/log/nordic_pp.log 2>&1 || cat ~/log/nordic_pp.log
 
-# Arpae Cosmo Italy
-40 4,16 * * * /usr/local/bin/openmeteo-api download-arpae cosmo_2i --concurrent 4 > ~/log/cosmo_2i.log 2>&1 || cat ~/log/cosmo_2i.log
-45 3,15 * * * /usr/local/bin/openmeteo-api download-arpae cosmo_5m --concurrent 4 > ~/log/cosmo_5m.log 2>&1 || cat ~/log/cosmo_5m.log
-00 0,3,6,9,12,15,18,21 * * * /usr/local/bin/openmeteo-api download-arpae cosmo_2i_ruc --concurrent 4 > ~/log/cosmo_2i_ruc.log 2>&1 || cat ~/log/cosmo_2i_ruc.log
+# ItaliaMeteoArpae
+0 2,14 * * * /usr/local/bin/openmeteo-api download-italia-meteo-arpae icon_2i --concurrent 4 > ~/log/icon_2i.log 2>&1 || cat ~/log/icon_2i.log
 
 # MeteoFrance
 15 3,9,15,21 * * * bash -c "source ~/mfkey.env; /usr/local/bin/openmeteo-api download-meteofrance arpege_world > ~/log/arpege_world.log 2>&1 || cat ~/log/arpege_world.log"

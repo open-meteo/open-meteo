@@ -959,7 +959,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         }
     }
     
-    func multiplyAdd(domain: EcmwfDomain) -> (multiply: Float, add: Float)? {
+    func multiplyAdd(domain: EcmwfDomain, dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .surface_temperature: fallthrough
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: fallthrough
@@ -1000,7 +1000,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_100hPa: fallthrough
         case .specific_humidity_50hPa:
             return (1000, 0)
-        case .shortwave_radiation: return (1/Float(domain.dtSeconds), 0) // joules to watt
+        case .shortwave_radiation: return (1/Float(dtSeconds), 0) // joules to watt
         default:
             return nil
         }

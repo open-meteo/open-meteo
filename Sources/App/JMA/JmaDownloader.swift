@@ -149,14 +149,14 @@ struct JmaDownload: AsyncCommand {
     }
 }
 
-protocol JmaVariableDownloadable: GenericVariable {
+protocol JmaVariableDownloadable: GenericVariable, Hashable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
     var skipHour0: Bool { get }
 }
 
 extension GribMessage {
     /// Return the corresponding JMA variable for this grib message
-    func toJmaVariable() -> JmaVariableDownloadable? {
+    func toJmaVariable() -> (any JmaVariableDownloadable)? {
         guard let shortName = get(attribute: "shortName"),
               let parameterCategory = get(attribute: "parameterCategory").flatMap(Int.init),
               let parameterNumber = get(attribute: "parameterNumber").flatMap(Int.init),

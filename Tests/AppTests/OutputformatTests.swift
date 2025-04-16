@@ -5,11 +5,20 @@ import XCTest
 import Vapor
 import SwiftEccodes
 
+extension Application {
+    public static func testable() async throws -> Application {
+        let app = try await Application.make(.testing)
+        try configure(app)
+        return app
+    }
+}
+
+
 final class OutputformatTests: XCTestCase {
     var app: Application?
     
     override func setUp() async throws {
-        app = try Application.testable()
+        app = try await Application.testable()
     }
     
     override func tearDown() async throws {

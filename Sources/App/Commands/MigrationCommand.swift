@@ -28,7 +28,7 @@ struct MigrationCommand: AsyncCommand {
             return
         }
         
-        for case let fileURL as URL in directoryEnumerator {
+        for case let fileURL as URL in AnySequence(directoryEnumerator) {
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                   let isDirectory = resourceValues.isDirectory,
                   let name = resourceValues.name, 
@@ -42,12 +42,12 @@ struct MigrationCommand: AsyncCommand {
                 logger.warning("Skipping \(name)")
                 continue
             }
-            let grid = domain == .copernicus_dem90 ? nil : domain.getDomain().grid
+            let grid = domain == .copernicus_dem90 ? nil : domain.getDomain()?.grid
             guard let directoryEnumerator = FileManager.default.enumerator(at: URL(fileURLWithPath: "\(OpenMeteo.dataDirectory)\(name)", isDirectory: true), includingPropertiesForKeys: Array(resourceKeys), options: [.skipsHiddenFiles, .skipsSubdirectoryDescendants]) else {
                 logger.warning("No files at \(OpenMeteo.dataDirectory)\(name)")
                 continue
             }
-            for case let fileURL as URL in directoryEnumerator {
+            for case let fileURL as URL in AnySequence(directoryEnumerator) {
                 guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                       let isDirectory = resourceValues.isDirectory,
                       let variable = resourceValues.name,
@@ -62,7 +62,7 @@ struct MigrationCommand: AsyncCommand {
                     logger.warning("No files at \(path)")
                     continue
                 }
-                for case let fileURL as URL in directoryEnumerator {
+                for case let fileURL as URL in AnySequence(directoryEnumerator) {
                     guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                           let isDirectory = resourceValues.isDirectory,
                           let file = resourceValues.name,

@@ -101,7 +101,7 @@ struct DownloadIconCommand: AsyncCommand {
     
     
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [IconVariableDownloadable], concurrent: Int) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -444,7 +444,7 @@ struct DownloadIconCommand: AsyncCommand {
         
         let group = try VariableGroup.load(rawValueOptional: signature.group) ?? .all
         
-        let onlyVariables: [IconVariableDownloadable]? = try signature.onlyVariables.map {
+        let onlyVariables: [any IconVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
                 if let variable = IconPressureVariable(rawValue: String($0)) {
                     return variable
@@ -457,7 +457,7 @@ struct DownloadIconCommand: AsyncCommand {
         /// - surface variables with soil
         /// - model-level e.g. for 180m wind, they have a much larger dalay and sometimes are aborted
         /// - pressure level which take forever to download because it is too much data
-        var groupVariables: [IconVariableDownloadable]
+        var groupVariables: [any IconVariableDownloadable]
         switch group {
         case .all:
             groupVariables = IconSurfaceVariable.allCases + domain.levels.reversed().flatMap { level in

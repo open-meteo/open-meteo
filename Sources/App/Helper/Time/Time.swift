@@ -23,7 +23,7 @@ extension TimeError: AbortError {
 }
 
 
-public struct Timestamp: Hashable {
+public struct Timestamp: Hashable, Sendable {
     public let timeIntervalSince1970: Int
     
     /// Hour in 0-23
@@ -326,7 +326,7 @@ extension Range where Bound == Timestamp {
 
 
 /// Time with utc offset seconds
-public struct TimerangeLocal {
+public struct TimerangeLocal: Sendable {
     /// utc timestamp
     public let range: Range<Timestamp>
     

@@ -83,7 +83,9 @@ struct S3DataController: RouteCollection {
         
         var files = [S3ListV2File]()
         var directories = [String]()
-        for case let fileURL as URL in directoryEnumerator {
+        /// Note: Maybe at some point a async version of the directory enumerator should be used.
+        /// https://forums.swift.org/t/xcode-16-3-cant-use-makeiterator-via-filemanagers-enumerator-at-in-async-function/78976
+        for case let fileURL as URL in AnySequence(directoryEnumerator) {
             guard let resourceValues = try? fileURL.resourceValues(forKeys: resourceKeys),
                   let isDirectory = resourceValues.isDirectory,
                   let name = resourceValues.name,
@@ -167,7 +169,7 @@ struct S3DataController: RouteCollection {
             }
             return response
         }
-        let response = req.fileio.streamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
+        let response = try await req.fileio.asyncStreamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
         return response
     }
 }

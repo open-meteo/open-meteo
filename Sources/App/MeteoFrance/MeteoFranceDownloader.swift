@@ -59,7 +59,7 @@ struct MeteoFranceDownload: AsyncCommand {
         
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         
-        let onlyVariables: [MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {
+        let onlyVariables: [any MeteoFranceVariableDownloadable]? = try signature.onlyVariables.map {
             try $0.split(separator: ",").map {
                 if let variable = MeteoFrancePressureVariable(rawValue: String($0)) {
                     return variable
@@ -272,6 +272,8 @@ struct MeteoFranceDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
         
         let grid = domain.grid
+        let nx = grid.nx
+        let ny = grid.ny
         var handles = [GenericVariableHandle]()
         var previous = GribDeaverager()
         let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
@@ -323,7 +325,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         
                         if let temporary = MfVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                             logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
-                            var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                            var grib2d = GribArray2D(nx: nx, ny: ny)
                             try grib2d.load(message: message)
                             if domain.isGlobal {
                                 grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -336,7 +338,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         
                         if domain == .arome_france_hd, let temporary = MfVariablePrecipTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                             logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
-                            var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                            var grib2d = GribArray2D(nx: nx, ny: ny)
                             try grib2d.load(message: message)
                             if domain.isGlobal {
                                 grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -363,7 +365,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
                         
                         let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
-                        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                        var grib2d = GribArray2D(nx: nx, ny: ny)
                         //message.dumpAttributes()
                         try grib2d.load(message: message)
                         if domain.isGlobal {
@@ -401,7 +403,7 @@ struct MeteoFranceDownload: AsyncCommand {
         return handles
     }
     
-    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> MeteoFranceVariableDownloadable? {
+    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> (any MeteoFranceVariableDownloadable)? {
         
         switch (parameterName, levelStr) {
         case ("Total cloud cover", "0"):
@@ -505,7 +507,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
     
     /// Download one field at a time
-    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [any MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }

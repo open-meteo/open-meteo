@@ -58,7 +58,7 @@ struct GemDownload: AsyncCommand {
             fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
         }
         
-        let onlyVariables: [GemVariableDownloadable]? = signature.onlyVariables.map {
+        let onlyVariables: [any GemVariableDownloadable]? = signature.onlyVariables.map {
             $0.split(separator: ",").map {
                 if let variable = GemPressureVariable(rawValue: String($0)) {
                     return variable
@@ -70,9 +70,9 @@ struct GemDownload: AsyncCommand {
             }
         }
         
-        let variablesSurface: [GemVariableDownloadable] = GemSurfaceVariable.allCases
+        let variablesSurface: [any GemVariableDownloadable] = GemSurfaceVariable.allCases
         
-        let variablesPressure: [GemVariableDownloadable] = domain.levels.flatMap {
+        let variablesPressure: [any GemVariableDownloadable] = domain.levels.flatMap {
             level in GemPressureVariableType.allCases.compactMap { variable in
                 return GemPressureVariable(variable: variable, level: level)
             }
@@ -138,7 +138,7 @@ struct GemDownload: AsyncCommand {
     }
     
     /// Download data and store as compressed files for each timestep
-    func download(application: Application, domain: GemDomain, variables: [GemVariableDownloadable], run: Timestamp, server: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion

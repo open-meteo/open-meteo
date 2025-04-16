@@ -318,9 +318,12 @@ fileprivate extension URL {
 
 fileprivate extension Array where Element == S3DataController.S3ListV2File {
     /// Only include files with data newer than a given timestamp. This is based on evaluating the time-chunk in the filename and is not based on the modification time
-    func includeFiles(timeRange: Range<Timestamp>, domain: DomainRegistry) -> [Element] {
-        let omFileLength = domain.getDomain().omFileLength
-        let dtSeconds = domain.getDomain().dtSeconds
+    func includeFiles(timeRange: Range<Timestamp>, domain registry: DomainRegistry) -> [Element] {
+        guard let domain = registry.getDomain() else {
+            return []
+        }
+        let omFileLength = domain.omFileLength
+        let dtSeconds = domain.dtSeconds
         return self.filter({ file in
             if file.name.contains("/static/") {
                 return true

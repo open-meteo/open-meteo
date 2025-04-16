@@ -422,6 +422,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .global_tilted_irradiance, .global_tilted_irradiance_instant:
                 try prefetchData(raw: .direct_radiation, time: time)
                 try prefetchData(raw: .diffuse_radiation, time: time)
+            case .surface_temperature:
+                try prefetchData(raw: .soil_temperature_0cm, time: time)
             }
         case .pressure(let variable):
             let level = variable.level
@@ -649,6 +651,8 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
                 
+            case .surface_temperature:
+                return try get(raw: .soil_temperature_0cm, time: time)
             }
         case .pressure(let variable):
             let level = variable.level

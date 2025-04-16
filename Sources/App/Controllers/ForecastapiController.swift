@@ -362,6 +362,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case kma_seamless
     case kma_gdps
     case kma_ldps
+    
+    case italia_meteo_arpae_icon_2i
 
     
     /// Return the required readers for this domain configuration
@@ -537,14 +539,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .bom_access_global:
             let probabilities = try ProbabilityReader.makeBomReader(lat: lat, lon: lon, elevation: elevation, mode: mode)
             return [probabilities] + (try BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? [])
-        case .arpae_cosmo_seamless:
-            return try ArpaeMixer(domains: [.cosmo_5m, .cosmo_2i, .cosmo_2i_ruc], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .arpae_cosmo_2i:
-            return try ArpaeReader(domain: .cosmo_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .arpae_cosmo_2i_ruc:
-            return try ArpaeReader(domain: .cosmo_2i_ruc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
-        case .arpae_cosmo_5m:
-            return try ArpaeReader(domain: .cosmo_5m, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
+        case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
+            throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .knmi_harmonie_arome_europe:
             return try KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({[$0]}) ?? []
         case .knmi_harmonie_arome_netherlands:
@@ -621,6 +617,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .kma_ldps:
             let reader = try KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [reader].compactMap({$0})
+        case .italia_meteo_arpae_icon_2i:
+            let reader = try ItaliaMeteoArpaeReader(domain: .icon_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [reader].compactMap({$0})
         }
     }
     
@@ -674,12 +673,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return CmaDomain.grapes_global
         case .bom_access_global:
             return BomDomain.access_global
-        case .arpae_cosmo_2i:
-            return ArpaeDomain.cosmo_2i
-        case .arpae_cosmo_2i_ruc:
-            return ArpaeDomain.cosmo_2i_ruc
-        case .arpae_cosmo_5m:
-            return ArpaeDomain.cosmo_5m
         default:
             return nil
         }
@@ -735,12 +728,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try CmaReader(domain: .grapes_global, gridpoint: gridpoint, options: options)
         case .bom_access_global:
             return try BomReader(domain: .access_global, gridpoint: gridpoint, options: options)
-        case .arpae_cosmo_2i:
-            return try ArpaeReader(domain: .cosmo_2i, gridpoint: gridpoint, options: options)
-        case .arpae_cosmo_2i_ruc:
-            return try ArpaeReader(domain: .cosmo_2i_ruc, gridpoint: gridpoint, options: options)
-        case .arpae_cosmo_5m:
-            return try ArpaeReader(domain: .cosmo_5m, gridpoint: gridpoint, options: options)
+        case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
+            throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
         default:
             return nil
         }
