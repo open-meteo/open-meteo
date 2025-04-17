@@ -89,6 +89,11 @@ extension Request {
     private func parseApiParams() throws -> ApiQueryParameter {
         self.method == .POST ? try self.content.decode(ApiQueryParameter.self) : try self.query.decode(ApiQueryParameter.self)
     }
+    
+    /// http or https
+    fileprivate var scheme: String {
+        return headers.first(name: "X-Forwarded-Proto") ?? url.scheme ?? "http"
+    }
 
     /// fn params: hostname, unlockSlot, numberOfLocationsMaximum, params
     @discardableResult
@@ -118,6 +123,12 @@ extension Request {
             }
             try await RateLimiter.instance.check(address: address)
             let params = try parseApiParams()
+            guard params.apikey == nil else {
+                guard self.method != .POST else {
+                    throw ForecastapiError.generic(message: "Please use the customer- prefixed URL for POST requests")
+                }
+                return self.redirect(to: "\(scheme)://customer-\(host)/\(url.string)")
+            }
             let responder = try await fn(host, params)
             if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
                 throw ForecastapiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
