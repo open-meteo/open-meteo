@@ -26,6 +26,9 @@ struct MergeYearlyCommand: AsyncCommand {
 
         @Flag(name: "delete", help: "Delete the underlaying chunks")
         var delete: Bool
+        
+        @Flag(name: "allow-missing", help: "Allow partial years (missing chunks)")
+        var allowMissing: Bool
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -40,7 +43,7 @@ struct MergeYearlyCommand: AsyncCommand {
 
         for year in years {
             for variable in variables {
-                try Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force)
+                try Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force, allowMissing: signature.allowMissing)
             }
         }
 
@@ -63,7 +66,7 @@ struct MergeYearlyCommand: AsyncCommand {
     }
 
     /// Generate a yearly file for a specified domain, variable and year
-    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool) throws {
+    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool) throws {
         let registry = domain.domainRegistry
         logger.info("Processing variable \(variable) for year \(year)")
         let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
@@ -95,7 +98,7 @@ struct MergeYearlyCommand: AsyncCommand {
             let indexTime = chunkIndex * omFileLength ..< (chunkIndex + 1) * omFileLength
             return (reader, indexTime)
         }
-        guard chunkFiles.count == chunkRange.count else {
+        guard allowMissing || chunkFiles.count == chunkRange.count else {
             throw MergeYearlyError.notAllChunksAvailable
         }
 
