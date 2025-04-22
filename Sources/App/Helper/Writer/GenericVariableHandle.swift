@@ -159,14 +159,14 @@ struct GenericVariableHandle {
             var data3d = Array3DFastTime(nLocations: spatialChunks.x * spatialChunks.y, nLevel: nMembers, nTime: time.count)
             var readTemp = [Float](repeating: .nan, count: spatialChunks.x * spatialChunks.y * maxTimeStepsPerFile)
             
-            if !onlyGeneratePreviousDays {
+            /*if false && !onlyGeneratePreviousDays {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
                 let fn = try FileHandle.createNewFile(file: "\(domain.downloadDirectory)\(variable.omFileName.file).om", overwrite: true)
                 let writeFile = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
                 let writer = try writeFile.prepareArray(
                     type: Float.self,
-                    dimensions: [readers.count, ny, nx].map(UInt64.init),
-                    chunkDimensions: [1, 32, 32],
+                    dimensions: [ny, nx, readers.count].map(UInt64.init),
+                    chunkDimensions: [1, 12, UInt64(readers.count)],
                     compression: .pfor_delta2d_int16,
                     scale_factor: variable.scalefactor,
                     add_offset: 0
@@ -176,10 +176,10 @@ struct GenericVariableHandle {
                 for (i,reader) in readers.enumerated() {
                     data.append(contentsOf: try reader.reader.read())
                 }
-                try writer.writeData(array: data) //Array2DFastSpace(data: data, nLocations: grid.count, nTime: readers.count).transpose().data)
+                try writer.writeData(array: Array2DFastSpace(data: data, nLocations: grid.count, nTime: readers.count).transpose().data)
                 let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
                 try writeFile.writeTrailer(rootVariable: root)
-            }
+            }*/
 
             // Create netcdf file for debugging
             if createNetcdf && !onlyGeneratePreviousDays {

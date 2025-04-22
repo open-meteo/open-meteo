@@ -12,8 +12,13 @@ single timestep
 - [40x40] chunk size
 - data_run/ecmwf_ifs025/2025/04/17/00:00Z/temperature_2m/H000.om
 - pro: realtime access
+- pro: irregular timesteps are well represented
 - pro: maps usage, although run needs to be selected and hour needs wired client side calculations
-- con: very inefficient to read timeseries
+- pro: able to thin out data afterwards
+- con: lots of small files -> need efficient and reliable s3 sync
+- con: very inefficient to read timeseries -> luckily usually less than ~120 steps
+- issue: how to index files for maps? S3 listing!?!?
+- 24h aggregations for maps?
 
 total run:
 - [10x10x20] chunk size
@@ -303,7 +308,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     fatalError("Got unknown variable \(shortName) \(levelhPa)")
                 }
-                print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
+                //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
                 /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
                 if [EcmwfVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min, .shortwave_radiation, .precipitation, .runoff].contains(variable) && hour == 0 {
                     return nil
@@ -372,12 +377,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if hour == 0 && skipHour0 {
                     return nil
                 }
-                //try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-                //let fn = try writer.write(file: "\(domain.downloadDirectory)/\(variable)_\(timestamp.format_YYYYMMddHH).om", compressionType: .aec, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+                let fn = try writer.write(file: "\(domain.downloadDirectory)/\(variable)_\(timestamp.format_YYYYMMddHH).om", compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
                 
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
+                //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 // Note: skipHour0 needs still to be set for solar interpolation
-                logger.info("Processing \(variable) member \(member) timestep \(timestamp)")
+                logger.info("Processing \(variable) member \(member) timestep \(timestamp.format_YYYYMMddHH)")
                 return GenericVariableHandle(
                     variable: variable,
                     time: timestamp,
