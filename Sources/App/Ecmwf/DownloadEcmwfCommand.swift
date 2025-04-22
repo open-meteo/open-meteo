@@ -1,6 +1,44 @@
 import Foundation
 import OmFileFormat
 import Vapor
+import SwiftNetCDF
+
+/**
+per run storage:
+- No interpolated timesteps!
+- hour 0 missing for some params
+
+single timestep
+- [40x40] chunk size
+- data_run/ecmwf_ifs025/2025/04/17/00:00Z/temperature_2m/H000.om
+- pro: realtime access
+- pro: maps usage, although run needs to be selected and hour needs wired client side calculations
+- con: very inefficient to read timeseries
+
+total run:
+- [10x10x20] chunk size
+- data_run/ecmwf_ifs025/2025/07/17/00:00Z/temperature_2m.om
+- pro: timeseries read half decent
+- con: less good for maps
+- con: no realtime write, larger delay
+
+maps oriented:
+- [40x40] chunks
+- data_spatial/ecmwf_ifs025/temperature_2m/2025/07/17/H00:00.om
+- data_spatial/ecmwf_ifs025_daily/temperature_2m_maximum/2025/07/10.om
+- pro: ovewrite parts
+- consider: lower resolutions inside the file, e.g. 1440x720 to 720x360 (only makes sense if files are large)
+- consider: daily aggregations (precip sum, wind max)
+- consider: interpolated steps
+ 
+ maps alternative continue using time chunks:
+ - data_spatial/ecmwf_ifs025/temperature_2m/chunk_1234.om
+
+test:
+- file size single step temperature_2m with 40x40 chunk
+- file size multi step
+ [10x10x20] chunk size
+**/
 
 /**
  Download from
@@ -265,7 +303,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     fatalError("Got unknown variable \(shortName) \(levelhPa)")
                 }
-
+                print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
                 /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
                 if [EcmwfVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min, .shortwave_radiation, .precipitation, .runoff].contains(variable) && hour == 0 {
                     return nil
@@ -334,7 +372,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if hour == 0 && skipHour0 {
                     return nil
                 }
-
+                //try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+                //let fn = try writer.write(file: "\(domain.downloadDirectory)/\(variable)_\(timestamp.format_YYYYMMddHH).om", compressionType: .aec, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
+                
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 // Note: skipHour0 needs still to be set for solar interpolation
                 logger.info("Processing \(variable) member \(member) timestep \(timestamp)")
