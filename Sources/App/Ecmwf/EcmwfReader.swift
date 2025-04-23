@@ -30,12 +30,6 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func get(raw: EcmwfVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        /// Adjust surface pressure to target elevation. Surface pressure is stored for `modelElevation`, but we want to get the pressure on `targetElevation`
-        if raw == .surface_pressure {
-            let pressure = try reader.get(variable: raw, time: time)
-            let factor = Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.modelElevation.numeric) / Meteorology.sealevelPressureFactor(temperature: 20, elevation: reader.targetElevation)
-            return DataAndUnit(pressure.data.map({ $0 * factor }), pressure.unit)
-        }
         return try reader.get(variable: raw, time: time)
     }
 
@@ -361,8 +355,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.dewpoint), temperature.unit)
         case .soil_temperature_0cm, .skin_temperature:
             return try get(raw: .surface_temperature, time: time)
-        case .surface_air_pressure:
-            return try get(raw: .surface_pressure, time: time)
+        case .surface_air_pressure, .surface_pressure:
+            let temperature = try get(raw: .temperature_2m, time: time).data
+            let pressure = try get(raw: .pressure_msl, time: time)
+            return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
         case .relativehumidity_2m:
             return try get(raw: .relative_humidity_2m, time: time)
         case .dew_point_2m, .dewpoint_2m:
@@ -646,8 +642,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .relative_humidity_50hPa, time: time)
         case .skin_temperature, .soil_temperature_0cm:
             try prefetchData(raw: .surface_temperature, time: time)
-        case .surface_air_pressure:
-            try prefetchData(raw: .surface_pressure, time: time)
+        case .surface_air_pressure, .surface_pressure:
+            try prefetchData(raw: .pressure_msl, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
         case .relativehumidity_2m:
             try prefetchData(raw: .relative_humidity_2m, time: time)
         case .dew_point_2m, .dewpoint_2m:
