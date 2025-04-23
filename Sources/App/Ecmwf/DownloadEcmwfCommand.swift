@@ -11,6 +11,7 @@ per run storage:
 single timestep
 - [40x40] chunk size
 - data_run/ecmwf_ifs025/2025/04/17/00:00Z/temperature_2m/H000.om
+- data_run/ecmwf_ifs025/2025/04/17/00:00Z/H000/temperature_2m.om (can start single S3 sync afterwards)
 - pro: realtime access
 - pro: irregular timesteps are well represented
 - pro: maps usage, although run needs to be selected and hour needs wired client side calculations
@@ -377,18 +378,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if hour == 0 && skipHour0 {
                     return nil
                 }
-                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-                let fn = try writer.write(file: "\(domain.downloadDirectory)/\(variable)_\(timestamp.format_YYYYMMddHH).om", compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data, overwrite: true)
-                
                 //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                 // Note: skipHour0 needs still to be set for solar interpolation
                 logger.info("Processing \(variable) member \(member) timestep \(timestamp.format_YYYYMMddHH)")
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: member,
-                    fn: fn
-                )
+                return try writer.write(domain: domain, run: run, time: timestamp, member: member, variable: variable, data: grib2d.array.data, storeOnDisk: domain == .ifs025 || domain == .aifs025_single)
             }.collect().compactMap({ $0 })
             handles.append(contentsOf: h)
 
