@@ -830,6 +830,9 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case soil_moisture_7_to_28cm
     case soil_moisture_9_27cm
     case soil_moisture_9_to_27cm
+    case soil_moisture_81_to_243cm
+    case soil_moisture_243_to_729cm
+    case soil_moisture_729_to_2187cm
     case soil_moisture_index_0_to_100cm
     case soil_moisture_index_0_to_7cm
     case soil_moisture_index_100_to_255cm
@@ -848,6 +851,9 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case soil_temperature_54cm
     case soil_temperature_6cm
     case soil_temperature_7_to_28cm
+    case soil_temperature_162cm
+    case soil_temperature_486cm
+    case soil_temperature_1458cm
     case surface_air_pressure
     case snowfall_height
     case surface_pressure

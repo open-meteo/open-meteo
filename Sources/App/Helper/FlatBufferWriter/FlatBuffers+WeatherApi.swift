@@ -384,6 +384,18 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .temperature, aggregation: .max, altitude: 2, previousDay: previousDay)
         case .temperature_2m_min:
             return .init(variable: .temperature, aggregation: .min, altitude: 2, previousDay: previousDay)
+        case .soil_moisture_81_to_243cm:
+            return .init(variable: .soilMoisture, depth: 81, depthTo: 243, previousDay: previousDay)
+        case .soil_moisture_243_to_729cm:
+            return .init(variable: .soilMoisture, depth: 243, depthTo: 729, previousDay: previousDay)
+        case .soil_moisture_729_to_2187cm:
+            return .init(variable: .soilMoisture, depth: 729, depthTo: 2187, previousDay: previousDay)
+        case .soil_temperature_162cm:
+            return .init(variable: .soilTemperature, depth: 162, previousDay: previousDay)
+        case .soil_temperature_486cm:
+            return .init(variable: .soilTemperature, depth: 486, previousDay: previousDay)
+        case .soil_temperature_1458cm:
+            return .init(variable: .soilTemperature, depth: 1458, previousDay: previousDay)
         }
     }
 }
