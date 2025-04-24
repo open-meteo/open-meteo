@@ -324,7 +324,7 @@ actor VariablePerMemberStorage<V: Hashable> {
 extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members an timesteps.
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriterHelper, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmRunSpatialWriter, trueNorth: [Float]? = nil, overwrite: Bool = false) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .flatMap({ t, handles -> [GenericVariableHandle] in
@@ -332,24 +332,14 @@ extension VariablePerMemberStorage {
                     return []
                 }
                 let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
-                let speedHandle = GenericVariableHandle(
-                    variable: outSpeedVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outSpeedVariable.scalefactor, all: speed)
-                )
+                let speedHandle = try writer.write(time: t.timestamp, member: t.member, variable: outSpeedVariable, data: speed, overwrite: overwrite)
 
                 if let outDirectionVariable {
                     var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
                     if let trueNorth {
                         direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                     }
-                    let directionHandle = GenericVariableHandle(
-                        variable: outDirectionVariable,
-                        time: t.timestamp,
-                        member: t.member,
-                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outDirectionVariable.scalefactor, all: direction)
-                    )
+                    let directionHandle = try writer.write(time: t.timestamp, member: t.member, variable: outDirectionVariable, data: direction, overwrite: overwrite)
                     return [speedHandle, directionHandle]
                 }
                 return [speedHandle]

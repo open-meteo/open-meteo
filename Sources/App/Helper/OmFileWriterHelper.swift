@@ -2,7 +2,7 @@ import Foundation
 import OmFileFormat
 import SwiftNetCDF
 
-struct OmRunSpatialWriter {
+struct OmRunSpatialWriter: Sendable {
     let dimensions: [Int]
     let chunks: [Int]
     let domain: GenericDomain

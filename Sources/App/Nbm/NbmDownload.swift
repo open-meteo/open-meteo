@@ -122,7 +122,7 @@ struct NbmDownload: AsyncCommand {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
@@ -177,13 +177,7 @@ struct NbmDownload: AsyncCommand {
                 if let fma = variable.variable.multiplyAdd(domain: domain) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
-                handles.append(GenericVariableHandle(
-                    variable: variable.variable,
-                    time: timestamp,
-                    member: 0, fn: fn
-                ))
+                handles.append(try writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
             }
 
             previousForecastHour = forecastHour

@@ -117,6 +117,7 @@ struct DmiDownload: AsyncCommand {
         let deadLineHours = Double(4)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         guard let grid = domain.grid as? ProjectionGrid<LambertConformalConicProjection> else {
             fatalError("Wrong grid")
@@ -197,7 +198,6 @@ struct DmiDownload: AsyncCommand {
                         return nil // skip precipitation at timestep 0
                     }
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                     var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                     try grib2d.load(message: message)
 
@@ -243,15 +243,12 @@ struct DmiDownload: AsyncCommand {
                     guard await previousScoped.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return nil
                     }
-
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn)
+                    return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
 
                 previous = previousScoped
 
                 logger.info("Calculating wind speed and direction from U/V components and correcting for true north")
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 let windHandles = [
                     try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth),
                     try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth),

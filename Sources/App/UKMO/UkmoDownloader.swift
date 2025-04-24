@@ -247,9 +247,9 @@ struct UkmoDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: domain == .uk_deterministic_2km || domain == .global_deterministic_10km)
 
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing, waitAfterLastModified: TimeInterval(2 * 60))
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
         let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
@@ -300,13 +300,7 @@ struct UkmoDownload: AsyncCommand {
                             }
                         }
                         let variable = variable.withLevel(level: level)
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                        return GenericVariableHandle(
-                            variable: variable,
-                            time: timestamp,
-                            member: member,
-                            fn: fn
-                        )
+                        return try writer.write(time: timestamp, member: member, variable: variable, data: data)
                     }
                 }.flatMap({ $0 })
                 handles.append(contentsOf: handle)

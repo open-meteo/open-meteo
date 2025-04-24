@@ -92,7 +92,7 @@ struct KmaDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let grid = domain.grid
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         let ftp = FtpDownloader()
         ftp.connectTimeout = 5
@@ -157,15 +157,8 @@ struct KmaDownload: AsyncCommand {
                         }
                     }
                 }
-
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
                 logger.info("Processing \(variable) timestep \(timestamp.format_YYYYMMddHH)")
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: 0,
-                    fn: fn
-                )
+                return try writer.write(time: timestamp, member: 0, variable: variable, data: array2d.array.data)
             }.compactMap({ $0 })
             logger.info("Calculating wind speed, direction and snow")
             // Convert U/V wind components to speed and direction
@@ -199,7 +192,7 @@ extension KmaDomain {
 
 extension VariablePerMemberStorage {
     /// Sum up 2 variables
-    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
+    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .compactMap({ t, handles -> GenericVariableHandle? in
@@ -208,13 +201,8 @@ extension VariablePerMemberStorage {
                     let var2 = handles.first(where: { $0.key.variable == var2 }) else {
                     return nil
                 }
-                let snowfall = zip(var1.value.data, var2.value.data).map(+)
-                return GenericVariableHandle(
-                    variable: outVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
-                )
+                let sum = zip(var1.value.data, var2.value.data).map(+)
+                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: sum)
             }
         )
     }
