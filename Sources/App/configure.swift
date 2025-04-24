@@ -14,14 +14,14 @@ enum OpenMeteo {
     }()
     
     /// Data directory with trailing slash
-    static var dataRunDirectory = {
-        if let dir = Environment.get("DATA_RUN_DIRECTORY") {
+    static var dataSpatialDirectory = {
+        if let dir = Environment.get("DATA_SPATIAL_DIRECTORY") {
             guard dir.last == "/" else {
                 fatalError("DATA_RUN_DIRECTORY must end with a trailing slash")
             }
             return dir
         }
-        return  "./data_run/"
+        return  "./data_spatial/"
     }()
 
     /// Temporary directory with trailing slash

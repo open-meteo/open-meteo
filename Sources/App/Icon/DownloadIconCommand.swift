@@ -112,6 +112,8 @@ struct DownloadIconCommand: AsyncCommand {
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
+        let storeOnDisk = domain == .icon || domain == .iconD2 || domain == .iconEu
+        let writerRun = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -227,13 +229,7 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                     }
                     // logger.info("Compressing and writing data to \(filenameDest)")
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    await handles.append(GenericVariableHandle(
-                        variable: variable,
-                        time: timestamp,
-                        member: member,
-                        fn: fn
-                    ))
+                    await handles.append(try writerRun.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
                 }
             }
 
@@ -343,13 +339,7 @@ struct DownloadIconCommand: AsyncCommand {
                 }
 
                 let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: v.variable.scalefactor, all: data.data)
-                await handles.append(GenericVariableHandle(
-                    variable: v.variable,
-                    time: v.timestamp,
-                    member: v.member,
-                    fn: fn
-                ))
+                await handles.append(try writerRun.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
             }
 
             /// Post process 15 minutes data. Note: There is no temperature in 15min data

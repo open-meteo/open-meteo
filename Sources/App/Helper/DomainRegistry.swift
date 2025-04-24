@@ -130,8 +130,8 @@ enum DomainRegistry: String, CaseIterable {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
     }
     
-    var directoryRun: String {
-        return "\(OpenMeteo.dataRunDirectory)\(rawValue)/"
+    var directorySpatial: String {
+        return "\(OpenMeteo.dataSpatialDirectory)\(rawValue)/"
     }
 
     func getDomain() -> GenericDomain? {

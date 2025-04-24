@@ -2,6 +2,49 @@ import Foundation
 import OmFileFormat
 import SwiftNetCDF
 
+struct OmRunSpatialWriter {
+    let dimensions: [Int]
+    let chunks: [Int]
+    let domain: GenericDomain
+    let run: Timestamp
+    let storeOnDisk: Bool
+    
+    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool) {
+        let y = min(domain.grid.ny, 32)
+        let x = min(domain.grid.nx, 1024 / y)
+        self.dimensions = [domain.grid.ny, domain.grid.nx]
+        self.chunks = [y, x]
+        self.domain = domain
+        self.run = run
+        self.storeOnDisk = storeOnDisk
+    }
+    
+    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: CompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
+        let fn: FileHandle
+        if storeOnDisk {
+            let path = "\(domain.domainRegistry.directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
+            let file = "\(path)\(variable.omFileName.file).om"
+            if !overwrite && FileManager.default.fileExists(atPath: file) {
+                throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
+            }
+            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+            let fileTemp = "\(file)~"
+            try FileManager.default.removeItemIfExists(at: fileTemp)
+            fn = try FileHandle.createNewFile(file: fileTemp)
+            try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor)
+            try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
+        } else {
+            let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
+            try FileManager.default.removeItemIfExists(at: file)
+            fn = try FileHandle.createNewFile(file: file)
+            try FileManager.default.removeItem(atPath: file)
+            try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor)
+        }
+        return GenericVariableHandle(variable: variable, time: time, member: member, fn: fn)
+    }
+}
+
+
 /// Small helper class to generate compressed files
 public final class OmFileWriterHelper {
     public let dimensions: [Int]
@@ -27,10 +70,10 @@ public final class OmFileWriterHelper {
         return fn
     }
     
-    func write(domain: GenericDomain, run: Timestamp, time: Timestamp, member: Int, variable: GenericVariable, data: [Float], storeOnDisk: Bool, compressionType: CompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
+    /*func write(domain: GenericDomain, run: Timestamp, time: Timestamp, member: Int, variable: GenericVariable, data: [Float], storeOnDisk: Bool, compressionType: CompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
         let fn: FileHandle
         if storeOnDisk {
-            let path = "\(domain.domainRegistry.directoryRun)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
+            let path = "\(domain.domainRegistry.directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
             let file = "\(path)\(variable.omFileName.file).om"
             if !overwrite && FileManager.default.fileExists(atPath: file) {
                 throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
@@ -49,7 +92,7 @@ public final class OmFileWriterHelper {
             try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor)
         }
         return GenericVariableHandle(variable: variable, time: time, member: member, fn: fn)
-    }
+    }*/
 
     public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
         let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
