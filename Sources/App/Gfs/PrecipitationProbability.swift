@@ -146,7 +146,7 @@ extension Array where Element == GenericVariableHandle {
     /// Calculate precipitation >0.1mm/h probability. BOM downloads multiple timesteps, uncompress handles and calculate probabilities
     /// `precipitationVariable` is used to filter only precipitation variables
     /// `domain` must be set to generate a temporary file handle afterwards
-    func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain) throws -> [GenericVariableHandle] {
+    func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain, run: Timestamp) throws -> [GenericVariableHandle] {
         var previousTimesamp: Timestamp?
         return try self
             .filter({ $0.variable.omFileName == precipitationVariable.omFileName })
@@ -171,15 +171,8 @@ extension Array where Element == GenericVariableHandle {
                 }
                 previousTimesamp = timestamp
                 precipitationProbability01.multiplyAdd(multiply: 100 / Float(nMember), add: 0)
-                let variable = ProbabilityVariable.precipitation_probability
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: 1)
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: precipitationProbability01)
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: 0,
-                    fn: fn
-                )
+                let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+                return try writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
             })
     }
 }
