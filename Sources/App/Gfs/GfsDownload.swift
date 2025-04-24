@@ -207,8 +207,8 @@ struct GfsDownload: AsyncCommand {
         if let maxForecastHour {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
-
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
@@ -257,13 +257,7 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
-                    handles.append(GenericVariableHandle(
-                        variable: variable.variable,
-                        time: timestamp,
-                        member: 0,
-                        fn: fn
-                    ))
+                    handles.append(try writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
                 }
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
@@ -423,16 +417,12 @@ struct GfsDownload: AsyncCommand {
                         // do not write pressure to disk
                         continue
                     }
-
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
-                    handles.append(GenericVariableHandle(
-                        variable: variable.variable,
-                        time: timestamp,
-                        member: member, fn: fn                    ))
+                    handles.append(try writer.write(time: timestamp, member: member, variable: variable.variable, data: grib2d.array.data))
                 }
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
             if domain.ensembleMembers > 1 {
+                // TODO: adapt for spatial storage
                 if let handle = try await storePrecipMembers.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
                     domain: domain,
@@ -466,7 +456,7 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 
 extension VariablePerMemberStorage {
     /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .compactMap({ t, handles -> GenericVariableHandle? in
@@ -478,12 +468,7 @@ extension VariablePerMemberStorage {
                 let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
                     max($0 / 100 * $1 * 0.7, 0)
                 })
-                return GenericVariableHandle(
-                    variable: outVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
-                )
+                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: snowfall)
             }
         )
     }
