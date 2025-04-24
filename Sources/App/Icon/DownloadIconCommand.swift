@@ -113,7 +113,7 @@ struct DownloadIconCommand: AsyncCommand {
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
         let storeOnDisk = domain == .icon || domain == .iconD2 || domain == .iconEu
-        let writerRun = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -147,7 +147,7 @@ struct DownloadIconCommand: AsyncCommand {
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
 
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+                //let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
@@ -167,6 +167,7 @@ struct DownloadIconCommand: AsyncCommand {
                     // Write 15min D2 icon data
                     let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
                     try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
+                    let writer = OmRunSpatialWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: false)
                     for (i, message) in messages.enumerated() {
                         guard let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType") else {
@@ -187,13 +188,7 @@ struct DownloadIconCommand: AsyncCommand {
                                 continue
                             }
                         }
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        await handles15minIconD2.append(GenericVariableHandle(
-                            variable: variable,
-                            time: timestamp,
-                            member: 0,
-                            fn: fn
-                        ))
+                        await handles15minIconD2.append(try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data))
                     }
                     messages = [messages[0]]
                 }
@@ -229,7 +224,7 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                     }
                     // logger.info("Compressing and writing data to \(filenameDest)")
-                    await handles.append(try writerRun.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
+                    await handles.append(try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
                 }
             }
 
@@ -337,14 +332,13 @@ struct DownloadIconCommand: AsyncCommand {
                     // We set them to 0 to be consistent with cloud_top and cloud_base in DMI Harmonie model
                     data.data = data.data.map { $0 < -499 ? 0 : $0 }
                 }
-
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
-                await handles.append(try writerRun.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
+                await handles.append(try writer.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
             }
 
             /// Post process 15 minutes data. Note: There is no temperature in 15min data
             try await storage15min.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
                 var data = data
+                let writer = OmRunSpatialWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: false)
                 /// Add snow to liquid rain if temperature is > 1.5°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain, let snowfallWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_water_equivalent)) {
                     /// Take temperature from 1-hourly data
@@ -404,15 +398,7 @@ struct DownloadIconCommand: AsyncCommand {
                     // Do not write snowfall_convective_water_equivalent to disk anymore
                     return
                 }
-
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: v.variable.scalefactor, all: data.data)
-                await handles15minIconD2.append(GenericVariableHandle(
-                    variable: v.variable,
-                    time: v.timestamp,
-                    member: v.member,
-                    fn: fn
-                ))
+                await handles15minIconD2.append(try writer.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
             }
             previousHour = hour
         }
