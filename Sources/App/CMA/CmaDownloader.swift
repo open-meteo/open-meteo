@@ -274,7 +274,7 @@ struct DownloadCmaCommand: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let nForecastHours = domain.forecastHours(run: run.hour)
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
-
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
         let previous = GribDeaverager()
 
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
@@ -308,7 +308,6 @@ struct DownloadCmaCommand: AsyncCommand {
                         }
                     }
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     // message.dumpAttributes()
                     try grib2d.load(message: message)
@@ -325,8 +324,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
 
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
         }
