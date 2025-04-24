@@ -433,12 +433,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
 
             if domain == .ifs025_ensemble {
-                // TODO: adapt for spatial storage
                 logger.info("Calculating precipitation probability")
                 if let handle = try await inMemory.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
                     domain: domain,
                     timestamp: timestamp,
+                    run: run,
                     dtHoursOfCurrentStep: hour - previousHour
                 ) {
                     handles.append(handle)

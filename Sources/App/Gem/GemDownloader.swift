@@ -142,7 +142,7 @@ struct GemDownload: AsyncCommand {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: [GemDomain.gem_global, .gem_hrdps_continental, .gem_regional].contains(domain))
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
@@ -226,24 +226,11 @@ struct GemDownload: AsyncCommand {
                                     fatalError("Wind speed calculation requires \(windspeedVariable) to download")
                                 }
                                 let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: windspeedVariable.scalefactor, all: windspeed)
-                                handles.append(GenericVariableHandle(
-                                    variable: windspeedVariable,
-                                    time: run.add(hours: hour),
-                                    member: member,
-                                    fn: fn
-                                ))
+                                handles.append(try writer.write(time: timestamp, member: member, variable: windspeedVariable, data: windspeed))
                                 grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
                             }
                         }
-
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        handles.append(GenericVariableHandle(
-                            variable: variable,
-                            time: run.add(hours: hour),
-                            member: member,
-                            fn: fn
-                        ))
+                        handles.append(try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
                     }
                 } catch {
                     if !isSnowfallWaterEq {
@@ -257,6 +244,7 @@ struct GemDownload: AsyncCommand {
                         precipitationVariable: .precipitation,
                         domain: domain,
                         timestamp: timestamp,
+                        run: run,
                         dtHoursOfCurrentStep: hour - previousHour
                     ) {
                         handles.append(handle)

@@ -422,11 +422,11 @@ struct GfsDownload: AsyncCommand {
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
             if domain.ensembleMembers > 1 {
-                // TODO: adapt for spatial storage
                 if let handle = try await storePrecipMembers.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
                     domain: domain,
                     timestamp: timestamp,
+                    run: run,
                     dtHoursOfCurrentStep: forecastHour - previousHour
                 ) {
                     handles.append(handle)

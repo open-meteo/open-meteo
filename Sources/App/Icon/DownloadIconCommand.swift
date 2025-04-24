@@ -147,7 +147,6 @@ struct DownloadIconCommand: AsyncCommand {
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
 
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                //let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
@@ -234,6 +233,7 @@ struct DownloadIconCommand: AsyncCommand {
                     precipitationVariable: .precipitation,
                     domain: domain,
                     timestamp: timestamp,
+                    run: run,
                     dtHoursOfCurrentStep: hour - previousHour
                 ))
             }
