@@ -32,7 +32,7 @@ struct OmRunSpatialWriter: Sendable {
             let fileTemp = "\(file)~"
             try FileManager.default.removeItemIfExists(at: fileTemp)
             fn = try FileHandle.createNewFile(file: fileTemp)
-            try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor)
+            try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor, run: run, time: time)
             try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
         } else {
             let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
@@ -135,7 +135,7 @@ extension Array where Element == Float {
     }
 
     /// Write the current array as an om file to an open file handle
-    func writeOmFile(fn: FileHandle, dimensions: [Int], chunks: [Int], compression: CompressionType, scalefactor: Float) throws {
+    func writeOmFile(fn: FileHandle, dimensions: [Int], chunks: [Int], compression: CompressionType, scalefactor: Float, run: Timestamp? = nil, time: Timestamp? = nil) throws {
         guard dimensions.reduce(1, *) == self.count else {
             fatalError(#function + ": Array size \(self.count) does not match dimensions \(dimensions)")
         }
@@ -149,7 +149,11 @@ extension Array where Element == Float {
             add_offset: 0
         )
         try writer.writeData(array: self)
-        let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
+        let runTime: OmOffsetSize? = try run.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "forecast_reference_time", children: []) }
+        let validTime: OmOffsetSize? = try time.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "time", children: []) }
+        let coordinates = dimensions.count == 2 ? try writeFile.write(value: "lat lon", name: "coordinates", children: []) : nil
+        let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+        let root = try writeFile.write(array: writer.finalise(), name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
         try writeFile.writeTrailer(rootVariable: root)
     }
 
