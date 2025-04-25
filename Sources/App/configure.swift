@@ -17,7 +17,7 @@ enum OpenMeteo {
     static var dataSpatialDirectory: String? = {
         if let dir = Environment.get("DATA_SPATIAL_DIRECTORY") {
             guard dir.last == "/" else {
-                fatalError("DATA_RUN_DIRECTORY must end with a trailing slash")
+                fatalError("DATA_SPATIAL_DIRECTORY must end with a trailing slash")
             }
             return dir
         }
