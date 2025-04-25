@@ -82,6 +82,10 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             let handles = try await downloadCamsGlobal(application: context.application, domain: domain, run: run, variables: variables, user: ftpuser, password: ftppassword)
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            if let uploadS3Bucket = signature.uploadS3Bucket {
+                let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+            }
             return
         case .cams_europe:
             guard let cdskey = signature.cdskey else {
@@ -96,6 +100,10 @@ struct DownloadCamsCommand: AsyncCommand {
             }
             let handles = try await downloadCamsEurope(application: context.application, domain: domain, run: run, variables: variables, cdskey: cdskey, forecastHours: nil, concurrent: signature.concurrent ?? 1)
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: signature.concurrent ?? 1, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            if let uploadS3Bucket = signature.uploadS3Bucket {
+                let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+            }
             return
         case .cams_global_greenhouse_gases:
             guard let cdskey = signature.cdskey else {
@@ -104,6 +112,10 @@ struct DownloadCamsCommand: AsyncCommand {
             let concurrent = signature.concurrent ?? 1
             let handles = try await downloadCamsGlobalGreenhouseGases(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey, concurrent: concurrent)
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+            if let uploadS3Bucket = signature.uploadS3Bucket {
+                let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+            }
             return
         }
     }
@@ -117,7 +129,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
@@ -160,13 +172,8 @@ struct DownloadCamsCommand: AsyncCommand {
                 for i in data.indices {
                     data[i] *= meta.scalefactor
                 }
-
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: run.add(hours: hour),
-                    member: 0,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                )
+                
+                return try writer.write(time: run.add(hours: hour), member: 0, variable: variable, data: data)
             }
         }
         await curl.printStatistics()
@@ -319,7 +326,7 @@ struct DownloadCamsCommand: AsyncCommand {
         )
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
         var handles = [GenericVariableHandle]()
 
         do {
@@ -342,9 +349,7 @@ struct DownloadCamsCommand: AsyncCommand {
                     /*if let scaling = variable.netCdfScaling(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
                     }*/
-
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
             handles.append(contentsOf: h)
