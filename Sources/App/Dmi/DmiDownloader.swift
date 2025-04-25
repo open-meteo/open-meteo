@@ -39,7 +39,7 @@ struct DmiDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -109,7 +109,7 @@ struct DmiDownload: AsyncCommand {
      Download GRIB file for each timestamp, decode, generate some derived variables.
      Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
      */
-    func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         /*guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'DMI_API_KEY'")
         }*/
@@ -144,7 +144,7 @@ struct DmiDownload: AsyncCommand {
             // let url = "https://download.dmi.dk/public/opendata/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
             let url = "https://dmi-opendata.s3-eu-north-1.amazonaws.com/forecastdata/\(dataset)/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
 
-            return try await curl.withGribStream(url: url, bzip2Decode: false/*, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]*/) { stream in
+            let handles = try await curl.withGribStream(url: url, bzip2Decode: false/*, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]*/) { stream in
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
@@ -263,6 +263,10 @@ struct DmiDownload: AsyncCommand {
                 }
                 return h + windHandles
             }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [t])
+            }
+            return handles
         }
 
         await curl.printStatistics()

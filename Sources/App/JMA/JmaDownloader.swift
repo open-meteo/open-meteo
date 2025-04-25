@@ -55,21 +55,21 @@ struct JmaDownload: AsyncCommand {
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
-                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
+                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: nil)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
         }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// MSM or GSM domain
     /// Return open file handles, to ensure overlapping runs are not conflicting
-    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let deadLineHours: Double = domain == .gsm ? 3 : 6
@@ -104,7 +104,7 @@ struct JmaDownload: AsyncCommand {
 
         let handles = try await filesToDownload.asyncFlatMap { filename -> [GenericVariableHandle] in
             let url = "\(server)\(filename)"
-            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
                 return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     guard let variable = message.toJmaVariable(),
                           let stepRange = message.get(attribute: "stepRange"),
@@ -141,6 +141,11 @@ struct JmaDownload: AsyncCommand {
                     return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
+            if let uploadS3Bucket = uploadS3Bucket {
+                let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+            }
+            return handles
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)

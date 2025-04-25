@@ -51,7 +51,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
@@ -116,7 +116,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         return nil
     }
 
-    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -246,6 +246,9 @@ struct GfsGraphCastDownload: AsyncCommand {
                 try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high),
                 try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
             ]
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
             return handles + handles2 + handles3 + handlesClouds
         }
         await curl.printStatistics()

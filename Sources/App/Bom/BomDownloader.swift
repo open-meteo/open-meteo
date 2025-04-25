@@ -61,6 +61,11 @@ struct DownloadBomCommand: AsyncCommand {
             try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting) :
             try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+        }
     }
 
     func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp) async throws {

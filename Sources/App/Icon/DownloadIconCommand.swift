@@ -99,7 +99,7 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
@@ -400,6 +400,9 @@ struct DownloadIconCommand: AsyncCommand {
                 }
                 await handles15minIconD2.append(try writer.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
             }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
             previousHour = hour
         }
         await curl.printStatistics()
@@ -473,7 +476,7 @@ struct DownloadIconCommand: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
 
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
 
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
