@@ -20,6 +20,7 @@ single timestep
 - con: very inefficient to read timeseries -> luckily usually less than ~120 steps
 - issue: how to index files for maps? S3 listing!?!?
 - 24h aggregations for maps?
+- 250 TB per 1 year data!!!!
  
  all variables in one file per timestep?
  - data_run/ecmwf_ifs025/2025/04/17/00:00Z/20250423060000.om
@@ -39,17 +40,21 @@ total run:
 - con: less good for maps
 - con: no realtime write, larger delay
 
-maps oriented:
+Continuous Maps:
 - [40x40] chunks
 - data_spatial/ecmwf_ifs025/temperature_2m/2025/07/17/H00:00.om
+- data_spatial/ecmwf_ifs025/2025/07/17/00:00/temperature_2m.om
 - data_spatial/ecmwf_ifs025_daily/temperature_2m_maximum/2025/07/10.om
-- pro: ovewrite parts
+- pro: overwrite parts
 - consider: lower resolutions inside the file, e.g. 1440x720 to 720x360 (only makes sense if files are large)
 - consider: daily aggregations (precip sum, wind max)
 - consider: interpolated steps
+- 10 TB per 1 year data (including all pressure levels)
  
  maps alternative continue using time chunks:
  - data_spatial/ecmwf_ifs025/temperature_2m/chunk_1234.om
+ - inefficient, because has to upload unmodified data again
+ - pro: larger files
 
 test:
 - file size single step temperature_2m with 40x40 chunk
