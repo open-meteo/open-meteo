@@ -25,9 +25,6 @@ struct OmRunSpatialWriter: Sendable {
             //let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
             let path = "\(directorySpatial)/\(time.format_directoriesYYYYMMddhhmm)/"
             let file = "\(path)\(variable.omFileName.file).om"
-            if !overwrite && FileManager.default.fileExists(atPath: file) {
-                throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
-            }
             try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
             let fileTemp = "\(file)~"
             try FileManager.default.removeItemIfExists(at: fileTemp)
