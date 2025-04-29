@@ -10,6 +10,12 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
     case swell_wave_height
     case swell_wave_period
     case swell_wave_direction
+    case secondary_swell_wave_height
+    case secondary_swell_wave_period
+    case secondary_swell_wave_direction
+    case tertiary_swell_wave_height
+    case tertiary_swell_wave_period
+    case tertiary_swell_wave_direction
 
     var storePreviousForecast: Bool {
         return false
@@ -42,11 +48,11 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
             return .seconds
         case .wind_wave_direction:
             return .degreeDirection
-        case .swell_wave_height:
+        case .swell_wave_height, .secondary_swell_wave_height, .tertiary_swell_wave_height:
             return .metre
-        case .swell_wave_period:
+        case .swell_wave_period, .secondary_swell_wave_period, .tertiary_swell_wave_period:
             return .seconds
-        case .swell_wave_direction:
+        case .swell_wave_direction, .secondary_swell_wave_direction, .tertiary_swell_wave_direction:
             return .degreeDirection
         }
     }
@@ -68,11 +74,11 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
             return period
         case .wind_wave_direction:
             return direction
-        case .swell_wave_height:
+        case .swell_wave_height, .secondary_swell_wave_height, .tertiary_swell_wave_height:
             return height
-        case .swell_wave_period:
+        case .swell_wave_period, .secondary_swell_wave_period, .tertiary_swell_wave_period:
             return period
-        case .swell_wave_direction:
+        case .swell_wave_direction, .secondary_swell_wave_direction, .tertiary_swell_wave_direction:
             return direction
         }
     }
@@ -91,11 +97,11 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
             return .hermite(bounds: 0...Float.infinity)
         case .wind_wave_direction:
             return .linearDegrees
-        case .swell_wave_height:
+        case .swell_wave_height, .secondary_swell_wave_height, .tertiary_swell_wave_height:
             return .linear
-        case .swell_wave_period:
+        case .swell_wave_period, .secondary_swell_wave_period, .tertiary_swell_wave_period:
             return .hermite(bounds: 0...Float.infinity)
-        case .swell_wave_direction:
+        case .swell_wave_direction, .secondary_swell_wave_direction, .tertiary_swell_wave_direction:
             return .linearDegrees
         }
     }
@@ -122,6 +128,18 @@ extension GfsWaveVariable: GfsVariableDownloadable {
             return ":SWPER:1 in sequence:"
         case .swell_wave_direction:
             return "SWDIR:1 in sequence:"
+        case .secondary_swell_wave_height:
+            return ":SWELL:2 in sequence:"
+        case .secondary_swell_wave_period:
+            return ":SWPER:2 in sequence:"
+        case .secondary_swell_wave_direction:
+            return "SWDIR:2 in sequence:"
+        case .tertiary_swell_wave_height:
+            return ":SWELL:3 in sequence:"
+        case .tertiary_swell_wave_period:
+            return ":SWPER:3 in sequence:"
+        case .tertiary_swell_wave_direction:
+            return "SWDIR:3 in sequence:"
         }
     }
 
