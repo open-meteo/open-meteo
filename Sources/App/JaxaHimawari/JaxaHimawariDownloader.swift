@@ -122,7 +122,9 @@ struct JaxaHimawariDownload: AsyncCommand {
             let data = try await downloader.get(logger: logger, path: path)
             try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
         }
-        let timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")
+        guard let timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour") else {
+            fatalError("Could not read meta data file")
+        }
 
         return try await variables.asyncCompactMap({ variable -> GenericVariableHandle? in
             logger.info("Downloading \(variable) \(run.iso8601_YYYY_MM_dd_HH_mm)")
@@ -141,7 +143,10 @@ struct JaxaHimawariDownload: AsyncCommand {
                 return nil
             }
             do {
-                var sw = try data.readNetcdf(name: "SWR")
+                guard var sw = try data.readNetcdf(name: "SWR") else {
+                    logger.warning("warning: Could not open variable SWR. Skipping")
+                    return nil
+                }
 
                 // Transform instant solar radiation values to backwards averaged values
                 // Instant values have a scan time difference which needs to be corrected for
@@ -194,7 +199,7 @@ fileprivate struct JaxaFtpDownloader {
 }
 
 fileprivate extension Data {
-    func readNetcdf(name: String) throws -> Array2D {
+    func readNetcdf(name: String) throws -> Array2D? {
         return try withUnsafeBytes { memory in
             guard let nc = try NetCDF.open(memory: memory) else {
                 fatalError("Could not open netcdf from memory")
@@ -210,7 +215,7 @@ fileprivate extension Data {
                 array2d.flipLatitude()
                 return array2d
             }
-            fatalError("Could not open variable \(name)")
+            return nil
         }
     }
 }
