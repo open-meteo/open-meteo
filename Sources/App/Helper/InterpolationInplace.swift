@@ -250,17 +250,56 @@ extension Array where Element == Float {
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)
 
-        let nLocations = self.count / nTime
-        precondition(locationRange.count <= nLocations)
-        precondition(nLocations % locationRange.count == 0)
-
+        /// May contain multiple members
+        let nTimeSeries = self.count / nTime
+        let nLocations = locationRange.count
+        let nMembers = nTimeSeries / nLocations
+        precondition(nLocations <= nTimeSeries)
+        precondition(nTimeSeries % nLocations == 0)
+        
         // If no values are missing, return and do not calculate solar coefficients
-        guard let firstMissing = self[0..<nTime].firstIndex(where: { $0.isNaN }),
-              let lastMissing = self[0..<nTime].lastIndex(where: { $0.isNaN }) else {
+        guard self.containsNaN() else {
             return
         }
+        
+        // Find first and last missing values, but start from the first valid value
+        // Checks all time series
+        var firstMissing = nTime
+        var lastMissing = 0
+        for l in 0..<nTimeSeries {
+            var firstValid = nTime
+            for t in 0..<nTime {
+                guard !self[l * nTime + t].isNaN else {
+                    continue
+                }
+                if firstValid == nTime {
+                    firstValid = t
+                    continue
+                }
+                // 1 = no spacing
+                // 2 = -D-D-D
+                // 3 = --D--D--D
+                firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
+                break
+            }
+            for i in firstValid..<nTime {
+                guard self[l * nTime + i].isFinite else {
+                    continue
+                }
+                if i < firstMissing {
+                    firstMissing = i
+                }
+                if i > lastMissing {
+                    lastMissing = i
+                }
+            }
+        }
+        
+        let maximumMissingHours = 12
+        let missingSteps = maximumMissingHours * 3600 / time.dtSeconds
+        
         /// Which range of hours solar radiation data is required
-        let solarHours = firstMissing - 6 ..< lastMissing + 3
+        let solarHours = firstMissing - missingSteps*2 ..< lastMissing + missingSteps*2
         /// Only calculate solar coefficients for this time-range
         let solarTime = TimerangeDt(
             start: time.range.lowerBound.add(solarHours.lowerBound * time.dtSeconds),
@@ -279,10 +318,9 @@ extension Array where Element == Float {
         /// Lower bound of solar hours
         let sLow = solarHours.lowerBound
 
-        for l in 0..<nLocations {
-            let sPos = l / (nLocations / locationRange.count)
-
-            /// Find the first valid value. This might be adjusted due to data spacing
+        for l in 0..<nTimeSeries {
+            let sPos = l / nMembers
+            
             var firstValid = nTime
             for t in 0..<nTime {
                 guard !self[l * nTime + t].isNaN else {
@@ -309,7 +347,7 @@ extension Array where Element == Float {
                 let posB = t - 1
                 var posC = 0
                 // Find the first valid value for point C within the next 12 hours
-                for t2 in (t + 1)..<Swift.min(t + 1 + 1 + 12 * 3600 / time.dtSeconds, nTime) {
+                for t2 in (t + 1)..<Swift.min(t + 1 + 1 + maximumMissingHours * 3600 / time.dtSeconds, nTime) {
                     let value = self[l * nTime + t2]
                     guard !value.isNaN else {
                         continue

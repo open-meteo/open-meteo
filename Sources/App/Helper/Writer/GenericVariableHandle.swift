@@ -154,10 +154,6 @@ struct GenericVariableHandle {
                                     chunknLocations: nMembers > 1 ? nMembers : nil*/
             )
             // let nLocationsPerChunk = om.nLocationsPerChunk
-
-            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: nMembers, nTime: 1)
-            var data3d = Array3DFastTime(nLocations: spatialChunks.x * spatialChunks.y, nLevel: nMembers, nTime: time.count)
-            var readTemp = [Float](repeating: .nan, count: spatialChunks.x * spatialChunks.y * maxTimeStepsPerFile)
             
             /*if false && !onlyGeneratePreviousDays {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
@@ -224,6 +220,8 @@ struct GenericVariableHandle {
 
             try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
+                var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
+                var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
                 data3d.data.fillWithNaNs()
                 for reader in readers {
                     let dimensions = reader.reader.getDimensions()
@@ -239,17 +237,19 @@ struct GenericVariableHandle {
                         data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }
+                
+                let locationRange1D = RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
 
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
                     time: time,
                     grid: domain.grid,
-                    locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
+                    locationRange: locationRange1D
                 )
 
                 progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
-                return data3d.data[0..<nLoc * memberRange.count * time.count]
+                return ArraySlice(data3d.data)
             }
             progress.finish()
         }
