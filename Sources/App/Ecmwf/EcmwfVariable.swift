@@ -720,6 +720,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case apparent_temperature
     case vapor_pressure_deficit
     case vapour_pressure_deficit
+    case et0_fao_evapotranspiration
     case windspeed_10m
     case windspeed_100m
     case windspeed_1000hPa

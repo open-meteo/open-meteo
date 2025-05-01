@@ -434,6 +434,18 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let diffuseRadiation = try get(derived: .diffuse_radiation, time: time).data
             let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
+        case .et0_fao_evapotranspiration:
+            let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            let swrad = try get(raw: .shortwave_radiation, time: time).data
+            let temperature = try get(raw: .temperature_2m, time: time).data
+            let windspeed = try get(derived: .windspeed_10m, time: time).data
+            let rh = try get(raw: .relative_humidity_2m, time: time).data
+            let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
+
+            let et0 = swrad.indices.map { i in
+                return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
+            }
+            return DataAndUnit(et0, .millimetre)
         }
     }
 
@@ -669,6 +681,11 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try prefetchData(raw: .cloud_cover_mid, time: time)
         case .cloudcover_high:
             try prefetchData(raw: .cloud_cover_high, time: time)
+        case .et0_fao_evapotranspiration:
+            try prefetchData(raw: .shortwave_radiation, time: time)
+            try prefetchData(raw: .temperature_2m, time: time)
+            try prefetchData(raw: .relative_humidity_2m, time: time)
+            try prefetchData(derived: .wind_speed_10m, time: time)
         }
     }
 }
