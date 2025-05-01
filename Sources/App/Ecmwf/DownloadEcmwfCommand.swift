@@ -309,15 +309,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                 // fatalError()
 
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-
-                if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single].contains(domain) {
-                    grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                }
-
                 // solar shortwave radition show accum with step range "90"
                 if stepType == "accum" && !stepRange.contains("-") {
                     stepRange = "0-\(stepRange)"
@@ -326,6 +317,15 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 // Deaccumulate precipitation
                 guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                     return nil
+                }
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.multiplyAdd(domain: domain, dtSeconds: dtSeconds) {
+                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+
+                if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single].contains(domain) {
+                    grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
                 }
 
                 // Keep relative humidity in memory to generate total cloud cover files

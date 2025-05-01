@@ -237,6 +237,7 @@ extension Array where Element == Float {
     ///
     /// Assumes that the first value after a series of missing values is the average solar radiation for all missing steps (including self)
     /// Values after missing values will afterwards deaveraged as well
+    /// If multiple perturbed runs are supplied, dimensions must be [location, member, time]
     ///
     /// The interpolation can handle mixed missing values e.g. switching from 1 to 3 and then to 6 hourly values
     ///
