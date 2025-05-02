@@ -294,6 +294,10 @@ extension Array where Element == Float {
                 }
             }
         }
+        // Only first timestep is missing -> nothing to do here.
+        guard firstMissing <= lastMissing else {
+            return
+        }
         
         let maximumMissingHours = 12
         let missingSteps = maximumMissingHours * 3600 / time.dtSeconds
