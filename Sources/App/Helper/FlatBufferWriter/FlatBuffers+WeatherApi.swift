@@ -396,6 +396,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .soilTemperature, depth: 486, previousDay: previousDay)
         case .soil_temperature_1458cm:
             return .init(variable: .soilTemperature, depth: 1458, previousDay: previousDay)
+        case .sea_surface_temperature:
+            return .init(variable: .seaSurfaceTemperature, previousDay: previousDay)
         }
     }
 }

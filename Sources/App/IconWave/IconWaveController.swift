@@ -13,6 +13,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     case best_match
     case ewam
     case gwam
+    case era5
     case era5_ocean
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
@@ -83,6 +84,8 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
             return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({ [$0] }) ?? []
         case .ncep_gfswave016:
             return try GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, lat: lat, lon: lon, elevation: elevation, mode: mode).flatMap({ [$0] }) ?? []
+        case .era5:
+            return [try Era5Factory.makeReader(domain: .era5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         }
     }
 }
