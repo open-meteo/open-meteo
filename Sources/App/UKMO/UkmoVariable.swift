@@ -202,11 +202,8 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .global_deterministic_10km:
             switch self {
             case .showers, .snowfall_water_equivalent, .hail:
-                // Global has only instantanous rates for snow and showers
+                // Global has only instantaneous rates for snow and showers
                 return nil
-            // case .shortwave_radiation:
-                // global has only direct radiation, but not diffuse/total
-                // return nil
             case .cloud_base:
                 return nil
             case .uv_index:
@@ -219,12 +216,12 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .global_ensemble_20km:
             switch self {
             case .showers, .hail:
-                // Global has only instantanous rates for snow and showers
+                // Global has only instantaneous rates for snow and showers
                 return nil
-// case .cloud_base:
-            //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
-            // case .freezing_level_height:
-            //    return "height_ASL_at_freezing_level"
+                // case .cloud_base:
+                //    return "height_ASL_at_cloud_base_where_cloud_cover_2p5_oktas"
+                // case .freezing_level_height:
+                //    return "height_ASL_at_freezing_level"
             case .shortwave_radiation, .direct_radiation:
                 // Radiation is only available until hour 30 for runs 6z and 18z
                 if run.hour % 12 == 6 && forecastHour >= 31 {
@@ -235,7 +232,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 return nil
             case .rain, .snowfall_water_equivalent:
                 if forecastHour >= 57 {
-                    /// Only has 1 hourly aggregations, but timeintervals are actually 3 or 6 hourly
+                    /// Only has 1 hourly aggregations, but time-intervals are actually 3 or 6 hourly
                     return nil
                 }
             case .cloud_base, .freezing_level_height, .cloud_cover_2m, .convective_inhibition, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .uv_index:
@@ -250,6 +247,26 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 return nil
             default:
                 break
+            }
+        case .uk_ensemble_2km:
+            // No total precipitation available for uk ensemble
+            switch self {
+            case .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high, .wind_gusts_10m, .cape, .surface_temperature, .snow_depth_water_equivalent, .rain, .snowfall_water_equivalent, .direct_radiation:
+                /// Hour0 not available for clouds, but total clouds IS available for hour 0
+                if forecastHour == 0 {
+                    return nil
+                }
+                break
+            case .shortwave_radiation:
+                // Hours 126 is missing for shortwave radiation
+                if forecastHour == 0 || forecastHour == 126 {
+                    return nil
+                }
+                break
+            case .temperature_2m, .cloud_cover, .pressure_msl, .relative_humidity_2m, .wind_speed_10m, .wind_direction_10m, .visibility:
+                break
+            default:
+                return nil
             }
         }
 
@@ -302,7 +319,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             if forecastHour >= 150 {
                 return "rainfall_accumulation-PT06H"
             }
-            if forecastHour >= 57 {
+            if forecastHour >= 57 && [UkmoDomain.global_deterministic_10km, .global_ensemble_20km].contains(domain) {
                 return "rainfall_accumulation-PT03H"
             }
             return "rainfall_accumulation-PT01H" // "rainfall_rate"
@@ -319,14 +336,14 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .snow_depth_water_equivalent:
             return "snow_depth_water_equivalent"
         case .shortwave_radiation:
-            if forecastHour > 54 {
+            if forecastHour > 54 && [UkmoDomain.global_deterministic_10km, .global_ensemble_20km].contains(domain) {
                 return nil
             }
             return "radiation_flux_in_shortwave_total_downward_at_surface"
         case .direct_radiation:
             // Solar radiation is instant. Deaveraging only procudes acceptable results for 1-hourly data.
             // Data after 54 hours is 3 hourly
-            if forecastHour > 54 {
+            if forecastHour > 54 && [UkmoDomain.global_deterministic_10km, .global_ensemble_20km].contains(domain) {
                 return nil
             }
             return "radiation_flux_in_shortwave_direct_downward_at_surface"
@@ -487,7 +504,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
             break
-        case .uk_deterministic_2km:
+        case .uk_deterministic_2km, .uk_ensemble_2km:
             if variable == .vertical_velocity {
                 return nil
             }
@@ -611,7 +628,7 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
             return nil
-        case .uk_deterministic_2km:
+        case .uk_deterministic_2km, .uk_ensemble_2km:
             break
         }
         switch variable {

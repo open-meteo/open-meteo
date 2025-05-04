@@ -39,7 +39,7 @@ struct DmiDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -109,7 +109,7 @@ struct DmiDownload: AsyncCommand {
      Download GRIB file for each timestamp, decode, generate some derived variables.
      Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
      */
-    func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         /*guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'DMI_API_KEY'")
         }*/
@@ -117,6 +117,7 @@ struct DmiDownload: AsyncCommand {
         let deadLineHours = Double(4)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         guard let grid = domain.grid as? ProjectionGrid<LambertConformalConicProjection> else {
             fatalError("Wrong grid")
@@ -143,7 +144,7 @@ struct DmiDownload: AsyncCommand {
             // let url = "https://download.dmi.dk/public/opendata/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
             let url = "https://dmi-opendata.s3-eu-north-1.amazonaws.com/forecastdata/\(dataset)/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
 
-            return try await curl.withGribStream(url: url, bzip2Decode: false/*, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]*/) { stream in
+            let handles = try await curl.withGribStream(url: url, bzip2Decode: false/*, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]*/) { stream in
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
@@ -197,7 +198,6 @@ struct DmiDownload: AsyncCommand {
                         return nil // skip precipitation at timestep 0
                     }
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                     var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                     try grib2d.load(message: message)
 
@@ -243,15 +243,12 @@ struct DmiDownload: AsyncCommand {
                     guard await previousScoped.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return nil
                     }
-
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn)
+                    return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
 
                 previous = previousScoped
 
                 logger.info("Calculating wind speed and direction from U/V components and correcting for true north")
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 let windHandles = [
                     try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth),
                     try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth),
@@ -266,6 +263,10 @@ struct DmiDownload: AsyncCommand {
                 }
                 return h + windHandles
             }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [t])
+            }
+            return handles
         }
 
         await curl.printStatistics()

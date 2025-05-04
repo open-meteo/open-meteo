@@ -40,6 +40,11 @@ struct KnmiDownload: AsyncCommand {
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+        }
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -136,6 +141,7 @@ struct KnmiDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let grid = domain.grid
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
@@ -239,7 +245,6 @@ struct KnmiDownload: AsyncCommand {
                 }
                 logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)")
 
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
                 var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
                 try grib2d.load(message: message)
 
@@ -266,16 +271,13 @@ struct KnmiDownload: AsyncCommand {
                 guard await previous.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                     return nil
                 }
-
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                return GenericVariableHandle(variable: variable, time: timestamp, member: member, fn: fn)
+                return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
             }.collect().compactMap({ $0 })
 
             if generateElevationFile {
                 try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
             }
 
-            let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
             let gustHandles = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
 
             let windHandles = [

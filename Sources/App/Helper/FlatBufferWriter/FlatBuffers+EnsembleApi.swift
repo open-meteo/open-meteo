@@ -104,9 +104,9 @@ extension EnsembleSurfaceVariable: FlatBuffersVariable {
         case .global_tilted_irradiance_instant:
             return .init(variable: .globalTiltedIrradianceInstant)
         case .wind_speed_100m:
-            return .init(variable: .windSpeed, altitude: 10)
+            return .init(variable: .windSpeed, altitude: 100)
         case .wind_direction_100m:
-            return .init(variable: .windDirection, altitude: 10)
+            return .init(variable: .windDirection, altitude: 100)
         }
     }
 }
@@ -168,6 +168,9 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
         case .bom_access_global_ensemble:
             return .bomAccessGlobalEnsemble
         case .ukmo_global_ensemble_20km:
+            return .ukmoGlobalEnsemble20km
+        case .ukmo_uk_ensemble_2km:
+            // TODO register in SDK
             return .ukmoGlobalEnsemble20km
         }
     }

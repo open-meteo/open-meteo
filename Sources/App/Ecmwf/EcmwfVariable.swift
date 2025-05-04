@@ -184,7 +184,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     case relative_humidity_200hPa
     case relative_humidity_100hPa
     case relative_humidity_50hPa
-    case surface_pressure
     case pressure_msl
     case total_column_integrated_water_vapour
     case wind_v_component_10m
@@ -206,7 +205,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     case temperature_2m
     case temperature_2m_min
     case temperature_2m_max
-    case relative_vorticity_1000hPa
+    /*case relative_vorticity_1000hPa
     case relative_vorticity_925hPa
     case relative_vorticity_850hPa
     case relative_vorticity_700hPa
@@ -229,7 +228,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     case divergence_of_wind_250hPa
     case divergence_of_wind_200hPa
     case divergence_of_wind_100hPa
-    case divergence_of_wind_50hPa
+    case divergence_of_wind_50hPa*/
 
     case wind_gusts_10m
 
@@ -266,9 +265,9 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// If true, download
     var includeInEnsemble: DownloadOrProcess? {
         switch self {
-        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .surface_pressure, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
+        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
             return .downloadAndProcess
-        case .relative_humidity_925hPa, .relative_humidity_1000hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_500hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_600hPa, .relative_humidity_400hPa, .relative_humidity_100hPa, .relative_humidity_50hPa:
+        case .dew_point_2m, .relative_humidity_925hPa, .relative_humidity_1000hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_500hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_600hPa, .relative_humidity_400hPa, .relative_humidity_100hPa, .relative_humidity_50hPa:
             return .downloadOnly
         default: return nil
         }
@@ -276,7 +275,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     var isElevationCorrectable: Bool {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_max, .temperature_2m_min, .surface_pressure:
+        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_max, .temperature_2m_min:
             return true
         default:
             return false
@@ -307,15 +306,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .vertical_velocity_1000hPa, .vertical_velocity_925hPa, .vertical_velocity_850hPa, .vertical_velocity_600hPa, .vertical_velocity_700hPa, .vertical_velocity_500hPa, .vertical_velocity_400hPa, .vertical_velocity_300hPa, .vertical_velocity_250hPa, .vertical_velocity_200hPa, .vertical_velocity_100hPa, .vertical_velocity_50hPa: return .metrePerSecondNotUnitConverted
         case .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_100hPa, .temperature_50hPa: return .celsius
         case .relative_humidity_1000hPa, .relative_humidity_925hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_600hPa, .relative_humidity_500hPa, .relative_humidity_400hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_100hPa, .relative_humidity_50hPa: return .percentage
-        case .surface_pressure: return .hectopascal
         case .pressure_msl: return .hectopascal
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         case .wind_v_component_10m: return .metrePerSecond
         case .wind_u_component_10m: return .metrePerSecond
         case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_50hPa: return .gramPerKilogram
         case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return .celsius
-        case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return .perSecond
-        case .divergence_of_wind_1000hPa, .divergence_of_wind_925hPa, .divergence_of_wind_850hPa, .divergence_of_wind_700hPa, .divergence_of_wind_600hPa, .divergence_of_wind_500hPa, .divergence_of_wind_400hPa, .divergence_of_wind_300hPa, .divergence_of_wind_250hPa, .divergence_of_wind_200hPa, .divergence_of_wind_100hPa, .divergence_of_wind_50hPa: return .perSecond
+        /*case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return .perSecond
+        case .divergence_of_wind_1000hPa, .divergence_of_wind_925hPa, .divergence_of_wind_850hPa, .divergence_of_wind_700hPa, .divergence_of_wind_600hPa, .divergence_of_wind_500hPa, .divergence_of_wind_400hPa, .divergence_of_wind_300hPa, .divergence_of_wind_250hPa, .divergence_of_wind_200hPa, .divergence_of_wind_100hPa, .divergence_of_wind_50hPa: return .perSecond*/
         case .cloud_cover:
             return .percentage
         case .cloud_cover_low:
@@ -424,7 +422,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .relative_humidity_200hPa: return 200
         case .relative_humidity_100hPa: return 100
         case .relative_humidity_50hPa: return 50
-        case .surface_pressure: return nil
         case .pressure_msl: return nil
         case .total_column_integrated_water_vapour: return nil
         case .wind_v_component_10m: return 10
@@ -442,7 +439,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_100hPa: return 100
         case .specific_humidity_50hPa: return 50
         case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return 2
-        case .relative_vorticity_1000hPa: return 1000
+        /*case .relative_vorticity_1000hPa: return 1000
         case .relative_vorticity_925hPa: return 925
         case .relative_vorticity_850hPa: return 850
         case .relative_vorticity_700hPa: return 700
@@ -465,7 +462,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .divergence_of_wind_250hPa: return 250
         case .divergence_of_wind_200hPa: return 200
         case .divergence_of_wind_100hPa: return 100
-        case .divergence_of_wind_50hPa: return 50
+        case .divergence_of_wind_50hPa: return 50*/
         case .cloud_cover:
             return nil
         case .cloud_cover_low:
@@ -569,7 +566,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .relative_humidity_200hPa: return "r"
         case .relative_humidity_100hPa: return "r"
         case .relative_humidity_50hPa: return "r"
-        case .surface_pressure: return "sp"
         case .pressure_msl: return "msl"
         case .total_column_integrated_water_vapour: return "tcwv"
         case .wind_v_component_10m: return "10v"
@@ -589,7 +585,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .temperature_2m: return "2t"
         case .temperature_2m_min: return "mn2t3"
         case .temperature_2m_max: return "mx2t3"
-        case .relative_vorticity_1000hPa: return "vo"
+        /*case .relative_vorticity_1000hPa: return "vo"
         case .relative_vorticity_925hPa: return "vo"
         case .relative_vorticity_850hPa: return "vo"
         case .relative_vorticity_700hPa: return "vo"
@@ -612,7 +608,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .divergence_of_wind_250hPa: return "d"
         case .divergence_of_wind_200hPa: return "d"
         case .divergence_of_wind_100hPa: return "d"
-        case .divergence_of_wind_50hPa: return "d"
+        case .divergence_of_wind_50hPa: return "d"*/
         case .cloud_cover:
             return "tcc"
         case .cloud_cover_low:
@@ -654,15 +650,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .vertical_velocity_1000hPa, .vertical_velocity_925hPa, .vertical_velocity_850hPa, .vertical_velocity_600hPa, .vertical_velocity_700hPa, .vertical_velocity_500hPa, .vertical_velocity_400hPa, .vertical_velocity_300hPa, .vertical_velocity_250hPa, .vertical_velocity_200hPa, .vertical_velocity_100hPa, .vertical_velocity_50hPa: return (20..<100).interpolated(atFraction: (0..<500).fraction(of: Float(level ?? 0)))
         case .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_100hPa, .temperature_50hPa: return 20
         case .relative_humidity_1000hPa, .relative_humidity_925hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_600hPa, .relative_humidity_500hPa, .relative_humidity_400hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_100hPa, .relative_humidity_50hPa: return 1
-        case .surface_pressure: return 10
         case .pressure_msl: return 10
         case .total_column_integrated_water_vapour: return 10
         case .wind_v_component_10m, .wind_u_component_100m: return 10
         case .wind_u_component_10m, .wind_v_component_100m: return 10
         case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_50hPa: return 100
         case .temperature_2m, .temperature_2m_min, .temperature_2m_max: return 20
-        case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return 100
-        case .divergence_of_wind_1000hPa, .divergence_of_wind_925hPa, .divergence_of_wind_850hPa, .divergence_of_wind_700hPa, .divergence_of_wind_600hPa, .divergence_of_wind_500hPa, .divergence_of_wind_400hPa, .divergence_of_wind_300hPa, .divergence_of_wind_250hPa, .divergence_of_wind_200hPa, .divergence_of_wind_100hPa, .divergence_of_wind_50hPa: return 100
+        /*case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return 100
+        case .divergence_of_wind_1000hPa, .divergence_of_wind_925hPa, .divergence_of_wind_850hPa, .divergence_of_wind_700hPa, .divergence_of_wind_600hPa, .divergence_of_wind_500hPa, .divergence_of_wind_400hPa, .divergence_of_wind_300hPa, .divergence_of_wind_250hPa, .divergence_of_wind_200hPa, .divergence_of_wind_100hPa, .divergence_of_wind_50hPa: return 100*/
         case .cloud_cover:
             return 1
         case .cloud_cover_low:
@@ -691,8 +686,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_1000hPa, .temperature_925hPa, .temperature_850hPa, .temperature_700hPa, .temperature_600hPa, .temperature_500hPa, .temperature_400hPa, .temperature_300hPa, .temperature_250hPa, .temperature_200hPa, .temperature_100hPa, .temperature_50hPa, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
             return (1, -273.15)
         case .pressure_msl:
-            return (1 / 100, 0)
-        case .surface_pressure:
             return (1 / 100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
             if domain == .aifs025_single {
@@ -727,6 +720,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case apparent_temperature
     case vapor_pressure_deficit
     case vapour_pressure_deficit
+    case et0_fao_evapotranspiration
     case windspeed_10m
     case windspeed_100m
     case windspeed_1000hPa
@@ -851,6 +845,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case snowfall
     case is_day
     case surface_air_pressure
+    case surface_pressure
     case skin_temperature
     case soil_temperature_0cm
     case rain

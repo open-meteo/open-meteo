@@ -45,6 +45,12 @@ extension MarineVariable: FlatBuffersVariable {
             return .init(variable: .secondarySwellWavePeriod)
         case .secondary_swell_wave_direction:
             return .init(variable: .secondarySwellWaveDirection)
+        case .tertiary_swell_wave_height:
+            return .init(variable: .tertiarySwellWaveHeight)
+        case .tertiary_swell_wave_period:
+            return .init(variable: .tertiarySwellWavePeriod)
+        case .tertiary_swell_wave_direction:
+            return .init(variable: .tertiarySwellWaveDirection)
         }
     }
 }
@@ -111,6 +117,8 @@ extension IconWaveDomainApi: ModelFlatbufferSerialisable {
             return .ncepGfswave016
         case .ncep_gefswave025:
             return .ncepGefswave025
+        case .era5:
+            return .era5
         }
     }
 }

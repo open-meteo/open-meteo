@@ -115,6 +115,7 @@ enum DomainRegistry: String, CaseIterable {
     case ukmo_global_deterministic_10km
     case ukmo_global_ensemble_20km
     case ukmo_uk_deterministic_2km
+    case ukmo_uk_ensemble_2km
 
     case eumetsat_sarah3_30min
     case jma_jaxa_himawari_10min
@@ -128,6 +129,10 @@ enum DomainRegistry: String, CaseIterable {
 
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
+    }
+    
+    var directorySpatial: String? {
+        return OpenMeteo.dataSpatialDirectory.map { "\($0)\(rawValue)/" }
     }
 
     func getDomain() -> GenericDomain? {
@@ -333,6 +338,8 @@ enum DomainRegistry: String, CaseIterable {
             return KmaDomain.ldps
         case .italia_meteo_arpae_icon_2i:
             return ItaliaMeteoArpaeDomain.icon_2i
+        case .ukmo_uk_ensemble_2km:
+            return UkmoDomain.uk_ensemble_2km
         }
     }
 }

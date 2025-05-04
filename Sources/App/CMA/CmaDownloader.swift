@@ -62,7 +62,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
@@ -267,14 +267,14 @@ struct DownloadCmaCommand: AsyncCommand {
     /// Uses concurrent downloads and concurrent data conversion to process data as fast as possible
     /// Each download GRIB file is split into hundrets 16 MB parts and download in parallel using HTTP RANGE.
     /// Individual grib messages are extracted while downloading and processed concurrently
-    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 10
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let nForecastHours = domain.forecastHours(run: run.hour)
         let forecastHours = stride(from: 0, through: nForecastHours, by: 3)
-
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
         let previous = GribDeaverager()
 
         let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
@@ -283,7 +283,7 @@ struct DownloadCmaCommand: AsyncCommand {
             let timestamp = run.add(hours: forecastHour)
             // Split download into 16 MB parts and download concurrently
             // In case processing is too slow, incoming data will be buffered
-            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
                 // Process each grib message concurrently. Independent from download thread
                 return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     /*
@@ -308,7 +308,6 @@ struct DownloadCmaCommand: AsyncCommand {
                         }
                     }
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     // message.dumpAttributes()
                     try grib2d.load(message: message)
@@ -325,10 +324,13 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
 
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
+            return handles
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)

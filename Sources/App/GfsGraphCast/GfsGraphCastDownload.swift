@@ -51,7 +51,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
@@ -116,12 +116,13 @@ struct GfsGraphCastDownload: AsyncCommand {
         return nil
     }
 
-    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let forecastHours = domain.forecastHours(run: run.hour)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         // https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/graphcastgfs.20240401/00/forecasts_13_levels/graphcastgfs.t00z.pgrb2.0p25.f006
         let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
@@ -139,7 +140,6 @@ struct GfsGraphCastDownload: AsyncCommand {
                         fatalError("could not get step range or type")
                     }
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     // message.dumpAttributes()
                     try grib2d.load(message: message)
@@ -166,8 +166,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     }
 
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
 
@@ -187,15 +186,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 let rhVariable = GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
                 // Store to calculate cloud cover
                 await storage.set(variable: rhVariable, timestamp: timestamp, member: 0, data: Array2D(data: data, nx: t.nx, ny: t.ny))
-
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: rhVariable.scalefactor, all: data)
-                return GenericVariableHandle(
-                    variable: rhVariable,
-                    time: v.timestamp,
-                    member: v.member,
-                    fn: fn
-                )
+                return try writer.write(time: timestamp, member: 0, variable: rhVariable, data: data)
             }.compactMap({ $0 })
 
             // convert pressure vertical velocity to geometric velocity
@@ -209,14 +200,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     fatalError("Requires temperature_2m")
                 }
                 let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: v.variable.scalefactor, all: data)
-                return GenericVariableHandle(
-                    variable: v.variable,
-                    time: v.timestamp,
-                    member: v.member,
-                    fn: fn
-                )
+                return try writer.write(time: v.timestamp, member: 0, variable: v.variable, data: data)
             }.compactMap({ $0 })
 
             // Calculate cloud cover mid/low/high/total
@@ -256,33 +240,15 @@ struct GfsGraphCastDownload: AsyncCommand {
                 mid: cloudcover_mid,
                 high: cloudcover_high
             )
-            let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
             let handlesClouds = [
-                GenericVariableHandle(
-                    variable: GfsGraphCastSurfaceVariable.cloud_cover_low,
-                    time: timestamp,
-                    member: 0,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: cloudcover_low)
-                ),
-                GenericVariableHandle(
-                    variable: GfsGraphCastSurfaceVariable.cloud_cover_mid,
-                    time: timestamp,
-                    member: 0,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: cloudcover_mid)
-                ),
-                GenericVariableHandle(
-                    variable: GfsGraphCastSurfaceVariable.cloud_cover_high,
-                    time: timestamp,
-                    member: 0,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: cloudcover_high)
-                ),
-                GenericVariableHandle(
-                    variable: GfsGraphCastSurfaceVariable.cloud_cover,
-                    time: timestamp,
-                    member: 0,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: cloudcover)
-                )
+                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_low, data: cloudcover_low),
+                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid),
+                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high),
+                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
             ]
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
             return handles + handles2 + handles3 + handlesClouds
         }
         await curl.printStatistics()

@@ -91,6 +91,11 @@ struct MeteoFranceDownload: AsyncCommand {
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+        }
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -203,6 +208,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let deadLineHours = domain.timeoutHours
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
+        
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         // let grid = domain.grid
         var handles = [GenericVariableHandle]()
@@ -231,7 +238,6 @@ struct MeteoFranceDownload: AsyncCommand {
                         return nil
                     }
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     // message.dumpAttributes()
                     try grib2d.load(message: message)
@@ -244,8 +250,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     let variable = ProbabilityVariable.precipitation_probability
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect()
             }
             handles.append(contentsOf: h)
@@ -268,6 +273,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let deadLineHours = domain.timeoutHours
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
+        
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         let grid = domain.grid
         let nx = grid.nx
@@ -361,7 +368,6 @@ struct MeteoFranceDownload: AsyncCommand {
                             return nil
                         }
 
-                        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                         var grib2d = GribArray2D(nx: nx, ny: ny)
                         // message.dumpAttributes()
                         try grib2d.load(message: message)
@@ -382,12 +388,10 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
 
                         logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                        return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true)
                     }.collect()
 
-                    let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
-                    let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
+                    let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer, overwrite: true)
                     let precip = try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
 
                     return handles + windGust + precip
@@ -515,8 +519,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let grid = domain.grid
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let subsetGrid = domain.mfSubsetGrid
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
         var handles = [GenericVariableHandle]()
 
         for seconds in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true) {
@@ -557,13 +561,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                handles.append(GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: 0,
-                    fn: fn
-                ))
+                handles.append(try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true))
             }
         }
         // await curl.printStatistics()
@@ -573,7 +571,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
 extension VariablePerMemberStorage {
     /// Sum up rain, snow and graupel for total precipitation
-    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
+    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .compactMap({ t, handles -> GenericVariableHandle? in
@@ -584,12 +582,7 @@ extension VariablePerMemberStorage {
                     return nil
                 }
                 let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({ $0 + $1.0 + $1.1 })
-                return GenericVariableHandle(
-                    variable: outVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: precip)
-                )
+                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: precip)
             }
         )
     }

@@ -67,6 +67,11 @@ struct MfWaveDownload: AsyncCommand {
 
         let handles = try await download(application: context.application, domain: domain, run: run, onlyTides: signature.onlyTides)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+        }
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files
@@ -80,7 +85,7 @@ struct MfWaveDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         let nx = domain.grid.nx
         let ny = domain.grid.ny
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         // Note: The actual domain data area is slightly different
         /*if domain == .mfwave && !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
@@ -227,14 +232,7 @@ struct MfWaveDownload: AsyncCommand {
                                     try domain.surfaceElevationFileOm.createDirectory()
                                     try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                                 }
-                                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                                // Note: skipHour0 needs still to be set for solar interpolation
-                                return GenericVariableHandle(
-                                    variable: variable,
-                                    time: timestamp,
-                                    member: 0,
-                                    fn: fn
-                                )
+                                return try writer.write(time: timestamp, member: 0, variable: variable, data: data)
                             }
                         }
 
@@ -264,14 +262,7 @@ struct MfWaveDownload: AsyncCommand {
                                 try domain.surfaceElevationFileOm.createDirectory()
                                 try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                             }
-                            let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                            // Note: skipHour0 needs still to be set for solar interpolation
-                            return GenericVariableHandle(
-                                variable: variable,
-                                time: timestamp,
-                                member: 0,
-                                fn: fn
-                            )
+                            return try writer.write(time: timestamp, member: 0, variable: variable, data: data)
                         }
                     }.flatMap({ $0 })
                 })

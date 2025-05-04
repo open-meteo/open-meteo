@@ -130,28 +130,28 @@ struct GridSliceXyIterator: IteratorProtocol {
     let nxSlice: Int
     /// Number of x steps in the grid
     let nx: Int
+    
+    let yLowerBound: Int
+    let xLowerBound: Int
 
     init(yRange: Range<Int>, xRange: Range<Int>, nx: Int) {
-        let count = xRange.count * yRange.count
-        self.end = ((yRange.upperBound - 1) * nx + xRange.upperBound)
-        // For empty grids, set the position pointer to the end of iteration
-        self.position = count == 0 ? self.end : (yRange.lowerBound * nx + xRange.lowerBound - 1)
+        self.end = xRange.count * yRange.count
+        self.position = 0
         self.nxSlice = xRange.count
         self.nx = nx
+        self.xLowerBound = xRange.lowerBound
+        self.yLowerBound = yRange.lowerBound
     }
 
     mutating func next() -> Int? {
-        guard (position + 1) < end else {
+        guard position < end else {
             // End of iteration
             return nil
         }
-        let xSliceUpperBound = end % nx
-        guard (position + 1) % nx < xSliceUpperBound else {
-            // X range exceeded, increment Y, restart x
-            position = position + 1 + nx - nxSlice
-            return position
-        }
+        let x = position % nxSlice
+        let y = position / nxSlice
+        let gridpoint = (y + yLowerBound) * nx + x + xLowerBound
         position += 1
-        return position
+        return gridpoint
     }
 }

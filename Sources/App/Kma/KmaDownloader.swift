@@ -47,7 +47,7 @@ struct KmaDownload: AsyncCommand {
             fatalError("Option server is required")
         }
         try await downloadElevation(application: context.application, domain: domain, run: run, server: server)
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: server, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -85,14 +85,14 @@ struct KmaDownload: AsyncCommand {
         try elevation.array.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
     }
 
-    func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: KmaDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = Double(6)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
 
         let grid = domain.grid
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         let ftp = FtpDownloader()
         ftp.connectTimeout = 5
@@ -109,13 +109,12 @@ struct KmaDownload: AsyncCommand {
 
         return try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
             let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
+            let fHHH = forecastHour.zeroPadded(len: 3)
+            let timestamp = run.add(hours: forecastHour)
             let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> GenericVariableHandle? in
                 guard let kmaName = variable.getKmaName(domain: domain) else {
                     return nil
                 }
-
-                let fHHH = forecastHour.zeroPadded(len: 3)
-                let timestamp = run.add(hours: forecastHour)
                 let url = "\(server)\(domain.filePrefix)_v070_\(kmaName)_unis_h\(fHHH).\(run.format_YYYYMMddHH).gb2"
                 let data = try await ftp.get404Retry(logger: logger, url: url)
                 let array2d = try data.withUnsafeBytes({
@@ -157,15 +156,8 @@ struct KmaDownload: AsyncCommand {
                         }
                     }
                 }
-
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: array2d.array.data)
                 logger.info("Processing \(variable) timestep \(timestamp.format_YYYYMMddHH)")
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: timestamp,
-                    member: 0,
-                    fn: fn
-                )
+                return try writer.write(time: timestamp, member: 0, variable: variable, data: array2d.array.data)
             }.compactMap({ $0 })
             logger.info("Calculating wind speed, direction and snow")
             // Convert U/V wind components to speed and direction
@@ -180,7 +172,9 @@ struct KmaDownload: AsyncCommand {
                 // Precipitation variable contains rain. Sum up snow and rain to total precipitation
                 precipCorrections = try await inMemory.sumUp(var1: .precipitation, var2: .snowfall_water_equivalent, outVariable: KmaSurfaceVariable.precipitation, writer: writer)
             }
-
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
             return handles + wind10 + wind50 + precipCorrections
         }
     }
@@ -199,7 +193,7 @@ extension KmaDomain {
 
 extension VariablePerMemberStorage {
     /// Sum up 2 variables
-    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
+    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .compactMap({ t, handles -> GenericVariableHandle? in
@@ -208,13 +202,8 @@ extension VariablePerMemberStorage {
                     let var2 = handles.first(where: { $0.key.variable == var2 }) else {
                     return nil
                 }
-                let snowfall = zip(var1.value.data, var2.value.data).map(+)
-                return GenericVariableHandle(
-                    variable: outVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
-                )
+                let sum = zip(var1.value.data, var2.value.data).map(+)
+                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: sum)
             }
         )
     }

@@ -54,13 +54,13 @@ struct DownloadIconWaveCommand: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let variables = onlyVariables ?? IconWaveVariable.allCases
-        let handles = try await download(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour)
+        let handles = try await download(application: context.application, domain: domain, run: run, variables: variables, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
     /// Download all timesteps and preliminarily covnert it to compressed files
-    func download(application: Application, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable], maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: IconWaveDomain, run: Timestamp, variables: [IconWaveVariable], maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         // https://opendata.dwd.de/weather/maritime/wave_models/gwam/grib/00/mdww/GWAM_MDWW_2022072800_000.grib2.bz2
         // https://opendata.dwd.de/weather/maritime/wave_models/ewam/grib/00/mdww/EWAM_MDWW_2022072800_000.grib2.bz2
         let baseUrl = "http://opendata.dwd.de/weather/maritime/wave_models/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
@@ -71,16 +71,17 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         var grib2d = GribArray2D(nx: nx, ny: ny)
 
         let handles = try await (0..<(maxForecastHour ?? domain.countForecastHours)).asyncFlatMap { forecastStep in
             /// E.g. 0,3,6...174 for gwam
             let forecastHour = forecastStep * domain.dtHours
+            let timestamp = run.add(hours: forecastHour)
             logger.info("Downloading hour \(forecastHour)")
-
-            return try await variables.asyncMap { variable in
+            
+            let handles: [GenericVariableHandle] = try await variables.asyncMap { variable in
                 let url = "\(baseUrl)\(variable.dwdName)/\(domain.rawValue.uppercased())_\(variable.dwdName.uppercased())_\(run.format_YYYYMMddHH)_\(forecastHour.zeroPadded(len: 3)).grib2.bz2"
 
                 let message = try await curl.downloadGrib(url: url, bzip2Decode: true)[0]
@@ -101,15 +102,13 @@ struct DownloadIconWaveCommand: AsyncCommand {
                     try domain.surfaceElevationFileOm.createDirectory()
                     try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                 }
-
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: run.add(hours: forecastHour),
-                    member: 0,
-                    fn: fn
-                )
+                
+                return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
             }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
+            return handles
         }
         await curl.printStatistics()
         return handles

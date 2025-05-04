@@ -1,31 +1,31 @@
-# Docker Compose file for Vapor
+# Docker Compose file for running the Open-Meteo API on Docker
+# Start with: docker compose up
 #
-# Install Docker on your system to run and test
-# your Vapor app in a production-like environment.
+# http://0.0.0.0:8080/v1/forecast?latitude=47.1&longitude=8.6&hourly=temperature_2m&models=icon_global
 #
-# Note: This file is intended for testing and does not
-# implement best practices for a production deployment.
-#
-# Learn more: https://docs.docker.com/compose/reference/
-#
-#   Build images: docker-compose build
-#      Start app: docker-compose up open-meteo
-#   Run commands: docker-compose run open-meteo --help
-#       Stop all: docker-compose down (add -v to wipe data)
-#
-version: '3.7'
 
 volumes:
-  db_data:
+  open_meteo_database:
 
 x-shared_environment: &shared_environment
-  LOG_LEVEL: ${LOG_LEVEL:-info}
+  LOG_LEVEL: info
 
 services:
+  open-meteo-sync:
+      image: ghcr.io/open-meteo/open-meteo
+      container_name: open-meteo-sync
+      environment:
+        <<: *shared_environment
+      command: sync dwd_icon temperature_2m --past-days 2 --repeat-interval 1 --concurrent 1
+      volumes:
+       - open_meteo_database:/app/data
+      restart: always
+
   open-meteo:
-    image: open-meteo:latest
+    image: ghcr.io/open-meteo/open-meteo
+    container_name: open-meteo-api
     volumes:
-      - db_data:/app/data
+      - open_meteo_database:/app/data
     build:
       context: .
     environment:
