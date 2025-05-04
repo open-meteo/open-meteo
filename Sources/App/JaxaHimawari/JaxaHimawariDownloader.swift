@@ -65,9 +65,10 @@ struct JaxaHimawariDownload: AsyncCommand {
             let timerange = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: domain.dtSeconds)
             for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMddHHmm)")
-                let handles = try await runs.asyncFlatMap { run in
+                let handles = try await runs.asyncFlatMap { run -> [GenericVariableHandle] in
                     if let skipTimeSteps = signature.skipTimeSteps, skipTimeSteps.contains(run.format_YYYYMMddHHmm) {
                         logger.info("Skipping \(run.format_YYYYMMddHHmm)")
+                        return []
                     }
                     return try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
                 }
