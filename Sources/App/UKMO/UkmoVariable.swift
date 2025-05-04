@@ -262,7 +262,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
                 if forecastHour == 0 || forecastHour == 126 {
                     return nil
                 }
-                return nil
+                break
             case .temperature_2m, .cloud_cover, .pressure_msl, .relative_humidity_2m, .wind_speed_10m, .wind_direction_10m, .visibility:
                 break
             default:
