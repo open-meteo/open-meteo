@@ -5,9 +5,6 @@ import SwiftNetCDF
 
 /**
  Download UK MetOffice models from AWS rolling archive
- 
- TODO:
- - Only direct radiation is available for the global domain. A reverse solar separation model could be used to get global horizonal radiation.
  */
 struct UkmoDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -169,12 +166,11 @@ struct UkmoDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
-        let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
+        let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km ) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/\(run.iso8601_YYYYMMddTHHmm)Z-PT0000H00M-"
 
-        /// Ensemble model has a height_of_orography.nc, but there is no landmask
-        /// Use soil_temperature_on_soil_levels.nc for landmask
-        if domain == .global_ensemble_20km {
+        /// Ensemble model has a height_of_orography.nc and landsea_mask
+        if domain == .global_ensemble_20km || domain == .uk_ensemble_2km {
             logger.info("Downloading height and elevation data")
             let orographyFile = "\(baseUrl)height_of_orography.nc"
             let landSeaMaskFile = "\(baseUrl)landsea_mask.nc"
@@ -182,7 +178,7 @@ struct UkmoDownload: AsyncCommand {
                 fatalError("Could not download surface elevation")
             }
             guard let landmask = try await curl.downloadInMemoryAsync(url: landSeaMaskFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
-                fatalError("Could not download soil temperature")
+                fatalError("Could not download landsea_mask")
             }
             for i in elevation.indices {
                 if landmask[i] != 1 {
@@ -241,7 +237,7 @@ struct UkmoDownload: AsyncCommand {
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
             deadLineHours = 6
-        case .uk_deterministic_2km:
+        case .uk_deterministic_2km, .uk_ensemble_2km:
             deadLineHours = 2.5
         }
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
@@ -252,7 +248,7 @@ struct UkmoDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
-        let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
+        let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
 
         var handles = [GenericVariableHandle]()
