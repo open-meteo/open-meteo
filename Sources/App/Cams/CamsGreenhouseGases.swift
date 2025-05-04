@@ -43,7 +43,7 @@ extension DownloadCamsCommand {
             model_level: [137]
         )
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         return try await curl.withCdsApi(
             dataset: "cams-global-greenhouse-gas-forecasts",
@@ -66,8 +66,7 @@ extension DownloadCamsCommand {
                         grib2d.array.data.multiplyAdd(multiply: scaling, add: 0)
                     }
                     grib2d.array.shift180LongitudeAndFlipLatitude()
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                    return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
         }
     }

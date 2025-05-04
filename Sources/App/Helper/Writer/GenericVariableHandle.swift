@@ -154,10 +154,28 @@ struct GenericVariableHandle {
                                     chunknLocations: nMembers > 1 ? nMembers : nil*/
             )
             // let nLocationsPerChunk = om.nLocationsPerChunk
-
-            let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: domain, nMembers: nMembers, nTime: 1)
-            var data3d = Array3DFastTime(nLocations: spatialChunks.x * spatialChunks.y, nLevel: nMembers, nTime: time.count)
-            var readTemp = [Float](repeating: .nan, count: spatialChunks.x * spatialChunks.y * maxTimeStepsPerFile)
+            
+            /*if false && !onlyGeneratePreviousDays {
+                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+                let fn = try FileHandle.createNewFile(file: "\(domain.downloadDirectory)\(variable.omFileName.file).om", overwrite: true)
+                let writeFile = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
+                let writer = try writeFile.prepareArray(
+                    type: Float.self,
+                    dimensions: [ny, nx, readers.count].map(UInt64.init),
+                    chunkDimensions: [1, 12, UInt64(readers.count)],
+                    compression: .pfor_delta2d_int16,
+                    scale_factor: variable.scalefactor,
+                    add_offset: 0
+                )
+                var data = [Float]()
+                data.reserveCapacity(grid.count * readers.count)
+                for (i,reader) in readers.enumerated() {
+                    data.append(contentsOf: try reader.reader.read())
+                }
+                try writer.writeData(array: Array2DFastSpace(data: data, nLocations: grid.count, nTime: readers.count).transpose().data)
+                let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
+                try writeFile.writeTrailer(rootVariable: root)
+            }*/
 
             // Create netcdf file for debugging
             if createNetcdf && !onlyGeneratePreviousDays {
@@ -165,21 +183,35 @@ struct GenericVariableHandle {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
                 let ncFile = try NetCDF.create(path: "\(domain.downloadDirectory)\(variable.omFileName.file).nc", overwriteExisting: true)
                 try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
-                var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [
+                var ncVariable = try ncFile.createVariable(name: "data", type: Int16.self, dimensions: [
                     try ncFile.createDimension(name: "time", length: time.count),
                     try ncFile.createDimension(name: "member", length: nMembers),
                     try ncFile.createDimension(name: "LAT", length: grid.ny),
                     try ncFile.createDimension(name: "LON", length: grid.nx)
                 ])
+                // Note: calculating min value and switching to UInt16 improves compression, but requires to scan all data first
+                try ncVariable.defineSzip(options: .nearestNeighbor, pixelPerBlock: 16)
+                try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, grid.ny, grid.nx])
+                try ncVariable.setAttribute("scale_factor", 1/variable.scalefactor)
+                try ncVariable.setAttribute("add_offset", Float(0))
+                try ncVariable.setAttribute("_FillValue", Int16.max)
                 for reader in readers {
                     let data = try reader.reader.read()
                     let nt = reader.time.count
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
                     if nt > 1 {
                         let fastSpace = Array2DFastTime(data: data, nLocations: grid.count, nTime: nt).transpose().data
-                        try ncVariable.write(fastSpace, offset: [timeArrayIndex, reader.member, 0, 0], count: [nt, 1, grid.ny, grid.nx])
+                        try ncVariable.write(
+                            fastSpace.map { $0.isFinite ? Int16($0 * variable.scalefactor) : Int16.max },
+                            offset: [timeArrayIndex, reader.member, 0, 0],
+                            count: [nt, 1, grid.ny, grid.nx]
+                        )
                     } else {
-                        try ncVariable.write(data, offset: [timeArrayIndex, reader.member, 0, 0], count: [1, 1, grid.ny, grid.nx])
+                        try ncVariable.write(
+                            data.map { $0.isFinite ? Int16($0 * variable.scalefactor) : Int16.max },
+                            offset: [timeArrayIndex, reader.member, 0, 0],
+                            count: [1, 1, grid.ny, grid.nx]
+                        )
                     }
                 }
             }
@@ -188,6 +220,8 @@ struct GenericVariableHandle {
 
             try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
+                var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
+                var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
                 data3d.data.fillWithNaNs()
                 for reader in readers {
                     let dimensions = reader.reader.getDimensions()
@@ -203,17 +237,19 @@ struct GenericVariableHandle {
                         data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }
+                
+                let locationRange1D = RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
 
                 // Interpolate all missing values
                 data3d.interpolateInplace(
                     type: variable.interpolation,
                     time: time,
                     grid: domain.grid,
-                    locationRange: RegularGridSlice(grid: domain.grid, yRange: Int(yRange.lowerBound) ..< Int(yRange.upperBound), xRange: Int(xRange.lowerBound) ..< Int(xRange.upperBound))
+                    locationRange: locationRange1D
                 )
 
                 progress.add(nLoc * memberRange.count * time.count * MemoryLayout<Float>.size)
-                return data3d.data[0..<nLoc * memberRange.count * time.count]
+                return ArraySlice(data3d.data)
             }
             progress.finish()
         }
@@ -288,7 +324,7 @@ actor VariablePerMemberStorage<V: Hashable> {
 extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members an timesteps.
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmFileWriterHelper, trueNorth: [Float]? = nil) throws -> [GenericVariableHandle] {
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmRunSpatialWriter, trueNorth: [Float]? = nil, overwrite: Bool = false) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .flatMap({ t, handles -> [GenericVariableHandle] in
@@ -296,24 +332,14 @@ extension VariablePerMemberStorage {
                     return []
                 }
                 let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
-                let speedHandle = GenericVariableHandle(
-                    variable: outSpeedVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outSpeedVariable.scalefactor, all: speed)
-                )
+                let speedHandle = try writer.write(time: t.timestamp, member: t.member, variable: outSpeedVariable, data: speed, overwrite: overwrite)
 
                 if let outDirectionVariable {
                     var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
                     if let trueNorth {
                         direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                     }
-                    let directionHandle = GenericVariableHandle(
-                        variable: outDirectionVariable,
-                        time: t.timestamp,
-                        member: t.member,
-                        fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outDirectionVariable.scalefactor, all: direction)
-                    )
+                    let directionHandle = try writer.write(time: t.timestamp, member: t.member, variable: outDirectionVariable, data: direction, overwrite: overwrite)
                     return [speedHandle, directionHandle]
                 }
                 return [speedHandle]

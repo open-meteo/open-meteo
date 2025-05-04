@@ -102,13 +102,13 @@ struct GfsDownload: AsyncCommand {
 
             variables = onlyVariables ?? (signature.upperLevel ? (signature.surfaceLevel ? surfaceVariables + pressureVariables : pressureVariables) : surfaceVariables)
 
-            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws)
+            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
 
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
-            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws)
+            let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
             let nConcurrent = signature.concurrent ?? 1
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         }
@@ -173,7 +173,7 @@ struct GfsDownload: AsyncCommand {
     }
 
     /// download GFS025 and NAM CONUS
-    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?, skipMissing: Bool, downloadFromAws: Bool) async throws -> [GenericVariableHandle] {
+    func downloadGfs(application: Application, domain: GfsDomain, run: Timestamp, variables: [any GfsVariableDownloadable], secondFlush: Bool, maxForecastHour: Int?, skipMissing: Bool, downloadFromAws: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
         // GFS025 ensemble does not have elevation information, use non-ensemble version
@@ -207,11 +207,19 @@ struct GfsDownload: AsyncCommand {
         if let maxForecastHour {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
-
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         var handles = [GenericVariableHandle]()
+        
+        /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
+        let domainElevation = {
+            guard let elevation = try? domain.getStaticFile(type: .elevation)?.read() else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
 
         // Download HRRR 15 minutes data
         if domain == .hrrr_conus_15min {
@@ -257,13 +265,7 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
-                    handles.append(GenericVariableHandle(
-                        variable: variable.variable,
-                        time: timestamp,
-                        member: 0,
-                        fn: fn
-                    ))
+                    handles.append(try writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
                 }
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
@@ -297,13 +299,13 @@ struct GfsDownload: AsyncCommand {
             for member in 0..<domain.ensembleMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member, useAws: downloadFromAws)
-
+                
                 /// Keep data from previous timestep in memory to deaverage the next timestep
                 var inMemorySurface = [GfsSurfaceVariable: [Float]]()
                 var inMemoryPressure = [GfsPressureVariable: [Float]]()
                 /// Keep variables in memory. Precip + Frozen percent to calculate snowfall
                 let inMemory = VariablePerMemberStorage<GfsSurfaceVariable>()
-
+                
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
                     if skipMissing {
                         // for whatever reason, the `hrrr.t10z.wrfprsf01.grib2` file uses different grib dimensions
@@ -323,24 +325,24 @@ struct GfsDownload: AsyncCommand {
                         grib2d.array.shift180LongitudeAndFlipLatitude()
                     }
                     // try message.debugGrid(grid: domain.grid, flipLatidude: domain.isGlobal, shift180Longitude: domain.isGlobal)
-
+                    
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType") else {
                         fatalError("could not get step range or type")
                     }
-
+                    
                     /// Generate land mask from regular data for GFS Wave013
                     if domain == .gfswave016 && !domain.surfaceElevationFileOm.exists() {
                         let height = Array2D(data: grib2d.array.data.map { $0.isNaN ? 0 : -999 }, nx: domain.grid.nx, ny: domain.grid.ny)
                         try height.data.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                     }
-
+                    
                     // Deaccumulate precipitation
                     guard await deaverager.deaccumulateIfRequired(variable: variable.variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         continue
                     }
-
+                    
                     // Convert specific humidity to relative humidity
                     if let variable = variable.variable as? GfsSurfaceVariable,
                        variable == .relative_humidity_2m,
@@ -355,7 +357,7 @@ struct GfsDownload: AsyncCommand {
                         grib2d.array.data.multiplyAdd(multiply: 1000, add: 0) // kg/kg to g/kg
                         grib2d.array.data = Meteorology.specificToRelativeHumidity(specificHumidity: grib2d.array.data, temperature: temperature, pressure: surfacePressure)
                     }
-
+                    
                     // Convert pressure vertical velocity to geometric velocity in HRRR
                     if let variable = variable.variable as? GfsPressureVariable,
                        variable.variable == .vertical_velocity,
@@ -365,7 +367,7 @@ struct GfsDownload: AsyncCommand {
                         }
                         grib2d.array.data = Meteorology.verticalVelocityPressureToGeometric(omega: grib2d.array.data, temperature: temperature, pressureLevel: Float(variable.level))
                     }
-
+                    
                     // HRRR contains instantanous values for solar flux. Convert it to backwards averaged.
                     if let variable = variable.variable as? GfsSurfaceVariable {
                         if domain == .hrrr_conus && [.shortwave_radiation, .diffuse_radiation].contains(variable) {
@@ -378,7 +380,7 @@ struct GfsDownload: AsyncCommand {
                             }
                         }
                     }
-
+                    
                     // Cloud cover in GFS ensemble may be -1 or 101 or 102
                     if [GfsDomain.gfs025_ens, .gfs05_ens].contains(domain), let variable = variable.variable as? GfsSurfaceVariable, variable == .cloud_cover {
                         for i in grib2d.array.data.indices {
@@ -390,18 +392,27 @@ struct GfsDownload: AsyncCommand {
                             }
                         }
                     }
-
+                    
                     // Scaling before compression with scalefactor
                     if let fma = variable.variable.multiplyAdd(domain: domain) {
                         grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-
+                    
                     if let surface = variable.variable as? GfsSurfaceVariable {
                         if [GfsSurfaceVariable.precipitation, .frozen_precipitation_percent].contains(surface) {
                             await inMemory.set(variable: surface, timestamp: timestamp, member: member, data: grib2d.array)
                         }
                         if surface == .frozen_precipitation_percent {
                             continue // do not store frozen precip on disk
+                        }
+                    }
+                    
+                    /// GFS Waves may show NaN values on water if there are no waves -> set to 0 instead of NaN
+                    if domain == .gfswave016 || domain == .gfswave025 {
+                        for i in grib2d.array.data.indices {
+                            if domainElevation[i] <= -999 && grib2d.array.data[i].isNaN {
+                                grib2d.array.data[i] = 0
+                            }
                         }
                     }
 
@@ -423,12 +434,7 @@ struct GfsDownload: AsyncCommand {
                         // do not write pressure to disk
                         continue
                     }
-
-                    let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.variable.scalefactor, all: grib2d.array.data)
-                    handles.append(GenericVariableHandle(
-                        variable: variable.variable,
-                        time: timestamp,
-                        member: member, fn: fn                    ))
+                    handles.append(try writer.write(time: timestamp, member: member, variable: variable.variable, data: grib2d.array.data))
                 }
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
@@ -437,10 +443,14 @@ struct GfsDownload: AsyncCommand {
                     precipitationVariable: .precipitation,
                     domain: domain,
                     timestamp: timestamp,
+                    run: run,
                     dtHoursOfCurrentStep: forecastHour - previousHour
                 ) {
                     handles.append(handle)
                 }
+            }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
             }
             previousHour = forecastHour
         }
@@ -466,7 +476,7 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 
 extension VariablePerMemberStorage {
     /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmFileWriterHelper) throws -> [GenericVariableHandle] {
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
         return try self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
             .compactMap({ t, handles -> GenericVariableHandle? in
@@ -478,12 +488,7 @@ extension VariablePerMemberStorage {
                 let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
                     max($0 / 100 * $1 * 0.7, 0)
                 })
-                return GenericVariableHandle(
-                    variable: outVariable,
-                    time: t.timestamp,
-                    member: t.member,
-                    fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: outVariable.scalefactor, all: snowfall)
-                )
+                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: snowfall)
             }
         )
     }

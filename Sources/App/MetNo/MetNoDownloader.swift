@@ -45,6 +45,11 @@ struct MetNoDownloader: AsyncCommand {
         let handles = try download(logger: logger, domain: domain, variables: variables, run: run)
         let nConcurrent = signature.concurrent ?? 1
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        
+        if let uploadS3Bucket = signature.uploadS3Bucket {
+            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+        }
 
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -149,15 +154,9 @@ struct MetNoDownloader: AsyncCommand {
             }
 
             return try (0..<nTime).map { t in
-                let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
+                let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
                 let data = Array(spatial[t, 0..<spatial.nLocations])
-                let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                return GenericVariableHandle(
-                    variable: variable,
-                    time: run.add(hours: t),
-                    member: 0,
-                    fn: fn
-                )
+                return try writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
             }
         }
     }
@@ -187,6 +186,25 @@ extension DomainRegistry {
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             let dest = "s3://\(bucket)/data/\(dir)"
+            try Process.spawnRetried(
+                cmd: "aws",
+                args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+            )
+        }
+    }
+    
+    /// Upload spatial files to S3 `/data_spatial/<domain>/YYYY/MM/DD/HHMMZ/<variable>.om`
+    func syncToS3Spatial(bucket: String, timesteps: [Timestamp]) throws {
+        let dir = rawValue
+        guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
+            return
+        }
+        for timestep in timesteps {
+            let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
+            let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
+            if !FileManager.default.fileExists(atPath: src) {
+                continue
+            }
             try Process.spawnRetried(
                 cmd: "aws",
                 args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]

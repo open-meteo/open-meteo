@@ -4,7 +4,7 @@ import OmFileFormat
 /**
  Generic domain that is required for the reader
  */
-protocol GenericDomain {
+protocol GenericDomain: Sendable {
     /// The grid definition. Could later be replaced with a more generic implementation
     var grid: Gridable { get }
 

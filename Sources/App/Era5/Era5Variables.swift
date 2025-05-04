@@ -62,6 +62,9 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
     case direct_radiation_spread
     case boundary_layer_height_spread
     case total_column_integrated_water_vapour_spread
+    
+    case sea_surface_temperature
+    case sea_surface_temperature_spread
 
     /// Name used to query the ECMWF CDS API via python
     var cdsApiName: String? {
@@ -98,13 +101,14 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .wave_peak_period: return "peak_wave_period"
         case .boundary_layer_height: return "boundary_layer_height"
         case .total_column_integrated_water_vapour: return "total_column_water_vapour"
+        case .sea_surface_temperature: return "sea_surface_temperature"
         default: return nil
         }
     }
 
     func netCdfScaling(domain: CdsDomain) -> (offset: Float, scalefactor: Float)? {
         switch self {
-        case .temperature_2m: return (-273.15, 1) // kelvin to celsius
+        case .temperature_2m, .sea_surface_temperature: return (-273.15, 1) // kelvin to celsius
         case .dew_point_2m: return (-273.15, 1)
         case .cloud_cover, .cloud_cover_spread: return (0, 100) // fraction to percent
         case .cloud_cover_low, .cloud_cover_low_spread: return (0, 100) // fraction to percent
@@ -166,6 +170,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return 20 // 0.05s resolution
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
             return 10
+        case .sea_surface_temperature, .sea_surface_temperature_spread:
+            return 20
         }
     }
 
@@ -230,6 +236,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case .boundary_layer_height, .boundary_layer_height_spread:
             return .hermite(bounds: 0...10e9)
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
+            return .hermite(bounds: nil)
+        case .sea_surface_temperature, .sea_surface_temperature_spread:
             return .hermite(bounds: nil)
         }
     }
@@ -338,6 +346,8 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return "159.128"
         case .total_column_integrated_water_vapour:
             return "137.128"
+        case .sea_surface_temperature:
+            return "34.128"
         default:
             fatalError("Not supported")
         }
@@ -377,6 +387,10 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .metre
         case .total_column_integrated_water_vapour, .total_column_integrated_water_vapour_spread:
             return .kilogramPerSquareMetre
+        case .sea_surface_temperature:
+            return .celsius
+        case .sea_surface_temperature_spread:
+            return .kelvin
         }
     }
 
@@ -420,6 +434,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             case "sde": return .snow_depth_spread
             case "blh": return .boundary_layer_height_spread
             case "tcwv": return .total_column_integrated_water_vapour_spread
+            case "sst": return .sea_surface_temperature_spread
             default:
                 return nil
             }
@@ -457,6 +472,7 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
         case "mwd": return .wave_direction
         case "mwp": return .wave_period
         case "pp1d": return .wave_peak_period
+        case "sst": return .sea_surface_temperature
         default:
             return nil
         }

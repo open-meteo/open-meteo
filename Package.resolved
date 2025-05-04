@@ -59,7 +59,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/om-file-format.git",
       "state" : {
-        "revision" : "5a66c8fe1604701daa47db969e3d499f62cc0372"
+        "revision" : "8bb3ab01d3aab21d3043ca42ba2f432561e2fc48"
       }
     },
     {
@@ -256,8 +256,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftNetCDF.git",
       "state" : {
-        "revision" : "ad96f78495c297c3b3b472155e0fbe2ca7354b0d",
-        "version" : "1.1.3"
+        "revision" : "1b79423176bd1be4a5512e8333f6da193f04d791",
+        "version" : "1.1.7"
       }
     },
     {

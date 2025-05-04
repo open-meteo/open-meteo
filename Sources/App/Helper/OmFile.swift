@@ -497,11 +497,13 @@ extension OmFileSplitter {
     /// This makes it easier to migrate to the new file format writer
     /// If `nTime` is set, the spatial file contains TIME SERIES oriented steps as well
     static func makeSpatialWriter(domain: GenericDomain, nMembers: Int = 1, nTime: Int = 1) -> OmFileWriterHelper {
-        let chunks = calculateSpatialXYChunk(domain: domain, nMembers: nMembers, nTime: nTime)
+        let y = min(domain.grid.ny, 32)
+        let x = min(domain.grid.nx, 1024 / y)
+        
         if nTime > 1 {
-            return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, nTime], chunks: [chunks.y, chunks.x, nTime])
+            return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, nTime], chunks: [y, x, nTime])
         }
-        return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [chunks.y, chunks.x])
+        return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [y, x])
     }
 
     static func calculateSpatialXYChunk(domain: GenericDomain, nMembers: Int, nTime: Int) -> (y: Int, x: Int) {

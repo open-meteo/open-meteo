@@ -5,9 +5,6 @@ import SwiftNetCDF
 
 /**
  Download UK MetOffice models from AWS rolling archive
- 
- TODO:
- - Only direct radiation is available for the global domain. A reverse solar separation model could be used to get global horizonal radiation.
  */
 struct UkmoDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -94,7 +91,7 @@ struct UkmoDownload: AsyncCommand {
             }*/
 
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / domain.runsPerDay) {
-                let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
+                let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadS3Bucket: nil)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
@@ -103,7 +100,7 @@ struct UkmoDownload: AsyncCommand {
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, server: signature.server, skipMissing: signature.skipMissing, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -169,12 +166,11 @@ struct UkmoDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
-        let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
+        let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km ) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/\(run.iso8601_YYYYMMddTHHmm)Z-PT0000H00M-"
 
-        /// Ensemble model has a height_of_orography.nc, but there is no landmask
-        /// Use soil_temperature_on_soil_levels.nc for landmask
-        if domain == .global_ensemble_20km {
+        /// Ensemble model has a height_of_orography.nc and landsea_mask
+        if domain == .global_ensemble_20km || domain == .uk_ensemble_2km {
             logger.info("Downloading height and elevation data")
             let orographyFile = "\(baseUrl)height_of_orography.nc"
             let landSeaMaskFile = "\(baseUrl)landsea_mask.nc"
@@ -182,7 +178,7 @@ struct UkmoDownload: AsyncCommand {
                 fatalError("Could not download surface elevation")
             }
             guard let landmask = try await curl.downloadInMemoryAsync(url: landSeaMaskFile, minSize: nil).readUkmoNetCDF().data.first?.data.data else {
-                fatalError("Could not download soil temperature")
+                fatalError("Could not download landsea_mask")
             }
             for i in elevation.indices {
                 if landmask[i] != 1 {
@@ -235,24 +231,24 @@ struct UkmoDownload: AsyncCommand {
     /**
      Download a specified UKMO run and return file handles for conversion
      */
-    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?, skipMissing: Bool) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: UkmoDomain, variables: [UkmoVariableDownloadable], run: Timestamp, concurrent: Int, maxForecastHour: Int?, server: String?, skipMissing: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double
         switch domain {
         case .global_deterministic_10km, .global_ensemble_20km:
-            deadLineHours = 5
-        case .uk_deterministic_2km:
-            deadLineHours = 1.8
+            deadLineHours = 6
+        case .uk_deterministic_2km, .uk_ensemble_2km:
+            deadLineHours = 2.5
         }
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nMembers: domain.ensembleMembers)
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: domain == .uk_deterministic_2km || domain == .global_deterministic_10km)
 
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing, waitAfterLastModified: TimeInterval(2 * 60))
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
-        let timeStr = domain == .global_ensemble_20km ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
+        let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
 
         var handles = [GenericVariableHandle]()
@@ -300,18 +296,15 @@ struct UkmoDownload: AsyncCommand {
                             }
                         }
                         let variable = variable.withLevel(level: level)
-                        let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: data)
-                        return GenericVariableHandle(
-                            variable: variable,
-                            time: timestamp,
-                            member: member,
-                            fn: fn
-                        )
+                        return try writer.write(time: timestamp, member: member, variable: variable, data: data)
                     }
                 }.flatMap({ $0 })
                 handles.append(contentsOf: handle)
             } catch UkmoDownloadError.is12HoursShortRun {
                 break
+            }
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
             }
         }
         await curl.printStatistics()

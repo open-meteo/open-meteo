@@ -218,7 +218,7 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
 
                 let et0 = swrad.indices.map { i in
-                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
+                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:

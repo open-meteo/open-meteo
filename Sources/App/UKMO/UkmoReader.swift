@@ -104,40 +104,67 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     func get(raw: UkmoVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        if domain == .global_deterministic_10km, case let .surface(variable) = raw {
-            // Global domain does not have amounts for showers and snowfall.
-            // Precip and rain are available. The remainder must be either snow or showers.
-            // Use temperature < 0°C to estimate snow or showers
-            switch variable {
-            case .showers, .snowfall_water_equivalent:
-                let temperature = try get(raw: .temperature_2m, time: time).data
-                let rain = try get(raw: .rain, time: time).data
-                let precipitation = try get(raw: .precipitation, time: time).data
-                return variable == .showers ?
+        if case let .surface(variable) = raw {
+            if domain == .global_deterministic_10km || domain == .global_ensemble_20km {
+                // Global domain does not have amounts for showers and snowfall.
+                // Precip and rain are available. The remainder must be either snow or showers.
+                // Use temperature < 0°C to estimate snow or showers
+                switch variable {
+                case .showers, .snowfall_water_equivalent:
+                    let temperature = try get(raw: .temperature_2m, time: time).data
+                    let rain = try get(raw: .rain, time: time).data
+                    let precipitation = try get(raw: .precipitation, time: time).data
+                    return variable == .showers ?
                     DataAndUnit(zip(temperature, zip(precipitation, rain)).map({
                         $0 > 0 ? $1.0 - $1.1 : 0
                     }), .millimetre) :
                     DataAndUnit(zip(temperature, zip(precipitation, rain)).map({
                         $0 <= 0 ? $1.0 - $1.1 : 0
                     }), .millimetre)
-            default: break
+                default: break
+                }
+            }
+            if domain == .uk_ensemble_2km || domain == .global_ensemble_20km {
+                // no precipitation total
+                if variable == .precipitation {
+                    let rain = try get(raw: .rain, time: time).data
+                    let snow = try get(raw: .snowfall_water_equivalent, time: time).data
+                    return DataAndUnit(zip(rain, snow).map(+), .millimetre)
+                }
+                // no showers, use rain to preserve NaNs and set everything to 0
+                if variable == .showers {
+                    let rain = try get(raw: .rain, time: time).data
+                    return DataAndUnit(rain.map({min($0, 0)}), .millimetre)
+                }
+                
             }
         }
         return try reader.get(variable: raw, time: time)
     }
 
     func prefetchData(raw: UkmoVariable, time: TimerangeDtAndSettings) throws {
-        if domain == .global_deterministic_10km, case let .surface(variable) = raw {
-            // Global domain does not have amounts for showers and snowfall.
-            // Precip and rain are available. The remainder must be either snow or showers.
-            // Use temperature < 0°C to estimate snow or showers
-            switch variable {
-            case .showers, .snowfall_water_equivalent:
-                try reader.prefetchData(variable: .surface(.precipitation), time: time)
-                try reader.prefetchData(variable: .surface(.rain), time: time)
-                try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
-                return
-            default: break
+        if case let .surface(variable) = raw {
+            if domain == .global_deterministic_10km {
+                // Global domain does not have amounts for showers and snowfall.
+                // Precip and rain are available. The remainder must be either snow or showers.
+                // Use temperature < 0°C to estimate snow or showers
+                switch variable {
+                case .showers, .snowfall_water_equivalent:
+                    try reader.prefetchData(variable: .surface(.precipitation), time: time)
+                    try reader.prefetchData(variable: .surface(.rain), time: time)
+                    try reader.prefetchData(variable: .surface(.temperature_2m), time: time)
+                    return
+                default: break
+                }
+            }
+            if domain == .uk_ensemble_2km {
+                if variable == .precipitation {
+                    try reader.prefetchData(variable: .surface(.rain), time: time)
+                    try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
+                }
+                if variable == .showers {
+                    try reader.prefetchData(variable: .surface(.rain), time: time)
+                }
             }
         }
         try reader.prefetchData(variable: raw, time: time)
@@ -259,7 +286,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 let dewpoint = zip(temperature, rh).map(Meteorology.dewpoint)
 
                 let et0 = swrad.indices.map { i in
-                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: 3600)
+                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
                 }
                 return DataAndUnit(et0, .millimetre)
             case .snowfall:
