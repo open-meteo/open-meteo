@@ -39,6 +39,9 @@ struct JaxaHimawariDownload: AsyncCommand {
 
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Option(name: "skip-time-step", help: "Skip a list of timesteps")
+        var skipTimeSteps: String?
     }
 
     var help: String {
@@ -63,6 +66,9 @@ struct JaxaHimawariDownload: AsyncCommand {
             for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMddHHmm)")
                 let handles = try await runs.asyncFlatMap { run in
+                    if let skipTimeSteps = signature.skipTimeSteps, skipTimeSteps.contains(run.format_YYYYMMddHHmm) {
+                        logger.info("Skipping \(run.format_YYYYMMddHHmm)")
+                    }
                     return try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
                 }
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: runs[0], handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
