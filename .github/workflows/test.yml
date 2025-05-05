@@ -9,9 +9,9 @@ on:
     branches: [ main ]
 
 env:
-  swift_package_resolve: swift package resolve
-  swift_build: swift build --build-tests
-  swift_test: swift test
+  swift_package_resolve: ENABLE_PARQUET=TRUE swift package resolve
+  swift_build: ENABLE_PARQUET=TRUE swift build --build-tests
+  swift_test: ENABLE_PARQUET=TRUE swift test
   cache_version: 1
 
 jobs:
