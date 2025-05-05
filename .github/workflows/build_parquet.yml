@@ -35,14 +35,6 @@ jobs:
       - name: Resolve dependencies
         if: steps.cache-resolved-dependencies.outputs.cache-hit != 'true'
         run: ${{ env.swift_package_resolve }}
-      - name: Install Parquet
-        run: |
-            apt update
-            apt install -y -V ca-certificates lsb-release wget
-            wget https://apache.jfrog.io/artifactory/arrow/$(lsb_release --id --short | tr 'A-Z' 'a-z')/apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-            apt install -y -V ./apache-arrow-apt-source-latest-$(lsb_release --codename --short).deb
-            apt update
-            apt install -y -V libarrow-glib-dev libparquet-glib-dev
       - name: Build
         run: |
           ${{ env.swift_build }}
@@ -54,7 +46,9 @@ jobs:
         with:
           fpm_args: './build'
           # -d swiftlang-slim -d libeccodes0
-          fpm_opts: '-s dir -t deb -n openmeteo-api -v 0.0.0 -d libnetcdf19 -d libeccodes0 -d libarrow-glib-dev -d libparquet-glib-dev --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service  --deb-systemd build/openmeteo-api2.service  --deb-systemd build/openmeteo-api3.service --deb-default build/openmeteo-api.env --before-install build/openmeteo-before-install.sh --before-upgrade build/openmeteo-before-install.sh build/openmeteo-notify.sh=/usr/local/bin/ openmeteo-api=/usr/local/bin/ swift-backtrace=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
+          # -d gir1.2-parquet-1.0... ideally would get the correct library version....
+          # -d libarrow-glib-dev -d libparquet-glib-dev
+          fpm_opts: '-s dir -t deb -n openmeteo-api -v 0.0.0 -d libnetcdf19 -d libeccodes0 -d gir1.2-parquet-1.0 --deb-systemd-enable --deb-systemd-auto-start --deb-systemd build/openmeteo-sync.service --deb-systemd build/openmeteo-api.service  --deb-systemd build/openmeteo-api2.service  --deb-systemd build/openmeteo-api3.service --deb-default build/openmeteo-api.env --before-install build/openmeteo-before-install.sh --before-upgrade build/openmeteo-before-install.sh build/openmeteo-notify.sh=/usr/local/bin/ openmeteo-api=/usr/local/bin/ swift-backtrace=/usr/local/bin/ Public=/var/lib/openmeteo-api Resources=/var/lib/openmeteo-api'
       - name: Rename deb file
         run: mv openmeteo-api_0.0.0_amd64.deb openmeteo-api_0.0.0_jammy_amd64.deb
       - name: 'Upload Artifact'

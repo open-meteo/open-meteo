@@ -9,13 +9,13 @@ WORKDIR /build
 # as long as your Package.swift/Package.resolved
 # files do not change.
 COPY ./Package.* ./
-RUN swift package resolve
+RUN ENABLE_PARQUET=TRUE swift package resolve
 
 # Copy entire repo into container
 COPY . .
 
 # Compile with optimizations
-RUN MARCH_SKYLAKE=TRUE swift build -c release
+RUN ENABLE_PARQUET=TRUE MARCH_SKYLAKE=TRUE swift build -c release
 
 
 # ================================

@@ -72,13 +72,13 @@ jobs:
         private_key: ${{ secrets.GPG_PRIVATE }}
         key_passphrase: ${{ secrets.GPG_SECRET }}
     - name: Get eccodes
-      run: curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.33.0/libeccodes0_2.33.0_jammy_amd64.deb -o libeccodes0_2.33.0_jammy_amd64.deb
+      run: curl -L https://github.com/patrick-zippenfenig/ecCodes-ubuntu/releases/download/2.41.0/libeccodes0_2.41.0_jammy_amd64.deb -o libeccodes0_2.41.0_jammy_amd64.deb
     - name: Create APT repository
       uses: patrick-zippenfenig/apt-repo-action@master
       with:
         repo_supported_arch: amd64
         repo_supported_version: jammy
-        file: 'libeccodes0_2.33.0_jammy_amd64.deb'
+        file: 'libeccodes0_2.41.0_jammy_amd64.deb'
         file_target_version: jammy
         public_key: ${{ secrets.GPG_PUBLIC }}
         private_key: ${{ secrets.GPG_PRIVATE }}
