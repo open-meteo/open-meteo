@@ -190,6 +190,10 @@ extension SurfacePressureAndHeightVariable: RawRepresentableString where Pressur
             self = .surface(variable)
             return
         }
+        if let variable = Height(rawValue: rawValue) {
+            self = .height(variable)
+            return
+        }
         return nil
     }
 
