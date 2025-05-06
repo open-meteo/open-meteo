@@ -105,7 +105,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
 
     func get(raw: UkmoVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
         if case let .surface(variable) = raw {
-            if domain == .global_deterministic_10km || domain == .global_ensemble_20km {
+            if domain == .global_deterministic_10km {
                 // Global domain does not have amounts for showers and snowfall.
                 // Precip and rain are available. The remainder must be either snow or showers.
                 // Use temperature < 0°C to estimate snow or showers
@@ -157,7 +157,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
                 default: break
                 }
             }
-            if domain == .uk_ensemble_2km {
+            if domain == .uk_ensemble_2km || domain == .global_ensemble_20km  {
                 if variable == .precipitation {
                     try reader.prefetchData(variable: .surface(.rain), time: time)
                     try reader.prefetchData(variable: .surface(.snowfall_water_equivalent), time: time)
