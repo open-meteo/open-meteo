@@ -1,12 +1,12 @@
 # Getting started
 
-This tutorial provides instructions on setting up your weather API using either Docker or prebuilt packages for Ubuntu 22.04 Jammy. It presupposes a solid understanding of Linux server administration and familiarity with weather models.
+This tutorial provides instructions on setting up your weather API using either Docker or prebuilt packages for Ubuntu 22.04 Jammy. It assumes a good understanding of Linux server administration and familiarity with weather models.
 
 ## System Architecture
 Open-Meteo comprises three key components:
-1. An HTTP API server, which mirrors the API available on open-meteo.com. Developed using the Swift Vapor framework, this server compiles into a single binary, prioritizing fast access to weather data.
-2. A file-based database responsible for managing all downloaded datasets, stored in the `./data` directory. The weather database files use a proprietary binary format, optimizing time-series data compression for efficiency.
-3. Download commands tailored for various weather models. Users have the option to retrieve weather model data either through the [open-data distribution on AWS S3](https://github.com/open-meteo/open-data) or by directly downloading the original weather models.
+1. An HTTP API server, which provide the same API as available on open-meteo.com. Developed using the Swift Vapor framework, this server compiles into a single binary.
+2. A file-based database for storing all downloaded weather datasets, stored in the `./data` directory. The weather database files use a custom binary format, optimizing time-series data compression for efficiency. See [OM-File-Format](https://github.com/open-meteo/om-file-format).
+3. Download commands for various weather models. Users have the option to retrieve weather model data either through the [open-data distribution on AWS S3](https://github.com/open-meteo/open-data) or by directly downloading the original weather models.
 
 Hardware Requirements:
 - A relatively modern CPU with SIMD (or Intel® AVX2) instructions. `x86-64` and `Arm®` are supported.
@@ -29,11 +29,11 @@ docker volume create --name open-meteo-data
 # Start the API service on http://127.0.0.1:8080
 docker run -d --rm -v open-meteo-data:/app/data -p 8080:8080 ghcr.io/open-meteo/open-meteo
 
-# Download the latest ECMWF IFS 0.4° open-data forecast for temperature (50 MB)
-docker run -it --rm -v open-meteo-data:/app/data ghcr.io/open-meteo/open-meteo sync ecmwf_ifs04 temperature_2m
+# Download the latest ECMWF IFS 0.4° open-data forecast for temperature (150 MB)
+docker run -it --rm -v open-meteo-data:/app/data ghcr.io/open-meteo/open-meteo sync ecmwf_ifs025 temperature_2m
 
 # Get your forecast
-curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs04&hourly=temperature_2m"
+curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
 ```
 
 ### Using prebuilt Ubuntu Jammy Jellyfish packages
@@ -49,10 +49,10 @@ sudo apt install openmeteo-api
 # Download the latest ECMWF IFS 0.4° open-data forecast for temperature (50 MB)
 sudo chown -R $(id -u):$(id -g) /var/lib/openmeteo-api
 cd /var/lib/openmeteo-api
-openmeteo-api sync ecmwf_ifs04 temperature_2m
+openmeteo-api sync ecmwf_ifs025 temperature_2m
 
 # Get your forecast
-curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs04&hourly=temperature_2m"
+curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
 ```
 
 This will automatically install and initiate an API instance at `http://127.0.0.1:8080`. You can verify this by using:
@@ -69,7 +69,7 @@ By default, port 8080 is bound to 127.0.0.1 and is **not** accessible from the n
 Open-Meteo fetches raw weather data from national weather services and transforms it into a highly optimized time-series database. The Open-Meteo database is distributed as open-data through an [AWS Open-Data Sponsorship](https://github.com/open-meteo/open-data). For details on downloading raw weather forecasts from national weather services, refer to the [downloading datasets documentation](./downloading-datasets.md).
 
 As illustrated earlier, the `sync` command enables the direct download of the Open-Meteo weather database from AWS S3. It requires two arguments:
-1. One or more weather model, such as `ecmwf_ifs04` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
+1. One or more weather model, such as `ecmwf_ifs025` or `dwd_icon,dwd_icon_eu,dwd_icon_d2`
 2. A list of weather variables, for example, `temperature_2m,relative_humidity_2m,wind_u_component_10m,wind_v_component_10m`
 
 Please refer to the [Weather API tutorial](https://github.com/open-meteo/open-data/tree/main/tutorial_weather_api) for more more information.

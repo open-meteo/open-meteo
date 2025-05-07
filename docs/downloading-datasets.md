@@ -79,7 +79,7 @@ Flags:
 ### ECMWF IFS
 For the ECMWF API, only one domain is available with runs at `00,06,12,18`. Currently it is not supported to only download a subset of weather variables, but all variables need to be downloaded.
 
-To download ECMWF forecasts, run the binary with arguments `<exe> download-ecmwf --run 00`.
+To download ECMWF forecasts, run the binary with arguments `<exe> download-ecmwf --domain ifs025 --run 00`.
 
 
 ### ERA5
