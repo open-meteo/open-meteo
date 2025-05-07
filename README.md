@@ -61,6 +61,7 @@ Apps:
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
+- [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 
 Repositories:
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
@@ -84,6 +85,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - Python https://github.com/m0rp43us/openmeteopy
 - Kotlin https://github.com/open-meteo/open-meteo-api-kotlin
 - .Net / C# https://github.com/AlienDwarf/open-meteo-dotnet
+- dotnet 8 / C# https://github.com/colinnuk/open-meteo-dotnet-client-sdk
 - PHP Laravel https://github.com/michaelnabil230/laravel-weather
 - R https://github.com/tpisel/openmeteo
 - PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
