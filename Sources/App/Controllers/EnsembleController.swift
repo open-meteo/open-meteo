@@ -46,6 +46,13 @@ public struct EnsembleApiController {
                                     }
                                 }
                             }
+                            if let paramsDaily {
+                                for variable in paramsDaily {
+                                    for member in 0..<reader.domain.countEnsembleMember {
+                                        try reader.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
+                                    }
+                                }
+                             }
                         },
                         current: nil,
                         hourly: paramsHourly.map { variables in
