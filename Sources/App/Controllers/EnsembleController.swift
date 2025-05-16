@@ -79,7 +79,7 @@ public struct EnsembleApiController {
                                 return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<EnsembleVariableDaily> in
                                     var unit: SiUnit?
                                     let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                        guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMember: member))?.convertAndRound(params: params) else {
+                                        guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit
