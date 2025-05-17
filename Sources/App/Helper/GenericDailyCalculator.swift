@@ -119,4 +119,14 @@ extension GenericReaderMulti {
             }
         }
     }
+    
+    func prefetchData<V: DailyVariableCalculatable>(variable: V, time timeDaily: TimerangeDtAndSettings) throws where V.Variable == Variable {
+        let time = timeDaily.with(dtSeconds: 3600)
+        if let v0 = variable.aggregation.variables.0 {
+            try prefetchData(variable: v0, time: time)
+        }
+        if let v1 = variable.aggregation.variables.1 {
+            try prefetchData(variable: v1, time: time)
+        }
+    }
 }

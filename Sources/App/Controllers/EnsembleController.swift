@@ -16,7 +16,8 @@ public struct EnsembleApiController {
             let prepared = try GenericReaderMulti<EnsembleVariable, EnsembleMultiDomains>.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 7, forecastDaysMax: 36, pastDaysMax: 92, allowedRange: allowedRange)
 
             let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)
-            let nVariables = (paramsHourly?.count ?? 0) * domains.reduce(0, { $0 + $1.countEnsembleMember })
+            let paramsDaily = try EnsembleVariableDaily.load(commaSeparatedOptional: params.daily)
+            let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, { $0 + $1.countEnsembleMember })
 
             let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
                 let timezone = prepared.timezone
@@ -45,6 +46,13 @@ public struct EnsembleApiController {
                                     }
                                 }
                             }
+                            if let paramsDaily {
+                                for variable in paramsDaily {
+                                    for member in 0..<reader.domain.countEnsembleMember {
+                                        try reader.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
+                                    }
+                                }
+                             }
                         },
                         current: nil,
                         hourly: paramsHourly.map { variables in
@@ -66,7 +74,25 @@ public struct EnsembleApiController {
                                 })
                             }
                         },
-                        daily: nil,
+                        daily: paramsDaily.map { dailyVariables -> (() throws -> ApiSection<EnsembleVariableDaily>) in
+                            return {
+                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<EnsembleVariableDaily> in
+                                    var unit: SiUnit?
+                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
+                                        guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                            return nil
+                                        }
+                                        unit = d.unit
+                                        assert(time.dailyRead.count == d.data.count)
+                                        return ApiArray.float(d.data)
+                                    }
+                                    guard allMembers.count > 0 else {
+                                        return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: reader.domain.countEnsembleMember))
+                                    }
+                                    return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+                                })
+                            }
+                        },
                         sixHourly: nil,
                         minutely15: nil
                     )
@@ -312,7 +338,7 @@ typealias EnsembleVariableWithoutMember = SurfacePressureAndHeightVariable<Ensem
 typealias EnsembleVariable = EnsembleVariableWithoutMember
 
 /// Available daily aggregations
-/*enum EnsembleVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {
+enum EnsembleVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
@@ -325,19 +351,26 @@ typealias EnsembleVariable = EnsembleVariableWithoutMember
     case precipitation_probability_mean*/
     case snowfall_sum
     case rain_sum
-    case showers_sum
+    case cape_max
+    case cape_mean
+    case cape_min
+    //case showers_sum
     //case weathercode
     case shortwave_radiation_sum
-    case windspeed_10m_max
-    case windspeed_10m_min
-    case windspeed_10m_mean
-    case windgusts_10m_max
-    case windgusts_10m_min
-    case windgusts_10m_mean
-    case winddirection_10m_dominant
+    case wind_speed_10m_max
+    case wind_speed_10m_min
+    case wind_speed_10m_mean
+    case wind_speed_100m_max
+    case wind_speed_100m_min
+    case wind_speed_100m_mean
+    case wind_gusts_10m_max
+    case wind_gusts_10m_min
+    case wind_gusts_10m_mean
+    case wind_direction_10m_dominant
+    case wind_direction_100m_dominant
     case precipitation_hours
-    case sunrise
-    case sunset
+    //case sunrise
+    //case sunset
     case et0_fao_evapotranspiration
     /*case visibility_max
     case visibility_min
@@ -348,9 +381,15 @@ typealias EnsembleVariable = EnsembleVariableWithoutMember
     case surface_pressure_max
     case surface_pressure_min
     case surface_pressure_mean
-    case cloudcover_max
-    case cloudcover_min
-    case cloudcover_mean
+    case cloud_cover_max
+    case cloud_cover_min
+    case cloud_cover_mean
+    case dew_point_2m_max
+    case dew_point_2m_mean
+    case dew_point_2m_min
+    case relative_humidity_2m_max
+    case relative_humidity_2m_mean
+    case relative_humidity_2m_min
     /*case uv_index_max
     case uv_index_clear_sky_max*/
     
@@ -374,32 +413,32 @@ typealias EnsembleVariable = EnsembleVariableWithoutMember
             return .sum(.surface(.snowfall))
         case .rain_sum:
             return .sum(.surface(.rain))
-        case .showers_sum:
-            return .sum(.surface(.showers))
+        /*case .showers_sum:
+            return .sum(.surface(.showers))*/
         /*case .weathercode:
             return .max(.surface(.weathercode))*/
         case .shortwave_radiation_sum:
             return .radiationSum(.surface(.shortwave_radiation))
-        case .windspeed_10m_max:
+        case .wind_speed_10m_max:
             return .max(.surface(.windspeed_10m))
-        case .windspeed_10m_min:
+        case .wind_speed_10m_min:
             return .min(.surface(.windspeed_10m))
-        case .windspeed_10m_mean:
+        case .wind_speed_10m_mean:
             return .mean(.surface(.windspeed_10m))
-        case .windgusts_10m_max:
+        case .wind_gusts_10m_max:
             return .max(.surface(.windgusts_10m))
-        case .windgusts_10m_min:
+        case .wind_gusts_10m_min:
             return .min(.surface(.windgusts_10m))
-        case .windgusts_10m_mean:
+        case .wind_gusts_10m_mean:
             return .mean(.surface(.windgusts_10m))
-        case .winddirection_10m_dominant:
+        case .wind_direction_10m_dominant:
             return .dominantDirection(velocity: .surface(.windspeed_10m), direction: .surface(.winddirection_10m))
         case .precipitation_hours:
             return .precipitationHours(.surface(.precipitation))
-        case .sunrise:
+        /*case .sunrise:
             return .none
         case .sunset:
-            return .none
+            return .none*/
         case .et0_fao_evapotranspiration:
             return .sum(.surface(.et0_fao_evapotranspiration))
         /*case .visibility_max:
@@ -420,29 +459,39 @@ typealias EnsembleVariable = EnsembleVariableWithoutMember
             return .min(.surface(.surface_pressure))
         case .surface_pressure_mean:
             return .mean(.surface(.surface_pressure))
-        /*case .cape_max:
+        case .cloud_cover_max:
+            return .max(.surface(.cloudcover))
+        case .cloud_cover_min:
+            return .min(.surface(.cloudcover))
+        case .cloud_cover_mean:
+            return .mean(.surface(.cloudcover))
+        case .cape_max:
             return .max(.surface(.cape))
+        case .cape_mean:
+            return .mean(.surface(.cape))
         case .cape_min:
             return .min(.surface(.cape))
-        case .cape_mean:
-            return .mean(.surface(.cape))*/
-        case .cloudcover_max:
-            return .max(.surface(.cloudcover))
-        case .cloudcover_min:
-            return .min(.surface(.cloudcover))
-        case .cloudcover_mean:
-            return .mean(.surface(.cloudcover))
-        /*case .uv_index_max:
-            return .max(.surface(.uv_index))
-        case .uv_index_clear_sky_max:
-            return .max(.surface(.uv_index_clear_sky))
-        case .precipitation_probability_max:
-            return .max(.surface(.precipitation_probability))
-        case .precipitation_probability_min:
-            return .max(.surface(.precipitation_probability))
-        case .precipitation_probability_mean:
-            return .max(.surface(.precipitation_probability))*/
+        case .wind_speed_100m_max:
+            return .max(.surface(.wind_speed_100m))
+        case .wind_speed_100m_min:
+            return .min(.surface(.wind_speed_100m))
+        case .wind_speed_100m_mean:
+            return .mean(.surface(.wind_speed_100m))
+        case .wind_direction_100m_dominant:
+            return .dominantDirection(velocity: .surface(.wind_speed_100m), direction: .surface(.wind_direction_100m))
+        case .dew_point_2m_max:
+            return .max(.surface(.dew_point_2m))
+        case .dew_point_2m_mean:
+            return .mean(.surface(.dew_point_2m))
+        case .dew_point_2m_min:
+            return .min(.surface(.dew_point_2m))
+        case .relative_humidity_2m_max:
+            return .max(.surface(.relative_humidity_2m))
+        case .relative_humidity_2m_mean:
+            return .mean(.surface(.relative_humidity_2m))
+        case .relative_humidity_2m_min:
+            return .min(.surface(.relative_humidity_2m))
         }
     }
 }
-*/
+
