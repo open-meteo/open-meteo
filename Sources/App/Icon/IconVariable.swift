@@ -8,7 +8,7 @@ enum IconPressureVariableType: String, CaseIterable {
     case relative_humidity
 }
 
-struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable {
+struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVariableMixable, Sendable {
     let variable: IconPressureVariableType
     let level: Int
 
@@ -87,7 +87,7 @@ typealias IconVariable = SurfaceAndPressureVariable<IconSurfaceVariable, IconPre
 /**
  Available variables to download from the DWD open data server
  */
-enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable {
+enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable {
     case temperature_2m
     case cloud_cover // cloudcover total
     case cloud_cover_low

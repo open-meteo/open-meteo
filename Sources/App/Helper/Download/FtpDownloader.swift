@@ -1,23 +1,30 @@
-import curl_swift
+@preconcurrency import curl_swift
 import Vapor
 
 /// Simple helper to download files from a FTP server using CURL
-public class FtpDownloader {
+public final class FtpDownloader: Sendable {
     let shared = CURLSH()
 
-    var verbose = false
+    let verbose: Bool
 
-    var connectTimeout: Int = 30
+    let connectTimeout: Int
 
-    var resourceTimeout: Int = 300
+    let resourceTimeout: Int
 
-    var deadLineHours: Double = 1
+    let deadLineHours: Double
 
-    var retryDelaySeconds: Int = 5
+    let retryDelaySeconds: Int
 
-    var retryDelay404Seconds: Int = 30
+    let retryDelay404Seconds: Int
 
-    public init() {}
+    public init(verbose: Bool = false, connectTimeout: Int = 30, resourceTimeout: Int = 300, deadLineHours: Double = 1, retryDelaySeconds: Int = 5, retryDelay404Seconds: Int = 30) {
+        self.verbose = verbose
+        self.connectTimeout = connectTimeout
+        self.resourceTimeout = resourceTimeout
+        self.deadLineHours = deadLineHours
+        self.retryDelaySeconds = retryDelaySeconds
+        self.retryDelay404Seconds = retryDelay404Seconds
+    }
 
     public func get(logger: Logger, url: String) async throws -> Data? {
         let cacheFile = Curl.cacheDirectory.map { "\($0)/\(url.sha256))" }

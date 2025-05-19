@@ -60,7 +60,7 @@ extension Sequence {
     /// Execute a closure for each element concurrently and return a new value
     /// `nConcurrent` limits the number of concurrent tasks
     /// Note: Results are ordered which may have a performance penalty
-    func mapConcurrent<T>(
+    func mapConcurrent<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
     ) async rethrows -> [T] {
@@ -85,7 +85,7 @@ extension Sequence {
     /// Returns an `AsyncStream` to process in a pipeline
     /// `nConcurrent` limits the number of concurrent tasks
     /// Note: Results are ordered which may have a performance penalty
-    func mapStream<T>(
+    func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
     ) -> AsyncThrowingStream<T, Error> {
@@ -141,7 +141,7 @@ extension AsyncSequence {
     /// Returns an `AsyncStream` to process in a pipeline
     /// `nConcurrent` limits the number of concurrent tasks
     /// Note: Results are ordered which may have a performance penalty
-    func mapStream<T>(
+    func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
     ) -> AsyncThrowingStream<T, Error> {

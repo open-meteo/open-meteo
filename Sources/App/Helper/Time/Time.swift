@@ -344,7 +344,7 @@ public struct TimerangeLocal: Sendable {
     public let utcOffsetSeconds: Int
 }
 
-public struct TimerangeDt: Hashable {
+public struct TimerangeDt: Hashable, Sendable {
     public let range: Range<Timestamp>
     public let dtSeconds: Int
 

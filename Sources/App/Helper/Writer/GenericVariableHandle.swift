@@ -1,11 +1,11 @@
-import OmFileFormat
+@preconcurrency import OmFileFormat
 import SwiftNetCDF
 import Foundation
 import Logging
 
 /// Downloaders return FileHandles to keep files open while downloading
 /// If another download starts and would overlap, this still keeps the old file open
-struct GenericVariableHandle {
+struct GenericVariableHandle: Sendable {
     let variable: GenericVariable
     let time: Timestamp
     let member: Int
@@ -276,8 +276,8 @@ actor GenericVariableHandleStorage {
 }
 
 /// Thread safe storage for downloading grib messages. Can be used to post process data.
-actor VariablePerMemberStorage<V: Hashable> {
-    struct VariableAndMember: Hashable {
+actor VariablePerMemberStorage<V: Hashable & Sendable> {
+    struct VariableAndMember: Hashable, Sendable {
         let variable: V
         let timestamp: Timestamp
         let member: Int

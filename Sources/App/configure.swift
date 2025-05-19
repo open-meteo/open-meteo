@@ -3,7 +3,7 @@ import Vapor
 
 enum OpenMeteo {
     /// Data directory with trailing slash
-    static var dataDirectory = {
+    static let dataDirectory = {
         if let dir = Environment.get("DATA_DIRECTORY") {
             guard dir.last == "/" else {
                 fatalError("DATA_DIRECTORY must end with a trailing slash")
@@ -14,7 +14,7 @@ enum OpenMeteo {
     }()
     
     /// Data directory with trailing slash
-    static var dataSpatialDirectory: String? = {
+    static let dataSpatialDirectory: String? = {
         if let dir = Environment.get("DATA_SPATIAL_DIRECTORY") {
             guard dir.last == "/" else {
                 fatalError("DATA_SPATIAL_DIRECTORY must end with a trailing slash")
@@ -25,7 +25,7 @@ enum OpenMeteo {
     }()
 
     /// Temporary directory with trailing slash
-    static var tempDirectory = {
+    static let tempDirectory = {
         if let dir = Environment.get("TEMP_DIRECTORY") {
             guard dir.last == "/" else {
                 fatalError("TEMP_DIRECTORY must end with a trailing slash")
@@ -36,7 +36,7 @@ enum OpenMeteo {
     }()
 
     /// Maximum number of locations for multi point requests
-    static var numberOfLocationsMaximum: Int = {
+    static let numberOfLocationsMaximum: Int = {
         return (Environment.get("LOCATIONS_LIMIT").map(Int.init) ?? 1000) ?? 1000
     }()
 

@@ -2,7 +2,7 @@ import Foundation
 import NIOConcurrencyHelpers
 import Vapor
 
-protocol GenericFileManagable {
+protocol GenericFileManagable: Sendable {
     func wasDeleted() -> Bool
     static func open(from: OmFileManagerReadable) throws -> Self?
 }
@@ -11,9 +11,9 @@ protocol GenericFileManagable {
 /// If a file path is missing, this information is cached and checked in the background
 /// This could be later extended to use file system events
 /// Maybe upgraded to an actor as well. Currently uses pthread locks
-struct GenericFileManager<File: GenericFileManagable> {
+struct GenericFileManager<File: GenericFileManagable>: Sendable {
     /// A file might exist and is open, or it is missing
-    enum OmFileState {
+    enum OmFileState: Sendable{
         case exists(file: File, opened: Timestamp)
         case missing(path: String, opened: Timestamp)
     }

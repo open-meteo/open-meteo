@@ -4,7 +4,7 @@ import Vapor
 
 public struct ForecastapiController: RouteCollection {
     /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
-    static var runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
+    static let runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
 
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
@@ -268,7 +268,7 @@ extension ForecastVariable {
  
  Note Nov 2022: Use the term `seamless` instead of `mix`
  */
-enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain {
+enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain, Sendable {
     case best_match
 
     case gfs_seamless

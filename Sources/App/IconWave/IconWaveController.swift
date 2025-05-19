@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 
-enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain {
+enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain, Sendable {
     var genericDomain: (any GenericDomain)? {
         return nil
     }

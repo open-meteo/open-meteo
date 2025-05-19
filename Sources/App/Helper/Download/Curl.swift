@@ -25,7 +25,7 @@ enum CurlErrorNonRetry: NonRetryError {
 }
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
-final class Curl {
+final class Curl: Sendable {
     let logger: Logger
 
     /// Give up downloading after the time, default 3 hours

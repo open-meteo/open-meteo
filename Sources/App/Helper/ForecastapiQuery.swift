@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftTimeZoneLookup
+@preconcurrency import SwiftTimeZoneLookup
 
 struct ApiQueryStartEndRanges {
     let daily: ClosedRange<Timestamp>?

@@ -7,7 +7,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta
 }
 
-protocol ModelFlatbufferSerialisable: RawRepresentableString {
+protocol ModelFlatbufferSerialisable: RawRepresentableString, Sendable {
     associatedtype HourlyVariable: FlatBuffersVariable
     associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
     associatedtype HourlyHeightType: FlatBuffersVariable, RawRepresentable, Equatable
@@ -151,7 +151,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
     }
 
-    struct PerModel {
+    struct PerModel: Sendable {
         let model: Model
         let latitude: Float
         let longitude: Float
@@ -159,12 +159,12 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         /// Desired elevation from a DEM. Used in statistical downscaling
         let elevation: Float?
 
-        let prefetch: (() throws -> Void)
-        let current: (() throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
-        let hourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let daily: (() throws -> ApiSection<Model.DailyVariable>)?
-        let sixHourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let minutely15: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let prefetch: (@Sendable () throws -> Void)
+        let current: (@Sendable () throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
+        let hourly: (@Sendable () throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let daily: (@Sendable () throws -> ApiSection<Model.DailyVariable>)?
+        let sixHourly: (@Sendable () throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let minutely15: (@Sendable () throws -> ApiSection<SurfacePressureAndHeightVariable>)?
 
         /// e.g. `52.52N13.42E38m`
         var formatedCoordinatesFilename: String {
