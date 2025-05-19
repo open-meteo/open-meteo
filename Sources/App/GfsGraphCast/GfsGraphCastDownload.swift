@@ -1,7 +1,7 @@
 import Foundation
 import OmFileFormat
 import Vapor
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 /**
  Downloader for GFS GraphCast

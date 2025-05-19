@@ -11,7 +11,7 @@ extension Sequence {
         }
         return values
     }
-
+    
     func asyncFlatMap<T>(
         _ transform: (Element) async throws -> [T]
     ) async rethrows -> [T] {
@@ -23,13 +23,13 @@ extension Sequence {
         }
         return values
     }
-
+    
     func asyncCompactMap<T>(
         _ transform: (Element) async throws -> T?
     ) async rethrows -> [T] {
         var values = [T]()
         values.reserveCapacity(self.underestimatedCount)
-
+        
         for element in self {
             guard let result = try await transform(element) else {
                 continue
@@ -38,7 +38,9 @@ extension Sequence {
         }
         return values
     }
+}
 
+extension Sequence where Element: Sendable {
     /// Execute a closure for each element concurrently
     /// `nConcurrent` limits the number of concurrent tasks
     func foreachConcurrent(
@@ -56,7 +58,7 @@ extension Sequence {
             try await group.waitForAll()
         }
     }
-
+    
     /// Execute a closure for each element concurrently and return a new value
     /// `nConcurrent` limits the number of concurrent tasks
     /// Note: Results are ordered which may have a performance penalty
@@ -80,7 +82,9 @@ extension Sequence {
             return results.sorted(by: { $0.0 < $1.0 }).map { $0.1 }
         }
     }
+}
 
+extension Sequence where Element: Sendable, Self: Sendable {
     /// Execute a closure for each element concurrently and return a new value
     /// Returns an `AsyncStream` to process in a pipeline
     /// `nConcurrent` limits the number of concurrent tasks
@@ -135,55 +139,6 @@ extension AsyncSequence {
             results.append(element)
         }
         return results
-    }
-
-    /// Execute a closure for each element concurrently and return a new value
-    /// Returns an `AsyncStream` to process in a pipeline
-    /// `nConcurrent` limits the number of concurrent tasks
-    /// Note: Results are ordered which may have a performance penalty
-    func mapStream<T: Sendable>(
-        nConcurrent: Int,
-        body: @escaping @Sendable (Element) async throws -> T
-    ) -> AsyncThrowingStream<T, Error> {
-        assert(nConcurrent > 0)
-        return AsyncThrowingStream<T, Error> { continuation in
-            let task = Task {
-                do {
-                    try await withThrowingTaskGroup(of: (Int, T).self) { group in
-                        var results = [Int: T]()
-                        var readerIndex = 0
-                        var writerIndex = 0
-                        for try await element in self {
-                            if writerIndex >= nConcurrent, let result = try await group.next() {
-                                results[result.0] = result.1
-                                while let nextReturn = results.removeValue(forKey: readerIndex) {
-                                    readerIndex += 1
-                                    continuation.yield(nextReturn)
-                                }
-                            }
-                            let indexCopy = writerIndex
-                            group.addTask {
-                                return (indexCopy, try await body(element))
-                            }
-                            writerIndex += 1
-                        }
-                        while let result = try await group.next() {
-                            results[result.0] = result.1
-                            while let nextReturn = results.removeValue(forKey: readerIndex) {
-                                readerIndex += 1
-                                continuation.yield(nextReturn)
-                            }
-                        }
-                        continuation.finish()
-                    }
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-            continuation.onTermination = { _ in
-                task.cancel()
-            }
-        }
     }
 }
 

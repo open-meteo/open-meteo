@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 import OmFileFormat
 
 typealias CerraHourlyVariable = VariableOrDerived<CerraVariable, CerraVariableDerived>

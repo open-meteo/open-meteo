@@ -3,7 +3,7 @@ import Foundation
 @testable import App
 import XCTest
 import Vapor
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 extension Application {
     public static func testable() async throws -> Application {

@@ -1,7 +1,7 @@
 import Foundation
 import NIO
 import CBz2lib
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 import Logging
 
 extension AsyncSequence where Element == ByteBuffer {

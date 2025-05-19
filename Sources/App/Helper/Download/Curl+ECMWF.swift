@@ -1,6 +1,6 @@
 import Foundation
 import AsyncHTTPClient
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 import NIOCore
 
 enum EcmwfApiError: Error {
