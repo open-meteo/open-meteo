@@ -1,5 +1,5 @@
 import Foundation
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 protocol GribMessageAssociated {
     static func fromGrib(attributes: GribAttributes) -> Self?

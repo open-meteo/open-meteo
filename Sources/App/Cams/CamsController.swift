@@ -305,7 +305,7 @@ struct CamsQuery {
 }
 
 extension CamsQuery {
-    enum Domain: String, Codable {
+    enum Domain: String, Codable, Sendable {
         case auto
         case cams_global
         case cams_europe

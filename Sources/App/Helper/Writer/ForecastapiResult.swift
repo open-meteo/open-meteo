@@ -7,7 +7,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta
 }
 
-protocol ModelFlatbufferSerialisable: RawRepresentableString {
+protocol ModelFlatbufferSerialisable: RawRepresentableString, Sendable {
     associatedtype HourlyVariable: FlatBuffersVariable
     associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
     associatedtype HourlyHeightType: FlatBuffersVariable, RawRepresentable, Equatable
@@ -59,7 +59,7 @@ protocol ForecastapiResponder {
 }
 
 /// Stores the API output for multiple locations
-struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, Sendable {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, @unchecked Sendable {
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
@@ -77,7 +77,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         self.nVariablesTimesDomains = nVariablesTimesDomains
     }
 
-    struct PerLocation: Sendable {
+    struct PerLocation {
         let timezone: TimezoneWithOffset
         let time: TimerangeLocal
         let locationId: Int

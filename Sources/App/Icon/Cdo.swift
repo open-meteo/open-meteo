@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 import CHelper
 
 extension Process {
@@ -22,7 +22,7 @@ extension Process {
     }*/
 }
 
-struct CdoHelper {
+struct CdoHelper: Sendable {
     let cdo: CdoIconGlobal?
     let grid: Gridable
     let domain: IconDomains

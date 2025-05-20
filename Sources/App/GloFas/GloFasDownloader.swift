@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 struct GloFasDownloader: AsyncCommand {
     struct Signature: CommandSignature {

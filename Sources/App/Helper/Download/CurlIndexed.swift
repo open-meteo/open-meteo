@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 protocol CurlIndexedVariable {
     /// Return true, if this index string is matching. Index string looks like `13:520719:d=2022080900:ULWRF:top of atmosphere:anl:`

@@ -5,7 +5,7 @@ typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableD
 
 typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, CfsVariable>
 
-enum SeasonalForecastDomainApi: String, RawRepresentableString, CaseIterable {
+enum SeasonalForecastDomainApi: String, RawRepresentableString, CaseIterable, Sendable {
     case cfsv2
 
     var forecastDomain: SeasonalForecastDomain {

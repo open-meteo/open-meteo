@@ -7,7 +7,7 @@ let apiConcurrencyLimiter = ConcurrencyGroupLimiter()
  
  See: https://forums.swift.org/t/semaphore-alternatives-for-structured-concurrency/59353/3
  */
-final class ConcurrencyGroupLimiter {
+final class ConcurrencyGroupLimiter: @unchecked Sendable {
     let lock = NIOLock()
     /// Number of running per slot
     private var counts: [Int: Int] = [:]

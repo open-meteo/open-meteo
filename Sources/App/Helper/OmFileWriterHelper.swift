@@ -44,7 +44,7 @@ struct OmRunSpatialWriter: Sendable {
 
 
 /// Small helper class to generate compressed files
-public final class OmFileWriterHelper {
+public final class OmFileWriterHelper: Sendable {
     public let dimensions: [Int]
     public let chunks: [Int]
 

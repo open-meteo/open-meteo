@@ -22,8 +22,8 @@ import Vapor
  ```
  */
 struct S3DataController: RouteCollection {
-    static var syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
-    static var nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
+    static let syncApiKeys: [String.SubSequence] = Environment.get("API_SYNC_APIKEYS")?.split(separator: ",") ?? []
+    static let nginxSendfilePrefix = Environment.get("NGINX_SENDFILE_PREFIX")
 
     func boot(routes: RoutesBuilder) throws {
         if Self.syncApiKeys.isEmpty {
@@ -185,7 +185,7 @@ enum SyncError: AbortError {
 }
 
 fileprivate extension String {
-    static var sanitisedPathCharacterSet = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_/").inverted
+    static let sanitisedPathCharacterSet = CharacterSet(charactersIn: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890-_/").inverted
 
     /// Allow only alpha numerics, dash, underscore and slash
     var sanitisedPath: String {
@@ -195,7 +195,7 @@ fileprivate extension String {
 
 extension DateFormatter {
     /// Format dates like `2023-11-14T04:32:17.000Z`
-    static var awsS3DateTime = {
+    static let awsS3DateTime = {
         let dateFormat = DateFormatter()
         dateFormat.dateFormat = "y-MM-dd'T'HH:mm:ss.SSS'Z'"
         return dateFormat

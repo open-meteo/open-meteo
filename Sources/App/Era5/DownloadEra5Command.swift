@@ -1,5 +1,5 @@
 import Foundation
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 import Vapor
 import OmFileFormat
 
@@ -777,4 +777,8 @@ struct DownloadEra5Command: AsyncCommand {
         try FileManager.default.removeItemIfExists(at: "\(tempDownloadGribFile).py")
         return handles
     }
+}
+
+extension GribMessage: @unchecked @retroactive Sendable {
+    
 }

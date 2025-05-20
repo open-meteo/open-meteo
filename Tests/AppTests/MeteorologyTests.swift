@@ -1,7 +1,7 @@
 import Foundation
 @testable import App
 import XCTest
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 final class MeteorologyTests: XCTestCase {
     func testWetbulbTemperature() {

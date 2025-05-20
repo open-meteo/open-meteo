@@ -1,4 +1,4 @@
-// swift-tools-version:5.6
+// swift-tools-version:6.0
 
 import PackageDescription
 import Foundation
@@ -24,7 +24,7 @@ let enableParquet = ProcessInfo.processInfo.environment["ENABLE_PARQUET"] == "TR
 let package = Package(
     name: "OpenMeteoApi",
     platforms: [
-        .macOS(.v12)
+        .macOS(.v15)
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),

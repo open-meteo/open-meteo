@@ -1,5 +1,5 @@
 import Foundation
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 extension GribMessage {
     fileprivate struct Coords {

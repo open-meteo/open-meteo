@@ -1,6 +1,6 @@
 import Foundation
 import Vapor
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 import OmFileFormat
 
 struct KmaDownload: AsyncCommand {
@@ -59,8 +59,7 @@ struct KmaDownload: AsyncCommand {
             return
         }
         let logger = application.logger
-        let ftp = FtpDownloader()
-        ftp.connectTimeout = 5
+        let ftp = FtpDownloader(connectTimeout: 5)
 
         let grid = domain.grid
         let urlLand = "\(server)\(domain.filePrefix)_v070_land_unis_h000.\(run.format_YYYYMMddHH).gb2"
@@ -92,10 +91,11 @@ struct KmaDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let grid = domain.grid
+        let nx = grid.nx
+        let ny = grid.ny
         let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
-        let ftp = FtpDownloader()
-        ftp.connectTimeout = 5
+        let ftp = FtpDownloader(connectTimeout: 5)
         let variables = KmaSurfaceVariable.allCases
         // 0z/12z 288, 6z/18z 87
         let forecastHours: StrideThrough<Int>
@@ -121,7 +121,7 @@ struct KmaDownload: AsyncCommand {
                     let message = try SwiftEccodes.getMessages(memory: $0, multiSupport: true)[0]
                     // try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
                     // fatalError()
-                    var array2d = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
+                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
                     switch variable {
                     case /*.cloud_cover,*/ .cloud_cover_2m, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
                         array2d.array.data.multiplyAdd(multiply: 100, add: 0)

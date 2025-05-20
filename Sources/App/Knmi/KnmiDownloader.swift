@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 struct KnmiDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -141,6 +141,8 @@ struct KnmiDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let grid = domain.grid
+        let nx = grid.nx
+        let ny = grid.ny
         let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
@@ -212,7 +214,7 @@ struct KnmiDownload: AsyncCommand {
                 /// Keep wind u/v in memory
                 if let temporary = KnmiWindVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                     logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
-                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
                     await winds.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
                     return nil
@@ -223,7 +225,7 @@ struct KnmiDownload: AsyncCommand {
                         return nil
                     }
                     logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
-                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
                     switch unit {
                     case "m**2 s**-2": // gph to metre
@@ -245,7 +247,7 @@ struct KnmiDownload: AsyncCommand {
                 }
                 logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)")
 
-                var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                var grib2d = GribArray2D(nx: nx, ny: ny)
                 try grib2d.load(message: message)
 
                 // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
@@ -322,7 +324,8 @@ struct KnmiDownload: AsyncCommand {
                     trueNorth: trueNorth
                 )
             ].flatMap({ $0 })
-            let windPressureHandles = try await Set(winds.data.compactMap({ $0.key.variable.level.asIsobaricInhPa })).asyncFlatMap({hPa in
+            let levels = await Set(winds.data.compactMap({ $0.key.variable.level.asIsobaricInhPa }))
+            let windPressureHandles = try await levels.asyncFlatMap({hPa in
                 try await winds.calculateWindSpeed(
                     u: .init(variable: .u, level: .isobaricInhPa(hPa)),
                     v: .init(variable: .v, level: .isobaricInhPa(hPa)),

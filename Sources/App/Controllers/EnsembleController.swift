@@ -123,7 +123,7 @@ extension EnsembleVariableWithoutMember {
 /**
 List of ensemble models. "Seamless" models combine global with local models. A best_match model is not possible, as all models are too different to give any advice
  */
-enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain {
+enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain, Sendable {
     case icon_seamless
     case icon_global
     case icon_eu

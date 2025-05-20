@@ -660,7 +660,7 @@ struct SolarPositionAlgorithm {
 /**
  Fast lookup table for solar position
  */
-public struct SolarPositonFastLookup {
+public struct SolarPositonFastLookup: Sendable {
     let declination: [Float]
     let equationOfTime: [Float]
 

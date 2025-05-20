@@ -159,7 +159,7 @@ struct GloFasController {
     }
 }
 
-enum GlofasDomainApi: String, RawRepresentableString, CaseIterable {
+enum GlofasDomainApi: String, RawRepresentableString, CaseIterable, Sendable {
     case best_match
 
     case seamless_v3

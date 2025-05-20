@@ -1,7 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
-import SwiftEccodes
+@preconcurrency import SwiftEccodes
 
 struct DmiDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -122,6 +122,8 @@ struct DmiDownload: AsyncCommand {
         guard let grid = domain.grid as? ProjectionGrid<LambertConformalConicProjection> else {
             fatalError("Wrong grid")
         }
+        let nx = grid.nx
+        let ny = grid.ny
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
@@ -176,7 +178,7 @@ struct DmiDownload: AsyncCommand {
                             return nil
                         }
                         logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
-                        var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                        var grib2d = GribArray2D(nx: nx, ny: ny)
                         try grib2d.load(message: message)
                         switch unit {
                         case "m**2 s**-2": // gph to metre
@@ -198,7 +200,7 @@ struct DmiDownload: AsyncCommand {
                         return nil // skip precipitation at timestep 0
                     }
 
-                    var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
+                    var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
 
                     // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)

@@ -2,7 +2,7 @@
  Type erase AnySequence
  See https://forums.swift.org/t/anyasyncsequence/50828/4
  */
-struct AnyAsyncSequence<Element>: AsyncSequence {
+struct AnyAsyncSequence<Element>: AsyncSequence, @unchecked Sendable {
     typealias AsyncIterator = AnyAsyncIterator<Element>
     typealias Element = Element
 
@@ -37,7 +37,7 @@ struct AnyAsyncSequence<Element>: AsyncSequence {
     }
 }
 
-extension AsyncSequence {
+extension AsyncSequence where Element: Sendable {
     func eraseToAnyAsyncSequence() -> AnyAsyncSequence<Element> {
         AnyAsyncSequence(seq: self)
     }

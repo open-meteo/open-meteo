@@ -1,5 +1,5 @@
 import Foundation
-import OmFileFormat
+@preconcurrency import OmFileFormat
 import NIOConcurrencyHelpers
 import Vapor
 import NIO
@@ -90,7 +90,7 @@ enum OmFileManagerReadable: Hashable {
 /// cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 struct OmFileManager {
-    public static var instance = GenericFileManager<OmFileReaderArray<MmapFile, Float>>()
+    public static let instance = GenericFileManager<OmFileReaderArray<MmapFile, Float>>()
 
     private init() {}
 
@@ -100,6 +100,7 @@ struct OmFileManager {
     }
 }
 
+extension OmFileReaderArray: @unchecked @retroactive Sendable {}
 extension OmFileReaderArray: GenericFileManagable where Backend == MmapFile, OmType == Float {
     func wasDeleted() -> Bool {
         self.fn.file.wasDeleted()

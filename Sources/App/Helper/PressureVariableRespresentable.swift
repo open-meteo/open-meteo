@@ -98,7 +98,7 @@ protocol RawRepresentableString {
 }
 
 /// Enum with surface and pressure variable
-enum SurfaceAndPressureVariable<Surface, Pressure> {
+enum SurfaceAndPressureVariable<Surface: Sendable, Pressure: Sendable>: Sendable {
     case surface(Surface)
     case pressure(Pressure)
 }
@@ -174,7 +174,7 @@ extension SurfaceAndPressureVariable: GenericVariableMixable where Surface: Gene
 }
 
 /// Enum with surface and pressure variable
-enum SurfacePressureAndHeightVariable<Surface, Pressure, Height> {
+enum SurfacePressureAndHeightVariable<Surface: Sendable, Pressure: Sendable, Height: Sendable>: Sendable {
     case surface(Surface)
     case pressure(Pressure)
     case height(Height)
@@ -259,7 +259,7 @@ extension SurfacePressureAndHeightVariable: GenericVariableMixable where Surface
     }
 }
 
-enum VariableOrDerived<Raw: RawRepresentableString, Derived: RawRepresentableString>: RawRepresentableString {
+enum VariableOrDerived<Raw: RawRepresentableString & Sendable, Derived: RawRepresentableString & Sendable>: RawRepresentableString, Sendable {
     case raw(Raw)
     case derived(Derived)
 

@@ -141,7 +141,7 @@ struct ModelUpdateMetaJsonAndFileHandle: GenericFileManagable {
 
 /// Cache access to metadata JSONs
 struct MetaFileManager {
-    public static var instance = GenericFileManager<ModelUpdateMetaJsonAndFileHandle>()
+    public static let instance = GenericFileManager<ModelUpdateMetaJsonAndFileHandle>()
 
     private init() {}
 
