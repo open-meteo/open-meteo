@@ -22,7 +22,7 @@ extension Process {
     }*/
 }
 
-struct CdoHelper {
+struct CdoHelper: Sendable {
     let cdo: CdoIconGlobal?
     let grid: Gridable
     let domain: IconDomains

@@ -778,3 +778,7 @@ struct DownloadEra5Command: AsyncCommand {
         return handles
     }
 }
+
+extension GribMessage: @unchecked @retroactive Sendable {
+    
+}

@@ -1,6 +1,6 @@
 import Foundation
 
-protocol Projectable {
+protocol Projectable: Sendable {
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float)
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float)
 }

@@ -1,7 +1,7 @@
 import Foundation
 import OmFileFormat
 
-public protocol Gridable {
+public protocol Gridable: Sendable {
     var nx: Int { get }
     var ny: Int { get }
 

@@ -59,7 +59,7 @@ protocol ForecastapiResponder {
 }
 
 /// Stores the API output for multiple locations
-struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, Sendable {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, @unchecked Sendable {
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]
@@ -77,7 +77,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         self.nVariablesTimesDomains = nVariablesTimesDomains
     }
 
-    struct PerLocation: Sendable {
+    struct PerLocation {
         let timezone: TimezoneWithOffset
         let time: TimerangeLocal
         let locationId: Int
@@ -151,7 +151,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
     }
 
-    struct PerModel: Sendable {
+    struct PerModel {
         let model: Model
         let latitude: Float
         let longitude: Float
@@ -159,12 +159,12 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         /// Desired elevation from a DEM. Used in statistical downscaling
         let elevation: Float?
 
-        let prefetch: (@Sendable () throws -> Void)
-        let current: (@Sendable () throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
-        let hourly: (@Sendable () throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let daily: (@Sendable () throws -> ApiSection<Model.DailyVariable>)?
-        let sixHourly: (@Sendable () throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let minutely15: (@Sendable () throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let prefetch: (() throws -> Void)
+        let current: (() throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
+        let hourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let daily: (() throws -> ApiSection<Model.DailyVariable>)?
+        let sixHourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let minutely15: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
 
         /// e.g. `52.52N13.42E38m`
         var formatedCoordinatesFilename: String {
