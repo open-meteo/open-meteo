@@ -13,6 +13,28 @@ public protocol Gridable: Sendable {
     associatedtype SliceType: Sequence<Int>
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
+
+    /// Grid mapping name according to CF conventions
+    /// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
+    var cfProjectionParameters: CfProjectionParameters { get }
+}
+
+extension Gridable {
+    var gridBounds: GridBounds {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return GridBounds(lat_bounds: (sw.latitude, ne.latitude), lon_bounds: (sw.longitude, ne.longitude))
+    }
+}
+
+public struct CfProjectionParameters: Sendable {
+    let gridMappingName: String
+    let gridMappingAttributes: [String: Float]
+}
+
+public struct GridBounds {
+    let lat_bounds: (lower: Float, upper: Float)
+    let lon_bounds: (lower: Float, upper: Float)
 }
 
 public struct GridPoint2DFraction {

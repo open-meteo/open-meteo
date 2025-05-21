@@ -10,10 +10,23 @@ struct LambertConformalConicProjection: Projectable {
     /// Radius of Earth. Different radiuses may be used for different GRIBS: https://github.com/SciTools/iris-grib/issues/241#issuecomment-1239069695
     let R: Float
 
+    let cfProjectionParameters: CfProjectionParameters
+
     /// λ0 reference longitude in degrees `LoVInDegrees` in grib
     /// ϕ0  reference latitude in degrees. `LaDInDegrees` in grib
     /// ϕ1 and ϕ2 standard parallels in degrees `Latin1InDegrees` and `Latin2InDegrees` in grib
     public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float, radius: Float = 6370.997) {
+        self.cfProjectionParameters = CfProjectionParameters(
+            gridMappingName: "lambert_conformal_conic",
+            gridMappingAttributes: [
+                "standard_parallel": ϕ1_dec,
+                "latitude_of_projection_origin": ϕ0_dec,
+                "longitude_of_central_meridian": λ0_dec,
+                "false_easting": 0.0,
+                "false_northing": 0.0,
+                "earth_radius": radius // FIXME: Radius should be in meters
+            ]
+        )
         // https://mathworld.wolfram.com/LambertConformalConicProjection.html
         // https://pubs.usgs.gov/pp/1395/report.pdf page 104
         λ0 = ((λ0_dec + 180).truncatingRemainder(dividingBy: 360) - 180).degreesToRadians

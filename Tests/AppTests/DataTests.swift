@@ -290,7 +290,7 @@ import Vapor
 
     @Test func stereographic() {
         let nx = 935
-        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
+        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
 
         let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
         #expect(pos % nx == 420)
@@ -327,7 +327,7 @@ import Vapor
         #expect(lon.isApproximatelyEqual(to: -40.708557, absoluteTolerance: 0.001))
     }
 
-    @Test func cerraGrid() {
+    func testCerraGrid() {
         //
         let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
 
@@ -477,8 +477,8 @@ import Vapor
         #expect(pos.longitude == -24.95)
 
         let bologna = grid.findPoint(lat: 45.45, lon: 11.35)!
-        #expect(bologna % grid.nx == 363) // x
-        #expect(bologna / grid.nx == 265) // y
+        XCTAssertEqual(bologna % grid.nx, 363) // x
+        XCTAssertEqual(bologna / grid.nx, 265) // y
     }
 
     /**
