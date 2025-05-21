@@ -267,7 +267,22 @@ extension Array where Element == Float {
         var firstMissing = nTime
         var lastMissing = 0
         for l in 0..<nTimeSeries {
-            let firstValid = self[l * nTime + 0].isNaN ? 1 : 0
+            /// Find the first valid value. This might be adjusted due to data spacing
+            var firstValid = nTime
+            for t in 0..<nTime {
+                guard !self[l * nTime + t].isNaN else {
+                    continue
+                }
+                if firstValid == nTime {
+                    firstValid = t
+                    continue
+                }
+                // 1 = no spacing
+                // 2 = -D-D-D
+                // 3 = --D--D--D
+                firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
+                break
+            }
             for i in firstValid..<nTime {
                 guard self[l * nTime + i].isFinite else {
                     continue
@@ -310,7 +325,22 @@ extension Array where Element == Float {
 
         for l in 0..<nTimeSeries {
             let sPos = l / nMembers
-            let firstValid = self[l * nTime + 0].isNaN ? 1 : 0
+            /// Find the first valid value. This might be adjusted due to data spacing
+            var firstValid = nTime
+            for t in 0..<nTime {
+                guard !self[l * nTime + t].isNaN else {
+                    continue
+                }
+                if firstValid == nTime {
+                    firstValid = t
+                    continue
+                }
+                // 1 = no spacing
+                // 2 = -D-D-D
+                // 3 = --D--D--D
+                firstValid = Swift.max(firstValid - (t - firstValid - 1), 0)
+                break
+            }
 
             for t in firstValid..<nTime {
                 guard self[l * nTime + t].isNaN else {
