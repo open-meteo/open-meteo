@@ -8,6 +8,7 @@ on:
 env:
   REGISTRY: ghcr.io
   REGISTRY_IMAGE: ghcr.io/${{ github.repository }}
+  REGISTRY_IMAGE2: public.ecr.aws/w5w8t1y7/openmeteo
   
 jobs:
   build:
@@ -21,6 +22,17 @@ jobs:
             platform: linux/arm64
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+            registry-type: public
       -
         name: Prepare
         run: |
@@ -53,7 +65,7 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},name=${{ env.REGISTRY_IMAGE2 }},push-by-digest=true,name-canonical=true,push=true
       -
         name: Export digest
         run: |
@@ -74,6 +86,17 @@ jobs:
     needs:
       - build
     steps:
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4.1.0
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+        with:
+            registry-type: public
       -
         name: Download digests
         uses: actions/download-artifact@v4
@@ -89,7 +112,9 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY_IMAGE }}
+          images: |
+            - ${{ env.REGISTRY_IMAGE }}
+            - ${{ env.REGISTRY_IMAGE2 }}
       -
         name: Login to Docker Hub
         uses: docker/login-action@v3
