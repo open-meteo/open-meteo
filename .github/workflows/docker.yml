@@ -18,7 +18,7 @@ jobs:
         include:
           - os: ubuntu-22.04
             platform: linux/amd64
-          - os: buildjet-2vcpu-ubuntu-2204-arm
+          - os: ubuntu-22.04-arm
             platform: linux/arm64
     runs-on: ${{ matrix.os }}
     steps:
