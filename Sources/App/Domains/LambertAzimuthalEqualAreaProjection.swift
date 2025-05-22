@@ -15,7 +15,7 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
      */
     init(λ0 λ0_dec: Float, ϕ1 ϕ1_dec: Float, radius: Float = 6371229) {
         self.cfProjectionParameters = CfProjectionParameters(
-            gridMappingName: "lambert_azimuthal_equal_area",
+            gridMappingName: .lambertAzimuthalEqualArea,
             gridMappingAttributes: [
                 "longitude_of_projection_origin": λ0_dec,
                 "latitude_of_projection_origin": ϕ1_dec,

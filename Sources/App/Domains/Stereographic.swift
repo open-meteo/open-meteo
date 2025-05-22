@@ -17,7 +17,7 @@ struct StereographicProjection: Projectable {
 
     var cfProjectionParameters: CfProjectionParameters {
         CfProjectionParameters(
-            gridMappingName: "stereographic",
+            gridMappingName: .stereographic,
             gridMappingAttributes: [
                 "latitude_of_projection_origin": sinϕ1.radiansToDegrees,
                 "straight_vertical_longitude_from_pole": λ0.radiansToDegrees,

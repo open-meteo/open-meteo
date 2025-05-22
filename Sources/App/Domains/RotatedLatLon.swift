@@ -11,12 +11,12 @@ struct RotatedLatLonProjection: Projectable {
 
     var cfProjectionParameters: CfProjectionParameters {
         CfProjectionParameters(
-            gridMappingName: "rotated_latitude_longitude",
+            gridMappingName: .rotatedLatLon,
             // TODO: This needs to be checked!
             gridMappingAttributes: [
                 "grid_north_pole_latitude": -(θ.radiansToDegrees - 90),
-                "grid_north_pole_longitude": ϕ.radiansToDegrees,
-                "north_pole_grid_longitude": 0
+                "grid_north_pole_longitude": 0,
+                "north_pole_grid_longitude": ϕ.radiansToDegrees
             ]
         )
     }

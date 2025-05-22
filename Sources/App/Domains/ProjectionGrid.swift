@@ -45,11 +45,11 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         self.dy = dy
     }
 
-    public init(nx: Int, ny: Int, latitudeProjectionOrigion: Float, longitudeProjectionOrigion: Float, dx: Float, dy: Float, projection: Projection) {
+    public init(nx: Int, ny: Int, latitudeProjectionOrigin: Float, longitudeProjectionOrigin: Float, dx: Float, dy: Float, projection: Projection) {
         self.nx = nx
         self.ny = ny
         self.projection = projection
-        origin = (longitudeProjectionOrigion, latitudeProjectionOrigion)
+        origin = (longitudeProjectionOrigin, latitudeProjectionOrigin)
         self.dx = dx
         self.dy = dy
     }
