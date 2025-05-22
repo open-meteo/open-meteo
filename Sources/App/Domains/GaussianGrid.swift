@@ -4,7 +4,7 @@ import Foundation
 struct GaussianGrid: Gridable {
     // TODO: GaussianGrid is a special case we will have to treat differently...
     let cfProjectionParameters = CfProjectionParameters(
-        gridMappingName: "regular_latitude_longitude",
+        gridMappingName: .latitudeLongitude,
         gridMappingAttributes: [:]
     )
 

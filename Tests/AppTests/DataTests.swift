@@ -231,7 +231,7 @@ import Vapor
 
     @Test func lambertAzimuthalEqualAreaProjection() {
         let proj = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
-        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigion: -1036000, longitudeProjectionOrigion: -1158000, dx: 2000, dy: 2000, projection: proj)
+        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigin: -1036000, longitudeProjectionOrigin: -1158000, dx: 2000, dy: 2000, projection: proj)
         // peak north denmark 57.745566, 10.620785
         let coords = proj.forward(latitude: 57.745566, longitude: 10.620785)
         #expect(coords.x.isApproximatelyEqual(to: 773650.5, absoluteTolerance: 0.0001)) // around 774000.0

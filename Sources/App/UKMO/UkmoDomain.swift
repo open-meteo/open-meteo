@@ -36,8 +36,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return ProjectionGrid(
                 nx: 1042,
                 ny: 970,
-                latitudeProjectionOrigion: -1036000,
-                longitudeProjectionOrigion: -1158000,
+                latitudeProjectionOrigin: -1036000,
+                longitudeProjectionOrigin: -1158000,
                 dx: 2000,
                 dy: 2000,
                 projection: projection

@@ -10,7 +10,7 @@ struct RegularGrid: Gridable {
     let searchRadius: Int
 
     let cfProjectionParameters = CfProjectionParameters(
-        gridMappingName: "latitude_longitude",
+        gridMappingName: .latitudeLongitude,
         gridMappingAttributes: [:]
     )
 

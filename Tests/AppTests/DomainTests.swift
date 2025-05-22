@@ -55,4 +55,24 @@ import Testing
         #expect(sliceELonBorder.yRange == 79..<80)
         #expect(sliceELonBorder.xRange == 0..<1)
     }
+
+    func testProj4StringForKnownDomains() {
+        let iconProj4 = IconDomains.icon.grid.cfProjectionParameters.toProj4String()
+        XCTAssertEqual(iconProj4, "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs")
+
+        let aromeProj4 = MeteoFranceDomain.arome_france.grid.cfProjectionParameters.toProj4String()
+        XCTAssertEqual(aromeProj4, "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs")
+
+        let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.cfProjectionParameters.toProj4String()
+        XCTAssertEqual(cmcGemContinentalProj4, "+proj=ob_tran +o_lat_p=36.0885 +o_lon_p=0.0 +lon_1=245.305 +units=m +datum=WGS84 +no_defs +type=crs")
+
+        let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.cfProjectionParameters.toProj4String()
+        XCTAssertEqual(cmcGemRegionalProj4, "+proj=stere +lat_0=57.295784 +lon_0=249.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+
+        let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.cfProjectionParameters.toProj4String()
+        XCTAssertEqual(dmiHarmonieProj4, "+proj=lcc +lat_1=55.5 +lat_0=55.5 +lon_0=352.0 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+    
+        let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.cfProjectionParameters.toProj4String()
+        XCTAssertEqual(ukmoRegionalDeterministicProj4, "+proj=laea +lon_0=-2.5 +lat_0=54.9 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+    }
 }

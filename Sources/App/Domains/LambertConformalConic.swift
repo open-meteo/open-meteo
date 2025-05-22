@@ -17,7 +17,7 @@ struct LambertConformalConicProjection: Projectable {
     /// ϕ1 and ϕ2 standard parallels in degrees `Latin1InDegrees` and `Latin2InDegrees` in grib
     public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float, radius: Float = 6370.997) {
         self.cfProjectionParameters = CfProjectionParameters(
-            gridMappingName: "lambert_conformal_conic",
+            gridMappingName: .lambertConformalConic,
             gridMappingAttributes: [
                 "standard_parallel": ϕ1_dec,
                 "latitude_of_projection_origin": ϕ0_dec,
