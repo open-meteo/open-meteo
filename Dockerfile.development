@@ -2,7 +2,7 @@
 # Build image
 # ================================
 #FROM swift:5.7.0-jammy as build
-FROM ghcr.io/open-meteo/docker-container-build:latest as build
+FROM ghcr.io/open-meteo/docker-container-build:latest AS build
 EXPOSE 8080
 USER root
 

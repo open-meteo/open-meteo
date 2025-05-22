@@ -65,21 +65,42 @@ jobs:
           context: .
           platforms: ${{ matrix.platform }}
           labels: ${{ steps.meta.outputs.labels }}
-          outputs: |
-            type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
-            type=image,name=${{ env.REGISTRY_IMAGE2 }},push-by-digest=true,name-canonical=true,push=true
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE }},push-by-digest=true,name-canonical=true,push=true
       -
         name: Export digest
         run: |
           mkdir -p /tmp/digests
           digest="${{ steps.build.outputs.digest }}"
-          touch "/tmp/digests/${digest#sha256:}"          
+          touch "/tmp/digests/${digest#sha256:}"
+      -
+        name: Build and push by digest2
+        id: build2
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: ${{ matrix.platform }}
+          labels: ${{ steps.meta.outputs.labels }}
+          outputs: type=image,name=${{ env.REGISTRY_IMAGE2 }},push-by-digest=true,name-canonical=true,push=true    
+      -
+        name: Export digest2
+        run: |
+          mkdir -p /tmp/digests2
+          digest="${{ steps.build2.outputs.digest }}"
+          touch "/tmp/digests2/${digest#sha256:}" 
       -
         name: Upload digest
         uses: actions/upload-artifact@v4
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests/*
+          if-no-files-found: error
+          retention-days: 1
+      -
+        name: Upload digest2
+        uses: actions/upload-artifact@v4
+        with:
+          name: digests2-${{ env.PLATFORM_PAIR }}
+          path: /tmp/digests2/*
           if-no-files-found: error
           retention-days: 1
 
@@ -142,8 +163,8 @@ jobs:
         name: Download digests
         uses: actions/download-artifact@v4
         with:
-          path: /tmp/digests
-          pattern: digests-*
+          path: /tmp/digests2
+          pattern: digests2-*
           merge-multiple: true
       -
         name: Set up Docker Buildx
@@ -156,7 +177,7 @@ jobs:
           images: ${{ env.REGISTRY_IMAGE2 }}
       -
         name: Create manifest list and push
-        working-directory: /tmp/digests
+        working-directory: /tmp/digests2
         run: |
           docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf '${{ env.REGISTRY_IMAGE2 }}@sha256:%s ' *)          

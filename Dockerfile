@@ -1,7 +1,7 @@
 # ================================
 # Build image contains swift compiler and libraries like netcdf or eccodes
 # ================================
-FROM ghcr.io/open-meteo/docker-container-build:latest as build
+FROM ghcr.io/open-meteo/docker-container-build:latest AS build
 WORKDIR /build
 
 # First just resolve dependencies.
