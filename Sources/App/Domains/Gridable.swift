@@ -28,7 +28,7 @@ extension Gridable {
     }
 }
 
-enum GridMappingName: String {
+enum GridMappingName: String, Codable {
     case lambertConformalConic = "lambert_conformal_conic"
     case lambertAzimuthalEqualArea = "lambert_azimuthal_equal_area"
     case stereographic = "stereographic"
@@ -87,7 +87,7 @@ public struct CfProjectionParameters: Sendable {
     }
 }
 
-public struct GridBounds: Equatable {
+public struct GridBounds: Equatable, Codable, Sendable {
     let lat_bounds: ClosedRange<Float>
     let lon_bounds: ClosedRange<Float>
 }
