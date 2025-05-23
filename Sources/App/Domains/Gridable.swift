@@ -24,7 +24,7 @@ extension Gridable {
     var gridBounds: GridBounds {
         let sw = getCoordinates(gridpoint: 0)
         let ne = getCoordinates(gridpoint: nx * ny - 1)
-        return GridBounds(lat_bounds: (sw.latitude, ne.latitude), lon_bounds: (sw.longitude, ne.longitude))
+        return GridBounds(lat_bounds: sw.latitude...ne.latitude, lon_bounds: sw.longitude...ne.longitude)
     }
 }
 
@@ -87,9 +87,9 @@ public struct CfProjectionParameters: Sendable {
     }
 }
 
-public struct GridBounds {
-    let lat_bounds: (lower: Float, upper: Float)
-    let lon_bounds: (lower: Float, upper: Float)
+public struct GridBounds: Equatable {
+    let lat_bounds: ClosedRange<Float>
+    let lon_bounds: ClosedRange<Float>
 }
 
 public struct GridPoint2DFraction {
