@@ -36,6 +36,8 @@ docker run -it --rm -v open-meteo-data:/app/data ghcr.io/open-meteo/open-meteo s
 curl "http://127.0.0.1:8080/v1/forecast?latitude=47.1&longitude=8.4&models=ecmwf_ifs025&hourly=temperature_2m"
 ```
 
+Note: The Docker images are also hosted at AWS ECR: https://gallery.ecr.aws/w5w8t1y7/openmeteo
+
 ### Using prebuilt Ubuntu Jammy Jellyfish packages
 If you're operating on Ubuntu 22.04 Jammy Jellyfish, you have the option to utilize prebuilt binaries, which can be installed through APT with the following command:
 
