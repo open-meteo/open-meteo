@@ -58,7 +58,7 @@ cd open-meteo
 
 # Install Xcode from the App store
 # Install brew
-brew install netcdf cdo bzip2
+brew install netcdf bzip2
 open Package.swift
 # `swift run` works as well
 ```
@@ -72,7 +72,7 @@ git clone https://github.com/open-meteo/open-meteo.git
 cd open-meteo
 
 # Install the swift compiler as pointed out in the Vapor development guide
-sudo apt install libnetcdf-dev libeccodes-dev libbz2-dev build-essential cdo curl
+sudo apt install libnetcdf-dev libeccodes-dev libbz2-dev build-essential curl
 sudo apt-get install binutils git gnupg2 libc6-dev libcurl4-openssl-dev libedit2 libgcc-9-dev libpython3.8 \
   libsqlite3-0 libstdc++-9-dev libxml2-dev libz3-dev pkg-config tzdata unzip zlib1g-dev
 sudo apt install libbz2-dev libz-dev

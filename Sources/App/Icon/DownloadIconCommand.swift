@@ -78,11 +78,11 @@ struct DownloadIconCommand: AsyncCommand {
         let additionalTimeString = (domain == .iconD2 || domain == .iconD2Eps) ? "_000_0" : ""
         let variableName = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "hsurf" : "HSURF"
         let file = "\(serverPrefix)hsurf/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName).grib2.bz2"
-        var hsurf = try await cdo.downloadAndRemap(file)[0].getDouble().map(Float.init)
+        var hsurf = try await cdo.downloadAndRemap(file)[0].data.data
 
         let variableName2 = (domain == .iconD2 || domain == .iconD2Eps || domain == .iconEuEps || domain == .iconEps) ? "fr_land" : "FR_LAND"
         let file2 = "\(serverPrefix)fr_land/\(domainPrefix)_\(gridType)_time-invariant_\(dateStr)\(additionalTimeString)_\(variableName2).grib2.bz2"
-        let landFraction = try await cdo.downloadAndRemap(file2)[0].getDouble().map(Float.init)
+        let landFraction = try await cdo.downloadAndRemap(file2)[0].data.data
 
         // try Array2D(data: hsurf, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(downloadDirectory)hsurf.nc")
         // try Array2D(data: landFraction, nx: domain.grid.nx, ny: domain.grid.ny).writeNetcdf(filename: "\(downloadDirectory)fr_land.nc")
@@ -147,7 +147,7 @@ struct DownloadIconCommand: AsyncCommand {
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
 
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                //var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
                     return
@@ -167,27 +167,27 @@ struct DownloadIconCommand: AsyncCommand {
                     let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
                     try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
                     let writer = OmRunSpatialWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: false)
-                    for (i, message) in messages.enumerated() {
+                    for (i, (message, array2d)) in messages.enumerated() {
+                        var array2d = array2d
                         guard let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType") else {
                             fatalError("could not get step range or type")
                         }
                         let timestamp = run.add(hour * 3600 + i * 900)
-                        try grib2d.load(message: message)
                         if let fma = variable.multiplyAdd {
-                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                            array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         // Deaccumulate precipitation
-                        guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        guard await deaverager15min.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
                             continue
                         }
                         if let variable = variable as? IconSurfaceVariable {
                             if [IconSurfaceVariable.precipitation, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent].contains(variable) {
-                                await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
+                                await storage15min.set(variable: variable, timestamp: timestamp, member: 0, data: array2d)
                                 continue
                             }
                         }
-                        await handles15minIconD2.append(try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data))
+                        await handles15minIconD2.append(try writer.write(time: timestamp, member: 0, variable: variable, data: array2d.data))
                     }
                     messages = [messages[0]]
                 }
@@ -198,12 +198,12 @@ struct DownloadIconCommand: AsyncCommand {
                 }
 
                 // Contains more than 1 message for ensemble models
-                for (member, message) in messages.enumerated() {
-                    try grib2d.load(message: message)
+                for (member, (message, array2d)) in messages.enumerated() {
+                    var array2d = array2d
 
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {
-                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        array2d.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
 
                     guard let stepRange = message.get(attribute: "stepRange"),
@@ -212,18 +212,18 @@ struct DownloadIconCommand: AsyncCommand {
                     }
 
                     // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
                         continue
                     }
 
                     if let variable = variable as? IconSurfaceVariable {
                         if [IconSurfaceVariable.precipitation, .temperature_2m, .snowfall_height, .rain, .snowfall_water_equivalent, .snowfall_convective_water_equivalent, .weather_code, .freezing_level_height, .pressure_msl, .relative_humidity_2m].contains(variable) {
-                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                             continue
                         }
                     }
                     // logger.info("Compressing and writing data to \(filenameDest)")
-                    await handles.append(try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
+                    await handles.append(try writer.write(time: timestamp, member: member, variable: variable, data: array2d.data))
                 }
             }
 
