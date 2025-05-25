@@ -2,6 +2,7 @@ import Foundation
 import Vapor
 @preconcurrency import SwiftEccodes
 import CHelper
+import SwiftNetCDF
 
 extension Process {
     /*static func bunzip2(file: String) throws {
@@ -41,15 +42,28 @@ struct CdoHelper: Sendable {
     }
 
     // Uncompress bz2, reproject to regular grid and read into memory
-    func downloadAndRemap(_ url: String) async throws -> [GribMessage] {
+    func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
         guard let cdo else {
-            return try await curl.downloadGrib(url: url, bzip2Decode: true)
+            return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
+                return (message, Array2D(data: try message.getDouble().map(Float.init), nx: grid.nx, ny: grid.ny))
+            }
         }
+        /// Nearest neighbour interpolation
+        let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
+        return try messages.map { message in
+            let source = try message.getDouble()
+            let destination = cdo.sourceAddresses.map { src in
+                return Float(source[Int(src-1)])
+            }
+            let grid2d = Array2D(data: destination, nx: grid.nx, ny: grid.ny)
+            return (message, grid2d)
+        }
+        
         // Multiple messages might be present in each grib file
         // DWD produces non-standard GRIB2 files for 15 minutes ensemble data
         // GRIB messages need to be reordered by timestep
         // Otherwise CDO does not work
-        let buffer = try await curl.downloadInMemoryAsync(url: url, minSize: nil, bzip2Decode: true)
+        /*let buffer = try await curl.downloadInMemoryAsync(url: url, minSize: nil, bzip2Decode: true)
 
         var m = [(ptr: UnsafeRawBufferPointer, endStep: Int)]()
         try buffer.withUnsafeReadableBytes({
@@ -82,7 +96,7 @@ struct CdoHelper: Sendable {
         try FileManager.default.removeItem(atPath: gribFile)
         try FileManager.default.removeItem(atPath: gribFileRemapped)
         chelper_malloc_trim()
-        return messages
+        return messages*/
     }
 }
 
@@ -112,6 +126,8 @@ struct CdoIconGlobal {
     let weightsFile: String
     let logger: Logger
     let domain: IconDomains
+    
+    let sourceAddresses: [Int32]
 
     /// Download and prepare weights for icon global is missing
     public init?(logger: Logger, workDirectory: String, curl: Curl, domain: IconDomains) async throws {
@@ -132,6 +148,10 @@ struct CdoIconGlobal {
         }
 
         if fm.fileExists(atPath: gridFile) && fm.fileExists(atPath: weightsFile) {
+            guard let sourceAddresses = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "src_address")?.asType(Int32.self)?.read() else {
+                fatalError("could not open weights file")
+            }
+            self.sourceAddresses = sourceAddresses
             return
         }
 
@@ -168,6 +188,11 @@ struct CdoIconGlobal {
             try Process.spawn(cmd: "cdo", args: ["-s", "gennn,\(gridFile)", localUncompressed, weightsFile])
         }
         try FileManager.default.removeItem(atPath: localUncompressed)
+        
+        guard let sourceAddresses = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "src_address")?.asType(Int32.self)?.read() else {
+            fatalError("could not open weights file")
+        }
+        self.sourceAddresses = sourceAddresses
     }
 
     public func remap(in inn: String, out: String) throws {
