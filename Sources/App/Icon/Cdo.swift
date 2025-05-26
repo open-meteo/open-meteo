@@ -33,8 +33,11 @@ struct CdoHelper: Sendable {
         let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
         return try messages.map { message in
             let source = try message.getDouble()
-            let destination = cdo.sourceAddresses.map { src in
-                return Float(source[Int(src-1)])
+            let destination = cdo.mapping.map { src in
+                guard src >= 0 else {
+                    return Float.nan
+                }
+                return Float(source[Int(src)])
             }
             let grid2d = Array2D(data: destination, nx: grid.nx, ny: grid.ny)
             return (message, grid2d)
@@ -64,7 +67,7 @@ extension IconDomains {
 }
 
 struct CdoIconGlobal {
-    let sourceAddresses: [Int32]
+    let mapping: [Int32]
 
     /// Download and prepare weights for icon global remapping
     public init?(curl: Curl, domain: IconDomains) async throws {
@@ -78,9 +81,16 @@ struct CdoIconGlobal {
             let remoteFile = "https://openmeteo.s3.amazonaws.com/data/\(domain.domainRegistry.rawValue)/static/cdo_weights.nc"
             try await curl.download(url: remoteFile, toFile: weightsFile, bzip2Decode: false)
         }
-        guard let sourceAddresses = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "src_address")?.asType(Int32.self)?.read() else {
+        guard let src_address = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "src_address")?.asType(Int32.self)?.read() else {
             fatalError("could not open weights file")
         }
-        self.sourceAddresses = sourceAddresses
+        guard let dst_address = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "dst_address")?.asType(Int32.self)?.read() else {
+            fatalError("could not open weights file")
+        }
+        var mapping = [Int32](repeating: -1, count: domain.grid.count)
+        for (i, src) in src_address.enumerated() {
+            mapping[Int(dst_address[i])] = src - 1
+        }
+        self.mapping = mapping
     }
 }
