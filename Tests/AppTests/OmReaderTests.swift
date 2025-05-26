@@ -27,8 +27,7 @@ final class OmReaderTests: XCTestCase {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
         let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
         let cache = SimpleKVCache()
-        let concurrentFn = OmReaderBackendCoordinator(backend: readFn)
-        let cacheFn = OmReaderBlockCache(backend: concurrentFn, cache: cache, cacheKey: 234)
+        let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: 234)
         let read = try await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self, io_size_max: 4096)!
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         XCTAssertEqual(value[123], 1218)

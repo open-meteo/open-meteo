@@ -10,16 +10,16 @@ protocol OmFileReaderBackendAsyncData: OmFileReaderBackendAsync {
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache
  */
-final class OmReaderBlockCache<Backend: OmFileReaderBackendAsyncData, Cache: KVCache>: OmFileReaderBackendAsync {
+final class OmReaderBlockCache<Backend: OmFileReaderBackendAsyncData & Sendable, Cache: KVCache>: OmFileReaderBackendAsync, Sendable {
     let backend: Backend
-    let cache: Cache
+    private let cache: KVCacheCoordinator<Cache>
     let cacheKey: Int
     
     typealias DataType = Data
     
     init(backend: Backend, cache: Cache, cacheKey: Int) {
         self.backend = backend
-        self.cache = cache
+        self.cache = KVCacheCoordinator(cache: cache)
         self.cacheKey = cacheKey
     }
     
@@ -42,45 +42,12 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsyncData, Cache: KVC
         for block in blocks {
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
-            if let value = cache.get(key: cacheKey &+ block) {
-                // copy data into output data
-                //print("Using cached block \(block)")
-                data[range.array] = value[range.file]
-                continue
+            let value = try await cache.get(key: cacheKey &+ block) {
+                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
             }
-            
-            // missing, request block from backend
-            let value = try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            cache.set(key: cacheKey &+ block, value: value)
-            
             // copy data into ouput data
             data[range.array] = value[range.file]
         }
-        
         return try await backend.getData(offset: offset, count: count)
-    }
-    
-}
-
-protocol KVCache {
-    func set(key: Int, value: Data)
-    func get(key: Int) -> Data?
-}
-
-class SimpleKVCache: KVCache {
-    var cache: [Int: Data] = [:]
-    
-    func set(key: Int, value: Data) {
-        print("Storing \(value.count) bytes in cache for key \(key)")
-        cache[key] = value
-    }
-    
-    func get(key: Int) -> Data? {
-        if let value = cache[key] {
-            print("Cache HIT for key \(key)")
-            return value
-        }
-        print("Cache MISS for key \(key)")
-        return nil
     }
 }
