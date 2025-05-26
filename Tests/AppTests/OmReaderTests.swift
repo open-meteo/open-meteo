@@ -12,4 +12,14 @@ final class OmReaderTests: XCTestCase {
         let value = try await read.read(range: [250..<251, 420..<421])
         XCTAssertEqual(value.first, 214)
     }
+    
+    func testBlockCache() async throws {
+        let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
+        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
+        let cache = SimpleKVCache()
+        let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: 234)
+        let read = try await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self)!
+        let value = try await read.read(range: [250..<251, 420..<421])
+        XCTAssertEqual(value.first, 214)
+    }
 }
