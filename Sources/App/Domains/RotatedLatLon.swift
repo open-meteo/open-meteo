@@ -9,6 +9,18 @@ struct RotatedLatLonProjection: Projectable {
     /// Rotation around z-axis
     let ϕ: Float
 
+    var cfProjectionParameters: CfProjectionParameters {
+        CfProjectionParameters(
+            gridMappingName: .rotatedLatLon,
+            // TODO: This needs to be checked!
+            gridMappingAttributes: [
+                "grid_north_pole_latitude": -(θ.radiansToDegrees - 90),
+                "grid_north_pole_longitude": 0,
+                "north_pole_grid_longitude": ϕ.radiansToDegrees
+            ]
+        )
+    }
+
     public init(latitude: Float, longitude: Float) {
         θ = (90 + latitude).degreesToRadians
         ϕ = longitude.degreesToRadians
