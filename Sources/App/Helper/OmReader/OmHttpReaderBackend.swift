@@ -10,7 +10,7 @@ enum OmHttpReaderBackendError: Error {
 /**
  Reader backend to read from an HTTP server on demand. Checks last modified header and ETag.
  */
-final class OmHttpReaderBackend: OmFileReaderBackendAsyncData {
+final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
     let client: HTTPClient
     
     /// Size of remote http file
