@@ -1,0 +1,15 @@
+import Foundation
+@testable import App
+import XCTest
+// import Vapor
+import OmFileFormat
+
+final class OmReaderTests: XCTestCase {
+    func testHttpRead() async throws {
+        let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
+        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
+        let read = try await OmFileReaderAsync(fn: readFn).asArray(of: Float.self)!
+        let value = try await read.read(range: [250..<251, 420..<421])
+        XCTAssertEqual(value.first, 214)
+    }
+}
