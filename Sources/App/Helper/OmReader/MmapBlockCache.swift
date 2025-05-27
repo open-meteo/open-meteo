@@ -28,7 +28,7 @@ final class MmapBlockCache: KVCache {
         let fn: FileHandle
         let size = (8 + 8 + blockSize) * blockCount
         if FileManager.default.fileExists(atPath: file) {
-            fn = try .openFileReading(file: file)
+            fn = try .openFileReadWrite(file: file)
             guard try fn.seekToEnd() == size else {
                 fatalError()
             }
@@ -40,30 +40,30 @@ final class MmapBlockCache: KVCache {
         self.blockSize = blockSize
     }
     
-    func set(key: Int, value: Data) {
+    func set(key: UInt64, value: Data) {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         /// For in-flight requests set bit 0 to zero
         let inFlightkey = WordPair(first: UInt(key), second: time & 0xFFFFFFFFFFFFFFFE)
         /// For commired requests set bit 0 to zero
         let commitedkey = WordPair(first: UInt(key), second: time | 0x1)
         /// The maximum number of slots to check for an empty space. Afterwards use LRU
-        let lookAheadCount = 1024
+        let lookAheadCount: UInt64 = 1024
         mmap.data.withMemoryRebound(to: Atomic<WordPair>.self) { entries in
-            let hash = key % blockCount
+            let hash = key % UInt64(blockCount)
             for slot in hash ..< hash + lookAheadCount {
-                let slot = slot % blockCount
+                let slot = slot % UInt64(blockCount)
                 while true {
-                    let entry = entries[slot].load(ordering: .relaxed)
+                    let entry = entries[Int(slot)].load(ordering: .relaxed)
                     guard entry.second == 0 || entry.first == key else {
                         break
                     }
-                    guard entries[slot].compareExchange(expected: entry, desired: inFlightkey, ordering: .relaxed).exchanged else {
+                    guard entries[Int(slot)].compareExchange(expected: entry, desired: inFlightkey, ordering: .relaxed).exchanged else {
                         // another thread stole the slot
                         continue
                     }
                     let dest = mmap.data.baseAddress!.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
                     value.copyBytes(to: UnsafeMutablePointer(mutating: dest), count: value.count)
-                    guard entries[slot].compareExchange(expected: inFlightkey, desired: commitedkey, ordering: .relaxed).exchanged else {
+                    guard entries[Int(slot)].compareExchange(expected: inFlightkey, desired: commitedkey, ordering: .relaxed).exchanged else {
                         // another thread stole the slot
                         continue
                     }
@@ -77,11 +77,11 @@ final class MmapBlockCache: KVCache {
                 var overwriteEntry = WordPair(first: 0, second: UInt.max)
                 var overwritePos: Int = -1
                 for slot in hash ..< hash + lookAheadCount {
-                    let slot = slot % blockCount
-                    let entry = entries[slot].load(ordering: .relaxed)
+                    let slot = slot % UInt64(blockCount)
+                    let entry = entries[Int(slot)].load(ordering: .relaxed)
                     if entry.second < overwriteEntry.second {
                         overwriteEntry = entry
-                        overwritePos = slot
+                        overwritePos = Int(slot)
                     }
                 }
                 guard entries[overwritePos].compareExchange(expected: overwriteEntry, desired: inFlightkey, ordering: .relaxed).exchanged else {
@@ -100,22 +100,22 @@ final class MmapBlockCache: KVCache {
     }
     
     /// Find key in cache and return data. Updates the LRU timestamp.
-    func get(key: Int) -> Data? {
+    func get(key: UInt64) -> Data? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
-        let lookAheadCount = 1024
+        let lookAheadCount: UInt64 = 1024
         return mmap.data.withMemoryRebound(to: Atomic<WordPair>.self) { entries in
-            let hash = key % blockCount
+            let hash = key % UInt64(blockCount)
             for slot in hash ..< hash + lookAheadCount {
-                let slot = slot % blockCount
+                let slot = slot % UInt64(blockCount)
                 while true {
-                    let entry = entries[slot].load(ordering: .relaxed)
+                    let entry = entries[Int(slot)].load(ordering: .relaxed)
                     // check if keys match
                     // ignore any entries that are being modified right now
                     guard entry.first == key && entry.second & 0x1 == 1 else {
                         break
                     }
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
-                    guard entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed).exchanged else {
+                    guard entries[Int(slot)].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed).exchanged else {
                         // another thread just updated the timestamp, or the key was changed
                         continue
                     }

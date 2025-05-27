@@ -13,11 +13,11 @@ protocol OmFileReaderBackendAsyncData: OmFileReaderBackendAsync {
 final class OmReaderBlockCache<Backend: OmFileReaderBackendAsyncData & Sendable, Cache: KVCache>: OmFileReaderBackendAsync, Sendable {
     let backend: Backend
     private let cache: KVCacheCoordinator<Cache>
-    let cacheKey: Int
+    let cacheKey: UInt64
     
     typealias DataType = Data
     
-    init(backend: Backend, cache: Cache, cacheKey: Int) {
+    init(backend: Backend, cache: Cache, cacheKey: UInt64) {
         self.backend = backend
         self.cache = KVCacheCoordinator(cache: cache)
         self.cacheKey = cacheKey
@@ -42,7 +42,7 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsyncData & Sendable,
         for block in blocks {
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
-            let value = try await cache.get(key: cacheKey &+ block) {
+            let value = try await cache.get(key: cacheKey &+ UInt64(block)) {
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
             }
             // copy data into ouput data

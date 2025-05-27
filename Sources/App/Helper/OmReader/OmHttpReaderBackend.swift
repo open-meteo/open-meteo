@@ -7,6 +7,18 @@ enum OmHttpReaderBackendError: Error {
     case contentLengthMissing
 }
 
+func fnv1aHash64(_ string: String) -> UInt64 {
+    let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
+    let fnvPrime: UInt64 = 0x100000001b3
+
+    var hash = fnvOffsetBasis
+    for byte in string.utf8 {
+        hash ^= UInt64(byte)
+        hash = hash &* fnvPrime
+    }
+    return hash
+}
+
 /**
  Reader backend to read from an HTTP server on demand. Checks last modified header and ETag.
  */
@@ -26,6 +38,10 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
     let logger: Logger
     
     typealias DataType = Data
+    
+    var cacheKey: UInt64 {
+        return fnv1aHash64(url) &+ (eTag.map(fnv1aHash64) ?? 0) &+ (lastModified.map(fnv1aHash64) ?? 0)
+    }
     
     init(client: HTTPClient, logger: Logger, url: String) async throws {
         self.client = client

@@ -5,13 +5,13 @@ import Foundation
  */
 final actor KVCacheCoordinator<Cache: KVCache> {
     let cache: Cache
-    private var inFlight: [Int: [CheckedContinuation<Data, any Error>]] = [:]
+    private var inFlight: [UInt64: [CheckedContinuation<Data, any Error>]] = [:]
     
     init(cache: Cache) {
         self.cache = cache
     }
     
-    func get(key: Int, fn: @Sendable () async throws -> Data) async throws -> Data {
+    func get(key: UInt64, fn: @Sendable () async throws -> Data) async throws -> Data {
         if let value = await cache.get(key: key) {
             return value
         }
@@ -43,22 +43,22 @@ final actor KVCacheCoordinator<Cache: KVCache> {
  A KV cache should provide those functions
  */
 protocol KVCache: Sendable {
-    func set(key: Int, value: Data) async
-    func get(key: Int) async -> Data?
+    func set(key: UInt64, value: Data) async
+    func get(key: UInt64) async -> Data?
 }
 
 /**
  Simple KV cache using a dicttinaty
  */
 final actor SimpleKVCache: KVCache, Sendable {
-    var cache: [Int: Data] = [:]
+    var cache: [UInt64: Data] = [:]
     
-    func set(key: Int, value: Data) {
+    func set(key: UInt64, value: Data) {
         print("Storing \(value.count) bytes in cache for key \(key)")
         cache[key] = value
     }
     
-    func get(key: Int) -> Data? {
+    func get(key: UInt64) -> Data? {
         if let value = cache[key] {
             print("Cache HIT for key \(key)")
             return value
