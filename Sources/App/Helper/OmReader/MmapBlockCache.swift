@@ -109,10 +109,12 @@ final class MmapBlockCache: KVCache {
                 let slot = slot % blockCount
                 while true {
                     let entry = entries[slot].load(ordering: .relaxed)
-                    guard entry.first == key else {
+                    // check if keys match
+                    // ignore any entries that are being modified right now
+                    guard entry.first == key && entry.second & 0x1 == 1 else {
                         break
                     }
-                    let updateTimestamp = WordPair(first: UInt(key), second: time)
+                    let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
                     guard entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed).exchanged else {
                         // another thread just updated the timestamp, or the key was changed
                         continue
