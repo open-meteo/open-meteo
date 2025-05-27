@@ -32,4 +32,11 @@ final class OmReaderTests: XCTestCase {
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         XCTAssertEqual(value[123], 1218)
     }
+    
+    func testKeyValueCache() async throws {
+        let file = "cache.bin"
+        let cache = try MmapBlockCache(file: file, blockSize: 64, blockCount: 50)
+        cache.set(key: 234923, value: Data(repeating: 123, count: 8))
+        XCTAssertEqual(cache.get(key: 234923), Data(repeating: 123, count: 8))
+    }
 }
