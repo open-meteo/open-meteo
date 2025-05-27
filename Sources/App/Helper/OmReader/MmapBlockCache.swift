@@ -48,49 +48,49 @@ final class MmapBlockCache: KVCache {
         let commitedkey = WordPair(first: UInt(key), second: time | 0x1)
         /// The maximum number of slots to check for an empty space. Afterwards use LRU
         let lookAheadCount = 1024
-        mmap.data.withMemoryRebound(to: Atomic<WordPair>.self) { keys in
+        mmap.data.withMemoryRebound(to: Atomic<WordPair>.self) { entries in
             let hash = key % blockCount
             for slot in hash ..< hash + lookAheadCount {
                 let slot = slot % blockCount
-                let keyInSlot = keys[slot].load(ordering: .relaxed)
-                guard keyInSlot.second == 0 || keyInSlot.first == key else {
-                    continue
+                while true {
+                    let entry = entries[slot].load(ordering: .relaxed)
+                    guard entry.second == 0 || entry.first == key else {
+                        break
+                    }
+                    guard entries[slot].compareExchange(expected: entry, desired: inFlightkey, ordering: .relaxed).exchanged else {
+                        // another thread stole the slot
+                        continue
+                    }
+                    let dest = mmap.data.baseAddress!.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
+                    value.copyBytes(to: UnsafeMutablePointer(mutating: dest), count: value.count)
+                    guard entries[slot].compareExchange(expected: inFlightkey, desired: commitedkey, ordering: .relaxed).exchanged else {
+                        // another thread stole the slot
+                        continue
+                    }
+                    return
                 }
-                // take slot using CAS
-                guard keys[slot].compareExchange(expected: keyInSlot, desired: inFlightkey, ordering: .relaxed).exchanged else {
-                    // another thread stole the slot
-                    continue
-                }
-                let dest = mmap.data.baseAddress!.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
-                value.copyBytes(to: UnsafeMutablePointer(mutating: dest), count: value.count)
-                guard keys[slot].compareExchange(expected: inFlightkey, desired: commitedkey, ordering: .relaxed).exchanged else {
-                    // another thread stole the slot
-                    continue
-                }
-                return
             }
             
             // If we are here, no slots were free. Search lowest timestamp and overwrite this slot
             // Remember that other threads might do the same at the same time
             while true {
-                var overwriteKey = WordPair(first: 0, second: UInt.max)
+                var overwriteEntry = WordPair(first: 0, second: UInt.max)
                 var overwritePos: Int = -1
                 for slot in hash ..< hash + lookAheadCount {
                     let slot = slot % blockCount
-                    let keyInSlot = keys[slot].load(ordering: .relaxed)
-                    if keyInSlot.second < overwriteKey.second {
-                        overwriteKey = keyInSlot
+                    let entry = entries[slot].load(ordering: .relaxed)
+                    if entry.second < overwriteEntry.second {
+                        overwriteEntry = entry
                         overwritePos = slot
                     }
                 }
-                // take slot using CAS
-                guard keys[overwritePos].compareExchange(expected: overwriteKey, desired: inFlightkey, ordering: .relaxed).exchanged else {
+                guard entries[overwritePos].compareExchange(expected: overwriteEntry, desired: inFlightkey, ordering: .relaxed).exchanged else {
                     // another thread stole the slot
                     continue
                 }
                 let dest = mmap.data.baseAddress!.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(overwritePos))
                 value.copyBytes(to: UnsafeMutablePointer(mutating: dest), count: value.count)
-                guard keys[overwritePos].compareExchange(expected: inFlightkey, desired: commitedkey, ordering: .relaxed).exchanged else {
+                guard entries[overwritePos].compareExchange(expected: inFlightkey, desired: commitedkey, ordering: .relaxed).exchanged else {
                     // another thread stole the slot
                     continue
                 }
@@ -99,14 +99,29 @@ final class MmapBlockCache: KVCache {
         }
     }
     
+    /// Find key in cache and return data. Updates the LRU timestamp.
     func get(key: Int) -> Data? {
-        // find key
-        // check LRU for inflight bit
-        // increment LRU
-        // return data pointer
-        
-        fatalError()
+        let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
+        let lookAheadCount = 1024
+        return mmap.data.withMemoryRebound(to: Atomic<WordPair>.self) { entries in
+            let hash = key % blockCount
+            for slot in hash ..< hash + lookAheadCount {
+                let slot = slot % blockCount
+                while true {
+                    let entry = entries[slot].load(ordering: .relaxed)
+                    guard entry.first == key else {
+                        break
+                    }
+                    let updateTimestamp = WordPair(first: UInt(key), second: time)
+                    guard entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed).exchanged else {
+                        // another thread just updated the timestamp, or the key was changed
+                        continue
+                    }
+                    let dest = mmap.data.baseAddress!.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
+                    return Data(UnsafeRawBufferPointer(start: dest, count: blockSize))
+                }
+            }
+            return nil
+        }
     }
-    
-    
 }

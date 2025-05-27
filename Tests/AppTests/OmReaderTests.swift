@@ -35,8 +35,21 @@ final class OmReaderTests: XCTestCase {
     
     func testKeyValueCache() async throws {
         let file = "cache.bin"
+        try FileManager.default.removeItemIfExists(at: file)
         let cache = try MmapBlockCache(file: file, blockSize: 64, blockCount: 50)
-        cache.set(key: 234923, value: Data(repeating: 123, count: 8))
-        XCTAssertEqual(cache.get(key: 234923), Data(repeating: 123, count: 8))
+        cache.set(key: 234923, value: Data(repeating: 123, count: 64))
+        cache.set(key: 234923+50, value: Data(repeating: 142, count: 64))
+        XCTAssertEqual(cache.get(key: 234923), Data(repeating: 123, count: 64))
+        XCTAssertEqual(cache.get(key: 234923+50), Data(repeating: 142, count: 64))
+        
+        for i in 0..<50 {
+            cache.set(key: 1000+i, value: Data(repeating: UInt8(123+i), count: 64))
+        }
+        for i in 0..<50 {
+            XCTAssertEqual(cache.get(key: 1000+i), Data(repeating: UInt8(123+i), count: 64))
+        }
+        // Cache got overwritten
+        XCTAssertNil(cache.get(key: 234923))
+        XCTAssertNil(cache.get(key: 234923+50))
     }
 }
