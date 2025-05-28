@@ -26,7 +26,7 @@ final class MmapBlockCache: KVCache {
     
     init(file: String, blockSize: Int, blockCount: Int) throws {
         let fn: FileHandle
-        let size = (8 + 8 + blockSize) * blockCount
+        let size = (MemoryLayout<WordPair>.size + blockSize) * blockCount
         if FileManager.default.fileExists(atPath: file) {
             fn = try .openFileReadWrite(file: file)
             guard try fn.seekToEnd() == size else {
@@ -120,7 +120,7 @@ final class MmapBlockCache: KVCache {
                         continue
                     }
                     let dest = mmap.data.baseAddress!.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
-                    return Data(UnsafeRawBufferPointer(start: dest, count: blockSize))
+                    return Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: dest), count: blockSize, deallocator: .none)
                 }
             }
             return nil
