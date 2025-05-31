@@ -22,6 +22,10 @@ struct AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             return result
         }, callback: callback)
     }
+    
+    func prefetchData(key: UInt64) {
+        cache.prefetch(key: key)
+    }
 }
 
 

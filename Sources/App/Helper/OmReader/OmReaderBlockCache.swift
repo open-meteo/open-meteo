@@ -20,7 +20,13 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicB
     
     
     func prefetchData(offset: Int, count: Int) async throws {
-        // Maybe could prefetch cached blocks as well
+        let blockSize = 65536
+        let dataRange = offset ..< (offset + count)
+        let totalCount = self.backend.count
+        let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
+        for block in blocks {
+            cache.prefetchData(key: cacheKey &+ UInt64(block))
+        }
     }
     
     var count: Int {

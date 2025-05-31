@@ -8,6 +8,7 @@ import Synchronization
 public protocol AtomicBlockCacheStorable: Sendable {
     var count: Int { get }
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R
+    func prefetchData(offset: Int, count: Int)
 }
 
 extension MmapFile: AtomicBlockCacheStorable {
@@ -115,6 +116,30 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     continue // another thread stole the slot
                 }
                 return
+            }
+        }
+    }
+    
+    /// Prefetch data
+    func prefetch(key: UInt64) {
+        let lookAheadCount: UInt64 = 1024
+        let blockCount = blockCount
+        data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            let keyRange = key ..< key + lookAheadCount
+            for slot in keyRange {
+                let slot = slot % UInt64(blockCount)
+                while true {
+                    let entry = entries[Int(slot)].load(ordering: .relaxed)
+                    // check if keys match
+                    // ignore any entries that are being modified right now
+                    guard entry.first == key && entry.second & 0x1 == 1 else {
+                        break
+                    }
+                    let offset = blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot)
+                    data.prefetchData(offset: offset, count: blockSize)
+                    return
+                }
             }
         }
     }

@@ -70,10 +70,6 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
         self.logger = logger
     }
     
-    func getCount() async throws -> UInt64 {
-        return UInt64(count)
-    }
-    
     func prefetchData(offset: Int, count: Int) async throws {
         // nothing do do here
     }
