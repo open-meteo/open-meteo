@@ -32,7 +32,7 @@ extension AtomicBlockCache where Backend == MmapFile {
         if FileManager.default.fileExists(atPath: file) {
             fn = try .openFileReadWrite(file: file)
             guard try fn.seekToEnd() == size else {
-                fatalError()
+                fatalError("Cache file has the wrong size")
             }
         } else {
             fn = try .createNewFile(file: file, size: size, overwrite: false)
@@ -161,10 +161,6 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     guard entry.first == key && entry.second & 0x1 == 1 else {
                         break
                     }
-                    // Get data pointer and execute closure on data
-                    let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
-                    let ret = try fn(UnsafeRawBufferPointer(start: dest, count: blockSize))
-                    
                     // Update last modified timestamp
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
                     let updated = entries[Int(slot)].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
@@ -172,7 +168,11 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                         // Another thread changed the key or started an update
                         continue
                     }
-                    return ret
+                    
+                    // Get data pointer and execute closure on data
+                    // There is a slight chance, that data is modified while reading, but it should practically never happen
+                    let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
+                    return try fn(UnsafeRawBufferPointer(start: dest, count: blockSize))
                 }
             }
             return nil
