@@ -3,16 +3,16 @@ import Foundation
 /**
  Coordinate concurrent requests for the same cache key
  */
-final actor KVCacheCoordinator<Cache: KVCache> {
-    let cache: Cache
-    private var inFlight: [UInt64: [CheckedContinuation<Data, any Error>]] = [:]
+final actor KVCacheCoordinator<Backend: BlockCacheStorable> {
+    let cache: MmapBlockCache<Backend>
+    private var inFlight: [UInt64: [CheckedContinuation<UnsafeRawBufferPointer, any Error>]] = [:]
     
-    init(cache: Cache) {
+    init(cache: MmapBlockCache<Backend>) {
         self.cache = cache
     }
     
-    func get(key: UInt64, fn: @Sendable () async throws -> Data) async throws -> Data {
-        if let value = await cache.get(key: key) {
+    func get<T: ContiguousBytes & Sendable>(key: UInt64, fn: @Sendable () async throws -> T) async throws -> UnsafeRawBufferPointer {
+        if let value = cache.get(key: key) {
             return value
         }
         guard inFlight[key] == nil else {
@@ -25,45 +25,17 @@ final actor KVCacheCoordinator<Cache: KVCache> {
         do {
             print("Getting data for key \(key)")
             let data = try await fn()
-            await cache.set(key: key, value: data)
+            cache.set(key: key, value: data)
+            let result = cache.get(key: key)!
             inFlight.removeValue(forKey: key)?.forEach({
-                $0.resume(with: .success(data))
+                $0.resume(with: .success(result))
             })
-            return data
+            return result
         } catch {
             inFlight.removeValue(forKey: key)?.forEach({
                 $0.resume(with: .failure(error))
             })
             throw error
         }
-    }
-}
-
-/**
- A KV cache should provide those functions
- */
-protocol KVCache: Sendable {
-    func set(key: UInt64, value: Data) async
-    func get(key: UInt64) async -> Data?
-}
-
-/**
- Simple KV cache using a dicttinaty
- */
-final actor SimpleKVCache: KVCache, Sendable {
-    var cache: [UInt64: Data] = [:]
-    
-    func set(key: UInt64, value: Data) {
-        print("Storing \(value.count) bytes in cache for key \(key)")
-        cache[key] = value
-    }
-    
-    func get(key: UInt64) -> Data? {
-        if let value = cache[key] {
-            print("Cache HIT for key \(key)")
-            return value
-        }
-        print("Cache MISS for key \(key)")
-        return nil
     }
 }

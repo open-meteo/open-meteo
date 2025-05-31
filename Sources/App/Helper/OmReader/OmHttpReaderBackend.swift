@@ -2,6 +2,7 @@ import OmFileFormat
 import AsyncHTTPClient
 import Foundation
 import Logging
+import NIO
 
 enum OmHttpReaderBackendError: Error {
     case contentLengthMissing
@@ -33,7 +34,7 @@ extension String {
 /**
  Reader backend to read from an HTTP server on demand. Checks last modified header and ETag.
  */
-final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
+final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
     let client: HTTPClient
     
     /// Size of remote http file
@@ -48,7 +49,7 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
     
     let logger: Logger
     
-    typealias DataType = Data
+    typealias DataType = ByteBuffer
     
     var cacheKey: UInt64 {
         return url.fnv1aHash64 ^ (eTag?.fnv1aHash64 ?? 0) ^ (lastModified?.fnv1aHash64 ?? 0)
@@ -77,7 +78,20 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
         // nothing do do here
     }
     
-    func getData(offset: Int, count: Int) async throws -> Data {
+    func getData(offset: Int, count: Int) async throws -> ByteBuffer {
+        var request = HTTPClientRequest(url: url)
+        if let lastModified {
+            request.headers.add(name: "If-Unmodified-Since", value: lastModified)
+        }
+        if let eTag {
+            request.headers.add(name: "If-Match", value: eTag)
+        }
+        request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
+        let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
+        return try await response.body.collect(upTo: count)
+    }
+    
+    func withData<T>(offset: Int, count: Int, fn: (UnsafeRawPointer) async throws -> T) async throws -> T {
         var request = HTTPClientRequest(url: url)
         if let lastModified {
             request.headers.add(name: "If-Unmodified-Since", value: lastModified)
@@ -88,6 +102,16 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
         let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
         var buffer = try await response.body.collect(upTo: count)
-        return buffer.readData(length: count, byteTransferStrategy: .noCopy)!
+        let ptr = buffer.withUnsafeReadableBytes({return $0})
+        return try await fn(ptr.baseAddress!)
     }
+    
+}
+
+extension ByteBuffer: @retroactive ContiguousBytes {
+    public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
+        try self.withUnsafeReadableBytes(body)
+    }
+    
+    
 }
