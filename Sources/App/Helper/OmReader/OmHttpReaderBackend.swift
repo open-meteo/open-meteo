@@ -91,19 +91,9 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
         return try await response.body.collect(upTo: count)
     }
     
-    func withData<T>(offset: Int, count: Int, fn: (UnsafeRawPointer) async throws -> T) async throws -> T {
-        var request = HTTPClientRequest(url: url)
-        if let lastModified {
-            request.headers.add(name: "If-Unmodified-Since", value: lastModified)
-        }
-        if let eTag {
-            request.headers.add(name: "If-Match", value: eTag)
-        }
-        request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
-        let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
-        var buffer = try await response.body.collect(upTo: count)
-        let ptr = buffer.withUnsafeReadableBytes({return $0})
-        return try await fn(ptr.baseAddress!)
+    func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
+        let buffer = try await getData(offset: offset, count: count)
+        return try buffer.withUnsafeReadableBytes(fn)
     }
     
 }

@@ -32,57 +32,74 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: BlockCa
         return backend.count
     }
     
-    func withData<T>(offset: Int, count: Int, fn: (UnsafeRawPointer) async throws -> T) async throws -> T {
+    func withData<T: Sendable>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
         let blockSize = 65536
         let dataRange = offset ..< (offset + count)
-        let data = UnsafeMutableRawPointer.allocate(byteCount: count, alignment: 1)
-        defer { data.deallocate() }
         let totalCount = self.backend.count
-        // TODO shortcut for single block
-        
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
+        
+        /// Single block read, can directly execute closure on cached data
+        /// No extra allocation
+        if blocks.count == 1 {
+            //print("withData single block")
+            let block = offset / blockSize
+            let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
+            let range = dataRange.intersect(fileTime: blockRange)!
+            return try await cache.with(
+                key: cacheKey &+ UInt64(block),
+                backendFetch: ({
+                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
+            }), callback: ({ ptr in
+                return try fn(UnsafeRawBufferPointer(rebasing: ptr[range.file]))
+            }))
+        }
+        
+        let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
+        defer { data.deallocate() }
+        //print("withData \(blocks.count) blocks")
         for block in blocks {
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
-            let dest = UnsafeMutableRawBufferPointer(start: data.advanced(by: range.array.lowerBound), count: range.array.count)
-            print(range)
+            let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
             try await cache.with(
                 key: cacheKey &+ UInt64(block),
                 backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
             }), callback: ({ ptr in
-                ptr[range.file].copyBytes(to: dest)
+                let _ = ptr[range.file].copyBytes(to: dest)
             }))
         }
-        return try await fn(data)
+        return try fn(UnsafeRawBufferPointer(data))
     }
     
     
     func getData(offset: Int, count: Int) async throws -> Data {
         let blockSize = 65536
         let dataRange = offset ..< (offset + count)
-        var data = Data()
-        data.reserveCapacity(count)
+        let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
+        let dataRet = Data(bytesNoCopy: data.baseAddress!, count: count, deallocator: .free)
         let totalCount = self.backend.count
         // TODO shortcut for single block
         
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
+        //rint("getData \(blocks.count) blocks")
         for block in blocks {
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
-            print(range)
+            let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
             try await cache.with(
                 key: cacheKey &+ UInt64(block),
                 backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
             }), callback: ({ ptr in
                 //data.replaceSubrange(range.array, with: ptr[range.file])
-                let _ = data.withUnsafeMutableBytes { data in
-                    let dest = UnsafeMutableRawBufferPointer(start: data.advanced(by: range.array.lowerBound), count: range.array.count)
-                    return ptr[range.file].copyBytes(to: dest)
-                }
+                let _ = ptr[range.file].copyBytes(to: dest)
             }))
         }
-        return data
+        return dataRet
     }
+}
+
+extension UnsafeMutableRawBufferPointer: @unchecked @retroactive Sendable {
+    
 }

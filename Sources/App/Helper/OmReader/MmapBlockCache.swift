@@ -108,11 +108,11 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
     }
     
     /// Find key in cache and execute a closure on this data. Updates the LRU timestamp. If the data for changed during closure execution of the key was missing, return false
-    func with(key: UInt64, fn: (UnsafeRawBufferPointer) -> ()) -> Bool {
+    func with<R>(key: UInt64, fn: (UnsafeRawBufferPointer) throws -> (R)) rethrows -> R? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
-        return data.withMutableUnsafeBytes { bytes in
+        return try data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
             let hash = key % UInt64(blockCount)
             for slot in hash ..< hash + lookAheadCount {
@@ -126,7 +126,7 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
                     }
                     // Get data pointer and execute closure on data
                     let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
-                    fn(UnsafeRawBufferPointer(start: dest, count: blockSize))
+                    let ret = try fn(UnsafeRawBufferPointer(start: dest, count: blockSize))
                     
                     // Update last modified timestamp
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
@@ -135,20 +135,18 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
                         // Another thread changed the key or started an update
                         continue
                     }
-                    return true
+                    return ret
                 }
             }
-            return false
+            return nil
         }
     }
     
     /// Find key in cache and return a copy of its data
     func get(key: UInt64) -> Data? {
-        var data: Data? = nil
-        let _ = with(key: key) {
-            data = Data($0)
+        return with(key: key) {
+            Data($0)
         }
-        return data
     }
 }
 
