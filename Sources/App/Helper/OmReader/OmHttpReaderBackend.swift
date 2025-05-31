@@ -102,6 +102,4 @@ extension ByteBuffer: @retroactive ContiguousBytes {
     public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         try self.withUnsafeReadableBytes(body)
     }
-    
-    
 }

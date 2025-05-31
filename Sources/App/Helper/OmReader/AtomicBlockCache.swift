@@ -2,20 +2,41 @@ import Foundation
 import OmFileFormat
 import Synchronization
 
-extension MmapFile: @unchecked @retroactive Sendable {
-    
-}
-
-public protocol BlockCacheStorable: Sendable {
+/**
+ Needs to be some kind of writeable memory region
+ */
+public protocol AtomicBlockCacheStorable: Sendable {
     var count: Int { get }
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R
 }
 
-extension MmapFile: BlockCacheStorable {
+extension MmapFile: AtomicBlockCacheStorable {
     public func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
         return try data.withUnsafeBytes {
             return try body(.init(mutating: $0))
         }
+    }
+}
+
+extension DataAsClass: AtomicBlockCacheStorable {
+    public func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
+        try data.withUnsafeMutableBytes(body)
+    }
+}
+
+extension AtomicBlockCache where Backend == MmapFile {
+    init(file: String, blockSize: Int, blockCount: Int) throws {
+        let fn: FileHandle
+        let size = (MemoryLayout<WordPair>.size + blockSize) * blockCount
+        if FileManager.default.fileExists(atPath: file) {
+            fn = try .openFileReadWrite(file: file)
+            guard try fn.seekToEnd() == size else {
+                fatalError()
+            }
+        } else {
+            fn = try .createNewFile(file: file, size: size, overwrite: false)
+        }
+        self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
     }
 }
 
@@ -33,7 +54,7 @@ extension MmapFile: BlockCacheStorable {
  N * 128 bit for keys and timestamps. Timestamp of 0 means empty
  N * M for data
  */
-public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
+public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     let data: Backend
     let blockSize: Int
     
@@ -47,31 +68,29 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
         let inFlightKey = WordPair(first: UInt(key), second: time & ~0x1)
         /// For committed requests set bit 0 to zero
         let committedKey = WordPair(first: UInt(key), second: time | 0x1)
-        /// The maximum number of slots to check for an empty space. Afterwards use LRU
+        /// The maximum number of slots to check for an empty space. Afterwards overwrite LRU value
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
         data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
-            let hash = key % UInt64(blockCount)
-            for slot in hash ..< hash + lookAheadCount {
-                let slot = slot % UInt64(blockCount)
+            let keyRange = key ..< key + lookAheadCount
+            for slot in keyRange {
+                let slot = Int(slot % UInt64(blockCount))
                 while true {
-                    let entry = entries[Int(slot)].load(ordering: .relaxed)
+                    let entry = entries[slot].load(ordering: .relaxed)
                     guard entry.second == 0 || entry.first == key else {
                         break
                     }
-                    guard entries[Int(slot)].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
-                        // another thread stole the slot
-                        continue
+                    guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
+                        continue // another thread stole the slot
                     }
-                    let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
+                    let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                     value.withUnsafeBytes {
                         let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
                         $0.copyBytes(to: destBuffer)
                     }
-                    guard entries[Int(slot)].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
-                        // another thread stole the slot
-                        continue
+                    guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
+                        continue // another thread stole the slot
                     }
                     return
                 }
@@ -79,43 +98,36 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
             // If we are here, no slots were free. Search lowest timestamp and overwrite this slot
             // Remember that other threads might do the same at the same time
             while true {
-                var overwriteEntry = WordPair(first: 0, second: UInt.max)
-                var overwritePos: Int = -1
-                for slot in hash ..< hash + lookAheadCount {
-                    let slot = slot % UInt64(blockCount)
-                    let entry = entries[Int(slot)].load(ordering: .relaxed)
-                    if entry.second < overwriteEntry.second {
-                        overwriteEntry = entry
-                        overwritePos = Int(slot)
-                    }
+                let (slot, entry) = keyRange.reduce((0, WordPair(first: 0, second: UInt.max)), { (compare, slot) in
+                    let slot = Int(slot % UInt64(blockCount))
+                    let entry = entries[slot].load(ordering: .relaxed)
+                    return entry.second < compare.1.second ? (slot,entry) : compare
+                })
+                guard entries[slot].compareExchange(expected: entry, desired: inFlightKey, ordering: .relaxed).exchanged else {
+                    continue // another thread stole the slot
                 }
-                guard entries[overwritePos].compareExchange(expected: overwriteEntry, desired: inFlightKey, ordering: .relaxed).exchanged else {
-                    // another thread stole the slot
-                    continue
-                }
-                let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(overwritePos))
+                let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                 value.withUnsafeBytes {
                     let destBuffer = UnsafeMutableRawBufferPointer(start: UnsafeMutableRawPointer(mutating: dest), count: $0.count)
                     $0.copyBytes(to: destBuffer)
                 }
-                guard entries[overwritePos].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
-                    // another thread stole the slot
-                    continue
+                guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
+                    continue // another thread stole the slot
                 }
                 return
             }
         }
     }
     
-    /// Find key in cache and execute a closure on this data. Updates the LRU timestamp. If the data for changed during closure execution of the key was missing, return false
+    /// Find key in cache and execute a closure on this data. Updates the LRU timestamp. If the data for changed during closure execution of the key was missing, return nil
     func with<R>(key: UInt64, fn: (UnsafeRawBufferPointer) throws -> (R)) rethrows -> R? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
         return try data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
-            let hash = key % UInt64(blockCount)
-            for slot in hash ..< hash + lookAheadCount {
+            let keyRange = key ..< key + lookAheadCount
+            for slot in keyRange {
                 let slot = slot % UInt64(blockCount)
                 while true {
                     let entry = entries[Int(slot)].load(ordering: .relaxed)
@@ -150,25 +162,3 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
     }
 }
 
-
-extension MmapBlockCache where Backend == MmapFile {
-    init(file: String, blockSize: Int, blockCount: Int) throws {
-        let fn: FileHandle
-        let size = (MemoryLayout<WordPair>.size + blockSize) * blockCount
-        if FileManager.default.fileExists(atPath: file) {
-            fn = try .openFileReadWrite(file: file)
-            guard try fn.seekToEnd() == size else {
-                fatalError()
-            }
-        } else {
-            fn = try .createNewFile(file: file, size: size, overwrite: false)
-        }
-        self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
-    }
-}
-
-extension UnsafeRawBufferPointer {
-    var data: Data {
-        return Data(self)
-    }
-}

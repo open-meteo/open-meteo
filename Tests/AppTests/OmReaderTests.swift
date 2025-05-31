@@ -19,7 +19,7 @@ final class OmReaderTests: XCTestCase {
         let file = "cache64k50.bin"
         try FileManager.default.removeItemIfExists(at: file)
         defer { try! FileManager.default.removeItem(atPath: file) }
-        let cache = try MmapBlockCache(file: file, blockSize: 65536, blockCount: 50)
+        let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: readFn.cacheKey)
         let read = try! await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self)!
         let value = try await read.read(range: [250..<251, 420..<421])
@@ -35,18 +35,20 @@ final class OmReaderTests: XCTestCase {
         let file = "cache64k50_2.bin"
         try FileManager.default.removeItemIfExists(at: file)
         defer { try! FileManager.default.removeItem(atPath: file) }
-        let cache = try MmapBlockCache(file: file, blockSize: 65536, blockCount: 50)
+        let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: readFn.cacheKey)
         let read = try await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self, io_size_max: 4096)!
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         XCTAssertEqual(value[123], 1218)
+        
+        print("SECOND read")
+        let value2 = try await read.readConcurrent(range: [0..<257, 511..<513])
+        XCTAssertEqual(value2[123], 1218)
     }
     
     func testKeyValueCache() async throws {
-        let file = "cache.bin"
-        try FileManager.default.removeItemIfExists(at: file)
-        defer { try! FileManager.default.removeItem(atPath: file) }
-        let cache = try MmapBlockCache(file: file, blockSize: 64, blockCount: 50)
+        let data = DataAsClass(data: Data(repeating: 0, count: (64 + 16)*50))
+        let cache = AtomicBlockCache(data: data, blockSize: 64)
         cache.set(key: 234923, value: Data(repeating: 123, count: 64))
         cache.set(key: 234923+50, value: Data(repeating: 142, count: 64))
         XCTAssertEqual(cache.get(key: 234923), Data(repeating: 123, count: 64))

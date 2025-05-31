@@ -2,24 +2,19 @@ import OmFileFormat
 import Foundation
 
 
-/*protocol OmFileReaderBackendAsyncData: OmFileReaderBackendAsync {
-    /// Read data. Must be thread safe!
-    func getData(offset: Int, count: Int) async throws -> Data
-}*/
-
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache
  */
-final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: BlockCacheStorable>: OmFileReaderBackendAsync, Sendable {
+final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicBlockCacheStorable>: OmFileReaderBackendAsync, Sendable {
     let backend: Backend
-    private let cache: KVCacheCoordinator<Cache>
+    private let cache: AtomicCacheCoordinator<Cache>
     let cacheKey: UInt64
     
     typealias DataType = Data
     
-    init(backend: Backend, cache: MmapBlockCache<Cache>, cacheKey: UInt64) {
+    init(backend: Backend, cache: AtomicBlockCache<Cache>, cacheKey: UInt64) {
         self.backend = backend
-        self.cache = KVCacheCoordinator(cache: cache)
+        self.cache = AtomicCacheCoordinator(cache: cache)
         self.cacheKey = cacheKey
     }
     
