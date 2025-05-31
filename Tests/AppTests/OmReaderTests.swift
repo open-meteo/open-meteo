@@ -17,6 +17,7 @@ final class OmReaderTests: XCTestCase {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
         let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
         let file = "cache64k50.bin"
+        //try FileManager.default.removeItemIfExists(at: file)
         //let cache = SimpleKVCache()
         let cache = try MmapBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: readFn.cacheKey)
@@ -41,14 +42,14 @@ final class OmReaderTests: XCTestCase {
         let cache = try MmapBlockCache(file: file, blockSize: 64, blockCount: 50)
         cache.set(key: 234923, value: Data(repeating: 123, count: 64))
         cache.set(key: 234923+50, value: Data(repeating: 142, count: 64))
-        XCTAssertEqual(cache.get(key: 234923)?.data, Data(repeating: 123, count: 64))
-        XCTAssertEqual(cache.get(key: 234923+50)?.data, Data(repeating: 142, count: 64))
+        XCTAssertEqual(cache.get(key: 234923), Data(repeating: 123, count: 64))
+        XCTAssertEqual(cache.get(key: 234923+50), Data(repeating: 142, count: 64))
         
         for i in 0..<50 {
             cache.set(key: UInt64(1000+i), value: Data(repeating: UInt8(123+i), count: 64))
         }
         for i in 0..<50 {
-            XCTAssertEqual(cache.get(key: UInt64(1000+i))?.data, Data(repeating: UInt8(123+i), count: 64))
+            XCTAssertEqual(cache.get(key: UInt64(1000+i)), Data(repeating: UInt8(123+i), count: 64))
         }
         // Cache got overwritten
         XCTAssertNil(cache.get(key: 234923))

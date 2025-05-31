@@ -44,14 +44,15 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: BlockCa
         for block in blocks {
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
-            print(range)
-            let value = try await cache.get(key: cacheKey &+ UInt64(block)) {
-                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }
             let dest = UnsafeMutableRawBufferPointer(start: data.advanced(by: range.array.lowerBound), count: range.array.count)
-            value[range.file].copyBytes(to: dest)
-            // copy data into output data
-            //data[range.array] = value[range.file]
+            print(range)
+            try await cache.with(
+                key: cacheKey &+ UInt64(block),
+                backendFetch: ({
+                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
+            }), callback: ({ ptr in
+                ptr[range.file].copyBytes(to: dest)
+            }))
         }
         return try await fn(data)
     }
@@ -70,15 +71,17 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: BlockCa
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
             print(range)
-            let value = try await cache.get(key: cacheKey &+ UInt64(block)) {
+            try await cache.with(
+                key: cacheKey &+ UInt64(block),
+                backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }
-            // copy data into output data
-            //data[range.array] = value[range.file]
-            let _ = data.withUnsafeMutableBytes { data in
-                let dest = UnsafeMutableRawBufferPointer(start: data.advanced(by: range.array.lowerBound), count: range.array.count)
-                return value[range.file].copyBytes(to: dest)
-            }
+            }), callback: ({ ptr in
+                //data.replaceSubrange(range.array, with: ptr[range.file])
+                let _ = data.withUnsafeMutableBytes { data in
+                    let dest = UnsafeMutableRawBufferPointer(start: data.advanced(by: range.array.lowerBound), count: range.array.count)
+                    return ptr[range.file].copyBytes(to: dest)
+                }
+            }))
         }
         return data
     }
