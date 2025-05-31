@@ -19,7 +19,7 @@ public extension Float {
 
 extension Int {
     /// Integer division, but round up instead of floor
-    func divideRoundedUp(divisor: Int) -> Int {
+    @inlinable func divideRoundedUp(divisor: Int) -> Int {
         return (self + divisor - 1) / divisor
     }
 
