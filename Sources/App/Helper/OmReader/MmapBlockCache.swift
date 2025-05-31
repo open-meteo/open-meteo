@@ -7,6 +7,7 @@ extension MmapFile: @unchecked @retroactive Sendable {
 }
 
 public protocol BlockCacheStorable: Sendable {
+    var count: Int { get }
     func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R
     func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R
 }
@@ -37,19 +38,23 @@ extension MmapFile: BlockCacheStorable {
  N * M for data
  */
 public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
-    let mmap: Backend
+    let data: Backend
     let blockSize: Int
-    let blockCount: Int
+    
+    var blockCount: Int {
+        return data.count / (blockSize + MemoryLayout<WordPair>.size)
+    }
     
     func set<DataIn: ContiguousBytes & Sendable>(key: UInt64, value: DataIn) {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         /// For in-flight requests set bit 0 to zero
-        let inFlightKey = WordPair(first: UInt(key), second: time & 0xFFFFFFFFFFFFFFFE)
+        let inFlightKey = WordPair(first: UInt(key), second: time & ~0x1)
         /// For committed requests set bit 0 to zero
         let committedKey = WordPair(first: UInt(key), second: time | 0x1)
         /// The maximum number of slots to check for an empty space. Afterwards use LRU
         let lookAheadCount: UInt64 = 1024
-        mmap.withUnsafeBytes { bytes in
+        let blockCount = blockCount
+        data.withUnsafeBytes { bytes in
             bytes.withMemoryRebound(to: Atomic<WordPair>.self) { entries in
                 let hash = key % UInt64(blockCount)
                 for slot in hash ..< hash + lookAheadCount {
@@ -111,7 +116,8 @@ public struct MmapBlockCache<Backend: BlockCacheStorable>: Sendable {
     func get(key: UInt64) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
-        return mmap.withUnsafeBytes { bytes in
+        let blockCount = blockCount
+        return data.withUnsafeBytes { bytes in
             return bytes.withMemoryRebound(to: Atomic<WordPair>.self) { entries in
                 let hash = key % UInt64(blockCount)
                 for slot in hash ..< hash + lookAheadCount {
@@ -151,7 +157,7 @@ extension MmapBlockCache where Backend == MmapFile {
         } else {
             fn = try .createNewFile(file: file, size: size, overwrite: false)
         }
-        self = .init(mmap: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize, blockCount: blockCount)
+        self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
     }
 }
 
