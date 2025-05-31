@@ -7,16 +7,27 @@ enum OmHttpReaderBackendError: Error {
     case contentLengthMissing
 }
 
-func fnv1aHash64(_ string: String) -> UInt64 {
-    let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
-    let fnvPrime: UInt64 = 0x100000001b3
-
-    var hash = fnvOffsetBasis
-    for byte in string.utf8 {
-        hash ^= UInt64(byte)
-        hash = hash &* fnvPrime
+extension String {
+    /// Get FNV hash of the string
+    var fnv1aHash64: UInt64 {
+        let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
+        let fnvPrime: UInt64 = 0x100000001b3
+        return self.withContiguousStorageIfAvailable { ptr in
+            var hash = fnvOffsetBasis
+            for byte in UnsafeRawBufferPointer(ptr) {
+                hash ^= UInt64(byte)
+                hash = hash &* fnvPrime
+            }
+            return hash
+        } ?? {
+            var hash = fnvOffsetBasis
+            for byte in self.utf8 {
+                hash ^= UInt64(byte)
+                hash = hash &* fnvPrime
+            }
+            return hash
+        }()
     }
-    return hash
 }
 
 /**
@@ -40,7 +51,7 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsyncData, Sendable {
     typealias DataType = Data
     
     var cacheKey: UInt64 {
-        return fnv1aHash64(url) &+ (eTag.map(fnv1aHash64) ?? 0) &+ (lastModified.map(fnv1aHash64) ?? 0)
+        return url.fnv1aHash64 ^ (eTag?.fnv1aHash64 ?? 0) ^ (lastModified?.fnv1aHash64 ?? 0)
     }
     
     init(client: HTTPClient, logger: Logger, url: String) async throws {
