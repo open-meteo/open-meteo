@@ -142,10 +142,15 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            if let offsets = indexTime.intersect(fileTime: fileTime),
-               let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) {
-                try omFile.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
-                start = fileTime.upperBound
+            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            if let offsets = indexTime.intersect(fileTime: fileTime) {
+                try await RemoteOmFileManager.instance.with(file: file, client: time.httpClient, logger: time.logger) { reader in
+                    guard let reader = reader.asArray(of: Float.self, io_size_max: 65536, io_size_merge: 512) else {
+                        return
+                    }
+                    try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                    start = fileTime.upperBound
+                }
             }
         }
 
@@ -160,11 +165,14 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
-                    continue
+                let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+                try await RemoteOmFileManager.instance.with(file: file, client: time.httpClient, logger: time.logger) { reader in
+                    guard let reader = reader.asArray(of: Float.self, io_size_max: 65536, io_size_merge: 512) else {
+                        return
+                    }
+                    try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
+                    start = fileTime.upperBound
                 }
-                try omFile.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
-                start = fileTime.upperBound
             }
         }
         let delta = start - indexTime.lowerBound
@@ -177,10 +185,13 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            guard let omFile = try OmFileManager.get(.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)) else {
-                continue
+            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            try await RemoteOmFileManager.instance.with(file: file, client: time.httpClient, logger: time.logger) { reader in
+                guard let reader = reader.asArray(of: Float.self, io_size_max: 65536, io_size_merge: 512) else {
+                    return
+                }
+                try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }
-            try omFile.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
         }
         return out
     }
@@ -523,5 +534,148 @@ extension OmFileSplitter {
 extension Range where Bound == Int {
     func toUInt64() -> Range<UInt64> {
         .init(uncheckedBounds: (UInt64(lowerBound), UInt64(upperBound)))
+    }
+}
+
+
+
+
+
+
+
+extension OmFileReaderAsyncArrayProtocol where OmType == Float {
+    /// Read data from file. Switch between old legacy files and new multi dimensional files.
+    /// Note: `nTime` is the output array nTime. It is not the file nTime!
+    /// TODO: nMembers variable is wrong if called via API controller. Aways 1
+    func read3D(into: inout [Float], ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) async throws {
+        let dimensions = self.getDimensions()
+        switch dimensions.count {
+        case 2:
+            // Legacy files use 2 dimensions and flatten XY coordinates
+            let dim0 = Int(dimensions[0])
+            // let dim1 = Int(dimensions[1])
+            guard dim0 % (nx * ny) == 0 else {
+                return // in case dimensions got change and do not agree anymore, ignore this file
+            }
+            /// Even worse, they also flatten `levels` dimensions which is used for ensemble files
+            let nLevels = dim0 / (nx * ny)
+            if nLevels > 1 && location.count > 1 {
+                fatalError("Multi level and multi location not supported")
+            }
+            guard level < nLevels else {
+                return
+            }
+            let nLocations = UInt64(location.count)
+            let dim0Range = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
+            try await read(
+                into: &into,
+                range: [dim0Range.toUInt64(), timeOffsets.file.toUInt64()],
+                intoCubeOffset: [0, UInt64(timeOffsets.array.lowerBound)],
+                intoCubeDimension: [nLocations, UInt64(nTime)]
+            )
+        case 3:
+            // File uses dimensions [ny,nx,ntime]
+            guard ny == dimensions[0], nx == dimensions[1] else {
+                return
+            }
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound - 1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
+            let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
+            let range = [y, x, fileTime]
+            do {
+                try await read(
+                    into: &into,
+                    range: range,
+                    intoCubeOffset: [0, 0, UInt64(timeOffsets.array.lowerBound)],
+                    intoCubeDimension: [UInt64(y.count), UInt64(x.count), UInt64(nTime)]
+                )
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
+        case 4:
+            // File uses dimensions [ny,nx,nLevel,ntime]
+            // print("4D \(dimensions.map{Int($0)}) ny\(ny) nx\(nx) nMembers\(nMembers) l\(level)")
+            guard ny == dimensions[0], nx == dimensions[1], level < dimensions[2] else {
+                return
+            }
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound - 1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
+            let l = UInt64(level) ..< UInt64(level + 1)
+            let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
+            let range = [y, x, l, fileTime]
+            do {
+                try await read(
+                    into: &into,
+                    range: range,
+                    intoCubeOffset: [0, 0, 0, UInt64(timeOffsets.array.lowerBound)],
+                    intoCubeDimension: [UInt64(y.count), UInt64(x.count), 1, UInt64(nTime)]
+                )
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
+        default:
+            fatalError("ndims not implemented")
+        }
+    }
+
+    /// Prefetch data for fast access. Switch between old legacy files and new multi dimensional files
+    /// Note: `nTime` is the output array nTime. It is not the file nTime!
+    /// /// TODO: nMembers variable is wrong if called via API controller. Aways 1
+    func willNeed3D(ny: Int, nx: Int, nTime: Int, nMembers: Int, location: Range<Int>, level: Int, timeOffsets: (file: CountableRange<Int>, array: CountableRange<Int>)) async throws {
+        let dimensions = self.getDimensions()
+        switch dimensions.count {
+        case 2:
+            // Legacy files use 2 dimensions and flatten XY coordinates
+            let dim0 = Int(dimensions[0])
+            // let dim1 = Int(dimensions[1])
+            guard dim0 % (nx * ny) == 0 else {
+                return // in case dimensions got change and do not agree anymore, ignore this file
+            }
+            /// Even worse, they also flatten `levels` dimensions which is used for ensemble files
+            let nLevels = dim0 / (nx * ny)
+            if nLevels > 1 && location.count > 1 {
+                fatalError("Multi level and multi location not supported")
+            }
+            guard level < nLevels else {
+                return
+            }
+            let dim0Range = location.lowerBound * nLevels + level ..< location.lowerBound * nLevels + level + location.count
+            try await willNeed(range: [dim0Range.toUInt64(), timeOffsets.file.toUInt64()])
+        case 3:
+            // File uses dimensions [ny,nx,ntime]
+            guard ny == dimensions[0], nx == dimensions[1] else {
+                return
+            }
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound - 1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
+            let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
+            let range = [y, x, fileTime]
+            do {
+                try await willNeed(range: range)
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
+        case 4:
+            // File uses dimensions [ny,nx,nLevel,ntime]
+            guard ny == dimensions[0], nx == dimensions[1], level < dimensions[2] else {
+                return
+            }
+            let x = UInt64(location.lowerBound % nx) ..< UInt64((location.upperBound - 1) % nx) + 1
+            let y = UInt64(location.lowerBound / nx) ..< UInt64(location.lowerBound / nx + 1)
+            let l = UInt64(level) ..< UInt64(level + 1)
+            let fileTime = UInt64(timeOffsets.file.lowerBound) ..< UInt64(timeOffsets.file.upperBound)
+            let range = [y, x, l, fileTime]
+            do {
+                try await willNeed(range: range)
+            } catch OmFileFormatSwiftError.omDecoder(let error) {
+                print("\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+                throw OmFileFormatSwiftError.omDecoder(error: "\(error) range=\(range) [ny=\(ny) nx=\(nx) nTime=\(nTime) location=\(location) nMembers=\(nMembers) level=\(level) timeOffsets=\(timeOffsets)]")
+            }
+        default:
+            fatalError("ndims not implemented")
+        }
     }
 }

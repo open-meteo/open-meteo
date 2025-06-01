@@ -33,7 +33,7 @@ final class RemoteOmFileManager: Sendable {
         }
         do {
             return try await fn(reader)
-        } catch CurlError.fileModifiedSinceLastDownload {
+        } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
             guard let reader = try await get(file: file, client: client, logger: logger, forceNew: true) else {
                 return nil
             }
@@ -197,9 +197,10 @@ final actor RemoteOmFileManagerCache {
             
             // Revalidate remote files every 3 minutes
             // File may got added, modified or removed
-            if OpenMeteo.remoteDataDirectory != nil, entry.lastValidated < revalidateAfter {
+            if let remoteDirectory = OpenMeteo.remoteDataDirectory, entry.lastValidated < revalidateAfter {
                 entry.lastValidated = .now()
-                if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: key.getFilePath()) {
+                let remoteFile = "\(remoteDirectory)\(key.getRelativeFilePath())"
+                if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
                     if case .remote(let old) = entry.value {
                         guard old.cacheKey != new.cacheKey else {
                             continue // do not update if the existing entry is the same

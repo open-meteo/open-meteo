@@ -18,12 +18,8 @@ enum CurlError: Error {
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
     case couldNotGetContentLengthForConcurrentDownload
-    case fileModifiedSinceLastDownload
 }
 
-enum CurlErrorNonRetry: NonRetryError {
-    case unauthorized
-}
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
 final class Curl: Sendable {

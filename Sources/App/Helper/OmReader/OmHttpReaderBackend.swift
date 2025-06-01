@@ -61,7 +61,7 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
         headRequest.method = .HEAD
         do {
             logger.debug("Sending HEAD requests to \(url)")
-            let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5))
+            let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5), timeoutPerRequest: .seconds(1), backoffFactor: .milliseconds(500))
             guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
                 throw OmHttpReaderBackendError.contentLengthMissing
             }
