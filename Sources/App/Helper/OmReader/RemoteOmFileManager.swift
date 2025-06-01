@@ -100,12 +100,12 @@ final actor RemoteOmFileManagerCache {
     
     final class Entry {
         var value: Value
-        var created: Timestamp
+        var lastValidated: Timestamp
         var lastAccessed: Timestamp
         
-        init(value: Value, created: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
+        init(value: Value, lastValidated: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
             self.value = value
-            self.created = created
+            self.lastValidated = lastValidated
             self.lastAccessed = lastAccessed
         }
     }
@@ -197,12 +197,20 @@ final actor RemoteOmFileManagerCache {
             
             // Revalidate remote files every 3 minutes
             // File may got added, modified or removed
-            if entry.created < revalidateAfter, case .remote(let remote) = entry.value {
-                let new = try await OmHttpReaderBackend(client: client, logger: logger, url: key.getFilePath())
-                if new != remote {
-                    entry.value = new.map {.remote($0)} ?? nil
+            if OpenMeteo.remoteDataDirectory != nil, entry.lastValidated < revalidateAfter {
+                entry.lastValidated = .now()
+                if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: key.getFilePath()) {
+                    if case .remote(let old) = entry.value {
+                        guard old.cacheKey != new.cacheKey else {
+                            continue // do not update if the existing entry is the same
+                        }
+                        entry.value = .remote(new)
+                    } else {
+                        entry.value = .remote(new)
+                    }
+                } else {
+                    entry.value = nil
                 }
-                entry.created = .now()
             }
         }
     }
