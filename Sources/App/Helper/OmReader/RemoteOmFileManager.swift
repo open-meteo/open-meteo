@@ -1,38 +1,24 @@
 import OmFileFormat
 import Vapor
 
-/*protocol OmFileReaderAsyncProvider {
-    func asArray<OmType: OmFileArrayDataTypeProtocol>(of: OmType.Type, io_size_max: UInt64, io_size_merge: UInt64) -> any OmFileReaderAsyncArrayProvider
-}
-
-protocol OmFileReaderAsyncArrayProvider {
-    associatedtype OmType: OmFileArrayDataTypeProtocol
-    
-    func willNeed(range: [Range<UInt64>]?) async throws
-    func read(into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]?, intoCubeDimension: [UInt64]?) async throws
-}
-
-extension OmFileReaderAsync: OmFileReaderAsyncProvider {
-    func asArray<OmType>(of: OmType.Type, io_size_max: UInt64, io_size_merge: UInt64) -> any OmFileReaderAsyncArrayProvider where OmType : OmFileFormat.OmFileArrayDataTypeProtocol {
-        return self.asArray(of: of, io_size_max: io_size_max, io_size_merge: io_size_merge)
-    }
-}
-extension OmFileReaderAsyncArray: OmFileReaderAsyncArrayProvider {
-    func read(into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]?, intoCubeDimension: [UInt64]?) async throws {
-        return try await self.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
-    }
-}*/
 
 /**
- Keep track of remote files.
- Store 404 state
- Keep files open
- Reload files on read/willNeed if remote file was modified, retry with new file
- Background check if remote file was modified (every x seconds)
+ Keep track of local and remote OM files. If a OM file is locally available, use it, otherwise check a remote http endpoint.
  
- Old file validation:
- - background task every 10 seconds + replace existing -> never ending flood of requests. Last accessed timestamp + evict after 10 minutes?
- - after x seconds do refresh on request -> random latency + needs isolation
+ Local files use mmap to read data. This should only be used for fast storage. Access to mmap data is synchronous, but uses madvice for better prefetching
+ 
+ Remote files use HTTP Range requests to get data in chunks of 64kb. Requests to the same 64kb data block are serialised and queued.
+ Data blocks are cached in a local cache file. The cache file uses mmap and should reside on a fast local disk.
+ The mmap cache uses fixed blocks of 64kb and stores meta data using atomic double word operations. Cache can be reused after restart.
+ 
+ Files are checked for deletion, modification or addition periodically in the background:
+ - Local files are checked every 10 seconds
+ - Remote files are checked every 3 minutes
+ - All files are evicted from cache after 15 minutes of inactivity
+ 
+ TODO:
+ - Support multiple cache files. Could be useful if multiple NVMe drive are available for caching
+ - Support cache tiering for HDD + NVME cache
  */
 final class RemoteOmFileManager: Sendable {
     public static let instance = RemoteOmFileManager()
@@ -40,40 +26,68 @@ final class RemoteOmFileManager: Sendable {
     /// Isolate requests to files
     let cache = RemoteOmFileManagerCache()
     
-    func get(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> OmFileReaderAsync<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>>? {
+    /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
+    func with<R>(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, fn: (any OmFileReaderAsyncProtocol) async throws -> R) async throws -> R? {
+        guard let reader = try await get(file: file, client: client, logger: logger, forceNew: false) else {
+            return nil
+        }
+        do {
+            return try await fn(reader)
+        } catch CurlError.fileModifiedSinceLastDownload {
+            guard let reader = try await get(file: file, client: client, logger: logger, forceNew: true) else {
+                return nil
+            }
+            return try await fn(reader)
+        }
+    }
+    
+    /// Check if the file is available locally or remotely. `with<R>()` is recommended
+    /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
+    func get(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> (any OmFileReaderAsyncProtocol)? {
         guard let backend = try await cache.get(key: file, forceNew: forceNew, provider: {
-            try await OmHttpReaderBackend(client: client, logger: logger, url: file.getFilePath())
+            return try await file.asOmFileLocalOrRemote(client: client, logger: logger)
         }) else {
             return nil
         }
-        let cacheFn = OmReaderBlockCache(backend: backend, cache: OpenMeteo.dataBlockCache!, cacheKey: backend.cacheKey)
-        return try await OmFileReaderAsync(fn: cacheFn)
-    }
-    
-    public func willNeed(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, range: [Range<UInt64>]? = nil) async throws {
-        do {
-            let read = try await get(file: file, client: client, logger: logger)!.asArray(of: Float.self)!
-            try await read.willNeed(range: range)
-        } catch CurlError.fileModifiedSinceLastDownload {
-            let read = try await get(file: file, client: client, logger: logger, forceNew: true)!.asArray(of: Float.self)!
-            try await read.willNeed(range: range)
-        }
-    }
-    
-    public func read(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]? = nil, intoCubeDimension: [UInt64]? = nil) async throws {
-        do {
-            let read = try await get(file: file, client: client, logger: logger)!.asArray(of: Float.self)!
-            try await read.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
-        } catch CurlError.fileModifiedSinceLastDownload {
-            // File was modified on the remote server
-            let read = try await get(file: file, client: client, logger: logger, forceNew: true)!.asArray(of: Float.self)!
-            try await read.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
-        }
+        return try await backend.toReader()
     }
     
     /// Called every 10 seconds from a life cycle handler on an available thread
-    @Sendable func backgroundTask(application: Application) async throws {
+    func backgroundTask(application: Application) async throws {
         try await cache.revalidate(client: application.http.client.shared, logger: application.logger)
+    }
+}
+
+enum OmFileLocalOrRemote {
+    case local(MmapFile)
+    case remote(OmHttpReaderBackend)
+    
+    func toReader() async throws -> any OmFileReaderAsyncProtocol {
+        switch self {
+        case .local(let local):
+            return try await OmFileReaderAsync(fn: local)
+        case .remote(let remote):
+            let cacheFn = OmReaderBlockCache(backend: remote, cache: OpenMeteo.dataBlockCache, cacheKey: remote.cacheKey)
+            return try await OmFileReaderAsync(fn: cacheFn)
+        }
+    }
+}
+
+extension OmFileManagerReadable {
+    func asOmFileLocalOrRemote(client: HTTPClient, logger: Logger) async throws -> OmFileLocalOrRemote? {
+        let file = self.getRelativeFilePath()
+        let localFile = "\(OpenMeteo.dataDirectory)\(file)"
+        
+        if FileManager.default.fileExists(atPath: localFile) {
+            return .local(try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly))
+        }
+        if let remoteDirectory = OpenMeteo.remoteDataDirectory {
+            let remoteFile = "\(remoteDirectory)\(file)"
+            if let remote = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
+                return .remote(remote)
+            }
+        }
+        return nil
     }
 }
 
@@ -82,14 +96,14 @@ final class RemoteOmFileManager: Sendable {
  */
 final actor RemoteOmFileManagerCache {
     typealias Key = OmFileManagerReadable
-    typealias Value = OmHttpReaderBackend?
+    typealias Value = OmFileLocalOrRemote?
     
     final class Entry {
         var value: Value
         var created: Timestamp
         var lastAccessed: Timestamp
         
-        init(value: OmHttpReaderBackend?, created: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
+        init(value: Value, created: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
             self.value = value
             self.created = created
             self.lastAccessed = lastAccessed
@@ -163,16 +177,32 @@ final actor RemoteOmFileManagerCache {
             guard case .cached(let entry) = state else {
                 continue
             }
+            // Evict unused entries after 15 minutes
             if entry.lastAccessed < removeLastAccessedThan {
-                /// Evict unused entries
                 cache.removeValue(forKey: key)
                 continue
             }
-            if entry.created < revalidateAfter {
+            
+            // Always check if local files got deleted or overwritten
+            if case .local(let local) = entry.value, local.file.wasDeleted() {
+                cache.removeValue(forKey: key)
+                continue
+            }
+            
+            // Always check if a local file is now available
+            if entry.value == nil, FileManager.default.fileExists(atPath: key.getFilePath()) {
+                cache.removeValue(forKey: key)
+                continue
+            }
+            
+            // Revalidate remote files every 3 minutes
+            // File may got added, modified or removed
+            if entry.created < revalidateAfter, case .remote(let remote) = entry.value {
                 let new = try await OmHttpReaderBackend(client: client, logger: logger, url: key.getFilePath())
-                if new != entry.value {
-                    entry.value = new
+                if new != remote {
+                    entry.value = new.map {.remote($0)} ?? nil
                 }
+                entry.created = .now()
             }
         }
     }

@@ -5,7 +5,7 @@ import Foundation
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache
  */
-final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicBlockCacheStorable>: OmFileReaderBackendAsync, Sendable {
+struct OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicBlockCacheStorable>: OmFileReaderBackendAsync, Sendable {
     let backend: Backend
     private let cache: AtomicCacheCoordinator<Cache>
     let cacheKey: UInt64

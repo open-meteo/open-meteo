@@ -14,13 +14,25 @@ enum OpenMeteo {
         return  "./data/"
     }()
     
-    static let dataBlockCache: AtomicCacheCoordinator<MmapFile>? = { () -> AtomicCacheCoordinator<MmapFile>? in
-        guard let cacheFile = Environment.get("CACHE_FILE") else {
-            return nil
+    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
+    static let remoteDataDirectory: String? = {
+        if let dir = Environment.get("REMOTE_DATA_DIRECTORY") {
+            guard dir.starts(with: "http") else {
+                fatalError("REMOTE_DATA_DIRECTORY must start with 'http'")
+            }
+            guard dir.last == "/" else {
+                fatalError("REMOTE_DATA_DIRECTORY must end with a trailing slash")
+            }
+            return dir
         }
-        guard let cacheDirectory = Environment.get("CACHE_SIZE") else {
+        return nil
+    }()
+    
+    static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
+        let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
+        /*guard let cacheDirectory = Environment.get("CACHE_SIZE") else {
             return nil
-        }
+        }*/
         return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: 65536, blockCount: 50))
     }()
     

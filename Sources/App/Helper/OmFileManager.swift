@@ -20,8 +20,9 @@ enum OmFileManagerReadable: Hashable {
     func getFilePath() -> String {
         return "\(OpenMeteo.dataDirectory)\(getRelativeFilePath())"
     }
-
-    private func getRelativeFilePath() -> String {
+    
+    /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
+    func getRelativeFilePath() -> String {
         switch self {
         case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
             let ensembleMember = ensembleMember > 0 ? "_member\(ensembleMember.zeroPadded(len: 2))" : ""
