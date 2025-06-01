@@ -7,10 +7,10 @@ protocol GenericReaderDerived: GenericReaderProtocol {
 
     var reader: ReaderNext { get }
 
-    func get(derived: Derived, time: TimerangeDtAndSettings) throws -> DataAndUnit
+    func get(derived: Derived, time: TimerangeDtAndSettings) async throws -> DataAndUnit
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws
 
-    func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit
+    func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
     func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws
 }
 
@@ -78,12 +78,12 @@ extension GenericReaderDerived {
         }
     }
 
-    func get(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
         case .raw(let raw):
-            return try get(raw: raw, time: time)
+            return try await get(raw: raw, time: time)
         case .derived(let derived):
-            return try get(derived: derived, time: time)
+            return try await get(derived: derived, time: time)
         }
     }
 
@@ -103,8 +103,8 @@ protocol GenericReaderDerivedSimple: GenericReaderDerived {
 }
 
 extension GenericReaderDerivedSimple {
-    func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        try reader.get(variable: raw, time: time)
+    func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        try await reader.get(variable: raw, time: time)
     }
 
     func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws {

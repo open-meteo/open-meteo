@@ -66,14 +66,14 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         }
     }
 
-    func get(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit? {
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var data: [Float]?
         var unit: SiUnit?
         if variable.requiresOffsetCorrectionForMixing {
             for r in reader.reversed() {
-                guard let d = try r.get(mixed: variable.rawValue, time: time) else {
+                guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
                     continue
                 }
                 if data == nil {
@@ -94,7 +94,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         } else {
             // default case, just place new data in 1:1
             for r in reader.reversed() {
-                guard let d = try r.get(mixed: variable.rawValue, time: time) else {
+                guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
                     continue
                 }
                 if data == nil {
@@ -118,11 +118,11 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
 
 /// Conditional conformace just use RawValue (String) to resolve `ForecastVariable` to a specific type
 extension GenericReaderProtocol {
-    func get(mixed: String, time: TimerangeDtAndSettings) throws -> DataAndUnit? {
+    func get(mixed: String, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         guard let v = MixingVar(rawValue: mixed) else {
             return nil
         }
-        return try self.get(variable: v, time: time)
+        return try await self.get(variable: v, time: time)
     }
 
     func prefetchData(mixed: String, time: TimerangeDtAndSettings) throws -> Bool {

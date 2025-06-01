@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import Vapor
 
 /// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
 protocol GenericReaderProtocol {
@@ -11,7 +12,7 @@ protocol GenericReaderProtocol {
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
 
-    func get(variable: MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit
+    func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
     func getStatic(type: ReaderStaticVariable) throws -> Float?
     func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) throws
 }
@@ -19,7 +20,7 @@ protocol GenericReaderProtocol {
 /**
  Each call to `get` or `prefetch` is acompanied by time, ensemble member and previous day information
  */
-struct TimerangeDtAndSettings: Hashable {
+struct TimerangeDtAndSettings: Hashable  {
     let time: TimerangeDt
     /// Member stored in separate files
     let ensembleMember: Int
@@ -27,6 +28,22 @@ struct TimerangeDtAndSettings: Hashable {
     let ensembleMemberLevel: Int
 
     let previousDay: Int
+    
+    let logger: Logger
+    
+    let httpClient: HTTPClient
+    
+    
+    static func == (lhs: TimerangeDtAndSettings, rhs: TimerangeDtAndSettings) -> Bool {
+        return lhs.hashValue == rhs.hashValue
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(time)
+        hasher.combine(ensembleMember)
+        hasher.combine(ensembleMemberLevel)
+        hasher.combine(previousDay)
+    }
 
     var dtSeconds: Int {
         time.dtSeconds
@@ -37,21 +54,21 @@ struct TimerangeDtAndSettings: Hashable {
     }
 
     func with(start: Timestamp) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, logger: logger, httpClient: httpClient)
     }
 
     func with(time: TimerangeDt? = nil, ensembleMember: Int? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, logger: logger, httpClient: httpClient)
     }
 
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, logger: logger, httpClient: httpClient)
     }
 }
 
 extension TimerangeDt {
-    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0)
+    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil, logger: Logger = .init(label: ""), httpClient: HTTPClient = .shared) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0, logger: logger, httpClient: httpClient)
     }
 }
 
@@ -138,8 +155,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Read and scale if required
-    private func readAndScale(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        var data = try omFileSplitter.read(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time)
+    private func readAndScale(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        var data = try await omFileSplitter.read(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time)
 
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {
@@ -156,29 +173,29 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Read data and interpolate if required
-    func readAndInterpolate(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func readAndInterpolate(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
-            return try readAndScale(variable: variable, time: time)
+            return try await readAndScale(variable: variable, time: time)
         }
         let interpolationType = variable.interpolation
 
         if time.dtSeconds > domain.dtSeconds {
             // Aggregate data
             let timeRead = time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
-            let read = try readAndScale(variable: variable, time: time.with(time: timeRead))
+            let read = try await readAndScale(variable: variable, time: time.with(time: timeRead))
             let aggregated = read.data.aggregate(type: interpolationType, timeOld: timeRead, timeNew: time.time)
             return DataAndUnit(aggregated, read.unit)
         }
 
         // Interpolate data
         let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
-        let read = try readAndScale(variable: variable, time: time.with(time: timeLow))
+        let read = try await readAndScale(variable: variable, time: time.with(time: timeLow))
         let interpolated = read.data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
         return DataAndUnit(interpolated, read.unit)
     }
 
-    func get(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        return try readAndInterpolate(variable: variable, time: time)
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        return try await readAndInterpolate(variable: variable, time: time)
     }
 
     func getStatic(type: ReaderStaticVariable) throws -> Float? {

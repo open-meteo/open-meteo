@@ -49,9 +49,9 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         }
     }
 
-    func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        let data = try (0..<51).map({
-            try reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
+    func get(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        let data = try await (0..<51).asyncMap({
+            try await reader.get(variable: .river_discharge, time: time.with(ensembleMember: $0)).data
         })
         if data[0].onlyNaN() {
             return DataAndUnit(data[0], .cubicMetrePerSecond)
@@ -129,17 +129,17 @@ struct GloFasController {
                         current: nil,
                         hourly: nil,
                         daily: {
-                            return ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
+                            return await ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.asyncMap { variable in
                                 switch variable {
                                 case .raw:
-                                    let d = try (params.ensemble ? (0..<51) : (0..<1)).map { member -> ApiArray in
-                                        let d = try reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                                    let d = try await (params.ensemble ? (0..<51) : (0..<1)).asyncMap { member -> ApiArray in
+                                        let d = try await reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
                                         assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                         return ApiArray.float(d.data)
                                     }
                                     return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
                                 case .derived(let derived):
-                                    let d = try reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                                    let d = try await reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
                                     assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                     return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
                                 }

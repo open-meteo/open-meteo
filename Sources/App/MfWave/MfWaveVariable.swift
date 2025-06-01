@@ -172,24 +172,24 @@ struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
 
     let reader: GenericReaderCached<MfWaveDomain, Variable>
 
-    func get(raw: MfCurrentVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        return try reader.get(variable: raw, time: time)
+    func get(raw: MfCurrentVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        return try await reader.get(variable: raw, time: time)
     }
 
     func prefetchData(raw: MfCurrentVariable, time: TimerangeDtAndSettings) throws {
         try reader.prefetchData(variable: raw, time: time)
     }
 
-    func get(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch derived {
         case .ocean_current_velocity:
-            let u = try get(raw: .ocean_u_current, time: time).data
-            let v = try get(raw: .ocean_v_current, time: time).data
+            let u = try await get(raw: .ocean_u_current, time: time).data
+            let v = try await get(raw: .ocean_v_current, time: time).data
             let speed = zip(u, v).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .ocean_current_direction:
-            let u = try get(raw: .ocean_u_current, time: time).data
-            let v = try get(raw: .ocean_v_current, time: time).data
+            let u = try await get(raw: .ocean_u_current, time: time).data
+            let v = try await get(raw: .ocean_v_current, time: time).data
             let direction = Meteorology.windirectionFast(u: u, v: v).map {
                 ($0 + 180).truncatingRemainder(dividingBy: 360)
             }
@@ -237,8 +237,8 @@ struct MfWaveReader: GenericReaderProtocol {
         return try reader.getStatic(type: type)
     }
 
-    func get(variable: MfWaveVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        let data = try reader.get(variable: variable, time: time)
+    func get(variable: MfWaveVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        let data = try await reader.get(variable: variable, time: time)
         switch variable {
         case .wave_direction, .wind_wave_direction, .swell_wave_direction:
             let direction = data.data.map {

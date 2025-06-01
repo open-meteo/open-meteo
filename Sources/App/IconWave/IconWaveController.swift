@@ -139,14 +139,14 @@ struct IconWaveController {
             let nParamsMinutely = paramsMinutely?.count ?? 0
             let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, { $0 + $1.countEnsembleMember })
 
-            let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try prepared.map { prepared in
+            let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92, forecastDaysMinutely15Default: 7)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
 
-                let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try domains.compactMap { domain in
+                let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try await domains.asyncCompactMap { domain in
                     guard let reader = try GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: params.readerOptions) else {
                         return nil
                     }
@@ -176,8 +176,8 @@ struct IconWaveController {
                         },
                         current: paramsCurrent.map { variables in
                             return {
-                                return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try variables.compactMap { variable in
-                                    guard let d = try reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
+                                return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncCompactMap { variable in
+                                    guard let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
                                         return nil
                                     }
                                     return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
@@ -186,10 +186,10 @@ struct IconWaveController {
                         },
                         hourly: paramsHourly.map { variables in
                             return {
-                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
                                     var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                        guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
+                                        guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit
@@ -205,10 +205,10 @@ struct IconWaveController {
                         },
                         daily: paramsDaily.map { paramsDaily in
                             return {
-                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable -> ApiColumn<IconWaveVariableDaily> in
+                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await paramsDaily.asyncMap { variable -> ApiColumn<IconWaveVariableDaily> in
                                     var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member -> ApiArray? in
-                                        guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member -> ApiArray? in
+                                        guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit
@@ -225,10 +225,10 @@ struct IconWaveController {
                         sixHourly: nil,
                         minutely15: paramsMinutely.map { variables in
                             return {
-                                return .init(name: "minutely_15", time: time.minutely15, columns: try variables.map { variable in
+                                return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
                                     var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                        guard let d = try reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
+                                        guard let d = try await reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit

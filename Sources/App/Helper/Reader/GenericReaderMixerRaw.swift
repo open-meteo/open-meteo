@@ -80,14 +80,14 @@ extension GenericReaderMixerRaw {
         return try reader.last?.getStatic(type: type)
     }
 
-    func get(variable: Reader.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var data: [Float]?
         var unit: SiUnit?
         if variable.requiresOffsetCorrectionForMixing {
             for r in reader.reversed() {
-                let d = try r.get(variable: variable, time: time)
+                let d = try await r.get(variable: variable, time: time)
                 if data == nil {
                     // first iteration
                     data = d.data
@@ -106,7 +106,7 @@ extension GenericReaderMixerRaw {
         } else {
             // default case, just place new data in 1:1
             for r in reader.reversed() {
-                let d = try r.get(variable: variable, time: time)
+                let d = try await r.get(variable: variable, time: time)
                 if data == nil {
                     // first iteration
                     data = d.data

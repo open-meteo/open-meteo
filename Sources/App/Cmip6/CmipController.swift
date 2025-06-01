@@ -53,8 +53,8 @@ struct CmipController {
                         hourly: nil,
                         daily: paramsDaily.map { paramsDaily in
                             return {
-                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.map { variable in
-                                    let d = try reader.get(variable: variable, time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await paramsDaily.asyncMap { variable in
+                                    let d = try await reader.get(variable: variable, time: time.dailyRead.toSettings()).convertAndRound(params: params)
                                     assert(time.dailyRead.count == d.data.count)
                                     return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                                 })
@@ -77,7 +77,7 @@ struct CmipController {
 
 protocol Cmip6Readerable {
     func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) throws
-    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDtAndSettings) throws -> DataAndUnit
+    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDtAndSettings) async throws -> DataAndUnit
     var modelLat: Float { get }
     var modelLon: Float { get }
     var modelElevation: ElevationOrSea { get }
@@ -281,8 +281,8 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5.modelElevation.numeric)
     }
 
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        let raw = try reader.get(variable: variable, time: time)
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
 
         guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
@@ -397,8 +397,8 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         return referenceElevation
     }
 
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        let raw = try reader.get(variable: variable, time: time)
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
 
         guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
@@ -499,8 +499,8 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
     }
 
-    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
-        let raw = try reader.get(variable: variable, time: time)
+    func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+        let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
 
         guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
@@ -596,39 +596,39 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
 
     let domain: Cmip6Domain
 
-    func get(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch derived {
         case .snowfall_sum:
-            let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time).data
+            let snowwater = try await get(raw: .raw(.snowfall_water_equivalent_sum), time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
             return DataAndUnit(snowfall, .centimetre)
         case .rain_sum:
-            let snowwater = try get(raw: .raw(.snowfall_water_equivalent_sum), time: time)
-            let precip = try get(raw: .raw(.precipitation_sum), time: time)
+            let snowwater = try await get(raw: .raw(.snowfall_water_equivalent_sum), time: time)
+            let precip = try await get(raw: .raw(.precipitation_sum), time: time)
             let rain = zip(precip.data, snowwater.data).map({
                 return max($0.0 - $0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
         case .dewpoint_2m_max, .dew_point_2m_max:
-            let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
-            let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
-            let rhMax = try get(raw: .raw(.relative_humidity_2m_max), time: time).data
+            let tempMin = try await get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempMax = try await get(raw: .raw(.temperature_2m_max), time: time).data
+            let rhMax = try await get(raw: .raw(.relative_humidity_2m_max), time: time).data
             return DataAndUnit(zip(zip(tempMax, tempMin), rhMax).map(Meteorology.dewpointDaily), .celsius)
         case .dewpoint_2m_min, .dew_point_2m_min:
-            let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
-            let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
-            let rhMin = try get(raw: .raw(.relative_humidity_2m_min), time: time).data
+            let tempMin = try await get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempMax = try await get(raw: .raw(.temperature_2m_max), time: time).data
+            let rhMin = try await get(raw: .raw(.relative_humidity_2m_min), time: time).data
             return DataAndUnit(zip(zip(tempMax, tempMin), rhMin).map(Meteorology.dewpointDaily), .celsius)
         case .dewpoint_2m_mean, .dew_point_2m_mean:
-            let tempMin = try get(raw: .raw(.temperature_2m_min), time: time).data
-            let tempMax = try get(raw: .raw(.temperature_2m_max), time: time).data
-            let rhMean = try get(raw: .raw(.relative_humidity_2m_mean), time: time).data
+            let tempMin = try await get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempMax = try await get(raw: .raw(.temperature_2m_max), time: time).data
+            let rhMean = try await get(raw: .raw(.relative_humidity_2m_mean), time: time).data
             return DataAndUnit(zip(zip(tempMax, tempMin), rhMean).map(Meteorology.dewpointDaily), .celsius)
         case .growing_degree_days_base_0_limit_50:
             let base: Float = 0
             let limit: Float = 50
-            let tempmax = try get(raw: .raw(.temperature_2m_max), time: time).data
-            let tempmin = try get(raw: .raw(.temperature_2m_min), time: time).data
+            let tempmax = try await get(raw: .raw(.temperature_2m_max), time: time).data
+            let tempmin = try await get(raw: .raw(.temperature_2m_min), time: time).data
             return DataAndUnit(zip(tempmax, tempmin).map({ tmax, tmin in
                 max(min((tmax + tmin) / 2, limit) - base, 0)
             }), .gddCelsius)
@@ -640,7 +640,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
                 // 0 = water
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
-            let soilMoisture = try get(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
+            let soilMoisture = try await get(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_0_to_100cm_mean:
             guard let soilType = try self.getStatic(type: .soilType) else {
@@ -649,29 +649,29 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
             }
-            let soilMoisture = try get(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
+            let soilMoisture = try await get(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .daylight_duration:
             // note: time should align to UTC 0 midnight
             return DataAndUnit(Zensun.calculateDaylightDuration(utcMidnight: time.range, lat: modelLat, lon: modelLon), .seconds)
         case .windspeed_2m_max, .wind_speed_2m_max:
-            let wind = try get(raw: .raw(.wind_speed_10m_max), time: time)
+            let wind = try await get(raw: .raw(.wind_speed_10m_max), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
             return DataAndUnit(wind.data.map { $0 * scale }, wind.unit)
         case .windspeed_2m_mean, .wind_speed_2m_mean:
-            let wind = try get(raw: .raw(.wind_speed_10m_mean), time: time)
+            let wind = try await get(raw: .raw(.wind_speed_10m_mean), time: time)
             let scale = Meteorology.scaleWindFactor(from: 10, to: 2)
             return DataAndUnit(wind.data.map { $0 * scale }, wind.unit)
         case .windgusts_10m_mean:
-            return try get(raw: .derived(.wind_gusts_10m_mean), time: time)
+            return try await get(raw: .derived(.wind_gusts_10m_mean), time: time)
         case .windgusts_10m_max:
-            return try get(raw: .derived(.wind_gusts_10m_max), time: time)
+            return try await get(raw: .derived(.wind_gusts_10m_max), time: time)
         case .vapor_pressure_deficit_max:
-            return try get(raw: .derived(.vapour_pressure_deficit_max), time: time)
+            return try await get(raw: .derived(.vapour_pressure_deficit_max), time: time)
         case .windspeed_10m_max:
-            return try get(raw: .raw(.wind_speed_10m_max), time: time)
+            return try await get(raw: .raw(.wind_speed_10m_max), time: time)
         case .windspeed_10m_mean:
-            return try get(raw: .raw(.wind_speed_10m_mean), time: time)
+            return try await get(raw: .raw(.wind_speed_10m_mean), time: time)
         }
     }
 
@@ -726,18 +726,18 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
 
     let domain: Cmip6Domain
 
-    func get(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch derived {
         case .et0_fao_evapotranspiration_sum:
-            let tempmax = try get(raw: .temperature_2m_max, time: time).data
-            let tempmin = try get(raw: .temperature_2m_min, time: time).data
-            let tempmean = try get(raw: .temperature_2m_mean, time: time).data
-            let wind = try get(raw: .wind_speed_10m_mean, time: time).data
-            let radiation = try get(raw: .shortwave_radiation_sum, time: time).data
+            let tempmax = try await get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try await get(raw: .temperature_2m_min, time: time).data
+            let tempmean = try await get(raw: .temperature_2m_mean, time: time).data
+            let wind = try await get(raw: .wind_speed_10m_mean, time: time).data
+            let radiation = try await get(raw: .shortwave_radiation_sum, time: time).data
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time.with(dtSeconds: 3600)).sum(by: 24)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
-            let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
-            let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
+            let rhmin = hasRhMinMax ? try await get(raw: .relative_humidity_2m_min, time: time).data : nil
+            let rhmaxOrMean = hasRhMinMax ? try await get(raw: .relative_humidity_2m_max, time: time).data : try await get(raw: .relative_humidity_2m_mean, time: time).data
             let elevation = reader.targetElevation.isNaN ? reader.modelElevation.numeric : reader.targetElevation
 
             var et0 = [Float]()
@@ -761,11 +761,11 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             }
             return DataAndUnit(et0, .millimetre)
         case .vapour_pressure_deficit_max:
-            let tempmax = try get(raw: .temperature_2m_max, time: time).data
-            let tempmin = try get(raw: .temperature_2m_min, time: time).data
+            let tempmax = try await get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try await get(raw: .temperature_2m_min, time: time).data
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
-            let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
-            let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
+            let rhmin = hasRhMinMax ? try await get(raw: .relative_humidity_2m_min, time: time).data : nil
+            let rhmaxOrMean = hasRhMinMax ? try await get(raw: .relative_humidity_2m_max, time: time).data : try await get(raw: .relative_humidity_2m_mean, time: time).data
 
             var vpd = [Float]()
             vpd.reserveCapacity(tempmax.count)
@@ -783,12 +783,12 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             }
             return DataAndUnit(vpd, .kilopascal)
         case .leaf_wetness_probability_mean:
-            let tempmax = try get(raw: .temperature_2m_max, time: time).data
-            let tempmin = try get(raw: .temperature_2m_min, time: time).data
+            let tempmax = try await get(raw: .temperature_2m_max, time: time).data
+            let tempmin = try await get(raw: .temperature_2m_min, time: time).data
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
-            let rhmin = hasRhMinMax ? try get(raw: .relative_humidity_2m_min, time: time).data : nil
-            let rhmaxOrMean = hasRhMinMax ? try get(raw: .relative_humidity_2m_max, time: time).data : try get(raw: .relative_humidity_2m_mean, time: time).data
-            let preciptitation = try get(raw: .precipitation_sum, time: time).data
+            let rhmin = hasRhMinMax ? try await get(raw: .relative_humidity_2m_min, time: time).data : nil
+            let rhmaxOrMean = hasRhMinMax ? try await get(raw: .relative_humidity_2m_max, time: time).data : try await get(raw: .relative_humidity_2m_mean, time: time).data
+            let preciptitation = try await get(raw: .precipitation_sum, time: time).data
 
             var leafWetness = [Float]()
             leafWetness.reserveCapacity(tempmax.count)
@@ -804,7 +804,7 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
             return DataAndUnit(leafWetness, .percentage)
         case .soil_moisture_0_to_100cm_mean:
             // estimate soil moisture in 0-100 by a moving average over 0-10 cm moisture
-            let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            let sm0_10 = try await get(raw: .soil_moisture_0_to_10cm_mean, time: time)
             let sm10_28 = sm0_10.data.indices.map { return sm0_10.data[max(0, $0 - 5) ..< $0 + 1].mean() }
             let sm28_100 = sm10_28.indices.map { return sm10_28[max(0, $0 - 51) ..< $0 + 1].mean() }
             return DataAndUnit(zip(sm0_10.data, zip(sm10_28, sm28_100)).map({
@@ -812,18 +812,18 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                 return sm0_10 * 0.1 + sm10_28 * (0.28 - 0.1) + sm28_100 * (1 - 0.28)
             }), sm0_10.unit)
         case .soil_moisture_0_to_7cm_mean:
-            return try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            return try await get(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_moisture_7_to_28cm_mean:
-            let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            let sm0_10 = try await get(raw: .soil_moisture_0_to_10cm_mean, time: time)
             let sm10_28 = sm0_10.data.indices.map { return sm0_10.data[max(0, $0 - 5) ..< $0 + 1].mean() }
             return DataAndUnit(sm10_28, sm0_10.unit)
         case .soil_moisture_28_to_100cm_mean:
-            let sm0_10 = try get(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            let sm0_10 = try await get(raw: .soil_moisture_0_to_10cm_mean, time: time)
             let sm10_28 = sm0_10.data.indices.map { return sm0_10.data[max(0, $0 - 5) ..< $0 + 1].mean() }
             let sm28_100 = sm10_28.indices.map { return sm10_28[max(0, $0 - 51) ..< $0 + 1].mean() }
             return DataAndUnit(sm28_100, sm0_10.unit)
         case .soil_temperature_0_to_100cm_mean:
-            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let t2m = try await get(raw: .temperature_2m_mean, time: time)
             let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0 - 3) ..< $0 + 1].mean() }
             let st7_28 = st0_7.indices.map { return st0_7[max(0, $0 - 5) ..< $0 + 1].mean() }
             let st28_100 = st7_28.indices.map { return st7_28[max(0, $0 - 51) ..< $0 + 1].mean() }
@@ -832,24 +832,24 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
                 return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
             }), t2m.unit)
         case .soil_temperature_0_to_7cm_mean:
-            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let t2m = try await get(raw: .temperature_2m_mean, time: time)
             let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0 - 3) ..< $0 + 1].mean() }
             return DataAndUnit(st0_7, t2m.unit)
         case .soil_temperature_7_to_28cm_mean:
-            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let t2m = try await get(raw: .temperature_2m_mean, time: time)
             let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0 - 3) ..< $0 + 1].mean() }
             let st7_28 = st0_7.indices.map { return st0_7[max(0, $0 - 5) ..< $0 + 1].mean() }
             return DataAndUnit(st7_28, t2m.unit)
         case .soil_temperature_28_to_100cm_mean:
-            let t2m = try get(raw: .temperature_2m_mean, time: time)
+            let t2m = try await get(raw: .temperature_2m_mean, time: time)
             let st0_7 = t2m.data.indices.map { return t2m.data[max(0, $0 - 3) ..< $0 + 1].mean() }
             let st7_28 = st0_7.indices.map { return st0_7[max(0, $0 - 5) ..< $0 + 1].mean() }
             let st28_100 = st7_28.indices.map { return st7_28[max(0, $0 - 51) ..< $0 + 1].mean() }
             return DataAndUnit(st28_100, t2m.unit)
         case .wind_gusts_10m_mean:
-            return try get(raw: .wind_speed_10m_mean, time: time)
+            return try await get(raw: .wind_speed_10m_mean, time: time)
         case .wind_gusts_10m_max:
-            return try get(raw: .wind_speed_10m_max, time: time)
+            return try await get(raw: .wind_speed_10m_max, time: time)
         }
     }
 

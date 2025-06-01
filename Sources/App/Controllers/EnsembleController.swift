@@ -19,12 +19,12 @@ public struct EnsembleApiController {
             let paramsDaily = try EnsembleVariableDaily.load(commaSeparatedOptional: params.daily)
             let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, { $0 + $1.countEnsembleMember })
 
-            let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try prepared.map { prepared in
+            let locations: [ForecastapiResult<EnsembleMultiDomains>.PerLocation] = try await prepared.asyncMap { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
-                let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
+                let readers: [ForecastapiResult<EnsembleMultiDomains>.PerModel] = try await prepared.perModel.asyncCompactMap { readerAndDomain in
                     guard let reader = try readerAndDomain.reader() else {
                         return nil
                     }
@@ -57,10 +57,10 @@ public struct EnsembleApiController {
                         current: nil,
                         hourly: paramsHourly.map { variables in
                             return {
-                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try variables.map { variable in
+                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
                                     var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                        guard let d = try reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
+                                        guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit
@@ -74,12 +74,12 @@ public struct EnsembleApiController {
                                 })
                             }
                         },
-                        daily: paramsDaily.map { dailyVariables -> (() throws -> ApiSection<EnsembleVariableDaily>) in
+                        daily: paramsDaily.map { dailyVariables -> (() async throws -> ApiSection<EnsembleVariableDaily>) in
                             return {
-                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try dailyVariables.map { variable -> ApiColumn<EnsembleVariableDaily> in
+                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await dailyVariables.asyncMap { variable -> ApiColumn<EnsembleVariableDaily> in
                                     var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try (0..<reader.domain.countEnsembleMember).compactMap { member in
-                                        guard let d = try reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
+                                        guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit

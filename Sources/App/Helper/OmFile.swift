@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import Vapor
 
 /// Read any time from multiple files
 struct OmFileSplitter {
@@ -127,12 +128,12 @@ struct OmFileSplitter {
         }
     }
 
-    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> Array2DFastTime {
-        let data = try read(variable: variable, location: location, level: level, time: time)
+    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) async throws -> Array2DFastTime {
+        let data = try await read(variable: variable, location: location, level: level, time: time)
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
 
-    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) throws -> [Float] {
+    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) async throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound

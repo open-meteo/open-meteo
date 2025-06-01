@@ -45,11 +45,11 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         self.cache = .init()
     }
 
-    func get(variable: Variable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         if let value = cache[VariableAndTime(variable: variable, time: time)] {
             return value
         }
-        let data = try reader.get(variable: variable, time: time)
+        let data = try await reader.get(variable: variable, time: time)
         cache[VariableAndTime(variable: variable, time: time)] = data
         return data
     }

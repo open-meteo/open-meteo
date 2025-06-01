@@ -70,8 +70,8 @@ extension ForecastapiResult.PerLocation {
         guard let first = results.first else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        let sections = try runAllSections()
-        let current = try first.current?()
+        let sections = try await runAllSections()
+        let current = try await first.current?()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 
         b.buffer.writeString("""
