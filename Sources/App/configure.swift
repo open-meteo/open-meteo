@@ -175,6 +175,11 @@ public func configure(_ app: Application) throws {
         delay: .seconds(2),
         MetaFileManager.instance.backgroundTask
     )
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(0),
+        delay: .seconds(10),
+        RemoteOmFileManager.instance.backgroundTask
+    )
 
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(Int64(60 - Timestamp.now().second)),

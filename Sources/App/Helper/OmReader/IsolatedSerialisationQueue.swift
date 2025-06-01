@@ -1,7 +1,7 @@
 /**
  Ensure that only a single task is running to return a resource
  */
-final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
+/*final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
     private var queue: [Key: [CheckedContinuation<Value, any Error>]] = [:]
     
     /**
@@ -87,3 +87,4 @@ final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable
         }
     }
 }
+*/

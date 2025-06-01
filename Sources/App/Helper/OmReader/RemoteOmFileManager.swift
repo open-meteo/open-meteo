@@ -1,4 +1,5 @@
 import OmFileFormat
+import Vapor
 
 /*protocol OmFileReaderAsyncProvider {
     func asArray<OmType: OmFileArrayDataTypeProtocol>(of: OmType.Type, io_size_max: UInt64, io_size_merge: UInt64) -> any OmFileReaderAsyncArrayProvider
@@ -33,13 +34,15 @@ extension OmFileReaderAsyncArray: OmFileReaderAsyncArrayProvider {
  - background task every 10 seconds + replace existing -> never ending flood of requests. Last accessed timestamp + evict after 10 minutes?
  - after x seconds do refresh on request -> random latency + needs isolation
  */
-final class RemoteOmFileManager {
-    /// Isolate requests to files
-    var cache = RemoteOmFileManagerCache()
+final class RemoteOmFileManager: Sendable {
+    public static let instance = RemoteOmFileManager()
     
-    func get(file: OmFileManagerReadable, forceNew: Bool = false) async throws -> OmFileReaderAsync<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>>? {
+    /// Isolate requests to files
+    let cache = RemoteOmFileManagerCache()
+    
+    func get(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> OmFileReaderAsync<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>>? {
         guard let backend = try await cache.get(key: file, forceNew: forceNew, provider: {
-            try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: file.getFilePath())
+            try await OmHttpReaderBackend(client: client, logger: logger, url: file.getFilePath())
         }) else {
             return nil
         }
@@ -47,25 +50,30 @@ final class RemoteOmFileManager {
         return try await OmFileReaderAsync(fn: cacheFn)
     }
     
-    public func willNeed(file: OmFileManagerReadable, range: [Range<UInt64>]? = nil) async throws {
+    public func willNeed(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, range: [Range<UInt64>]? = nil) async throws {
         do {
-            let read = try await get(file: file)!.asArray(of: Float.self)!
+            let read = try await get(file: file, client: client, logger: logger)!.asArray(of: Float.self)!
             try await read.willNeed(range: range)
         } catch CurlError.fileModifiedSinceLastDownload {
-            let read = try await get(file: file, forceNew: true)!.asArray(of: Float.self)!
+            let read = try await get(file: file, client: client, logger: logger, forceNew: true)!.asArray(of: Float.self)!
             try await read.willNeed(range: range)
         }
     }
     
-    public func read(file: OmFileManagerReadable, into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]? = nil, intoCubeDimension: [UInt64]? = nil) async throws {
+    public func read(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]? = nil, intoCubeDimension: [UInt64]? = nil) async throws {
         do {
-            let read = try await get(file: file)!.asArray(of: Float.self)!
+            let read = try await get(file: file, client: client, logger: logger)!.asArray(of: Float.self)!
             try await read.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
         } catch CurlError.fileModifiedSinceLastDownload {
             // File was modified on the remote server
-            let read = try await get(file: file, forceNew: true)!.asArray(of: Float.self)!
+            let read = try await get(file: file, client: client, logger: logger, forceNew: true)!.asArray(of: Float.self)!
             try await read.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
         }
+    }
+    
+    /// Called every 10 seconds from a life cycle handler on an available thread
+    @Sendable func backgroundTask(application: Application) async throws {
+        try await cache.revalidate(client: application.http.client.shared, logger: application.logger)
     }
 }
 
@@ -147,7 +155,8 @@ final actor RemoteOmFileManagerCache {
      Remove entries that have not been accessed for more than 15 minutes
      Revalidate entries older than 3 minutes
      */
-    func revalidate() async throws {
+    func revalidate(client: HTTPClient, logger: Logger) async throws {
+        print("## In om remote file revalidation")
         let removeLastAccessedThan: Timestamp = .now().subtract(minutes: 15)
         let revalidateAfter: Timestamp = .now().subtract(minutes: 3)
         for (key, state) in cache {
@@ -160,7 +169,7 @@ final actor RemoteOmFileManagerCache {
                 continue
             }
             if entry.created < revalidateAfter {
-                let new = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: key.getFilePath())
+                let new = try await OmHttpReaderBackend(client: client, logger: logger, url: key.getFilePath())
                 if new != entry.value {
                     entry.value = new
                 }
