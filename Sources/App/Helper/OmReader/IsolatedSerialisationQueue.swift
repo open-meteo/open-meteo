@@ -37,6 +37,15 @@ final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable
     enum State {
         case cached(Value)
         case running([CheckedContinuation<Value, any Error>])
+        
+        var isCached: Bool {
+            switch self {
+            case .cached:
+                return true
+            case .running:
+                return false
+            }
+        }
     }
     
     var cache = [Key: State]()
@@ -45,8 +54,8 @@ final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable
      Get a resource identified by a key. If the request is currently being requested, enqueue the request
      */
     func get(key: Key, forceNew: Bool, provider: () async throws -> Value) async throws -> Value {
-        guard forceNew == false, let state = cache[key] else {
-            // Value not cached
+        guard let state = cache[key], !(forceNew == true && state.isCached) else {
+            // Value not cached or needs to be refreshed
             cache[key] = .running([])
             do {
                 let data = try await provider()

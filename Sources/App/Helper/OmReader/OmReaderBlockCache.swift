@@ -102,6 +102,7 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicB
         let totalCount = self.backend.count
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         
+        /// TODO: check if cached data is sequentially available in cache
         /// Single block read, can directly execute closure on cached data
         /// No extra allocation
         if blocks.count == 1 {
