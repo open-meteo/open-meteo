@@ -7,7 +7,7 @@ import OmFileFormat
 final class OmReaderTests: XCTestCase {
     func testHttpRead() async throws {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
-        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
+        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!
         let read = try await OmFileReaderAsync(fn: readFn).asArray(of: Float.self)!
         let value = try await read.read(range: [250..<251, 420..<421])
         XCTAssertEqual(value.first, 214)
@@ -15,12 +15,12 @@ final class OmReaderTests: XCTestCase {
     
     func testBlockCache() async throws {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
-        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
+        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!
         let file = "cache64k50.bin"
         try FileManager.default.removeItemIfExists(at: file)
         defer { try! FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
-        let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: readFn.cacheKey)
+        let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
         let read = try! await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self)!
         let value = try await read.read(range: [250..<251, 420..<421])
         XCTAssertEqual(value.first, 214)
@@ -31,12 +31,12 @@ final class OmReaderTests: XCTestCase {
     
     func testBlockCacheConcurrent() async throws {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
-        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)
+        let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!
         let file = "cache64k50_2.bin"
         try FileManager.default.removeItemIfExists(at: file)
         defer { try! FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
-        let cacheFn = OmReaderBlockCache(backend: readFn, cache: cache, cacheKey: readFn.cacheKey)
+        let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
         let read = try await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self, io_size_max: 4096)!
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         XCTAssertEqual(value[123], 1218)

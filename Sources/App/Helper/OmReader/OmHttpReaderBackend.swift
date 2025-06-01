@@ -55,19 +55,23 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
         return url.fnv1aHash64 ^ (eTag?.fnv1aHash64 ?? 0) ^ (lastModified?.fnv1aHash64 ?? 0)
     }
     
-    init(client: HTTPClient, logger: Logger, url: String) async throws {
+    init?(client: HTTPClient, logger: Logger, url: String) async throws {
         self.client = client
         var headRequest = HTTPClientRequest(url: url)
         headRequest.method = .HEAD
-        let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5))
-        guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
-            throw OmHttpReaderBackendError.contentLengthMissing
+        do {
+            let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5))
+            guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
+                throw OmHttpReaderBackendError.contentLengthMissing
+            }
+            self.lastModified = headResponse.headers["Last-Modified"].first
+            self.eTag = headResponse.headers["ETag"].first
+            self.count = contentLength
+            self.url = url
+            self.logger = logger
+        } catch CurlError.fileNotFound {
+            return nil
         }
-        self.lastModified = headResponse.headers["Last-Modified"].first
-        self.eTag = headResponse.headers["ETag"].first
-        self.count = contentLength
-        self.url = url
-        self.logger = logger
     }
     
     func prefetchData(offset: Int, count: Int) async throws {

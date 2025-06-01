@@ -1,6 +1,71 @@
 import OmFileFormat
 import Foundation
 
+/*protocol OmFileReaderAsyncProvider {
+    func asArray<OmType: OmFileArrayDataTypeProtocol>(of: OmType.Type, io_size_max: UInt64, io_size_merge: UInt64) -> any OmFileReaderAsyncArrayProvider
+}
+
+protocol OmFileReaderAsyncArrayProvider {
+    associatedtype OmType: OmFileArrayDataTypeProtocol
+    
+    func willNeed(range: [Range<UInt64>]?) async throws
+    func read(into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]?, intoCubeDimension: [UInt64]?) async throws
+}
+
+extension OmFileReaderAsync: OmFileReaderAsyncProvider {
+    func asArray<OmType>(of: OmType.Type, io_size_max: UInt64, io_size_merge: UInt64) -> any OmFileReaderAsyncArrayProvider where OmType : OmFileFormat.OmFileArrayDataTypeProtocol {
+        return self.asArray(of: of, io_size_max: io_size_max, io_size_merge: io_size_merge)
+    }
+}
+extension OmFileReaderAsyncArray: OmFileReaderAsyncArrayProvider {
+    func read(into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]?, intoCubeDimension: [UInt64]?) async throws {
+        return try await self.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
+    }
+}*/
+
+/**
+ Keep track of remote files.
+ Store 404 state
+ Keep files open
+ Reload files on read/willNeed if remote file was modified, retry with new file
+ Background check if remote file was modified (every x seconds)
+ */
+final class RemoteFileManager {
+    /// Isolate requests to files
+    var cache = IsolatedSerialisationCache<OmFileManagerReadable, OmHttpReaderBackend?>()
+    
+    func get(file: OmFileManagerReadable, forceNew: Bool = false) async throws -> OmFileReaderAsync<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>>? {
+        guard let backend = try await cache.get(key: file, forceNew: forceNew, provider: {
+            try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: file.getFilePath())
+        }) else {
+            return nil
+        }
+        let cacheFn = OmReaderBlockCache(backend: backend, cache: OpenMeteo.dataBlockCache!, cacheKey: backend.cacheKey)
+        return try await OmFileReaderAsync(fn: cacheFn)
+    }
+    
+    public func willNeed(file: OmFileManagerReadable, range: [Range<UInt64>]? = nil) async throws {
+        do {
+            let read = try await get(file: file)!.asArray(of: Float.self)!
+            try await read.willNeed(range: range)
+        } catch CurlError.fileModifiedSinceLastDownload {
+            let read = try await get(file: file, forceNew: true)!.asArray(of: Float.self)!
+            try await read.willNeed(range: range)
+        }
+    }
+    
+    public func read(file: OmFileManagerReadable, into: UnsafeMutablePointer<Float>, range: [Range<UInt64>], intoCubeOffset: [UInt64]? = nil, intoCubeDimension: [UInt64]? = nil) async throws {
+        do {
+            let read = try await get(file: file)!.asArray(of: Float.self)!
+            try await read.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
+        } catch CurlError.fileModifiedSinceLastDownload {
+            // File was modified on the remote server
+            let read = try await get(file: file, forceNew: true)!.asArray(of: Float.self)!
+            try await read.read(into: into, range: range, intoCubeOffset: intoCubeOffset, intoCubeDimension: intoCubeDimension)
+        }
+    }
+}
+
 
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache
@@ -12,17 +77,15 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicB
     
     typealias DataType = Data
     
-    init(backend: Backend, cache: AtomicBlockCache<Cache>, cacheKey: UInt64) {
+    init(backend: Backend, cache: AtomicCacheCoordinator<Cache>, cacheKey: UInt64) {
         self.backend = backend
-        self.cache = AtomicCacheCoordinator(cache: cache)
+        self.cache = cache
         self.cacheKey = cacheKey
     }
     
     
     func prefetchData(offset: Int, count: Int) async throws {
         let blockSize = 65536
-        let dataRange = offset ..< (offset + count)
-        let totalCount = self.backend.count
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         for block in blocks {
             cache.prefetchData(key: cacheKey &+ UInt64(block))
@@ -80,7 +143,6 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicB
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
         let dataRet = Data(bytesNoCopy: data.baseAddress!, count: count, deallocator: .free)
         let totalCount = self.backend.count
-        // TODO shortcut for single block
         
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         //rint("getData \(blocks.count) blocks")

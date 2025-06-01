@@ -100,7 +100,6 @@ struct OmFileManager {
     }
 }
 
-extension OmFileReaderArray: @unchecked @retroactive Sendable {}
 extension OmFileReaderArray: GenericFileManagable where Backend == MmapFile, OmType == Float {
     func wasDeleted() -> Bool {
         self.fn.file.wasDeleted()

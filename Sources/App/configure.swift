@@ -1,4 +1,5 @@
 import Vapor
+import OmFileFormat
 // import Leaf
 
 enum OpenMeteo {
@@ -11,6 +12,16 @@ enum OpenMeteo {
             return dir
         }
         return  "./data/"
+    }()
+    
+    static let dataBlockCache: AtomicCacheCoordinator<MmapFile>? = { () -> AtomicCacheCoordinator<MmapFile>? in
+        guard let cacheFile = Environment.get("CACHE_FILE") else {
+            return nil
+        }
+        guard let cacheDirectory = Environment.get("CACHE_SIZE") else {
+            return nil
+        }
+        return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: 65536, blockCount: 50))
     }()
     
     /// Data directory with trailing slash

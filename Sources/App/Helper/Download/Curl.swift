@@ -18,6 +18,7 @@ enum CurlError: Error {
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
     case couldNotGetContentLengthForConcurrentDownload
+    case fileModifiedSinceLastDownload
 }
 
 enum CurlErrorNonRetry: NonRetryError {

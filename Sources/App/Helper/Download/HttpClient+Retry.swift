@@ -54,6 +54,9 @@ extension HTTPClient {
                 if error404WaitTime != nil && response.status == .notFound {
                     throw CurlError.fileNotFound
                 }
+                if response.status == .preconditionFailed {
+                    throw CurlError.fileModifiedSinceLastDownload
+                }
                 return response
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key.")
