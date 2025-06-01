@@ -51,14 +51,14 @@ final class OmReaderTests: XCTestCase {
         let cache = AtomicBlockCache(data: data, blockSize: 64)
         cache.set(key: 234923, value: Data(repeating: 123, count: 64))
         cache.set(key: 234923+50, value: Data(repeating: 142, count: 64))
-        XCTAssertEqual(cache.get(key: 234923), Data(repeating: 123, count: 64))
-        XCTAssertEqual(cache.get(key: 234923+50), Data(repeating: 142, count: 64))
+        XCTAssertEqual(cache.get(key: 234923)!.data, Data(repeating: 123, count: 64))
+        XCTAssertEqual(cache.get(key: 234923+50)!.data, Data(repeating: 142, count: 64))
         
         for i in 0..<50 {
             cache.set(key: UInt64(1000+i), value: Data(repeating: UInt8(123+i), count: 64))
         }
         for i in 0..<50 {
-            XCTAssertEqual(cache.get(key: UInt64(1000+i)), Data(repeating: UInt8(123+i), count: 64))
+            XCTAssertEqual(cache.get(key: UInt64(1000+i))!.data, Data(repeating: UInt8(123+i), count: 64))
         }
         // Cache got overwritten
         XCTAssertNil(cache.get(key: 234923))

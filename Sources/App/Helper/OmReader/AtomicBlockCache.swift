@@ -144,12 +144,12 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
-    /// Find key in cache and execute a closure on this data. Updates the LRU timestamp. If the data for changed during closure execution of the key was missing, return nil
-    func with<R>(key: UInt64, fn: (UnsafeRawBufferPointer) throws -> (R)) rethrows -> R? {
+    /// Find key in cache, updates the LRU timestamp and returns a pointer to the memory region. There is a slight chance, that data is modified while reading, but it should practically never happen
+    func get(key: UInt64) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
-        return try data.withMutableUnsafeBytes { bytes in
+        return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
             let keyRange = key ..< key + lookAheadCount
             for slot in keyRange {
@@ -172,18 +172,17 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     // Get data pointer and execute closure on data
                     // There is a slight chance, that data is modified while reading, but it should practically never happen
                     let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
-                    return try fn(UnsafeRawBufferPointer(start: dest, count: blockSize))
+                    return UnsafeRawBufferPointer(start: dest, count: blockSize)
                 }
             }
             return nil
         }
     }
-    
-    /// Find key in cache and return a copy of its data
-    func get(key: UInt64) -> Data? {
-        return with(key: key) {
-            Data($0)
-        }
-    }
 }
 
+extension UnsafeRawBufferPointer {
+    /// Copy pointer to new Data
+    var data: Data {
+        return Data(self)
+    }
+}

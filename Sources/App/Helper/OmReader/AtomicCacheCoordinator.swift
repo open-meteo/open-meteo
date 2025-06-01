@@ -13,8 +13,8 @@ struct AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
     }
     
     func with<R: Sendable, T: ContiguousBytes & Sendable>(key: UInt64, backendFetch: @Sendable () async throws -> T, callback: @Sendable (UnsafeRawBufferPointer) throws -> (R)) async throws -> R {
-        if let ret = try cache.with(key: key, fn: callback) {
-            return ret
+        if let result = cache.get(key: key) {
+            return try callback(result)
         }
         return try await queue.with(key: key, backendFetch: {
             let result = try await backendFetch()
