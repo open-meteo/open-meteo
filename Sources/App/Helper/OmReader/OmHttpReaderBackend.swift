@@ -103,3 +103,9 @@ extension ByteBuffer: @retroactive ContiguousBytes {
         try self.withUnsafeReadableBytes(body)
     }
 }
+
+extension OmHttpReaderBackend: Equatable {
+    static func == (lhs: OmHttpReaderBackend, rhs: OmHttpReaderBackend) -> Bool {
+        lhs.cacheKey == rhs.cacheKey
+    }
+}

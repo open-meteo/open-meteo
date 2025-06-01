@@ -60,7 +60,7 @@ final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable
             do {
                 let data = try await provider()
                 guard case .running(let queued) = cache.updateValue(.cached(data), forKey: key) else {
-                    fatalError("Stat was not .running()")
+                    fatalError("State was not .running()")
                 }
                 queued.forEach {
                     $0.resume(with: .success(data))
@@ -68,7 +68,7 @@ final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable
                 return data
             } catch {
                 guard case .running(let queued) = cache.removeValue(forKey: key) else {
-                    fatalError("Stat was not .running()")
+                    fatalError("State was not .running()")
                 }
                 queued.forEach({
                     $0.resume(with: .failure(error))
