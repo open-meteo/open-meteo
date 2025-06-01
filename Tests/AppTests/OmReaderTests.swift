@@ -1,10 +1,15 @@
 import Foundation
 @testable import App
 import XCTest
-// import Vapor
+import Vapor
 import OmFileFormat
 
 final class OmReaderTests: XCTestCase {
+    override func setUp() async throws {
+        var env = try Environment.detect()
+        try LoggingSystem.bootstrap(from: &env)
+    }
+    
     func testHttpRead() async throws {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
         let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!

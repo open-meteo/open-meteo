@@ -60,6 +60,7 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
         var headRequest = HTTPClientRequest(url: url)
         headRequest.method = .HEAD
         do {
+            logger.debug("Sending HEAD requests to \(url)")
             let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5))
             guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
                 throw OmHttpReaderBackendError.contentLengthMissing
@@ -87,6 +88,7 @@ final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
             request.headers.add(name: "If-Match", value: eTag)
         }
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
+        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(url)")
         let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
         return try await response.body.collect(upTo: count)
     }
