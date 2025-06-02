@@ -213,12 +213,12 @@ struct OmFileSplitter {
      
      TODO: should use Array3DFastTime
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16) throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16) async throws {
         precondition(array2d.nTime == time.count)
         precondition(array2d.nLocations == nx * ny)
 
         // Process at most 8 MB at once
-        try updateFromTimeOrientedStreaming3D(variable: variable, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { yRange, xRange, _ in
+        try await updateFromTimeOrientedStreaming3D(variable: variable, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { yRange, xRange, _ in
             guard yRange.count == 1 || xRange.count == nx else {
                 fatalError("chunk dimensions need to be either parts of X or a mutliple or X")
             }
@@ -234,7 +234,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) throws -> ArraySlice<Float>) throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         let indexTime = time.toIndexTime()
         let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)
 
@@ -247,7 +247,7 @@ struct OmFileSplitter {
         }
 
         struct WriterPerStep {
-            let read: OmFileReader<MmapFile>?
+            let read: OmFileReaderAsync<MmapFile>?
             let writeFile: OmFileWriter<FileHandle>
             let write: OmFileWriterArray<Float, FileHandle>
             let writeFn: FileHandle
@@ -257,13 +257,13 @@ struct OmFileSplitter {
         }
 
         // open all files for all timeranges and write a header
-        let writers: [WriterPerStep] = try indextimeChunked.flatMap { timeChunk -> [WriterPerStep] in
+        let writers: [WriterPerStep] = try await indextimeChunked.asyncFlatMap { timeChunk -> [WriterPerStep] in
             let fileTime = timeChunk * nTimePerFile ..< (timeChunk + 1) * nTimePerFile
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 return []
             }
 
-            return try previousDaysRange.map { previousDay -> WriterPerStep in
+            return try await previousDaysRange.asyncMap { previousDay -> WriterPerStep in
                 let skip = previousDay * 86400 / time.dtSeconds
                 let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
@@ -272,7 +272,7 @@ struct OmFileSplitter {
                 FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
                 try FileManager.default.removeItemIfExists(at: tempFile)
                 let fn = try FileHandle.createNewFile(file: tempFile)
-                let omRead = try? OmFileReader(file: readFile.getFilePath())
+                let omRead = try? await OmFileReaderAsync(mmapFile: readFile.getFilePath())
 
                 let writeFile = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024)
                 let writer = try writeFile.prepareArray(
@@ -303,7 +303,7 @@ struct OmFileSplitter {
                 let memberRange = 0 ..< UInt64(nMembers)
 
                 // Contains the entire time-series to be updated for a chunks of locations
-                let data = try supplyChunk(yRange, xRange, memberRange)
+                let data = try await supplyChunk(yRange, xRange, memberRange)
 
                 // TODO check if chunks need to be reorganised for ensemble files!!!
 
@@ -317,18 +317,18 @@ struct OmFileSplitter {
                                 // Dimensions are ok, read data. Ignores legacy ensemble files
                                 let start = yRange.lowerBound * UInt64(nx) + xRange.lowerBound
                                 let count = UInt64(yRange.count * xRange.count)
-                                try omRead.read(
+                                try await omRead.read(
                                     into: &fileData,
                                     range: [start ..< start + count, 0..<UInt64(nTimePerFile)]
                                 )
                             }
                         case 3:
-                            try omRead.read(
+                            try await omRead.read(
                                 into: &fileData,
                                 range: [yRange, xRange, 0..<UInt64(nTimePerFile)]
                             )
                         case 4: // ensemble files
-                            try omRead.read(
+                            try await omRead.read(
                                 into: &fileData,
                                 range: [yRange, xRange, memberRange, 0..<UInt64(nTimePerFile)]
                             )

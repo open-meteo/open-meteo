@@ -208,13 +208,13 @@ struct DownloadDemCommand: AsyncCommand {
                             continue
                         }
 
-                        guard let om = try OmFileReader(file: omFile).asArray(of: Float.self) else {
+                        guard let om = try await OmFileReaderAsync(file: omFile).asArray(of: Float.self) else {
                             fatalError("not a float array")
                         }
                         let dimensions = om.getDimensions()
                         precondition(dimensions[0] == 1200)
                         precondition(dimensions[1] == px)
-                        let data = try om.read()
+                        let data = try await om.read()
                         for i in 0..<1200 {
                             line[i * (px * 360) + (lon + 180) * px ..< i * (px * 360) + (lon + 180) * px + px] = data[i * px ..< (i + 1) * px]
                         }

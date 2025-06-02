@@ -247,7 +247,7 @@ struct DownloadBomCommand: AsyncCommand {
             }
             if domain == .access_global_ensemble && variable.om == .precipitation {
                 logger.info("Calculating precipitation probability")
-                try handles.append(contentsOf: handles.calculatePrecipitationProbabilityMultipleTimestamps(
+                try await handles.append(contentsOf: handles.calculatePrecipitationProbabilityMultipleTimestamps(
                     precipitationVariable: BomVariable.precipitation,
                     domain: domain,
                     run: run
