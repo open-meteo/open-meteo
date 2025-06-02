@@ -111,11 +111,11 @@ extension OmFileReaderArray: GenericFileManagable where Backend == MmapFile, OmT
     }
 }
 
-extension OmFileReaderArray where OmType == Float {
+extension OmFileReaderAsyncArrayProtocol where OmType == Float {
     /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
-    public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+    public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) async throws -> [Float] {
         let gridpoint = dim0.gridpoint
-        return try readInterpolated(
+        return try await readInterpolated(
             dim0X: gridpoint % dim0Nx,
             dim0XFraction: dim0.xFraction,
             dim0Y: gridpoint / dim0Nx,
@@ -126,12 +126,12 @@ extension OmFileReaderArray where OmType == Float {
     }
 
     /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
-    public func readInterpolated(pos: GridPoint2DFraction) throws -> Float {
+    public func readInterpolated(pos: GridPoint2DFraction) async throws -> Float {
         let dims = getDimensions()
         guard dims.count == 2 else {
             fatalError("Dimension count must be 2")
         }
-        return try readInterpolated(
+        return try await readInterpolated(
             dim0: pos.gridpoint / Int(dims[1]),
             dim0Fraction: pos.yFraction,
             dim1: pos.gridpoint % Int(dims[1]),
@@ -140,7 +140,7 @@ extension OmFileReaderArray where OmType == Float {
     }
 
     /// Read interpolated between 4 points. Assuming dim0 and dim1 are a spatial field
-    public func readInterpolated(dim0: Int, dim0Fraction: Float, dim1: Int, dim1Fraction: Float) throws -> Float {
+    public func readInterpolated(dim0: Int, dim0Fraction: Float, dim1: Int, dim1Fraction: Float) async throws -> Float {
         let dims = getDimensions()
         guard dims.count == 2 else {
             throw ForecastapiError.generic(message: "Dimension count must be 2 in \(#function)")
@@ -160,7 +160,7 @@ extension OmFileReaderArray where OmType == Float {
         }
 
         // reads 4 points at once
-        let points = try read(range: [dim0 ..< dim0 + 2, dim1 ..< dim1 + 2])
+        let points = try await read(range: [dim0 ..< dim0 + 2, dim1 ..< dim1 + 2])
 
         // interpolate linearly between
         return points[0] * (1 - dim0Fraction) * (1 - dim1Fraction) +
@@ -170,7 +170,7 @@ extension OmFileReaderArray where OmType == Float {
     }
 
     /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
-    public func readInterpolated(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) throws -> [Float] {
+    public func readInterpolated(dim0X: Int, dim0XFraction: Float, dim0Y: Int, dim0YFraction: Float, dim0Nx: Int, dim1 dim1Read: Range<Int>) async throws -> [Float] {
         let dims = getDimensions()
         guard dims.count == 2 || dims.count == 3 else {
             throw ForecastapiError.generic(message: "Dimension count must be 2 or 3 in \(#function)")
@@ -194,8 +194,8 @@ extension OmFileReaderArray where OmType == Float {
 
         if dims.count == 2 {
             // reads 4 points. As 2 points are next to each other, we can read a small row of 2 elements at once
-            let top = try read(range: [dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1Read.toUInt64()])
-            let bottom = try read(range: [(dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1Read.toUInt64()])
+            let top = try await read(range: [dim0Y * dim0Nx + dim0X ..< dim0Y * dim0Nx + dim0X + 2, dim1Read.toUInt64()])
+            let bottom = try await read(range: [(dim0Y + 1) * dim0Nx + dim0X ..< (dim0Y + 1) * dim0Nx + dim0X + 2, dim1Read.toUInt64()])
 
             // interpolate linearly between
             let nt = dim1Read.count
@@ -209,7 +209,7 @@ extension OmFileReaderArray where OmType == Float {
         }
 
         // New 3D files use [y,x,time] and are able to read 2x2xT slices directly
-        let data = try read(range: [dim0Y ..< dim0Y + 2, dim0X ..< dim0X + 2, dim1Read.toUInt64()])
+        let data = try await read(range: [dim0Y ..< dim0Y + 2, dim0X ..< dim0X + 2, dim1Read.toUInt64()])
         let nt = dim1Read.count
         return zip(zip(data[0..<nt], data[nt..<2 * nt]), zip(data[nt * 2..<nt * 3], data[nt * 3..<nt * 4])).map {
             let ((a, b), (c, d)) = $0

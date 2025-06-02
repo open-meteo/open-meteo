@@ -57,7 +57,7 @@ struct SeasonalForecastDownload: AsyncCommand {
             try await downloadCfsElevation(application: context.application, domain: domain, run: run)
 
             try await downloadCfs(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting)
-            try await convertCfs(logger: logger, domain: domain, run: run)
+            try await convertCfs(application: context.application, domain: domain, run: run)
         case .jma:
             fatalError()
         case .eccc:
@@ -109,7 +109,9 @@ struct SeasonalForecastDownload: AsyncCommand {
     }
 
     /// Process each variable and update time-series optimised files
-    func convertCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) async throws {
+    func convertCfs(application: Application, domain: SeasonalForecastDomain, run: Timestamp) async throws {
+        let logger = application.logger
+        let client = application.http.client.shared
         let om = OmFileSplitter(domain)
 
         for member in 1..<domain.nMembers + 1 {
@@ -169,7 +171,7 @@ struct SeasonalForecastDownload: AsyncCommand {
             }()
 
             /// -999 for sea
-            let elevations = try await domain.getStaticFile(type: .elevation)!.read()
+            let elevations = try await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)!.asArray(of: Float.self)!.read(range: nil)
 
             /// convert surface pressure to mean sea level pressure
             for l in 0..<tmp2m.nLocations {
