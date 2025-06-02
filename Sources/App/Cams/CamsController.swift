@@ -15,22 +15,22 @@ extension CamsQuery.Domain: GenericDomainProvider {
 }
 
 extension CamsMixer: GenericReaderProvider {
-    init?(domain: CamsQuery.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        guard let reader = try Self(domains: domain.camsDomains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    init?(domain: CamsQuery.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        guard let reader = try await Self(domains: domain.camsDomains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         self = reader
     }
 
-    init?(domain: CamsQuery.Domain, gridpoint: Int, options: GenericReaderOptions) throws {
+    init?(domain: CamsQuery.Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
         switch domain {
         case .auto:
             return nil
         case .cams_global:
-            let reader = try GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint)
+            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint)
             self.reader = [CamsReader(reader: GenericReaderCached(reader: reader))]
         case .cams_europe:
-            let reader = try GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint)
+            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint)
             self.reader = [CamsReader(reader: GenericReaderCached(reader: reader))]
         }
     }
@@ -51,16 +51,16 @@ struct CamsController {
 
             let nVariables = (paramsHourly?.count ?? 0) * domains.count
 
-            let prepared = try CamsMixer.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
+            let prepared = try await CamsMixer.prepareReaders(domains: domains, params: params, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
 
-            let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try prepared.map { prepared in
+            let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try await prepared.asyncMap { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
 
-                let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try prepared.perModel.compactMap { readerAndDomain in
-                    guard let reader = try readerAndDomain.reader() else {
+                let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try await prepared.perModel.asyncCompactMap { readerAndDomain in
+                    guard let reader = try await readerAndDomain.reader() else {
                         return nil
                     }
                     let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
@@ -293,8 +293,8 @@ extension Array where Element == Float {
 struct CamsMixer: GenericReaderMixer {
     let reader: [CamsReader]
 
-    static func makeReader(domain: CamsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> CamsReader? {
-        guard let reader = try GenericReader<CamsDomain, CamsVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    static func makeReader(domain: CamsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> CamsReader? {
+        guard let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         return CamsReader(reader: GenericReaderCached(reader: reader))

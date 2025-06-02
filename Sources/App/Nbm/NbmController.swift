@@ -79,8 +79,8 @@ struct NbmReaderLowLevel: GenericReaderProtocol {
         reader.modelDtSeconds
     }
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        return try reader.getStatic(type: type)
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.getStatic(type: type)
     }
 
     typealias MixingVar = NbmVariable
@@ -114,9 +114,9 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
 
     let options: GenericReaderOptions
 
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        let readers: [NbmReaderLowLevel] = try domains.compactMap { domain in
-            guard let reader = try GenericReader<NbmDomain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        let readers: [NbmReaderLowLevel] = try await domains.asyncCompactMap { domain in
+            guard let reader = try await GenericReader<NbmDomain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 return nil
             }
             return NbmReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)
@@ -128,8 +128,8 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
 
-    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
-        let reader = try GenericReader<NbmDomain, Variable>(domain: domain, position: gridpoint)
+    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
+        let reader = try await GenericReader<NbmDomain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderMixerSameDomain(reader: [NbmReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)])
         self.options = options
     }

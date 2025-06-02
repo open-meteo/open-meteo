@@ -94,16 +94,16 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
     let options: GenericReaderOptions
 
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
 
-    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
-        let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
+    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
+        let reader = try await GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
@@ -399,7 +399,7 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 struct GemMixer: GenericReaderMixer {
     let reader: [GemReader]
 
-    static func makeReader(domain: GemReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> GemReader? {
-        return try GemReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    static func makeReader(domain: GemReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GemReader? {
+        return try await GemReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 }

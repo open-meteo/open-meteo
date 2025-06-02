@@ -18,21 +18,21 @@ struct CmipController {
 
             let biasCorrection = !(params.disable_bias_correction ?? false)
 
-            let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try prepared.map { prepared in
+            let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
-                let readers: [ForecastapiResult<Cmip6Domain>.PerModel] = try domains.compactMap { domain in
-                    let reader: any Cmip6Readerable = try {
+                let readers: [ForecastapiResult<Cmip6Domain>.PerModel] = try await domains.asyncCompactMap { domain in
+                    let reader: any Cmip6Readerable = try await {
                         if biasCorrection {
-                            guard let reader = try Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                            guard let reader = try await Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
                                 throw ForecastapiError.noDataAvilableForThisLocation
                             }
                             return Cmip6ReaderPostBiasCorrected(reader: reader, domain: domain)
                         } else {
-                            guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                            guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
                                 throw ForecastapiError.noDataAvilableForThisLocation
                             }
                             let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -240,8 +240,11 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     /// era5 land reader
     let readerEra5Land: GenericReader<CdsDomain, Era5Variable>?
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        return try readerEra5.getStatic(type: type) ?? readerEra5.getStatic(type: type)
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        if let result = try await readerEra5.getStatic(type: type) {
+            return result
+        }
+        return try await readerEra5.getStatic(type: type)
     }
 
     /// Get Bias correction field from era5-land or era5
@@ -331,14 +334,14 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         }
     }
 
-    init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let readerEra5Land = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+        guard let readerEra5Land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let readerEra5 = try GenericReader<CdsDomain, Era5Variable>(domain: .era5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+        guard let readerEra5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -378,18 +381,18 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
 
     var _referenceElevation: ElevationOrSea?
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        guard let file = referenceDomain.getStaticFile(type: type) else {
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        guard let file = await referenceDomain.getStaticFile(type: type) else {
             return nil
         }
         return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition.gridpoint, file: file)
     }
 
-    func getReferenceElevation() throws -> ElevationOrSea {
+    func getReferenceElevation() async throws -> ElevationOrSea {
         if let _referenceElevation {
             return _referenceElevation
         }
-        guard let elevationFile = referenceDomain.getStaticFile(type: .elevation) else {
+        guard let elevationFile = await referenceDomain.getStaticFile(type: .elevation) else {
             throw ForecastapiError.generic(message: "Elevation file for domain \(referenceDomain) is missing")
         }
         let referenceElevation = try referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
@@ -433,7 +436,7 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
             let isElevationCorrectable = raw == .temperature_2m_max || raw == .temperature_2m_min || raw == .temperature_2m_mean
 
             if isElevationCorrectable && raw.unit == .celsius && !targetElevation.isNaN {
-                let modelElevation = try getReferenceElevation().numeric
+                let modelElevation = try await getReferenceElevation().numeric
                 if !modelElevation.isNaN && targetElevation != modelElevation {
                     for i in data.indices {
                         // correct temperature by 0.65° per 100 m elevation
@@ -449,8 +452,8 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         try reader.prefetchData(variable: variable, time: time)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         guard let referencePosition = referenceDomain.grid.findPointInterpolated(lat: lat, lon: lon) else {
@@ -492,8 +495,8 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
 
     let referenceElevation: ElevationOrSea
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        guard let file = referenceDomain.getStaticFile(type: type) else {
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        guard let file = await referenceDomain.getStaticFile(type: type) else {
             return nil
         }
         return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
@@ -560,11 +563,11 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         try reader.prefetchData(variable: variable, time: time)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
-        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let referencePosition = try referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation), mode: mode) else {
+        guard let referencePosition = try await referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation), mode: mode) else {
             return nil
         }
         self.referenceDomain = referenceDomain
@@ -574,9 +577,9 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea) throws {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea) async throws {
         let (lat, lon) = referenceDomain.grid.getCoordinates(gridpoint: referencePosition)
-        guard let reader = try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest) else {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -633,7 +636,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
                 max(min((tmax + tmin) / 2, limit) - base, 0)
             }), .gddCelsius)
         case .soil_moisture_index_0_to_10cm_mean:
-            guard let soilType = try self.getStatic(type: .soilType) else {
+            guard let soilType = try await self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
@@ -643,7 +646,7 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
             let soilMoisture = try await get(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_0_to_100cm_mean:
-            guard let soilType = try self.getStatic(type: .soilType) else {
+            guard let soilType = try await self.getStatic(type: .soilType) else {
                 throw ForecastapiError.generic(message: "Could not read soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {

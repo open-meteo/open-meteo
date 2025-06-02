@@ -79,14 +79,14 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(lon2, -179.875, accuracy: 0.001)
     }
 
-    func testElevationMatching() throws {
+    func testElevationMatching() async throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
 
-        let optimised = try IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
+        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
         XCTAssertEqual(optimised.gridpoint, 225405)
         XCTAssertEqual(optimised.gridElevation.numeric, 600)
 
-        let nearest = try IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
+        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
         XCTAssertEqual(nearest.gridpoint, 225406)
         XCTAssertEqual(nearest.gridElevation.numeric, 1006.0)
     }

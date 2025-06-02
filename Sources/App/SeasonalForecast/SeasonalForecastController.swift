@@ -168,7 +168,7 @@ struct SeasonalForecastController {
                 let timeSixHourlyDisplay = time.dailyDisplay.with(dtSeconds: 3600 * 6)
 
                 let readers: [ForecastapiResult<SeasonalForecastDomainApi>.PerModel] = try await domains.asyncCompactMap { domain in
-                    guard let reader = try SeasonalForecastReader(domain: domain.forecastDomain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
+                    guard let reader = try await SeasonalForecastReader(domain: domain.forecastDomain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
                         return nil
                     }
                     let members = 1..<domain.forecastDomain.nMembers + 1

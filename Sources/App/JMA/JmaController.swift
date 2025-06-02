@@ -87,8 +87,8 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
     let options: GenericReaderOptions
 
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
@@ -363,7 +363,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 struct JmaMixer: GenericReaderMixer {
     let reader: [JmaReader]
 
-    static func makeReader(domain: JmaReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> JmaReader? {
-        return try JmaReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    static func makeReader(domain: JmaReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> JmaReader? {
+        return try await JmaReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 }

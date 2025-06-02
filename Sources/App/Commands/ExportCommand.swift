@@ -434,7 +434,7 @@ struct ExportCommand: AsyncCommand {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
             let targetDomain = targetGridDomain?.genericDomain ?? domain.genericDomain
-            guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
+            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
             try ncElevation.write(elevationFile.read())
@@ -456,7 +456,7 @@ struct ExportCommand: AsyncCommand {
 
             if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
-                guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
+                guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
                 }
                 for l in 0..<grid.count {
@@ -464,7 +464,7 @@ struct ExportCommand: AsyncCommand {
                     let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
 
                     // Read data
-                    let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                    let reader = try await domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
                     guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                         fatalError("Invalid variable \(variable)")
                     }
@@ -478,7 +478,7 @@ struct ExportCommand: AsyncCommand {
             // Loop over locations, read and write
             for gridpoint in 0..<grid.count {
                 // Read data
-                let reader = try domain.getReader(position: gridpoint)
+                let reader = try await domain.getReader(position: gridpoint)
                 guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
@@ -504,7 +504,7 @@ struct ExportCommand: AsyncCommand {
         /// Interpolate data from one grid to another and perform bias correction
         if let targetGridDomain {
             let targetDomain = targetGridDomain.genericDomain
-            guard let elevationFile = targetDomain.getStaticFile(type: .elevation) else {
+            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
 
@@ -513,7 +513,7 @@ struct ExportCommand: AsyncCommand {
                 let elevation = try grid.readElevation(gridpoint: l, elevationFile: elevationFile)
 
                 // Read data
-                let reader = try domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
+                let reader = try await domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land)
                 guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                     fatalError("Invalid variable \(variable)")
                 }
@@ -527,7 +527,7 @@ struct ExportCommand: AsyncCommand {
         // Loop over locations, read and write
         for gridpoint in 0..<grid.count {
             // Read data
-            let reader = try domain.getReader(position: gridpoint)
+            let reader = try await domain.getReader(position: gridpoint)
             guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                 fatalError("Invalid variable \(variable)")
             }
@@ -800,58 +800,58 @@ enum ExportDomain: String, CaseIterable {
         return genericDomain.grid
     }
 
-    func getReader(position: Int) throws -> any GenericReaderProtocol {
+    func getReader(position: Int) async throws -> any GenericReaderProtocol {
         let options = GenericReaderOptions()
 
         switch self {
         case .CMCC_CM2_VHR4:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position), domain: Cmip6Domain.CMCC_CM2_VHR4), domain: Cmip6Domain.CMCC_CM2_VHR4)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.CMCC_CM2_VHR4, position: position), domain: Cmip6Domain.CMCC_CM2_VHR4), domain: Cmip6Domain.CMCC_CM2_VHR4)
         case .MRI_AGCM3_2_S:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position), domain: .MRI_AGCM3_2_S), domain: .MRI_AGCM3_2_S)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MRI_AGCM3_2_S, position: position), domain: .MRI_AGCM3_2_S), domain: .MRI_AGCM3_2_S)
         case .FGOALS_f3_H:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position), domain: .FGOALS_f3_H), domain: .FGOALS_f3_H)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.FGOALS_f3_H, position: position), domain: .FGOALS_f3_H), domain: .FGOALS_f3_H)
         case .HiRAM_SIT_HR:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position), domain: .HiRAM_SIT_HR), domain: .HiRAM_SIT_HR)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.HiRAM_SIT_HR, position: position), domain: .HiRAM_SIT_HR), domain: .HiRAM_SIT_HR)
         case .EC_Earth3P_HR:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position), domain: .EC_Earth3P_HR), domain: .EC_Earth3P_HR)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.EC_Earth3P_HR, position: position), domain: .EC_Earth3P_HR), domain: .EC_Earth3P_HR)
         case .MPI_ESM1_2_XR:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position), domain: .MPI_ESM1_2_XR), domain: .MPI_ESM1_2_XR)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.MPI_ESM1_2_XR, position: position), domain: .MPI_ESM1_2_XR), domain: .MPI_ESM1_2_XR)
         case .NICAM16_8S:
-            return Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position), domain: .NICAM16_8S), domain: .NICAM16_8S)
+            return await Cmip6ReaderPostBiasCorrected(reader: Cmip6ReaderPreBiasCorrection(reader: try GenericReader(domain: Cmip6Domain.NICAM16_8S, position: position), domain: .NICAM16_8S), domain: .NICAM16_8S)
         case .glofas_v3_consolidated:
-            return try GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position)
+            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidatedv3, position: position)
         case .glofas_v4_consolidated:
-            return try GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position)
+            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.consolidated, position: position)
         case .glofas_v3_forecast:
-            return try GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position)
+            return try await GenericReader<GloFasDomain, GloFasVariable>(domain: GloFasDomain.forecastv3, position: position)
         case .glofas_v3_seasonal:
-            return try GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position)
+            return try await GenericReader<GloFasDomain, GloFasVariableMember>(domain: GloFasDomain.seasonalv3, position: position)
         case .era5_land:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)), options: options)
+            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position)), options: options)
         case .era5:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)), options: options)
+            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position)), options: options)
         case .ecmwf_ifs:
-            return Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, position: position)), options: options)
+            return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, position: position)), options: options)
         }
     }
 
-    func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> any GenericReaderProtocol {
+    func getReader(targetGridDomain: TargetGridDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws -> any GenericReaderProtocol {
         guard let cmipDomain = self.cmipDomain else {
             fatalError("Regridding only supported for CMIP domains")
         }
         switch targetGridDomain {
         case .era5_interpolated_10km:
-            guard let biasCorrector = try Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let biasCorrector = try await Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         case .era5_land:
-            guard let biasCorrector = try Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let biasCorrector = try await Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         case .imerg:
-            guard let biasCorrector = try Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+            guard let biasCorrector = try await Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 throw ForecastapiError.noDataAvilableForThisLocation
             }
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)

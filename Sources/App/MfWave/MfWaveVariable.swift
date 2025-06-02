@@ -233,8 +233,8 @@ struct MfWaveReader: GenericReaderProtocol {
         return reader.modelDtSeconds
     }
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        return try reader.getStatic(type: type)
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.getStatic(type: type)
     }
 
     func get(variable: MfWaveVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {

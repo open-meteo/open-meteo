@@ -16,7 +16,7 @@ protocol GenericReaderMixerRaw: GenericReaderProtocol {
 protocol GenericReaderMixer: GenericReaderMixerRaw {
     associatedtype Domain: GenericDomain
 
-    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Reader?
+    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Reader?
 }
 
 struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {
@@ -26,12 +26,12 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
 }
 
 extension GenericReaderMixer {
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
 
-        let reader: [Reader] = try domains.reversed().compactMap { domain -> (Reader?) in
-            guard let domain = try Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+        let reader: [Reader] = try await domains.reversed().asyncCompactMap { domain -> (Reader?) in
+            guard let domain = try await Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return nil
             }
             if elevation.isNaN {
@@ -76,8 +76,8 @@ extension GenericReaderMixerRaw {
         }
     }
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        return try reader.last?.getStatic(type: type)
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.last?.getStatic(type: type)
     }
 
     func get(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {

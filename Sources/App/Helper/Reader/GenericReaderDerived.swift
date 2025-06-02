@@ -87,8 +87,8 @@ extension GenericReaderDerived {
         }
     }
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        return try reader.getStatic(type: type)
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.getStatic(type: type)
     }
 
     func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDtAndSettings) throws {

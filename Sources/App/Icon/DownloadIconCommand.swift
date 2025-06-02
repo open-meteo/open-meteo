@@ -129,8 +129,8 @@ struct DownloadIconCommand: AsyncCommand {
         let deaverager15min = GribDeaverager()
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
-        let domainElevation = {
-            guard let elevation = try? domain.getStaticFile(type: .elevation)?.read() else {
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation)?.read() else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

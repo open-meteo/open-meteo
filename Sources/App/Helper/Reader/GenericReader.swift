@@ -13,7 +13,7 @@ protocol GenericReaderProtocol {
     var modelDtSeconds: Int { get }
 
     func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    func getStatic(type: ReaderStaticVariable) throws -> Float?
+    func getStatic(type: ReaderStaticVariable) async throws -> Float?
     func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) throws
 }
 
@@ -108,10 +108,10 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Initialise reader to read a single grid-point
-    public init(domain: Domain, position: Int) throws {
+    public init(domain: Domain, position: Int) async throws {
         self.domain = domain
         self.position = position
-        if let elevationFile = domain.getStaticFile(type: .elevation) {
+        if let elevationFile = await domain.getStaticFile(type: .elevation) {
             self.modelElevation = try domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
         } else {
             self.modelElevation = .noData
@@ -124,9 +124,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Return nil, if the coordinates are outside the domain grid
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
         // check if coordinates are in domain, otherwise return nil
-        guard let gridpoint = try domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: domain.getStaticFile(type: .elevation), mode: mode) else {
+        guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: domain.getStaticFile(type: .elevation), mode: mode) else {
             return nil
         }
         self.domain = domain
@@ -198,8 +198,8 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         return try await readAndInterpolate(variable: variable, time: time)
     }
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        guard let file = domain.getStaticFile(type: type) else {
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        guard let file = await domain.getStaticFile(type: type) else {
             return nil
         }
         return try domain.grid.readFromStaticFile(gridpoint: position, file: file)

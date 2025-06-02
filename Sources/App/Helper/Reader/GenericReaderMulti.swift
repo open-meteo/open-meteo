@@ -3,9 +3,9 @@ import Foundation
 protocol MultiDomainMixerDomain: RawRepresentableString, GenericDomainProvider {
     var countEnsembleMember: Int { get }
 
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> [any GenericReaderProtocol]
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> [any GenericReaderProtocol]
 
-    func getReader(gridpoint: Int, options: GenericReaderOptions) throws -> (any GenericReaderProtocol)?
+    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)?
 }
 
 /// Combine multiple independent weather models, that may not have given forecast variable
@@ -35,8 +35,8 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         self.domain = domain
     }
 
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        let reader = try domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        let reader = try await domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         guard !reader.isEmpty else {
             return nil
         }
@@ -44,8 +44,8 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         self.reader = reader
     }
 
-    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
-        guard let reader = try domain.getReader(gridpoint: gridpoint, options: options) else {
+    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
+        guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
             return nil
         }
         self.domain = domain
