@@ -24,7 +24,7 @@ struct DemController {
                     throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
                 }
             }
-            return DemResponder(latitude: latitude, longitude: longitude)
+            return DemResponder(latitude: latitude, longitude: longitude, logger: req.logger, httpClient: req.application.http.client.shared)
         }
     }
 }
@@ -34,21 +34,21 @@ fileprivate struct DemResponder: ForecastapiResponder {
 
     let latitude: [Float]
     let longitude: [Float]
+    let logger: Logger
+    let httpClient: HTTPClient
 
     func calculateQueryWeight(nVariablesModels: Int?) -> Float {
         return Float(nVariablesModels ?? latitude.count)
     }
 
     func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response {
-        return try await ForecastapiController.runLoop.next().submit({
-            let elevation = try zip(latitude, longitude).map { latitude, longitude in
-                try Dem90.read(lat: latitude, lon: longitude)
-            }
-            var headers = HTTPHeaders()
-            headers.add(name: .contentType, value: "application/json")
-            return Response(status: .ok, headers: headers, body: .init(string: """
-               {"elevation":\(elevation)}
-               """))
-        }).get()
+        let elevation = try await zip(latitude, longitude).asyncMap { latitude, longitude in
+            try await Dem90.read(lat: latitude, lon: longitude, logger: logger, httpClient: httpClient)
+        }
+        var headers = HTTPHeaders()
+        headers.add(name: .contentType, value: "application/json")
+        return Response(status: .ok, headers: headers, body: .init(string: """
+           {"elevation":\(elevation)}
+           """))
     }
 }

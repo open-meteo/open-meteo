@@ -125,8 +125,10 @@ struct IconWaveController {
         try await req.withApiParameter("marine-api") { _, params in
             let currentTime = Timestamp.now()
             let allowedRange = Timestamp(1940, 1, 1) ..< currentTime.add(86400 * 17)
+            let logger = req.logger
+            let httpClient = req.application.http.client.shared
 
-            let prepared = try params.prepareCoordinates(allowTimezones: true)
+            let prepared = try await params.prepareCoordinates(allowTimezones: false, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
                 throw ForecastapiError.generic(message: "Bounding box not supported")
             }
@@ -138,7 +140,7 @@ struct IconWaveController {
 
             let nParamsMinutely = paramsMinutely?.count ?? 0
             let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, { $0 + $1.countEnsembleMember })
-            let options = params.readerOptions(for: req)
+            let options = params.readerOptions(logger: logger, httpClient: httpClient)
             
             let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

@@ -7,8 +7,10 @@ struct CmipController {
         try await req.withApiParameter("climate-api") { _, params in
             let currentTime = Timestamp.now()
             let allowedRange = Timestamp(1950, 1, 1) ..< Timestamp(2051, 1, 1)
+            let logger = req.logger
+            let httpClient = req.application.http.client.shared
 
-            let prepared = try params.prepareCoordinates(allowTimezones: false)
+            let prepared = try await params.prepareCoordinates(allowTimezones: false, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
                 throw ForecastapiError.generic(message: "Bounding box not supported")
             }
@@ -17,7 +19,7 @@ struct CmipController {
             let nVariables = (paramsDaily?.count ?? 0) * domains.count
 
             let biasCorrection = !(params.disable_bias_correction ?? false)
-            let options = params.readerOptions(for: req)
+            let options = params.readerOptions(logger: logger, httpClient: httpClient)
 
             let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

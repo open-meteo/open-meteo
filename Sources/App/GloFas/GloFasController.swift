@@ -90,8 +90,10 @@ struct GloFasController {
         try await req.withApiParameter("flood-api") { _, params in
             let currentTime = Timestamp.now()
             let allowedRange = Timestamp(1984, 1, 1) ..< currentTime.add(86400 * 230)
+            let logger = req.logger
+            let httpClient = req.application.http.client.shared
 
-            let prepared = try params.prepareCoordinates(allowTimezones: false)
+            let prepared = try await params.prepareCoordinates(allowTimezones: false, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
                 throw ForecastapiError.generic(message: "Bounding box not supported")
             }
@@ -100,7 +102,7 @@ struct GloFasController {
                 throw ForecastapiError.generic(message: "Parameter 'daily' required")
             }
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
-            let options = params.readerOptions(for: req)
+            let options = params.readerOptions(logger: logger, httpClient: httpClient)
 
             let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

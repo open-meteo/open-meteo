@@ -45,20 +45,20 @@ struct Dem90: GenericDomain {
     }
 
     /// Get elevation for coordinate. Access to om files is cached.
-    static func read(lat: Float, lon: Float) throws -> Float {
+    static func read(lat: Float, lon: Float, logger: Logger, httpClient: HTTPClient) async throws -> Float {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }
         let lati = lat < 0 ? Int(lat) - 1 : Int(lat)
-        guard let om = try OmFileManager.get(.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)) else {
-            // file not available
-            return .nan
-        }
         let latrow = UInt64(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
         let lonrow = UInt64((lon + 180) * Float(px))
         var value: Float = .nan
-        try om.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1])
+        
+        let file = OmFileManagerReadable.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
+        try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
+            try await reader.asArray(of: Float.self)?.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
+        }
         return value
     }
 
