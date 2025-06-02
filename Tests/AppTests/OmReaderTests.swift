@@ -53,7 +53,7 @@ final class OmReaderTests: XCTestCase {
     
     func testRemoteFileManager() async throws {
         let value = try await RemoteOmFileManager.instance.with(file: .staticFile(domain: .dwd_icon_d2_eps, variable: "HSURF", chunk: nil), client: .shared, logger: .init(label: "")) { reader in
-            try await reader.asArray(of: Float.self, io_size_max: 65536, io_size_merge: 512)!.read(range: [250..<251, 420..<421])
+            try await reader.asArray(of: Float.self)!.read(range: [250..<251, 420..<421])
         }
         XCTAssertEqual(value?.first, 214)
     }

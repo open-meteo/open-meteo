@@ -88,7 +88,7 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     let options: GenericReaderOptions
 
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)

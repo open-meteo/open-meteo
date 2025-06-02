@@ -9,8 +9,7 @@ protocol GenericReaderProvider {
 
 extension GenericReaderProvider {
     /// Prepare readers for Point, MultiPoint and BoundingBox queries
-    public static func prepareReaders(domains: [DomainProvider], params: ApiQueryParameter, currentTime: Timestamp, forecastDayDefault: Int, forecastDaysMax: Int, pastDaysMax: Int, allowedRange: Range<Timestamp>) async throws -> [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: DomainProvider, reader: () async throws -> (Self?))])] {
-        let options = params.readerOptions
+    public static func prepareReaders(domains: [DomainProvider], params: ApiQueryParameter, options: GenericReaderOptions, currentTime: Timestamp, forecastDayDefault: Int, forecastDaysMax: Int, pastDaysMax: Int, allowedRange: Range<Timestamp>) async throws -> [(locationId: Int, timezone: TimezoneWithOffset, time: ForecastApiTimeRange, perModel: [(domain: DomainProvider, reader: () async throws -> (Self?))])] {
         let prepared = try params.prepareCoordinates(allowTimezones: true)
 
         switch prepared {

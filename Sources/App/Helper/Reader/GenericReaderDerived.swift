@@ -1,4 +1,5 @@
 import Foundation
+import Vapor
 
 /// The required functions to implement a reader that provides derived variables
 protocol GenericReaderDerived: GenericReaderProtocol {
@@ -21,10 +22,16 @@ struct GenericReaderOptions {
 
     /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west
     private var azimuth: Float
+    
+    let logger: Logger
+    
+    let httpClient: HTTPClient
 
-    public init(tilt: Float? = nil, azimuth: Float? = nil) {
+    public init(tilt: Float? = nil, azimuth: Float? = nil, logger: Logger, httpClient: HTTPClient) {
         self.tilt = tilt ?? 0
         self.azimuth = azimuth ?? 0
+        self.logger = logger
+        self.httpClient = httpClient
     }
 
     /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.

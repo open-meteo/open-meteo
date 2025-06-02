@@ -114,8 +114,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return timeformat ?? .iso8601
     }
 
-    var readerOptions: GenericReaderOptions {
-        return GenericReaderOptions(tilt: tilt, azimuth: azimuth)
+    func readerOptions(for request: Request) -> GenericReaderOptions {
+        return GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: request.application.http.client.shared)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps
