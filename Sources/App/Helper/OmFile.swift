@@ -128,12 +128,12 @@ struct OmFileSplitter {
         }
     }
 
-    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) async throws -> Array2DFastTime {
-        let data = try await read(variable: variable, location: location, level: level, time: time)
+    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> Array2DFastTime {
+        let data = try await read(variable: variable, location: location, level: level, time: time, logger: logger, httpClient: httpClient)
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
 
-    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings) async throws -> [Float] {
+    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
@@ -144,7 +144,7 @@ struct OmFileSplitter {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
             let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await RemoteOmFileManager.instance.with(file: file, client: time.httpClient, logger: time.logger) { reader in
+                try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
                     guard let reader = reader.asArray(of: Float.self) else {
                         return
                     }
@@ -166,7 +166,7 @@ struct OmFileSplitter {
                     continue
                 }
                 let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await RemoteOmFileManager.instance.with(file: file, client: time.httpClient, logger: time.logger) { reader in
+                try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
                     guard let reader = reader.asArray(of: Float.self) else {
                         return
                     }
@@ -186,7 +186,7 @@ struct OmFileSplitter {
                 continue
             }
             let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await RemoteOmFileManager.instance.with(file: file, client: time.httpClient, logger: time.logger) { reader in
+            try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
                 guard let reader = reader.asArray(of: Float.self) else {
                     return
                 }

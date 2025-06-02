@@ -29,11 +29,6 @@ struct TimerangeDtAndSettings: Hashable  {
 
     let previousDay: Int
     
-    let logger: Logger
-    
-    let httpClient: HTTPClient
-    
-    
     static func == (lhs: TimerangeDtAndSettings, rhs: TimerangeDtAndSettings) -> Bool {
         return lhs.hashValue == rhs.hashValue
     }
@@ -54,21 +49,21 @@ struct TimerangeDtAndSettings: Hashable  {
     }
 
     func with(start: Timestamp) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, logger: logger, httpClient: httpClient)
+        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 
     func with(time: TimerangeDt? = nil, ensembleMember: Int? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, logger: logger, httpClient: httpClient)
+        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, logger: logger, httpClient: httpClient)
+        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
     }
 }
 
 extension TimerangeDt {
-    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil, logger: Logger = .init(label: ""), httpClient: HTTPClient = .shared) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0, logger: logger, httpClient: httpClient)
+    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0)
     }
 }
 
@@ -170,7 +165,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        var data = try await omFileSplitter.read(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time)
+        var data = try await omFileSplitter.read(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
 
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {
