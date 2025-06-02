@@ -28,17 +28,6 @@ struct TimerangeDtAndSettings: Hashable  {
     let ensembleMemberLevel: Int
 
     let previousDay: Int
-    
-    static func == (lhs: TimerangeDtAndSettings, rhs: TimerangeDtAndSettings) -> Bool {
-        return lhs.hashValue == rhs.hashValue
-    }
-    
-    func hash(into hasher: inout Hasher) {
-        hasher.combine(time)
-        hasher.combine(ensembleMember)
-        hasher.combine(ensembleMemberLevel)
-        hasher.combine(previousDay)
-    }
 
     var dtSeconds: Int {
         time.dtSeconds
