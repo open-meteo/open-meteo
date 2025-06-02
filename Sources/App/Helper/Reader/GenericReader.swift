@@ -67,7 +67,7 @@ struct TimerangeDtAndSettings: Hashable  {
 }
 
 extension TimerangeDt {
-    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil, logger: Logger, httpClient: HTTPClient) -> TimerangeDtAndSettings {
+    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil, logger: Logger = .init(label: ""), httpClient: HTTPClient = .shared) -> TimerangeDtAndSettings {
         return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0, logger: logger, httpClient: httpClient)
     }
 }

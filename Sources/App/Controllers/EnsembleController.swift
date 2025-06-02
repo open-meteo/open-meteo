@@ -43,14 +43,14 @@ public struct EnsembleApiController {
                             if let hourlyVariables = paramsHourly {
                                 for variable in hourlyVariables {
                                     for member in 0..<reader.domain.countEnsembleMember {
-                                        try reader.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, logger: req.logger, httpClient: req.application.http.client.shared))
+                                        try reader.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
                                     }
                                 }
                             }
                             if let paramsDaily {
                                 for variable in paramsDaily {
                                     for member in 0..<reader.domain.countEnsembleMember {
-                                        try reader.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, logger: req.logger, httpClient: req.application.http.client.shared))
+                                        try reader.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
                                     }
                                 }
                              }
@@ -61,7 +61,7 @@ public struct EnsembleApiController {
                                 return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
                                     var unit: SiUnit?
                                     let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
-                                        guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, logger: req.logger, httpClient: req.application.http.client.shared))?.convertAndRound(params: params) else {
+                                        guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit
@@ -80,7 +80,7 @@ public struct EnsembleApiController {
                                 return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await dailyVariables.asyncMap { variable -> ApiColumn<EnsembleVariableDaily> in
                                     var unit: SiUnit?
                                     let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
-                                        guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member, logger: req.logger, httpClient: req.application.http.client.shared))?.convertAndRound(params: params) else {
+                                        guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
                                             return nil
                                         }
                                         unit = d.unit

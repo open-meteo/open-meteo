@@ -1188,7 +1188,7 @@ struct DownloadCmipCommand: AsyncCommand {
     /*func generateBiasCorrectionFields(logger: Logger, domain: Cmip6Domain, variables: [Cmip6Variable]) throws {
         logger.info("Calculating bias correction fields")
         let binsPerYear = 6
-        let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600)toSettings(logger: req.logger, httpClient: req.application.http.client.shared)
+        let time = TimerangeDt(start: Timestamp(1960,1,1), to: Timestamp(2022+1,1,1), dtSeconds: 24*3600).toSettings()
         let writer = OmFileWriter(dim0: domain.grid.count, dim1: binsPerYear, chunk0: 200, chunk1: binsPerYear)
         let variables = Cmip6Variable.allCases.map({ Cmip6VariableOrDerived.raw($0) }) + Cmip6VariableDerivedBiasCorrected.allCases.map({ Cmip6VariableOrDerived.derived($0) })
         
