@@ -5,9 +5,15 @@ import Vapor
 import OmFileFormat
 
 final class OmReaderTests: XCTestCase {
+    private var app: Application?
+    
     override func setUp() async throws {
-        var env = try Environment.detect()
-        try LoggingSystem.bootstrap(from: &env)
+        app = try await Application.testable()
+    }
+
+    override func tearDown() async throws {
+        try await app?.asyncShutdown()
+        app = nil
     }
     
     func testHttpRead() async throws {
