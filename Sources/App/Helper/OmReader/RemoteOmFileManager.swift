@@ -91,12 +91,6 @@ extension OmFileManagerReadable {
     }
 }
 
-extension OmFileReaderAsyncProtocol {
-    func asArray<OmType: OmFileArrayDataTypeProtocol>(of: OmType.Type) -> (any OmFileReaderAsyncArrayProtocol<OmType>)? {
-        return asArray(of: of, io_size_max: 65536, io_size_merge: 512)
-    }
-}
-
 /**
  KV cache, but a resource is resolved not in parallel
  */

@@ -7,7 +7,7 @@ struct GloFasMixer: GenericReaderMixer {
     let reader: [GloFasReader]
 
     static func makeReader(domain: GloFasReader.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GloFasReader? {
-        return try await GloFasReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        return try await GloFasReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode)
     }
 }
 
@@ -36,8 +36,8 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
     typealias Derived = GlofasDerivedVariable
 
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
@@ -100,7 +100,6 @@ struct GloFasController {
                 throw ForecastapiError.generic(message: "Parameter 'daily' required")
             }
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
-            let options = params.readerOptions(for: req)
 
             let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
@@ -109,7 +108,7 @@ struct GloFasController {
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
                 let readers: [ForecastapiResult<GlofasDomainApi>.PerModel] = try await domains.asyncCompactMap { domain in
-                    guard let reader = try await domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest, options: options) else {
+                    guard let reader = try await domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest, options: params.readerOptions) else {
                         return nil
                     }
                     return ForecastapiResult<GlofasDomainApi>.PerModel(

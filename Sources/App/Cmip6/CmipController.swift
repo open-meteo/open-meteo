@@ -17,7 +17,6 @@ struct CmipController {
             let nVariables = (paramsDaily?.count ?? 0) * domains.count
 
             let biasCorrection = !(params.disable_bias_correction ?? false)
-            let options = params.readerOptions(for: req)
 
             let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
@@ -28,12 +27,12 @@ struct CmipController {
                 let readers: [ForecastapiResult<Cmip6Domain>.PerModel] = try await domains.asyncCompactMap { domain in
                     let reader: any Cmip6Readerable = try await {
                         if biasCorrection {
-                            guard let reader = try await Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+                            guard let reader = try await Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
                                 throw ForecastapiError.noDataAvilableForThisLocation
                             }
                             return Cmip6ReaderPostBiasCorrected(reader: reader, domain: domain)
                         } else {
-                            guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+                            guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land) else {
                                 throw ForecastapiError.noDataAvilableForThisLocation
                             }
                             let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -249,13 +248,11 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     }
 
     /// Get Bias correction field from era5-land or era5
-    func getEra5BiasCorrectionWeights(for variable: Cmip6VariableOrDerived) async throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        if let readerEra5Land, let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) {
+    func getEra5BiasCorrectionWeights(for variable: Cmip6VariableOrDerived) throws -> (weights: BiasCorrectionSeasonalLinear, modelElevation: Float) {
+        if let readerEra5Land, let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try readerEra5Land.domain.openBiasCorrectionFile(for: variable.rawValue) {
             let nTime = Int(referenceWeightFile.getDimensions().last!)
             var weights = [Float](repeating: .nan, count: nTime)
-            try await referenceWeightFile.read3D(
+            try referenceWeightFile.read3D(
                 into: &weights,
                 ny: readerEra5Land.domain.grid.ny,
                 nx: readerEra5Land.domain.grid.nx,
@@ -269,12 +266,12 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
                 return (BiasCorrectionSeasonalLinear(meansPerYear: weights), readerEra5Land.modelElevation.numeric)
             }
         }
-        guard let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await readerEra5.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let variable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try readerEra5.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(readerEra5.domain)")
         }
         let nTime = Int(referenceWeightFile.getDimensions().last!)
         var weights = [Float](repeating: .nan, count: nTime)
-        try await referenceWeightFile.read3D(
+        try referenceWeightFile.read3D(
             into: &weights,
             ny: readerEra5.domain.grid.ny,
             nx: readerEra5.domain.grid.nx,
@@ -288,17 +285,15 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
     }
 
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
         let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
 
-        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let nTime = Int(controlWeightFile.getDimensions().last!)
         var weights = [Float](repeating: .nan, count: nTime)
-        try await controlWeightFile.read3D(
+        try controlWeightFile.read3D(
             into: &weights,
             ny: reader.domain.grid.ny,
             nx: reader.domain.grid.nx,
@@ -309,7 +304,7 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
             timeOffsets: (file: 0..<nTime, array: 0..<nTime)
         )
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
-        let referenceWeights = try await getEra5BiasCorrectionWeights(for: variable)
+        let referenceWeights = try getEra5BiasCorrectionWeights(for: variable)
         referenceWeights.weights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
             for i in data.indices {
@@ -339,14 +334,14 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         }
     }
 
-    init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    init?(domain: Cmip6Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let readerEra5Land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+        guard let readerEra5Land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        guard let readerEra5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+        guard let readerEra5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
@@ -387,24 +382,20 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     var _referenceElevation: ElevationOrSea?
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        guard let file = await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let file = await referenceDomain.getStaticFile(type: type) else {
             return nil
         }
-        return try await referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition.gridpoint, file: file)
+        return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition.gridpoint, file: file)
     }
 
     func getReferenceElevation() async throws -> ElevationOrSea {
         if let _referenceElevation {
             return _referenceElevation
         }
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        guard let elevationFile = await referenceDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let elevationFile = await referenceDomain.getStaticFile(type: .elevation) else {
             throw ForecastapiError.generic(message: "Elevation file for domain \(referenceDomain) is missing")
         }
-        let referenceElevation = try await referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
+        let referenceElevation = try referenceDomain.grid.readElevationInterpolated(gridpoint: referencePosition, elevationFile: elevationFile)
         self._referenceElevation = referenceElevation
         return referenceElevation
     }
@@ -412,15 +403,13 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
 
-        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let nTime = Int(controlWeightFile.getDimensions().last!)
         var weights = [Float](repeating: .nan, count: nTime)
-        try await controlWeightFile.read3D(
+        try controlWeightFile.read3D(
             into: &weights,
             ny: reader.domain.grid.ny,
             nx: reader.domain.grid.nx,
@@ -432,10 +421,10 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         )
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
 
-        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
         }
-        let referenceWeights = await BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<Int(referenceWeightFile.getDimensions().last!)))
+        let referenceWeights = BiasCorrectionSeasonalLinear(meansPerYear: try referenceWeightFile.readInterpolated(dim0: referencePosition, dim0Nx: referenceDomain.grid.nx, dim1: 0..<Int(referenceWeightFile.getDimensions().last!)))
 
         referenceWeights.applyOffset(on: &data, otherWeights: controlWeights, time: time.time, type: variable.biasCorrectionType)
         if let bounds = variable.biasCorrectionType.bounds {
@@ -463,8 +452,8 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         try reader.prefetchData(variable: variable, time: time)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         guard let referencePosition = referenceDomain.grid.findPointInterpolated(lat: lat, lon: lon) else {
@@ -507,26 +496,22 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
     let referenceElevation: ElevationOrSea
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
-        guard let file = await referenceDomain.getStaticFile(type: type, httpClient: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let file = await referenceDomain.getStaticFile(type: type) else {
             return nil
         }
-        return try await referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
+        return try referenceDomain.grid.readFromStaticFile(gridpoint: referencePosition, file: file)
     }
 
     func get(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         let raw = try await reader.get(variable: variable, time: time)
         var data = raw.data
-        let client = reader.reader.httpClient
-        let logger = reader.reader.logger
 
-        guard let controlWeightFile = try await reader.domain.openBiasCorrectionFile(for: variable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let controlWeightFile = try reader.domain.openBiasCorrectionFile(for: variable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(reader.domain)")
         }
         let nTime = Int(controlWeightFile.getDimensions().last!)
         var weights = [Float](repeating: .nan, count: nTime)
-        try await controlWeightFile.read3D(
+        try controlWeightFile.read3D(
             into: &weights,
             ny: reader.domain.grid.ny,
             nx: reader.domain.grid.nx,
@@ -538,12 +523,12 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         )
         let controlWeights = BiasCorrectionSeasonalLinear(meansPerYear: weights)
 
-        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try await referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue, client: client, logger: logger)?.asArray(of: Float.self) else {
+        guard let referenceVariable = ForecastVariableDaily(rawValue: variable.rawValue), let referenceWeightFile = try referenceDomain.openBiasCorrectionFile(for: referenceVariable.rawValue) else {
             throw ForecastapiError.generic(message: "Could not read reference weight file \(variable) for domain \(referenceDomain)")
         }
         let nTime2 = Int(referenceWeightFile.getDimensions().last!)
         var weights2 = [Float](repeating: .nan, count: nTime)
-        try await referenceWeightFile.read3D(
+        try referenceWeightFile.read3D(
             into: &weights2,
             ny: referenceDomain.grid.ny,
             nx: referenceDomain.grid.nx,
@@ -578,13 +563,11 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         try reader.prefetchData(variable: variable, time: time)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) async throws {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
-        let client = reader.httpClient
-        let logger = reader.logger
-        guard let referencePosition = try await referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.asArray(of: Float.self), mode: mode) else {
+        guard let referencePosition = try await referenceDomain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: referenceDomain.getStaticFile(type: .elevation), mode: mode) else {
             return nil
         }
         self.referenceDomain = referenceDomain
@@ -594,9 +577,9 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)
     }
 
-    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea, options: GenericReaderOptions) async throws {
+    init?(domain: Cmip6Domain, referenceDomain: GenericDomain, referencePosition: Int, referenceElevation: ElevationOrSea) async throws {
         let (lat, lon) = referenceDomain.grid.getCoordinates(gridpoint: referencePosition)
-        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest, options: options) else {
+        guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, lat: lat, lon: lon, elevation: referenceElevation.numeric, mode: .nearest) else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
         self.reader = Cmip6ReaderPreBiasCorrection(reader: reader, domain: domain)

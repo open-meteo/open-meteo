@@ -202,7 +202,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
 
     public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         let readers: [GfsReaderLowLevel] = try await domains.asyncCompactMap { domain in
-            guard let reader = try await GenericReader<GfsDomain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            guard let reader = try await GenericReader<GfsDomain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
                 return nil
             }
             return GfsReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)
@@ -215,7 +215,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
     }
 
     public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
-        let reader = try await GenericReader<GfsDomain, Variable>(domain: domain, position: gridpoint, options: options)
+        let reader = try await GenericReader<GfsDomain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderMixerSameDomain(reader: [GfsReaderLowLevel(reader: GenericReaderCached(reader: reader), domain: domain)])
         self.options = options
     }

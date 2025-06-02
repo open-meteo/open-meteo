@@ -59,7 +59,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     typealias Derived = CerraVariableDerived
 
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
@@ -67,7 +67,7 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     }
 
     public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
-        let reader = try await GenericReader<Domain, Variable>(domain: domain, position: gridpoint, options: options)
+        let reader = try await GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
