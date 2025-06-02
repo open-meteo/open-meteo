@@ -98,7 +98,3 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackendAsync, Cache: AtomicBlockC
         return dataRet
     }
 }
-
-extension UnsafeMutableRawBufferPointer: @unchecked @retroactive Sendable {
-    
-}

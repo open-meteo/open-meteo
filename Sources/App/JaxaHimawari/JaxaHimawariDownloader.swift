@@ -86,7 +86,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             let timestampFile = "\(domain.downloadDirectory)last.txt"
             let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
             let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
-            let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile))?.toTimestamp())
+            let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
             let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
             guard startTime <= endTime else {
                 logger.info("All steps already downloaded")

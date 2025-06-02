@@ -6,7 +6,7 @@ import Vapor
  
  Endpoint https://ensemble-api.open-meteo.com/v1/ensemble?latitude=52.52&longitude=13.41&models=icon_seamless&hourly=temperature_2m
  */
-public struct EnsembleApiController {
+public struct EnsembleApiController: Sendable {
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter("ensemble-api") { _, params in
             let currentTime = Timestamp.now()

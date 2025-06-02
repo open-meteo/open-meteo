@@ -71,7 +71,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let lastTimestampFile = "\(domain.downloadDirectory)last.txt"
         let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
         let endTime = Timestamp.now().floor(toNearestHour: 1)
-        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile))?.toTimestamp())
+        let lastDownloadedTimeStep = ((try? String(contentsOfFile: lastTimestampFile, encoding: .utf8))?.toTimestamp())
         let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
         guard startTime <= endTime else {
             logger.info("All steps already downloaded")

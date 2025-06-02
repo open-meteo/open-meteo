@@ -36,7 +36,6 @@ struct SeasonalForecastDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
         let domain = try SeasonalForecastDomain.load(rawValue: signature.domain)
 
         switch domain {

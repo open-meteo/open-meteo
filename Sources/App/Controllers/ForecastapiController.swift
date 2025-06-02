@@ -3,9 +3,6 @@ import OpenMeteoSdk
 import Vapor
 
 public struct ForecastapiController: RouteCollection {
-    /// Dedicated thread pool for API calls reading data from disk. Prevents blocking of the main thread pools.
-    static let runLoop = MultiThreadedEventLoopGroup(numberOfThreads: System.coreCount)
-
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
