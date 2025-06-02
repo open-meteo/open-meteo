@@ -119,11 +119,11 @@ struct GloFasController {
                         elevation: reader.targetElevation,
                         prefetch: {
                             for param in paramsDaily {
-                                try reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
+                                try reader.prefetchData(variable: param, time: time.dailyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared))
                             }
                             if params.ensemble {
                                 for member in 1..<51 {
-                                    try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
+                                    try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member, logger: req.logger, httpClient: req.application.http.client.shared))
                                 }
                             }
                         },
@@ -134,13 +134,13 @@ struct GloFasController {
                                 switch variable {
                                 case .raw:
                                     let d = try await (params.ensemble ? (0..<51) : (0..<1)).asyncMap { member -> ApiArray in
-                                        let d = try await reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                                        let d = try await reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member, logger: req.logger, httpClient: req.application.http.client.shared)).convertAndRound(params: params)
                                         assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                         return ApiArray.float(d.data)
                                     }
                                     return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
                                 case .derived(let derived):
-                                    let d = try await reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                                    let d = try await reader.get(variable: .derived(derived), time: time.dailyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)).convertAndRound(params: params)
                                     assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
                                     return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
                                 }

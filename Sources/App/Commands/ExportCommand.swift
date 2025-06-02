@@ -296,7 +296,7 @@ struct ExportCommand: AsyncCommand {
                     let rows = try variables.map { variable in
                         let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
                         let variable = variable == "precipitation_sum_imerg" ? "precipitation_sum" : variable
-                        guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
+                        guard let data = try reader.get(mixed: variable, time: time.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)) else {
                             fatalError("Invalid variable \(variable)")
                         }
                         return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
@@ -327,7 +327,7 @@ struct ExportCommand: AsyncCommand {
                     continue
                 }
                 let rows = try variables.map { variable in
-                    guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
+                    guard let data = try reader.get(mixed: variable, time: time.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)) else {
                         fatalError("Invalid variable \(variable)")
                     }
                     return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
@@ -367,7 +367,7 @@ struct ExportCommand: AsyncCommand {
                 let rows = try variables.map { variable in
                     let reader = variable == "precipitation_sum_imerg" ? try domain.getReader(targetGridDomain: .imerg, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land) : reader
                     let variable = variable == "precipitation_sum_imerg" ? "precipitation_sum" : variable
-                    guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
+                    guard let data = try reader.get(mixed: variable, time: time.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)) else {
                         fatalError("Invalid variable \(variable)")
                     }
                     return data
@@ -399,7 +399,7 @@ struct ExportCommand: AsyncCommand {
                 continue
             }
             let rows = try variables.map { variable in
-                guard let data = try reader.get(mixed: variable, time: time.toSettings()) else {
+                guard let data = try reader.get(mixed: variable, time: time.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)) else {
                     fatalError("Invalid variable \(variable)")
                 }
                 return data
@@ -470,7 +470,7 @@ struct ExportCommand: AsyncCommand {
 
                     // Read data
                     let reader = try await domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land, options: options)
-                    guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                    guard let data = try await reader.get(mixed: variable, time: time.toSettings(logger: logger, httpClient: client)) else {
                         fatalError("Invalid variable \(variable)")
                     }
                     let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
@@ -484,7 +484,7 @@ struct ExportCommand: AsyncCommand {
             for gridpoint in 0..<grid.count {
                 // Read data
                 let reader = try await domain.getReader(position: gridpoint, options: options)
-                guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
+                guard let data = try await reader.get(mixed: variable, time: time.toSettings(logger: logger, httpClient: client))?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
                 let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
@@ -519,7 +519,7 @@ struct ExportCommand: AsyncCommand {
 
                 // Read data
                 let reader = try await domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land, options: options)
-                guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                guard let data = try await reader.get(mixed: variable, time: time.toSettings(logger: logger, httpClient: client)) else {
                     fatalError("Invalid variable \(variable)")
                 }
                 try ncVariable.write(data.data, offset: [l / grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
@@ -533,7 +533,7 @@ struct ExportCommand: AsyncCommand {
         for gridpoint in 0..<grid.count {
             // Read data
             let reader = try await domain.getReader(position: gridpoint, options: options)
-            guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+            guard let data = try await reader.get(mixed: variable, time: time.toSettings(logger: logger, httpClient: client)) else {
                 fatalError("Invalid variable \(variable)")
             }
             try ncVariable.write(data.data, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])

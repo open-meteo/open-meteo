@@ -152,30 +152,30 @@ struct WeatherApiController {
                             if let paramsCurrent {
                                 for variable in paramsCurrent {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                                    try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay, logger: req.logger, httpClient: req.application.http.client.shared))
                                 }
                             }
                             if let paramsMinutely {
                                 for variable in paramsMinutely {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                                    try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, logger: req.logger, httpClient: req.application.http.client.shared))
                                 }
                             }
                             if let paramsHourly {
                                 for variable in paramsHourly {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
+                                    try reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, logger: req.logger, httpClient: req.application.http.client.shared))
                                 }
                             }
                             if let paramsDaily {
-                                try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
+                                try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared))
                             }
                         },
                         current: paramsCurrent.map { variables in
                             return {
                                 .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    guard let d = try await reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    guard let d = try await reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay, logger: req.logger, httpClient: req.application.http.client.shared))?.convertAndRound(params: params) else {
                                         return .init(variable: variable.resultVariable, unit: .undefined, value: .nan)
                                     }
                                     return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
@@ -186,7 +186,7 @@ struct WeatherApiController {
                             return {
                                 return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    guard let d = try await reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    guard let d = try await reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, logger: req.logger, httpClient: req.application.http.client.shared))?.convertAndRound(params: params) else {
                                         return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: timeHourlyRead.count))])
                                     }
                                     assert(timeHourlyRead.count == d.data.count)
@@ -213,7 +213,7 @@ struct WeatherApiController {
                                         return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                     }
 
-                                    guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
+                                    guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)) else {
                                         return ApiColumn(variable: variable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.dailyRead.count))])
                                     }
                                     assert(time.dailyRead.count == d.data.count)
@@ -226,7 +226,7 @@ struct WeatherApiController {
                             return {
                                 return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    guard let d = try await reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    guard let d = try await reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, logger: req.logger, httpClient: req.application.http.client.shared))?.convertAndRound(params: params) else {
                                         return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.minutely15.count))])
                                     }
                                     assert(time.minutely15.count == d.data.count)

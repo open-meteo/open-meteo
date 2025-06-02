@@ -47,7 +47,7 @@ struct CmipController {
                         elevation: reader.targetElevation,
                         prefetch: {
                             if let dailyVariables = paramsDaily {
-                                try reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
+                                try reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared))
                             }
                         },
                         current: nil,
@@ -55,7 +55,7 @@ struct CmipController {
                         daily: paramsDaily.map { paramsDaily in
                             return {
                                 return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await paramsDaily.asyncMap { variable in
-                                    let d = try await reader.get(variable: variable, time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                                    let d = try await reader.get(variable: variable, time: time.dailyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)).convertAndRound(params: params)
                                     assert(time.dailyRead.count == d.data.count)
                                     return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
                                 })

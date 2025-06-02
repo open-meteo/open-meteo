@@ -90,8 +90,8 @@ struct SatelliteDownloadCommand: AsyncCommand {
             try writer.write(file: biasFile, compressionType: .fpx_xor2d, scalefactor: 1, overwrite: false, supplyChunk: { dim0 in
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
-                try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: time.toSettings())
-                let data = try reader.read2D(variable: variable.omFileName.file, location: locationRange, level: 0, time: time.toSettings())
+                try reader.willNeed(variable: variable.omFileName.file, location: locationRange, level: 0, time: timetoSettings(logger: req.logger, httpClient: req.application.http.client.shared))
+                let data = try reader.read2D(variable: variable.omFileName.file, location: locationRange, level: 0, time: timetoSettings(logger: req.logger, httpClient: req.application.http.client.shared))
                 for l in 0..<locationRange.count {
                     bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(data[l, 0..<time.count], time: time, binsPerYear: binsPerYear).meansPerYear)
                 }

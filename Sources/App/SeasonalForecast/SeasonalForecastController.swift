@@ -182,14 +182,14 @@ struct SeasonalForecastController {
                             if let paramsSixHourly {
                                 for varible in paramsSixHourly {
                                     for member in members {
-                                        try reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member))
+                                        try reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member, logger: req.logger, httpClient: req.application.http.client.shared))
                                     }
                                 }
                             }
                             if let paramsDaily {
                                 for varible in paramsDaily {
                                     for member in members {
-                                        try reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member))
+                                        try reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member, logger: req.logger, httpClient: req.application.http.client.shared))
                                     }
                                 }
                             }
@@ -201,7 +201,7 @@ struct SeasonalForecastController {
                                 return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
                                     var unit: SiUnit?
                                     let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                                        let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMember: member))
+                                        let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMember: member, logger: req.logger, httpClient: req.application.http.client.shared))
                                         unit = d.unit
                                         assert(time.dailyRead.count == d.data.count)
                                         return ApiArray.float(d.data)
@@ -218,7 +218,7 @@ struct SeasonalForecastController {
                                 return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
                                     var unit: SiUnit?
                                     let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                                        let d = try await reader.get(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                                        let d = try await reader.get(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMember: member, logger: req.logger, httpClient: req.application.http.client.shared)).convertAndRound(params: params)
                                         unit = d.unit
                                         assert(timeSixHourlyRead.count == d.data.count)
                                         return ApiArray.float(d.data)

@@ -72,7 +72,7 @@ struct CamsController {
                     let hourlyFn: (() async throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
                         return {
                             return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
-                                let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
+                                let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)).convertAndRound(params: params)
                                 assert(timeHourlyRead.count == d.data.count)
                                 return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
                             })
@@ -82,7 +82,7 @@ struct CamsController {
                     let currentFn: (() async throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsCurrent.map { variables in
                         return {
                             return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
-                                let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
+                                let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings(logger: req.logger, httpClient: req.application.http.client.shared)).convertAndRound(params: params)
                                 return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
                             })
                         }
@@ -95,10 +95,10 @@ struct CamsController {
                         elevation: reader.targetElevation,
                         prefetch: {
                             if let paramsCurrent {
-                                try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
+                                try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings(logger: req.logger, httpClient: req.application.http.client.shared))
                             }
                             if let paramsHourly {
-                                try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
+                                try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(logger: req.logger, httpClient: req.application.http.client.shared))
                             }
                         },
                         current: currentFn,
