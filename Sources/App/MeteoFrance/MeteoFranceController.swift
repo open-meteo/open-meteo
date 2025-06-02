@@ -155,12 +155,12 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
         return try await reader.get(variable: raw, time: time)
     }
 
-    func prefetchData(raw: MeteoFranceVariable, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: raw, time: time)
+    func prefetchData(raw: MeteoFranceVariable, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: raw, time: time)
     }
 
     /// TODO partly duplicate code with ICON
-    /*private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    /*private func interpolatePressureLevel(variable: MeteoFrancePressureVariableType, level: Int, lowerLevel: Int, upperLevel: Int, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         let lower = try await get(raw: .pressure(MeteoFrancePressureVariable(variable: variable, level: lowerLevel)), time: time)
         let upper = try await get(raw: .pressure(MeteoFrancePressureVariable(variable: variable, level: upperLevel)), time: time)
         
@@ -193,110 +193,110 @@ struct MeteoFranceReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }*/
 
-    func prefetchData(variable: MeteoFranceSurfaceVariable, time: TimerangeDtAndSettings) throws {
-        try prefetchData(variable: .raw(.surface(variable)), time: time)
+    func prefetchData(variable: MeteoFranceSurfaceVariable, time: TimerangeDtAndSettings) async throws {
+        try await prefetchData(variable: .raw(.surface(variable)), time: time)
     }
 
     func get(raw: MeteoFranceSurfaceVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         return try await get(variable: .raw(.surface(raw)), time: time)
     }
 
-    func prefetchData(derived: MeteoFranceVariableDerived, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: MeteoFranceVariableDerived, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .surface(let surface):
             switch surface {
             case .apparent_temperature:
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
-                try prefetchData(variable: .relative_humidity_2m, time: time)
-                try prefetchData(variable: .shortwave_radiation, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .wind_u_component_10m, time: time)
+                try await prefetchData(variable: .wind_v_component_10m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .shortwave_radiation, time: time)
             case .relativehumidity_2m:
-                try prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
             case .wind_speed_10m, .windspeed_10m, .wind_direction_10m, .winddirection_10m:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try await prefetchData(variable: .wind_u_component_10m, time: time)
+                try await prefetchData(variable: .wind_v_component_10m, time: time)
             case .vapor_pressure_deficit, .vapour_pressure_deficit:
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
             case .et0_fao_evapotranspiration:
-                try prefetchData(variable: .shortwave_radiation, time: time)
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .relative_humidity_2m, time: time)
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try await prefetchData(variable: .shortwave_radiation, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .wind_u_component_10m, time: time)
+                try await prefetchData(variable: .wind_v_component_10m, time: time)
             case .snowfall:
-                try prefetchData(variable: .snowfall_water_equivalent, time: time)
+                try await prefetchData(variable: .snowfall_water_equivalent, time: time)
             case .surface_pressure:
-                try prefetchData(variable: .pressure_msl, time: time)
-                try prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .pressure_msl, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
             case .terrestrial_radiation, .terrestrial_radiation_instant:
                 break
             case .dew_point_2m, .dewpoint_2m:
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
             case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .shortwave_radiation_instant:
-                try prefetchData(variable: .shortwave_radiation, time: time)
+                try await prefetchData(variable: .shortwave_radiation, time: time)
             case .weather_code, .weathercode:
-                try prefetchData(variable: .cloud_cover, time: time)
-                try prefetchData(variable: .precipitation, time: time)
-                try prefetchData(derived: .surface(.snowfall), time: time)
-                try prefetchData(variable: .cape, time: time)
-                try prefetchData(variable: .wind_gusts_10m, time: time)
+                try await prefetchData(variable: .cloud_cover, time: time)
+                try await prefetchData(variable: .precipitation, time: time)
+                try await prefetchData(derived: .surface(.snowfall), time: time)
+                try await prefetchData(variable: .cape, time: time)
+                try await prefetchData(variable: .wind_gusts_10m, time: time)
             case .is_day:
                 break
             case .wind_speed_20m, .windspeed_20m, .wind_direction_20m, .winddirection_20m:
-                try prefetchData(variable: .wind_u_component_20m, time: time)
-                try prefetchData(variable: .wind_v_component_20m, time: time)
+                try await prefetchData(variable: .wind_u_component_20m, time: time)
+                try await prefetchData(variable: .wind_v_component_20m, time: time)
             case .windspeed_50m, .wind_speed_50m, .winddirection_50m, .wind_direction_50m:
-                try prefetchData(variable: .wind_u_component_50m, time: time)
-                try prefetchData(variable: .wind_v_component_50m, time: time)
+                try await prefetchData(variable: .wind_u_component_50m, time: time)
+                try await prefetchData(variable: .wind_v_component_50m, time: time)
             case .windspeed_80m, .wind_speed_80m, .winddirection_80m, .wind_direction_80m, .windspeed_100m, .wind_speed_100m, .winddirection_100m, .wind_direction_100m:
-                try prefetchData(variable: .wind_u_component_100m, time: time)
-                try prefetchData(variable: .wind_v_component_100m, time: time)
+                try await prefetchData(variable: .wind_u_component_100m, time: time)
+                try await prefetchData(variable: .wind_v_component_100m, time: time)
             case .windspeed_120m, .wind_speed_120m, .winddirection_120m, .wind_direction_120m, .windspeed_150m, .wind_speed_150m, .winddirection_150m, .wind_direction_150m:
-                try prefetchData(variable: .wind_u_component_150m, time: time)
-                try prefetchData(variable: .wind_v_component_150m, time: time)
+                try await prefetchData(variable: .wind_u_component_150m, time: time)
+                try await prefetchData(variable: .wind_v_component_150m, time: time)
             case .windspeed_180m, .wind_speed_180m, .winddirection_180m, .wind_direction_180m, .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m:
-                try prefetchData(variable: .wind_u_component_200m, time: time)
-                try prefetchData(variable: .wind_v_component_200m, time: time)
+                try await prefetchData(variable: .wind_u_component_200m, time: time)
+                try await prefetchData(variable: .wind_v_component_200m, time: time)
             case .temperature_80m:
-                try prefetchData(variable: .temperature_100m, time: time)
+                try await prefetchData(variable: .temperature_100m, time: time)
             case .temperature_120m:
-                try prefetchData(variable: .temperature_150m, time: time)
+                try await prefetchData(variable: .temperature_150m, time: time)
             case .temperature_180m:
-                try prefetchData(variable: .temperature_200m, time: time)
+                try await prefetchData(variable: .temperature_200m, time: time)
             case .showers:
-                try prefetchData(variable: .precipitation, time: time)
+                try await prefetchData(variable: .precipitation, time: time)
             case .wet_bulb_temperature_2m:
-                try prefetchData(variable: .temperature_2m, time: time)
-                try prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .temperature_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
             case .cloudcover:
-                try prefetchData(variable: .cloud_cover, time: time)
+                try await prefetchData(variable: .cloud_cover, time: time)
             case .cloudcover_low:
-                try prefetchData(variable: .cloud_cover_low, time: time)
+                try await prefetchData(variable: .cloud_cover_low, time: time)
             case .cloudcover_mid:
-                try prefetchData(variable: .cloud_cover_mid, time: time)
+                try await prefetchData(variable: .cloud_cover_mid, time: time)
             case .cloudcover_high:
-                try prefetchData(variable: .cloud_cover_high, time: time)
+                try await prefetchData(variable: .cloud_cover_high, time: time)
             case .windgusts_10m:
-                try prefetchData(variable: .wind_gusts_10m, time: time)
+                try await prefetchData(variable: .wind_gusts_10m, time: time)
             case .sunshine_duration:
-                try prefetchData(derived: .surface(.direct_radiation), time: time)
+                try await prefetchData(derived: .surface(.direct_radiation), time: time)
             case .rain:
-                try prefetchData(variable: .precipitation, time: time)
-                try prefetchData(variable: .snowfall_water_equivalent, time: time)
+                try await prefetchData(variable: .precipitation, time: time)
+                try await prefetchData(variable: .snowfall_water_equivalent, time: time)
             }
         case .pressure(let v):
             switch v.variable {
             case .windspeed, .wind_speed, .winddirection, .wind_direction:
-                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .wind_u_component, level: v.level)), time: time)
-                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .wind_v_component, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .wind_u_component, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dewpoint, .dew_point, .relativehumidity:
-                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .temperature, level: v.level)), time: time)
-                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .temperature, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             case .cloudcover, .cloud_cover:
-                try prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(MeteoFrancePressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }
         }
     }

@@ -163,15 +163,15 @@ struct IconWaveController {
                         prefetch: {
                             if let paramsHourly {
                                 for member in 0..<reader.domain.countEnsembleMember {
-                                    try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(ensembleMember: member))
+                                    try await reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(ensembleMember: member))
                                 }
                             }
                             if let paramsCurrent {
-                                try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
+                                try await reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                             }
                             if let paramsDaily {
                                 for member in 0..<reader.domain.countEnsembleMember {
-                                    try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(ensembleMember: member))
+                                    try await reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(ensembleMember: member))
                                 }
                             }
                         },

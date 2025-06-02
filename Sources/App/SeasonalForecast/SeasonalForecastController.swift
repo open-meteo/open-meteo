@@ -40,19 +40,19 @@ enum DailyCfsVariable: String, RawRepresentableString {
 }
 
 extension SeasonalForecastReader {
-    func prefetchData(variable: SeasonalForecastVariable, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: SeasonalForecastVariable, time: TimerangeDtAndSettings) async throws {
         switch variable {
         case .raw(let variable):
-            try prefetchData(variable: variable, time: time)
+            try await prefetchData(variable: variable, time: time)
         case .derived(let variable):
             switch variable {
             case .windspeed_10m, .wind_speed_10m, .winddirection_10m, .wind_direction_10m:
-                try prefetchData(variable: .wind_u_component_10m, time: time)
-                try prefetchData(variable: .wind_v_component_10m, time: time)
+                try await prefetchData(variable: .wind_u_component_10m, time: time)
+                try await prefetchData(variable: .wind_v_component_10m, time: time)
             case .cloudcover:
-                try prefetchData(variable: .cloud_cover, time: time)
+                try await prefetchData(variable: .cloud_cover, time: time)
             case .relativehumidity_2m:
-                try prefetchData(variable: .relative_humidity_2m, time: time)
+                try await prefetchData(variable: .relative_humidity_2m, time: time)
             }
         }
     }
@@ -81,24 +81,24 @@ extension SeasonalForecastReader {
         }
     }
 
-    func prefetchData(variable: DailyCfsVariable, time timeDaily: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: DailyCfsVariable, time timeDaily: TimerangeDtAndSettings) async throws {
         let time = timeDaily.with(dtSeconds: modelDtSeconds)
         switch variable {
         case .temperature_2m_max:
-            try prefetchData(variable: CfsVariable.temperature_2m_max, time: time)
+            try await prefetchData(variable: CfsVariable.temperature_2m_max, time: time)
         case .temperature_2m_min:
-            try prefetchData(variable: CfsVariable.temperature_2m_min, time: time)
+            try await prefetchData(variable: CfsVariable.temperature_2m_min, time: time)
         case .precipitation_sum:
-            try prefetchData(variable: .precipitation, time: time)
+            try await prefetchData(variable: .precipitation, time: time)
         case .showers_sum:
-            try prefetchData(variable: .showers, time: time)
+            try await prefetchData(variable: .showers, time: time)
         case .shortwave_radiation_sum:
-            try prefetchData(variable: .shortwave_radiation, time: time)
+            try await prefetchData(variable: .shortwave_radiation, time: time)
         case .windspeed_10m_max, .wind_speed_10m_max, .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            try prefetchData(variable: .wind_u_component_10m, time: time)
-            try prefetchData(variable: .wind_v_component_10m, time: time)
+            try await prefetchData(variable: .wind_u_component_10m, time: time)
+            try await prefetchData(variable: .wind_v_component_10m, time: time)
         case .precipitation_hours:
-            try prefetchData(variable: .precipitation, time: time)
+            try await prefetchData(variable: .precipitation, time: time)
         }
     }
 
@@ -182,14 +182,14 @@ struct SeasonalForecastController {
                             if let paramsSixHourly {
                                 for varible in paramsSixHourly {
                                     for member in members {
-                                        try reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member))
+                                        try await reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member))
                                     }
                                 }
                             }
                             if let paramsDaily {
                                 for varible in paramsDaily {
                                     for member in members {
-                                        try reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member))
+                                        try await reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member))
                                     }
                                 }
                             }

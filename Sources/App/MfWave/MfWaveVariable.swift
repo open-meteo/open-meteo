@@ -176,8 +176,8 @@ struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
         return try await reader.get(variable: raw, time: time)
     }
 
-    func prefetchData(raw: MfCurrentVariable, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: raw, time: time)
+    func prefetchData(raw: MfCurrentVariable, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: raw, time: time)
     }
 
     func get(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
@@ -197,11 +197,11 @@ struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
 
-    func prefetchData(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: MfCurrentVariableDerived, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .ocean_current_direction, .ocean_current_velocity:
-            try prefetchData(raw: .ocean_u_current, time: time)
-            try prefetchData(raw: .ocean_v_current, time: time)
+            try await prefetchData(raw: .ocean_u_current, time: time)
+            try await prefetchData(raw: .ocean_v_current, time: time)
         }
     }
 }
@@ -250,8 +250,8 @@ struct MfWaveReader: GenericReaderProtocol {
         }
     }
 
-    func prefetchData(variable: MfWaveVariable, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: variable, time: time)
+    func prefetchData(variable: MfWaveVariable, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: variable, time: time)
     }
 }
 

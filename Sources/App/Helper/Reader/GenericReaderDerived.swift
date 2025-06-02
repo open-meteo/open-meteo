@@ -9,10 +9,10 @@ protocol GenericReaderDerived: GenericReaderProtocol {
     var reader: ReaderNext { get }
 
     func get(derived: Derived, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws
+    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) async throws
 
     func get(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws
+    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws
 }
 
 /// Parameters for tilted radiation calculation
@@ -76,12 +76,12 @@ extension GenericReaderDerived {
         reader.targetElevation
     }
 
-    func prefetchData(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: VariableOrDerived<ReaderNext.MixingVar, Derived>, time: TimerangeDtAndSettings) async throws {
         switch variable {
         case .raw(let raw):
-            return try prefetchData(raw: raw, time: time)
+            return try await prefetchData(raw: raw, time: time)
         case .derived(let derived):
-            return try prefetchData(derived: derived, time: time)
+            return try await prefetchData(derived: derived, time: time)
         }
     }
 
@@ -98,9 +98,9 @@ extension GenericReaderDerived {
         return try await reader.getStatic(type: type)
     }
 
-    func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDtAndSettings) throws {
-        try variables.forEach { variable in
-            try prefetchData(variable: variable, time: time)
+    func prefetchData(variables: [VariableOrDerived<ReaderNext.MixingVar, Derived>], time: TimerangeDtAndSettings) async throws {
+        for variable in variables {
+            try await prefetchData(variable: variable, time: time)
         }
     }
 }
@@ -114,7 +114,7 @@ extension GenericReaderDerivedSimple {
         try await reader.get(variable: raw, time: time)
     }
 
-    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: raw, time: time)
+    func prefetchData(raw: ReaderNext.MixingVar, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: raw, time: time)
     }
 }

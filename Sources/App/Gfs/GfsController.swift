@@ -158,28 +158,28 @@ struct GfsReaderLowLevel: GenericReaderProtocol {
         return try await reader.get(variable: raw, time: time)
     }
 
-    func prefetchData(variable raw: GfsVariable, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable raw: GfsVariable, time: TimerangeDtAndSettings) async throws {
         /// HRRR domain has no cloud cover for pressure levels, calculate from RH
         if domain == .hrrr_conus, case let .pressure(pressure) = raw, pressure.variable == .cloud_cover {
-            return try reader.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relative_humidity, level: pressure.level)), time: time)
+            return try await reader.prefetchData(variable: .pressure(GfsPressureVariable(variable: .relative_humidity, level: pressure.level)), time: time)
         }
 
         /// Make sure showers are `0` in HRRR, otherwise it is mixed with GFS showers
         if domain == .hrrr_conus || domain == .hrrr_conus_15min, case let .surface(variable) = raw, variable == .showers {
-            return try reader.prefetchData(variable: .surface(.precipitation), time: time)
+            return try await reader.prefetchData(variable: .surface(.precipitation), time: time)
         }
 
         /// GFS ensemble has no diffuse radiation
         if domain == .gfs025_ens || domain == .gfs05_ens, case let .surface(variable) = raw, variable == .diffuse_radiation {
-            return try reader.prefetchData(variable: .surface(.shortwave_radiation), time: time)
+            return try await reader.prefetchData(variable: .surface(.shortwave_radiation), time: time)
         }
 
         /// Only GFS013 has showers
         if domain != .gfs013, case let .surface(variable) = raw, variable == .showers {
-            return try reader.prefetchData(variable: .surface(.precipitation), time: time)
+            return try await reader.prefetchData(variable: .surface(.precipitation), time: time)
         }
 
-        try reader.prefetchData(variable: raw, time: time)
+        try await reader.prefetchData(variable: raw, time: time)
     }
 }
 
@@ -220,127 +220,127 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
 
-    func prefetchData(raw: GfsReaderLowLevel.MixingVar, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: raw, time: time)
+    func prefetchData(raw: GfsReaderLowLevel.MixingVar, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: raw, time: time)
     }
 
     func get(raw: GfsReaderLowLevel.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         return try await reader.get(variable: raw, time: time)
     }
 
-    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .surface(let surface):
             switch surface {
             case .apparent_temperature:
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
-                try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
-                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+                try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
+                try await prefetchData(raw: .surface(.shortwave_radiation), time: time)
             case .relativehumidity_2m:
-                try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
+                try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
             case .wind_speed_10m, .windspeed_10m:
-                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_10m), time: time)
             case .wind_direction_10m, .winddirection_10m:
-                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_10m), time: time)
             case .wind_speed_80m, .windspeed_80m:
-                try prefetchData(raw: .surface(.wind_u_component_80m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_80m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_80m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_80m), time: time)
             case .wind_direction_80m, .winddirection_80m:
-                try prefetchData(raw: .surface(.wind_u_component_80m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_80m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_80m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_80m), time: time)
             case .wind_speed_120m, .windspeed_120m, .wind_speed_100m, .windspeed_100m:
-                try prefetchData(raw: .surface(.wind_u_component_100m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_100m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_100m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_100m), time: time)
             case .wind_direction_120m, .winddirection_120m, .wind_direction_100m, .winddirection_100m:
-                try prefetchData(raw: .surface(.wind_u_component_100m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_100m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_100m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_100m), time: time)
             case .evapotranspiration:
-                try prefetchData(raw: .surface(.latent_heat_flux), time: time)
+                try await prefetchData(raw: .surface(.latent_heat_flux), time: time)
             case .vapour_pressure_deficit, .vapor_pressure_deficit:
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
+                try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
             case .et0_fao_evapotranspiration:
-                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
-                try prefetchData(raw: .surface(.wind_u_component_10m), time: time)
-                try prefetchData(raw: .surface(.wind_v_component_10m), time: time)
+                try await prefetchData(raw: .surface(.shortwave_radiation), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
+                try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
+                try await prefetchData(raw: .surface(.wind_u_component_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_v_component_10m), time: time)
             case .rain:
-                try prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
-                try prefetchData(raw: .surface(.precipitation), time: time)
-                try prefetchData(raw: .surface(.showers), time: time)
+                try await prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
+                try await prefetchData(raw: .surface(.precipitation), time: time)
+                try await prefetchData(raw: .surface(.showers), time: time)
             case .snowfall:
-                try prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
+                try await prefetchData(raw: .surface(.snowfall_water_equivalent), time: time)
             case .surface_pressure:
-                try prefetchData(raw: .surface(.pressure_msl), time: time)
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
+                try await prefetchData(raw: .surface(.pressure_msl), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
             case .terrestrial_radiation:
                 break
             case .terrestrial_radiation_instant:
                 break
             case .dew_point_2m, .dewpoint_2m:
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
+                try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
             case .diffuse_radiation_instant:
-                try prefetchData(raw: .surface(.diffuse_radiation), time: time)
+                try await prefetchData(raw: .surface(.diffuse_radiation), time: time)
             case .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .global_tilted_irradiance, .global_tilted_irradiance_instant, .direct_radiation_instant:
-                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
-                try prefetchData(raw: .surface(.diffuse_radiation), time: time)
+                try await prefetchData(raw: .surface(.shortwave_radiation), time: time)
+                try await prefetchData(raw: .surface(.diffuse_radiation), time: time)
             case .shortwave_radiation_instant:
-                try prefetchData(raw: .surface(.shortwave_radiation), time: time)
+                try await prefetchData(raw: .surface(.shortwave_radiation), time: time)
             case .weather_code, .weathercode:
-                try prefetchData(raw: .surface(.cloud_cover), time: time)
-                try prefetchData(raw: .surface(.precipitation), time: time)
-                try prefetchData(derived: .surface(.snowfall), time: time)
-                try prefetchData(raw: .surface(.showers), time: time)
-                try prefetchData(raw: .surface(.cape), time: time)
-                try prefetchData(raw: .surface(.wind_gusts_10m), time: time)
-                try prefetchData(raw: .surface(.visibility), time: time)
-                try prefetchData(raw: .surface(.lifted_index), time: time)
+                try await prefetchData(raw: .surface(.cloud_cover), time: time)
+                try await prefetchData(raw: .surface(.precipitation), time: time)
+                try await prefetchData(derived: .surface(.snowfall), time: time)
+                try await prefetchData(raw: .surface(.showers), time: time)
+                try await prefetchData(raw: .surface(.cape), time: time)
+                try await prefetchData(raw: .surface(.wind_gusts_10m), time: time)
+                try await prefetchData(raw: .surface(.visibility), time: time)
+                try await prefetchData(raw: .surface(.lifted_index), time: time)
             case .is_day:
                 break
             case .temperature_120m:
-                try prefetchData(raw: .surface(.temperature_100m), time: time)
+                try await prefetchData(raw: .surface(.temperature_100m), time: time)
             case .wet_bulb_temperature_2m:
-                try prefetchData(raw: .surface(.temperature_2m), time: time)
-                try prefetchData(raw: .surface(.relative_humidity_2m), time: time)
+                try await prefetchData(raw: .surface(.temperature_2m), time: time)
+                try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
             case .cloudcover:
-                try prefetchData(raw: .surface(.cloud_cover), time: time)
+                try await prefetchData(raw: .surface(.cloud_cover), time: time)
             case .cloudcover_low:
-                try prefetchData(raw: .surface(.cloud_cover_low), time: time)
+                try await prefetchData(raw: .surface(.cloud_cover_low), time: time)
             case .cloudcover_mid:
-                try prefetchData(raw: .surface(.cloud_cover_mid), time: time)
+                try await prefetchData(raw: .surface(.cloud_cover_mid), time: time)
             case .cloudcover_high:
-                try prefetchData(raw: .surface(.cloud_cover_high), time: time)
+                try await prefetchData(raw: .surface(.cloud_cover_high), time: time)
             case .sensible_heatflux:
-                try prefetchData(raw: .surface(.sensible_heat_flux), time: time)
+                try await prefetchData(raw: .surface(.sensible_heat_flux), time: time)
             case .latent_heatflux:
-                try prefetchData(raw: .surface(.latent_heat_flux), time: time)
+                try await prefetchData(raw: .surface(.latent_heat_flux), time: time)
             case .windgusts_10m:
-                try prefetchData(raw: .surface(.wind_gusts_10m), time: time)
+                try await prefetchData(raw: .surface(.wind_gusts_10m), time: time)
             case .freezinglevel_height:
-                try prefetchData(raw: .surface(.freezing_level_height), time: time)
+                try await prefetchData(raw: .surface(.freezing_level_height), time: time)
             case .sunshine_duration:
-                try prefetchData(derived: .surface(.direct_radiation), time: time)
+                try await prefetchData(derived: .surface(.direct_radiation), time: time)
             case .mass_density_8m:
-                try prefetchData(derived: .surface(.mass_density_8m), time: time)
+                try await prefetchData(derived: .surface(.mass_density_8m), time: time)
             }
         case .pressure(let v):
             switch v.variable {
             case .wind_speed, .windspeed, .wind_direction, .winddirection:
-                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
-                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(GfsPressureVariable(variable: .wind_u_component, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(GfsPressureVariable(variable: .wind_v_component, level: v.level)), time: time)
             case .dew_point, .dewpoint:
-                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)), time: time)
-                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(GfsPressureVariable(variable: .temperature, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(GfsPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             case .cloudcover:
-                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .cloud_cover, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(GfsPressureVariable(variable: .cloud_cover, level: v.level)), time: time)
             case .relativehumidity:
-                try prefetchData(raw: .pressure(GfsPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
+                try await prefetchData(raw: .pressure(GfsPressureVariable(variable: .relative_humidity, level: v.level)), time: time)
             }
         }
     }

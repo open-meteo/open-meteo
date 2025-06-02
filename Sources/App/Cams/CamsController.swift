@@ -95,10 +95,10 @@ struct CamsController {
                         elevation: reader.targetElevation,
                         prefetch: {
                             if let paramsCurrent {
-                                try reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
+                                try await reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
                             }
                             if let paramsHourly {
-                                try reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
+                                try await reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
                             }
                         },
                         current: currentFn,
@@ -233,43 +233,43 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         }
     }
 
-    func prefetchData(derived: CamsVariableDerived, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: CamsVariableDerived, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .european_aqi:
-            try prefetchData(derived: .european_aqi_pm2_5, time: time)
-            try prefetchData(derived: .european_aqi_pm10, time: time)
-            try prefetchData(derived: .european_aqi_no2, time: time)
-            try prefetchData(derived: .european_aqi_o3, time: time)
-            try prefetchData(derived: .european_aqi_so2, time: time)
+            try await prefetchData(derived: .european_aqi_pm2_5, time: time)
+            try await prefetchData(derived: .european_aqi_pm10, time: time)
+            try await prefetchData(derived: .european_aqi_no2, time: time)
+            try await prefetchData(derived: .european_aqi_o3, time: time)
+            try await prefetchData(derived: .european_aqi_so2, time: time)
         case .european_aqi_pm2_5:
-            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .european_aqi_pm10:
-            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
-            try prefetchData(raw: .nitrogen_dioxide, time: time)
+            try await prefetchData(raw: .nitrogen_dioxide, time: time)
         case .european_aqi_ozone, .european_aqi_o3:
-            try prefetchData(raw: .ozone, time: time)
+            try await prefetchData(raw: .ozone, time: time)
         case .european_aqi_sulphur_dioxide, .european_aqi_so2:
-            try prefetchData(raw: .sulphur_dioxide, time: time)
+            try await prefetchData(raw: .sulphur_dioxide, time: time)
         case .us_aqi:
-            try prefetchData(derived: .us_aqi_pm2_5, time: time)
-            try prefetchData(derived: .us_aqi_pm10, time: time)
-            try prefetchData(derived: .us_aqi_no2, time: time)
-            try prefetchData(derived: .us_aqi_o3, time: time)
-            try prefetchData(derived: .us_aqi_so2, time: time)
-            try prefetchData(derived: .us_aqi_co, time: time)
+            try await prefetchData(derived: .us_aqi_pm2_5, time: time)
+            try await prefetchData(derived: .us_aqi_pm10, time: time)
+            try await prefetchData(derived: .us_aqi_no2, time: time)
+            try await prefetchData(derived: .us_aqi_o3, time: time)
+            try await prefetchData(derived: .us_aqi_so2, time: time)
+            try await prefetchData(derived: .us_aqi_co, time: time)
         case .us_aqi_pm2_5:
-            try prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .pm2_5, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .us_aqi_pm10:
-            try prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .pm10, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
-            try prefetchData(raw: .nitrogen_dioxide, time: time)
+            try await prefetchData(raw: .nitrogen_dioxide, time: time)
         case .us_aqi_ozone, .us_aqi_o3:
-            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8 * 3600)))
+            try await prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8 * 3600)))
         case .us_aqi_sulphur_dioxide, .us_aqi_so2:
-            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
+            try await prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-24 * 3600)))
         case .us_aqi_carbon_monoxide, .us_aqi_co:
-            try prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8 * 3600)))
+            try await prefetchData(raw: .ozone, time: time.with(start: time.range.lowerBound.add(-8 * 3600)))
         case .is_day:
             break
         }

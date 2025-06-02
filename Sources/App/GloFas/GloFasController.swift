@@ -43,9 +43,9 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
     }
 
-    func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: GlofasDerivedVariable, time: TimerangeDtAndSettings) async throws {
         for member in 0..<51 {
-            try reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
+            try await reader.prefetchData(variable: .river_discharge, time: time.with(ensembleMember: member))
         }
     }
 
@@ -119,11 +119,11 @@ struct GloFasController {
                         elevation: reader.targetElevation,
                         prefetch: {
                             for param in paramsDaily {
-                                try reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
+                                try await reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
                             }
                             if params.ensemble {
                                 for member in 1..<51 {
-                                    try reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
+                                    try await reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
                                 }
                             }
                         },

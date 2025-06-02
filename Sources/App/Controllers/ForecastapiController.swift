@@ -152,23 +152,23 @@ struct WeatherApiController {
                             if let paramsCurrent {
                                 for variable in paramsCurrent {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                                    try await reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
                                 }
                             }
                             if let paramsMinutely {
                                 for variable in paramsMinutely {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                                    try await reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
                                 }
                             }
                             if let paramsHourly {
                                 for variable in paramsHourly {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
+                                    try await reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
                                 }
                             }
                             if let paramsDaily {
-                                try reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
+                                try await reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
                             }
                         },
                         current: paramsCurrent.map { variables in

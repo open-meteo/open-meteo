@@ -47,7 +47,7 @@ struct CmipController {
                         elevation: reader.targetElevation,
                         prefetch: {
                             if let dailyVariables = paramsDaily {
-                                try reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
+                                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
                             }
                         },
                         current: nil,
@@ -77,7 +77,7 @@ struct CmipController {
 }
 
 protocol Cmip6Readerable {
-    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) throws
+    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) async throws
     func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDtAndSettings) async throws -> DataAndUnit
     var modelLat: Float { get }
     var modelLon: Float { get }
@@ -329,13 +329,13 @@ struct Cmip6BiasCorrectorEra5Seamless: GenericReaderProtocol {
         return DataAndUnit(data, raw.unit)
     }
 
-    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: variable, time: time)
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: variable, time: time)
     }
 
-    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDtAndSettings) throws {
+    func prefetchData(variables: [Cmip6VariableOrDerived], time: TimerangeDtAndSettings) async throws {
         for variable in variables {
-            try prefetchData(variable: variable, time: time)
+            try await prefetchData(variable: variable, time: time)
         }
     }
 
@@ -459,8 +459,8 @@ final class Cmip6BiasCorrectorInterpolatedWeights: GenericReaderProtocol {
         return DataAndUnit(data, raw.unit)
     }
 
-    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: variable, time: time)
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: variable, time: time)
     }
 
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
@@ -574,8 +574,8 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
         return DataAndUnit(data, raw.unit)
     }
 
-    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: variable, time: time)
+    func prefetchData(variable: Cmip6VariableOrDerived, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: variable, time: time)
     }
 
     init?(domain: Cmip6Domain, referenceDomain: GenericDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
@@ -695,45 +695,45 @@ struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericR
         }
     }
 
-    func prefetchData(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: Cmip6VariableDerivedPostBiasCorrection, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .snowfall_sum:
-            try prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
+            try await prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
         case .rain_sum:
-            try prefetchData(raw: .raw(.precipitation_sum), time: time)
-            try prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
+            try await prefetchData(raw: .raw(.precipitation_sum), time: time)
+            try await prefetchData(raw: .raw(.snowfall_water_equivalent_sum), time: time)
         case .dewpoint_2m_max, .dew_point_2m_max:
-            try prefetchData(raw: .raw(.temperature_2m_min), time: time)
-            try prefetchData(raw: .raw(.relative_humidity_2m_max), time: time)
+            try await prefetchData(raw: .raw(.temperature_2m_min), time: time)
+            try await prefetchData(raw: .raw(.relative_humidity_2m_max), time: time)
         case .dewpoint_2m_min, .dew_point_2m_min:
-            try prefetchData(raw: .raw(.temperature_2m_max), time: time)
-            try prefetchData(raw: .raw(.relative_humidity_2m_min), time: time)
+            try await prefetchData(raw: .raw(.temperature_2m_max), time: time)
+            try await prefetchData(raw: .raw(.relative_humidity_2m_min), time: time)
         case .dewpoint_2m_mean, .dew_point_2m_mean:
-            try prefetchData(raw: .raw(.temperature_2m_mean), time: time)
-            try prefetchData(raw: .raw(.relative_humidity_2m_mean), time: time)
+            try await prefetchData(raw: .raw(.temperature_2m_mean), time: time)
+            try await prefetchData(raw: .raw(.relative_humidity_2m_mean), time: time)
         case .growing_degree_days_base_0_limit_50:
-            try prefetchData(raw: .raw(.temperature_2m_max), time: time)
-            try prefetchData(raw: .raw(.temperature_2m_min), time: time)
+            try await prefetchData(raw: .raw(.temperature_2m_max), time: time)
+            try await prefetchData(raw: .raw(.temperature_2m_min), time: time)
         case .soil_moisture_index_0_to_10cm_mean:
-            try prefetchData(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
+            try await prefetchData(raw: .raw(.soil_moisture_0_to_10cm_mean), time: time)
         case .soil_moisture_index_0_to_100cm_mean:
-            try prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
+            try await prefetchData(raw: .derived(.soil_moisture_0_to_100cm_mean), time: time)
         case .daylight_duration:
             break
         case .windspeed_2m_max, .wind_speed_2m_max:
-            try prefetchData(raw: .raw(.wind_speed_10m_max), time: time)
+            try await prefetchData(raw: .raw(.wind_speed_10m_max), time: time)
         case .windspeed_2m_mean, .wind_speed_2m_mean:
-            try prefetchData(raw: .raw(.wind_speed_10m_mean), time: time)
+            try await prefetchData(raw: .raw(.wind_speed_10m_mean), time: time)
         case .windgusts_10m_mean:
-            try prefetchData(raw: .derived(.wind_gusts_10m_mean), time: time)
+            try await prefetchData(raw: .derived(.wind_gusts_10m_mean), time: time)
         case .windgusts_10m_max:
-            try prefetchData(raw: .derived(.wind_gusts_10m_max), time: time)
+            try await prefetchData(raw: .derived(.wind_gusts_10m_max), time: time)
         case .vapor_pressure_deficit_max:
-            try prefetchData(raw: .derived(.vapour_pressure_deficit_max), time: time)
+            try await prefetchData(raw: .derived(.vapour_pressure_deficit_max), time: time)
         case .windspeed_10m_max:
-            try prefetchData(raw: .raw(.wind_speed_10m_max), time: time)
+            try await prefetchData(raw: .raw(.wind_speed_10m_max), time: time)
         case .windspeed_10m_mean:
-            try prefetchData(raw: .raw(.wind_speed_10m_mean), time: time)
+            try await prefetchData(raw: .raw(.wind_speed_10m_mean), time: time)
         }
     }
 }
@@ -873,62 +873,62 @@ struct Cmip6ReaderPreBiasCorrection<ReaderNext: GenericReaderProtocol>: GenericR
         }
     }
 
-    func prefetchData(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: Cmip6VariableDerivedBiasCorrected, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .et0_fao_evapotranspiration_sum:
-            try prefetchData(raw: .temperature_2m_max, time: time)
-            try prefetchData(raw: .temperature_2m_min, time: time)
-            try prefetchData(raw: .temperature_2m_mean, time: time)
-            try prefetchData(raw: .wind_speed_10m_mean, time: time)
-            try prefetchData(raw: .shortwave_radiation_sum, time: time)
+            try await prefetchData(raw: .temperature_2m_max, time: time)
+            try await prefetchData(raw: .temperature_2m_min, time: time)
+            try await prefetchData(raw: .temperature_2m_mean, time: time)
+            try await prefetchData(raw: .wind_speed_10m_mean, time: time)
+            try await prefetchData(raw: .shortwave_radiation_sum, time: time)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
-                try prefetchData(raw: .relative_humidity_2m_min, time: time)
-                try prefetchData(raw: .relative_humidity_2m_max, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_min, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_max, time: time)
             } else {
-                try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
         case .vapour_pressure_deficit_max:
-            try prefetchData(raw: .temperature_2m_max, time: time)
-            try prefetchData(raw: .temperature_2m_min, time: time)
+            try await prefetchData(raw: .temperature_2m_max, time: time)
+            try await prefetchData(raw: .temperature_2m_min, time: time)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
-                try prefetchData(raw: .relative_humidity_2m_min, time: time)
-                try prefetchData(raw: .relative_humidity_2m_max, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_min, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_max, time: time)
             } else {
-                try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
         case .leaf_wetness_probability_mean:
-            try prefetchData(raw: .temperature_2m_max, time: time)
-            try prefetchData(raw: .temperature_2m_min, time: time)
-            try prefetchData(raw: .precipitation_sum, time: time)
+            try await prefetchData(raw: .temperature_2m_max, time: time)
+            try await prefetchData(raw: .temperature_2m_min, time: time)
+            try await prefetchData(raw: .precipitation_sum, time: time)
             let hasRhMinMax = !(domain == .FGOALS_f3_H || domain == .HiRAM_SIT_HR || domain == .MPI_ESM1_2_XR || domain == .FGOALS_f3_H)
             if hasRhMinMax {
-                try prefetchData(raw: .relative_humidity_2m_min, time: time)
-                try prefetchData(raw: .relative_humidity_2m_max, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_min, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_max, time: time)
             } else {
-                try prefetchData(raw: .relative_humidity_2m_mean, time: time)
+                try await prefetchData(raw: .relative_humidity_2m_mean, time: time)
             }
         case .soil_moisture_0_to_100cm_mean:
-            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_moisture_0_to_7cm_mean:
-            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_moisture_7_to_28cm_mean:
-            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_moisture_28_to_100cm_mean:
-            try prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
+            try await prefetchData(raw: .soil_moisture_0_to_10cm_mean, time: time)
         case .soil_temperature_0_to_100cm_mean:
-            try prefetchData(raw: .temperature_2m_mean, time: time)
+            try await prefetchData(raw: .temperature_2m_mean, time: time)
         case .soil_temperature_0_to_7cm_mean:
-            try prefetchData(raw: .temperature_2m_max, time: time)
+            try await prefetchData(raw: .temperature_2m_max, time: time)
         case .soil_temperature_7_to_28cm_mean:
-            try prefetchData(raw: .temperature_2m_max, time: time)
+            try await prefetchData(raw: .temperature_2m_max, time: time)
         case .soil_temperature_28_to_100cm_mean:
-            try prefetchData(raw: .temperature_2m_max, time: time)
+            try await prefetchData(raw: .temperature_2m_max, time: time)
         case .wind_gusts_10m_mean:
-            try prefetchData(raw: .wind_speed_10m_mean, time: time)
+            try await prefetchData(raw: .wind_speed_10m_mean, time: time)
         case .wind_gusts_10m_max:
-            try prefetchData(raw: .wind_speed_10m_max, time: time)
+            try await prefetchData(raw: .wind_speed_10m_max, time: time)
         }
     }
 }

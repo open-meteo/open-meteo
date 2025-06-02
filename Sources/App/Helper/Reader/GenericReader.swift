@@ -14,7 +14,7 @@ protocol GenericReaderProtocol {
 
     func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
     func getStatic(type: ReaderStaticVariable) async throws -> Float?
-    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) throws
+    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws
 }
 
 /**
@@ -138,9 +138,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     /// Prefetch data asynchronously. At the time `read` is called, it might already by in the kernel page cache.
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
         if time.dtSeconds == domain.dtSeconds {
-            try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time)
+            try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time)
             return
         }
 
@@ -149,7 +149,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
             time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType) :
             time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
 
-        try omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead))
+        try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead))
     }
 
     /// Read and scale if required

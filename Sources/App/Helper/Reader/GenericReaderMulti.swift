@@ -52,17 +52,17 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         self.reader = [reader]
     }
 
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
         for reader in reader {
-            if try reader.prefetchData(mixed: variable.rawValue, time: time) {
+            if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
                 break
             }
         }
     }
 
-    func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) throws {
-        try variables.forEach { variable in
-            try prefetchData(variable: variable, time: time)
+    func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
+        for variable in variables {
+            try await prefetchData(variable: variable, time: time)
         }
     }
 
@@ -125,11 +125,11 @@ extension GenericReaderProtocol {
         return try await self.get(variable: v, time: time)
     }
 
-    func prefetchData(mixed: String, time: TimerangeDtAndSettings) throws -> Bool {
+    func prefetchData(mixed: String, time: TimerangeDtAndSettings) async throws -> Bool {
         guard let v = MixingVar(rawValue: mixed) else {
             return false
         }
-        try self.prefetchData(variable: v, time: time)
+        try await self.prefetchData(variable: v, time: time)
         return true
     }
 }

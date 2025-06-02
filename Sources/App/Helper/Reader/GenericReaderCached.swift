@@ -57,7 +57,7 @@ final class GenericReaderCached<Domain: GenericDomain, Variable: GenericVariable
         return try await reader.getStatic(type: type)
     }
 
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: variable, time: time)
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: variable, time: time)
     }
 }

@@ -19,7 +19,7 @@ extension CamsMixer {
         for variable in variables {
             switch variable {
             case .uv_index:
-                try prefetchData(variable: .uv_index)
+                try await prefetchData(variable: .uv_index)
             }
         }
     }

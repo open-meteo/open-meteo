@@ -159,7 +159,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         /// Desired elevation from a DEM. Used in statistical downscaling
         let elevation: Float?
 
-        let prefetch: (() throws -> Void)
+        let prefetch: (() async throws -> Void)
         let current: (() async throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
         let hourly: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
         let daily: (() async throws -> ApiSection<Model.DailyVariable>)?
@@ -252,7 +252,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             }
             for location in results {
                 for model in location.results {
-                    try model.prefetch()
+                    try await model.prefetch()
                 }
             }
             switch format ?? .json {

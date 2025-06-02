@@ -43,8 +43,8 @@ struct JaxaHimawariReader: GenericReaderDerived, GenericReaderProtocol {
         self.options = options
     }
 
-    func prefetchData(raw: JaxaHimawariVariable, time: TimerangeDtAndSettings) throws {
-        try reader.prefetchData(variable: raw, time: time)
+    func prefetchData(raw: JaxaHimawariVariable, time: TimerangeDtAndSettings) async throws {
+        try await reader.prefetchData(variable: raw, time: time)
     }
 
     func get(raw: JaxaHimawariVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
@@ -100,12 +100,12 @@ struct JaxaHimawariReader: GenericReaderDerived, GenericReaderProtocol {
         }
     }
 
-    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: Derived, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .terrestrial_radiation, .terrestrial_radiation_instant:
             break
         case .shortwave_radiation_instant, .direct_radiation, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant, .diffuse_radiation, .diffuse_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant:
-            try prefetchData(raw: .shortwave_radiation, time: time)
+            try await prefetchData(raw: .shortwave_radiation, time: time)
         }
     }
 }

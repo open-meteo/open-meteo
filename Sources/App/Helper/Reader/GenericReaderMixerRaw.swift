@@ -64,15 +64,15 @@ extension GenericReaderMixerRaw {
         reader.last!.modelDtSeconds
     }
 
-    func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws {
         for reader in reader {
-            try reader.prefetchData(variable: variable, time: time)
+            try await reader.prefetchData(variable: variable, time: time)
         }
     }
 
-    func prefetchData(variables: [Reader.MixingVar], time: TimerangeDtAndSettings) throws {
-        try variables.forEach { variable in
-            try prefetchData(variable: variable, time: time)
+    func prefetchData(variables: [Reader.MixingVar], time: TimerangeDtAndSettings) async throws {
+        for variable in variables {
+            try await prefetchData(variable: variable, time: time)
         }
     }
 

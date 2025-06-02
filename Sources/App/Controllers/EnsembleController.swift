@@ -43,14 +43,14 @@ public struct EnsembleApiController {
                             if let hourlyVariables = paramsHourly {
                                 for variable in hourlyVariables {
                                     for member in 0..<reader.domain.countEnsembleMember {
-                                        try reader.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
+                                        try await reader.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
                                     }
                                 }
                             }
                             if let paramsDaily {
                                 for variable in paramsDaily {
                                     for member in 0..<reader.domain.countEnsembleMember {
-                                        try reader.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
+                                        try await reader.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
                                     }
                                 }
                              }
