@@ -104,6 +104,20 @@ final actor RemoteOmFileManagerCache {
     typealias Key = OmFileManagerReadable
     typealias Value = OmFileLocalOrRemote?
     
+    final class Statistics {
+        var ticks = 0
+        var inactivity = 0
+        var localModified = 0
+        var remoteModified = 0
+        
+        func reset() {
+            inactivity = 0
+            localModified = 0
+            remoteModified = 0
+        }
+    }
+    
+    
     final class Entry {
         var value: Value
         var lastValidated: Timestamp
@@ -132,6 +146,7 @@ final actor RemoteOmFileManagerCache {
     }
     
     var cache = [Key: State]()
+    var statistics: Statistics = .init()
     
     /**
      Get a resource identified by a key. If the request is currently being requested, enqueue the request
@@ -173,30 +188,39 @@ final actor RemoteOmFileManagerCache {
     
     /**
      Remove entries that have not been accessed for more than 15 minutes
-     Revalidate entries older than 3 minutes
+     Revalidate entries older than 3 minutes.
+     Called every 10 seconds
      */
     func revalidate(client: HTTPClient, logger: Logger) async throws {
-        print("## In om remote file revalidation")
+        var running = 0
+        var total = 0
+        statistics.ticks += 1
+        
         let removeLastAccessedThan: Timestamp = .now().subtract(minutes: 15)
         let revalidateAfter: Timestamp = .now().subtract(minutes: 3)
         for (key, state) in cache {
+            total += 1
             guard case .cached(let entry) = state else {
+                running += 1
                 continue
             }
             // Evict unused entries after 15 minutes
             if entry.lastAccessed < removeLastAccessedThan {
+                statistics.inactivity += 1
                 cache.removeValue(forKey: key)
                 continue
             }
             
             // Always check if local files got deleted or overwritten
             if case .local(let local) = entry.value, local.file.wasDeleted() {
+                statistics.localModified += 1
                 cache.removeValue(forKey: key)
                 continue
             }
             
             // Always check if a local file is now available
             if entry.value == nil, FileManager.default.fileExists(atPath: key.getFilePath()) {
+                statistics.localModified += 1
                 cache.removeValue(forKey: key)
                 continue
             }
@@ -211,14 +235,21 @@ final actor RemoteOmFileManagerCache {
                         guard old.cacheKey != new.cacheKey else {
                             continue // do not update if the existing entry is the same
                         }
+                        statistics.remoteModified += 1
                         entry.value = .remote(new)
                     } else {
+                        statistics.remoteModified += 1
                         entry.value = .remote(new)
                     }
                 } else {
+                    statistics.remoteModified += 1
                     entry.value = nil
                 }
             }
+        }
+        if statistics.ticks.isMultiple(of: 10), total > 10 {
+            logger.info("OmFileManager: \(total) open files, \(running) running. Removed since last check: \(statistics.inactivity) inactive, \(statistics.localModified) local modified, \(statistics.remoteModified) remote modified")
+            statistics.reset()
         }
     }
 }
