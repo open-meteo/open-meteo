@@ -77,6 +77,7 @@ Repositories:
 Other:
 - [Menubar Weather](https://www.raycast.com/koinzhang/menubar-weather) A Raycast extension that displays live weather information in your menu bar
 - [MiniPavi](https://www.minipavi.fr/emulminitel/) Vintage French Minitel (a kind of BBS) weather forecast service (type "METEO" keyword on welcome Minitel screen)
+- [OFM-InternetWeatherModule](https://github.com/OpenKNX/OFM-InternetWeatherModule) An OpenKNX module to provide data of weather services on KNX-bus (configurable via ETS)  
 - Contributions welcome!
 
 Do you use Open-Meteo? Please open a pull request and add your repository or app to the list!
