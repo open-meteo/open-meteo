@@ -253,7 +253,7 @@ struct ExportCommand: AsyncCommand {
         #if ENABLE_PARQUET
         let logger = application.logger
         let client = application.http.client.shared
-        let options = GenericReaderOptions(logger: logger, httpClient: client)
+        let options = try GenericReaderOptions(logger: logger, httpClient: client)
 
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         let writer = BufferedParquetFileWriter(file: file)
