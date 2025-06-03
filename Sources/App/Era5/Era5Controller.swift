@@ -496,13 +496,13 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             let directRadiation = try await get(raw: .direct_radiation, time: time).data
             let ghi = try await get(raw: .shortwave_radiation, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .global_tilted_irradiance_instant:
             let directRadiation = try await get(raw: .direct_radiation, time: time).data
             let ghi = try await get(raw: .shortwave_radiation, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .wind_speed_10m_spread:
             let σu = try await get(raw: .wind_u_component_10m_spread, time: time)

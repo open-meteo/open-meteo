@@ -102,7 +102,7 @@ struct GloFasController {
                 throw ForecastapiError.generic(message: "Parameter 'daily' required")
             }
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
-            let options = params.readerOptions(logger: logger, httpClient: httpClient)
+            let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
             let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

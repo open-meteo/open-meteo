@@ -159,7 +159,7 @@ struct SeasonalForecastController {
             let paramsSixHourly = try SeasonalForecastVariable.load(commaSeparatedOptional: params.six_hourly)
             let paramsDaily = try DailyCfsVariable.load(commaSeparatedOptional: params.daily)
             let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, { $0 + $1.forecastDomain.nMembers })
-            let options = params.readerOptions(logger: logger, httpClient: httpClient)
+            let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
             let locations: [ForecastapiResult<SeasonalForecastDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

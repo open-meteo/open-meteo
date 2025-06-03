@@ -19,7 +19,7 @@ struct CmipController {
             let nVariables = (paramsDaily?.count ?? 0) * domains.count
 
             let biasCorrection = !(params.disable_bias_correction ?? false)
-            let options = params.readerOptions(logger: logger, httpClient: httpClient)
+            let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
             let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

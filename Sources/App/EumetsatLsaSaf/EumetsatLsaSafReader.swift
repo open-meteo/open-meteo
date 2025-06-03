@@ -86,12 +86,12 @@ struct EumetsatLsaSafReader: GenericReaderDerived, GenericReaderProtocol {
         case .global_tilted_irradiance:
             let directRadiation = try await get(raw: .direct_radiation, time: time).data
             let diffuseRadiation = try await get(derived: .diffuse_radiation, time: time).data
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .global_tilted_irradiance_instant:
             let directRadiation = try await get(raw: .direct_radiation, time: time).data
             let diffuseRadiation = try await get(derived: .diffuse_radiation, time: time).data
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }

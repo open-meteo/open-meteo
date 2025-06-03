@@ -420,7 +420,7 @@ struct ExportCommand: AsyncCommand {
         let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
         let logger = application.logger
         let client = application.http.client.shared
-        let options = GenericReaderOptions(logger: logger, httpClient: client)
+        let options = try GenericReaderOptions(logger: logger, httpClient: client)
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)

@@ -13,7 +13,7 @@ public struct EnsembleApiController: Sendable {
             let allowedRange = Timestamp(2023, 4, 1) ..< currentTime.add(86400 * 36)
 
             let domains = try EnsembleMultiDomains.load(commaSeparatedOptional: params.models) ?? [.gfs_seamless]
-            let options = params.readerOptions(for: req)
+            let options = try params.readerOptions(for: req)
             let prepared = try await GenericReaderMulti<EnsembleVariable, EnsembleMultiDomains>.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: 7, forecastDaysMax: 36, pastDaysMax: 92, allowedRange: allowedRange)
 
             let paramsHourly = try EnsembleVariableWithoutMember.load(commaSeparatedOptional: params.hourly)

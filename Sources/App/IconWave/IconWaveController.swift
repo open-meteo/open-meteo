@@ -140,7 +140,7 @@ struct IconWaveController {
 
             let nParamsMinutely = paramsMinutely?.count ?? 0
             let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, { $0 + $1.countEnsembleMember })
-            let options = params.readerOptions(logger: logger, httpClient: httpClient)
+            let options = try params.readerOptions(logger: logger, httpClient: httpClient)
             
             let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate

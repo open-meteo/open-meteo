@@ -114,12 +114,12 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return timeformat ?? .iso8601
     }
 
-    func readerOptions(logger: Logger, httpClient: HTTPClient) -> GenericReaderOptions {
-        return GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
+    func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
     }
     
-    func readerOptions(for request: Request) -> GenericReaderOptions {
-        return GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: request.application.http.client.shared)
+    func readerOptions(for request: Request) throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: request.application.http.client.shared)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps

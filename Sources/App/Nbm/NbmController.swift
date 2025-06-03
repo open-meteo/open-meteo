@@ -309,13 +309,13 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 let diffuseRadiation = try await get(derived: .surface(.diffuse_radiation), time: time).data
                 let ghi = try await get(raw: .surface(.shortwave_radiation), time: time).data
                 let directRadiation = zip(ghi, diffuseRadiation).map(-)
-                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             case .global_tilted_irradiance_instant:
                 let diffuseRadiation = try await get(derived: .surface(.diffuse_radiation), time: time).data
                 let ghi = try await get(raw: .surface(.shortwave_radiation), time: time).data
                 let directRadiation = zip(ghi, diffuseRadiation).map(-)
-                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
+                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
                 return DataAndUnit(gti, .wattPerSquareMetre)
             case .diffuse_radiation:
                 let swrad = try await get(raw: .surface(.shortwave_radiation), time: time)

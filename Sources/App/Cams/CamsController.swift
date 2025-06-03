@@ -50,7 +50,7 @@ struct CamsController {
             let domains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
 
             let nVariables = (paramsHourly?.count ?? 0) * domains.count
-            let options = params.readerOptions(for: req)
+            let options = try params.readerOptions(for: req)
 
             let prepared = try await CamsMixer.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
 

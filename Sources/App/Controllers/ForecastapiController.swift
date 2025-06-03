@@ -119,7 +119,7 @@ struct WeatherApiController {
             let nParamsCurrent = paramsCurrent?.count ?? 0
             let nParamsDaily = paramsDaily?.count ?? 0
             let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.count
-            let options = params.readerOptions(for: req)
+            let options = try params.readerOptions(for: req)
 
             /// Prepare readers based on geometry
             /// Readers are returned as a callback to release memory after data has been retrieved
