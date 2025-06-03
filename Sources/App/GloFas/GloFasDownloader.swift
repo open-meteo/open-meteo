@@ -198,7 +198,7 @@ struct GloFasDownloader: AsyncCommand {
             logger.info("Reading \(date.format_YYYYMMdd)")
             let file = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
             guard FileManager.default.fileExists(atPath: file),
-                  let dailyFile = try await OmFileReaderAsync(file: file).asArray(of: Float.self)
+                  let dailyFile = try await OmFileReader(file: file).asArray(of: Float.self)
             else {
                 continue
             }

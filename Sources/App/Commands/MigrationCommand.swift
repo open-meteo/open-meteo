@@ -86,7 +86,7 @@ struct MigrationCommand: AsyncCommand {
         FileManager.default.waitIfFileWasRecentlyModified(at: temporary)
         try FileManager.default.removeItemIfExists(at: temporary)
         // Read data from the input OM file
-        guard let readfile = try? await OmFileReaderAsync(mmapFile: file) else {
+        guard let readfile = try? await OmFileReader(mmapFile: file) else {
             logger.warning("Failed to open file: \(file)")
             return
         }
@@ -131,7 +131,7 @@ struct MigrationCommand: AsyncCommand {
             try writeFn.close()
 
             /// Read data again to ensure the written data matches exactly
-            guard let verify = try await OmFileReaderAsync(mmapFile: temporary).asArray(of: Float.self)?.read() else {
+            guard let verify = try await OmFileReader(mmapFile: temporary).asArray(of: Float.self)?.read() else {
                 fatalError("Could not read temporary file")
             }
             guard data.isSimilar(verify) else {
@@ -205,7 +205,7 @@ struct MigrationCommand: AsyncCommand {
         try writeFn.close()
 
         /// Read data again to ensure the written data matches exactly
-        guard let verify = try await OmFileReaderAsync(mmapFile: temporary).asArray(of: Float.self) else {
+        guard let verify = try await OmFileReader(mmapFile: temporary).asArray(of: Float.self) else {
             fatalError("Could not read temporary file")
         }
         let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)), name: "Verify")

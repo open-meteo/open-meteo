@@ -12,6 +12,10 @@ public protocol AtomicBlockCacheStorable: Sendable {
 }
 
 extension MmapFile: AtomicBlockCacheStorable {
+    public func prefetchData(offset: Int, count: Int) {
+        self.prefetchData(offset: offset, count: count, advice: .willneed)
+    }
+    
     public func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
         return try data.withUnsafeBytes {
             return try body(.init(mutating: $0))
@@ -20,6 +24,10 @@ extension MmapFile: AtomicBlockCacheStorable {
 }
 
 extension DataAsClass: AtomicBlockCacheStorable {
+    public func prefetchData(offset: Int, count: Int) {
+        // Not necessary
+    }
+    
     public func withMutableUnsafeBytes<R>(_ body: (UnsafeMutableRawBufferPointer) throws -> R) rethrows -> R {
         try data.withUnsafeMutableBytes(body)
     }

@@ -34,7 +34,7 @@ extension String {
 /**
  Reader backend to read from an HTTP server on demand. Checks last modified header and ETag.
  */
-final class OmHttpReaderBackend: OmFileReaderBackendAsync, Sendable {
+final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     let client: HTTPClient
     
     /// Size of remote http file

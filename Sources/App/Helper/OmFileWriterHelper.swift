@@ -19,7 +19,7 @@ struct OmRunSpatialWriter: Sendable {
         self.storeOnDisk = storeOnDisk
     }
     
-    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: CompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
+    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
         let fn: FileHandle
         if storeOnDisk, let directorySpatial = domain.domainRegistry.directorySpatial {
             //let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
@@ -56,7 +56,7 @@ public final class OmFileWriterHelper: Sendable {
     /// Write all data at once without any streaming
     /// If `overwrite` is set, overwrite existing files atomically
     @discardableResult
-    public func write(file: String, compressionType: CompressionType, scalefactor: Float, all: [Float], overwrite: Bool = false) throws -> FileHandle {
+    public func write(file: String, compressionType: OmCompressionType, scalefactor: Float, all: [Float], overwrite: Bool = false) throws -> FileHandle {
         if !overwrite && FileManager.default.fileExists(atPath: file) {
             throw OmFileFormatSwiftError.fileExistsAlready(filename: file)
         }
@@ -92,7 +92,7 @@ public final class OmFileWriterHelper: Sendable {
         return GenericVariableHandle(variable: variable, time: time, member: member, fn: fn)
     }*/
 
-    public func writeTemporary(compressionType: CompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
+    public func writeTemporary(compressionType: OmCompressionType, scalefactor: Float, all: [Float]) throws -> FileHandle {
         let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
         try FileManager.default.removeItemIfExists(at: file)
         let fn = try FileHandle.createNewFile(file: file)
@@ -105,7 +105,7 @@ public final class OmFileWriterHelper: Sendable {
 extension Array where Element == Float {
     /// Write a given array as a 2D om file
     @discardableResult
-    func writeOmFile(file: String, dimensions: [Int], chunks: [Int], compression: CompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws -> FileHandle {
+    func writeOmFile(file: String, dimensions: [Int], chunks: [Int], compression: OmCompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws -> FileHandle {
         guard !FileManager.default.fileExists(atPath: file) else {
             fatalError("File exists already \(file)")
         }
@@ -132,7 +132,7 @@ extension Array where Element == Float {
     }
 
     /// Write the current array as an om file to an open file handle
-    func writeOmFile(fn: FileHandle, dimensions: [Int], chunks: [Int], compression: CompressionType, scalefactor: Float, run: Timestamp? = nil, time: Timestamp? = nil) throws {
+    func writeOmFile(fn: FileHandle, dimensions: [Int], chunks: [Int], compression: OmCompressionType, scalefactor: Float, run: Timestamp? = nil, time: Timestamp? = nil) throws {
         guard dimensions.reduce(1, *) == self.count else {
             fatalError(#function + ": Array size \(self.count) does not match dimensions \(dimensions)")
         }
@@ -155,7 +155,7 @@ extension Array where Element == Float {
     }
 
     /// Write a spatial om file using grid dimensions and 20x20 chunks. Mostly used to write elevation files
-    func writeOmFile2D(file: String, grid: Gridable, chunk0: Int = 20, chunk1: Int = 20, compression: CompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
+    func writeOmFile2D(file: String, grid: Gridable, chunk0: Int = 20, chunk1: Int = 20, compression: OmCompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
         let chunk0 = Swift.min(grid.ny, 20)
         try writeOmFile(file: file, dimensions: [grid.ny, grid.nx], chunks: [chunk0, 400 / chunk0], compression: compression, scalefactor: scalefactor, createNetCdf: createNetCdf)
     }

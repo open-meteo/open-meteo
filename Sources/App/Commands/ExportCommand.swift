@@ -548,7 +548,7 @@ struct ExportCommand: AsyncCommand {
 extension Gridable {
     /// Return true if there is no land around a 5x5 box
     /// `searchRadius = 2` for 5x5 search
-    func onlySeaAround(gridpoint: Int, elevationFile: any OmFileReaderAsyncArrayProtocol<Float>, searchRadius: Int) async throws -> Bool {
+    func onlySeaAround(gridpoint: Int, elevationFile: any OmFileReaderArrayProtocol<Float>, searchRadius: Int) async throws -> Bool {
         let yy = gridpoint / nx
         let xx = gridpoint % nx
         for y in min(max(yy - searchRadius, 0), ny) ..< min(max(yy + searchRadius + 1, 0), ny) {

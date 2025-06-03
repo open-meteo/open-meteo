@@ -57,7 +57,7 @@ enum OmFileManagerReadable: Hashable {
     }
 }
 
-extension OmFileReaderAsyncArrayProtocol where OmType == Float {
+extension OmFileReaderArrayProtocol where OmType == Float {
     /// Read interpolated between 4 points. Assuming dim0 is used for locations and dim1 is a time series
     public func readInterpolated(dim0: GridPoint2DFraction, dim0Nx: Int, dim1 dim1Read: Range<Int>) async throws -> [Float] {
         let gridpoint = dim0.gridpoint

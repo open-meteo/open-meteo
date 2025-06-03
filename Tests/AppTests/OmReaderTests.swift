@@ -19,7 +19,7 @@ final class OmReaderTests: XCTestCase {
     func testHttpRead() async throws {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
         let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!
-        let read = try await OmFileReaderAsync(fn: readFn).asArray(of: Float.self)!
+        let read = try await OmFileReader(fn: readFn).asArray(of: Float.self)!
         let value = try await read.read(range: [250..<251, 420..<421])
         XCTAssertEqual(value.first, 214)
     }
@@ -32,7 +32,7 @@ final class OmReaderTests: XCTestCase {
         defer { try! FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
-        let read = try! await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self)!
+        let read = try! await OmFileReader(fn: cacheFn).asArray(of: Float.self)!
         let value = try await read.read(range: [250..<251, 420..<421])
         XCTAssertEqual(value.first, 214)
         
@@ -48,7 +48,7 @@ final class OmReaderTests: XCTestCase {
         defer { try! FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
-        let read = try await OmFileReaderAsync(fn: cacheFn).asArray(of: Float.self, io_size_max: 4096)!
+        let read = try await OmFileReader(fn: cacheFn).asArray(of: Float.self, io_size_max: 4096)!
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         XCTAssertEqual(value[123], 1218)
         

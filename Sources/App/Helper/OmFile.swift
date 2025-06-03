@@ -213,7 +213,7 @@ struct OmFileSplitter {
      
      TODO: should use Array3DFastTime
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16) async throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16) async throws {
         precondition(array2d.nTime == time.count)
         precondition(array2d.nLocations == nx * ny)
 
@@ -234,7 +234,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Upates are done streamlingly to low memory usage
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, time: TimerangeDt, scalefactor: Float, compression: CompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         let indexTime = time.toIndexTime()
         let indextimeChunked = indexTime.divideRoundedUp(divisor: nTimePerFile)
 
@@ -247,7 +247,7 @@ struct OmFileSplitter {
         }
 
         struct WriterPerStep {
-            let read: OmFileReaderAsync<MmapFile>?
+            let read: OmFileReader<MmapFile>?
             let writeFile: OmFileWriter<FileHandle>
             let write: OmFileWriterArray<Float, FileHandle>
             let writeFn: FileHandle
@@ -272,7 +272,7 @@ struct OmFileSplitter {
                 FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
                 try FileManager.default.removeItemIfExists(at: tempFile)
                 let fn = try FileHandle.createNewFile(file: tempFile)
-                let omRead = try? await OmFileReaderAsync(mmapFile: readFile.getFilePath())
+                let omRead = try? await OmFileReader(mmapFile: readFile.getFilePath())
 
                 let writeFile = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024)
                 let writer = try writeFile.prepareArray(
@@ -417,7 +417,7 @@ extension Range where Bound == Int {
 
 
 
-extension OmFileReaderAsyncArrayProtocol where OmType == Float {
+extension OmFileReaderArrayProtocol where OmType == Float {
     /// Read data from file. Switch between old legacy files and new multi dimensional files.
     /// Note: `nTime` is the output array nTime. It is not the file nTime!
     /// TODO: nMembers variable is wrong if called via API controller. Aways 1

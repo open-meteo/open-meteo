@@ -208,7 +208,7 @@ struct DownloadDemCommand: AsyncCommand {
                             continue
                         }
 
-                        guard let om = try await OmFileReaderAsync(file: omFile).asArray(of: Float.self) else {
+                        guard let om = try await OmFileReader(file: omFile).asArray(of: Float.self) else {
                             fatalError("not a float array")
                         }
                         let dimensions = om.getDimensions()
