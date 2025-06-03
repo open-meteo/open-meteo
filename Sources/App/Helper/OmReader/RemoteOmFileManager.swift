@@ -45,11 +45,11 @@ final class RemoteOmFileManager: Sendable {
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
     func get(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> (any OmFileReaderProtocol)? {
         guard let backend = try await cache.get(key: file, forceNew: forceNew, provider: {
-            return try await file.asOmFileLocalOrRemote(client: client, logger: logger)
+            return try await file.newReader(client: client, logger: logger)
         }) else {
             return nil
         }
-        return try await backend.toReader()
+        return backend.toReader()
     }
     
     /// Called every 10 seconds from a life cycle handler on an available thread
@@ -59,32 +59,31 @@ final class RemoteOmFileManager: Sendable {
 }
 
 enum OmFileLocalOrRemote {
-    case local(MmapFile)
-    case remote(OmHttpReaderBackend)
+    case local(OmFileReader<MmapFile>)
+    case remote(OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>>)
     
-    func toReader() async throws -> any OmFileReaderProtocol {
+    func toReader() -> any OmFileReaderProtocol {
         switch self {
         case .local(let local):
-            return try await OmFileReader(fn: local)
+            return local
         case .remote(let remote):
-            let cacheFn = OmReaderBlockCache(backend: remote, cache: OpenMeteo.dataBlockCache, cacheKey: remote.cacheKey)
-            return try await OmFileReader(fn: cacheFn)
+            return remote
         }
     }
 }
 
 extension OmFileManagerReadable {
-    func asOmFileLocalOrRemote(client: HTTPClient, logger: Logger) async throws -> OmFileLocalOrRemote? {
+    func newReader(client: HTTPClient, logger: Logger) async throws -> OmFileLocalOrRemote? {
         let file = self.getRelativeFilePath()
         let localFile = "\(OpenMeteo.dataDirectory)\(file)"
         
         if FileManager.default.fileExists(atPath: localFile) {
-            return .local(try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly))
+            return .local(try await OmFileReader(fn: try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly)))
         }
         if let remoteDirectory = OpenMeteo.remoteDataDirectory {
             let remoteFile = "\(remoteDirectory)\(file)"
             if let remote = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
-                return .remote(remote)
+                return .remote(try await remote.asCachedReader())
             }
         }
         return nil
@@ -212,7 +211,7 @@ final actor RemoteOmFileManagerCache {
             }
             
             // Always check if local files got deleted or overwritten
-            if case .local(let local) = entry.value, local.file.wasDeleted() {
+            if case .local(let local) = entry.value, local.fn.file.wasDeleted() {
                 statistics.localModified += 1
                 cache.removeValue(forKey: key)
                 continue
@@ -232,14 +231,14 @@ final actor RemoteOmFileManagerCache {
                 let remoteFile = "\(remoteDirectory)\(key.getRelativeFilePath())"
                 if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
                     if case .remote(let old) = entry.value {
-                        guard old.cacheKey != new.cacheKey else {
+                        guard old.fn.cacheKey != new.cacheKey else {
                             continue // do not update if the existing entry is the same
                         }
                         statistics.remoteModified += 1
-                        entry.value = .remote(new)
+                        entry.value = .remote(try await new.asCachedReader())
                     } else {
                         statistics.remoteModified += 1
-                        entry.value = .remote(new)
+                        entry.value = .remote(try await new.asCachedReader())
                     }
                 } else {
                     statistics.remoteModified += 1
@@ -251,5 +250,12 @@ final actor RemoteOmFileManagerCache {
             logger.info("OmFileManager: \(total) open files, \(running) running. Removed since last check: \(statistics.inactivity) inactive, \(statistics.localModified) local modified, \(statistics.remoteModified) remote modified")
             statistics.reset()
         }
+    }
+}
+
+extension OmHttpReaderBackend {
+    func asCachedReader() async throws -> OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>> {
+        let cacheFn = OmReaderBlockCache(backend: self, cache: OpenMeteo.dataBlockCache, cacheKey: self.cacheKey)
+        return try await OmFileReader(fn: cacheFn)
     }
 }
