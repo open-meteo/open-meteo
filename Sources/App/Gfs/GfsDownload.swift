@@ -215,7 +215,7 @@ struct GfsDownload: AsyncCommand {
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.asArray(of: Float.self)?.read(range: nil) else {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

@@ -170,7 +170,7 @@ struct SeasonalForecastDownload: AsyncCommand {
             }()
 
             /// -999 for sea
-            let elevations = try await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)!.asArray(of: Float.self)!.read(range: nil)
+            let elevations = try await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)!.read(range: nil)
 
             /// convert surface pressure to mean sea level pressure
             for l in 0..<tmp2m.nLocations {

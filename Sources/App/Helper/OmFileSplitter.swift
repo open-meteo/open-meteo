@@ -87,9 +87,6 @@ struct OmFileSplitter {
             let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
                 try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-                    guard let reader = reader.asArray(of: Float.self) else {
-                        return
-                    }
                     try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -112,9 +109,6 @@ struct OmFileSplitter {
                 }
                 let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
                 try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-                    guard let reader = reader.asArray(of: Float.self) else {
-                        return
-                    }
                     try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -131,9 +125,6 @@ struct OmFileSplitter {
             }
             let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-                guard let reader = reader.asArray(of: Float.self) else {
-                    return
-                }
                 try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
             }
         }
@@ -156,9 +147,6 @@ struct OmFileSplitter {
             let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
                 try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-                    guard let reader = reader.asArray(of: Float.self) else {
-                        return
-                    }
                     try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -178,9 +166,6 @@ struct OmFileSplitter {
                 }
                 let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
                 try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-                    guard let reader = reader.asArray(of: Float.self) else {
-                        return
-                    }
                     try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -198,9 +183,6 @@ struct OmFileSplitter {
             }
             let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-                guard let reader = reader.asArray(of: Float.self) else {
-                    return
-                }
                 try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }
         }

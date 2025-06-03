@@ -57,7 +57,7 @@ struct Dem90: GenericDomain {
         
         let file = OmFileManagerReadable.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
         try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
-            try await reader.asArray(of: Float.self)?.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
+            try await reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
         }
         return value
     }

@@ -104,7 +104,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     public init(domain: Domain, position: Int, options: GenericReaderOptions) async throws {
         self.domain = domain
         self.position = position
-        if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)?.asArray(of: Float.self) {
+        if let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger) {
             self.modelElevation = try await domain.grid.readElevation(gridpoint: position, elevationFile: elevationFile)
         } else {
             self.modelElevation = .noData
@@ -121,7 +121,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     /// Return nil, if the coordinates are outside the domain grid
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         // check if coordinates are in domain, otherwise return nil
-        let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)?.asArray(of: Float.self)
+        let elevationFile = await domain.getStaticFile(type: .elevation, httpClient: options.httpClient, logger: options.logger)
         guard let gridpoint = try await domain.grid.findPoint(lat: lat, lon: lon, elevation: elevation, elevationFile: elevationFile, mode: mode) else {
             return nil
         }
@@ -197,7 +197,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     }
 
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
-        guard let file = await domain.getStaticFile(type: type, httpClient: httpClient, logger: logger)?.asArray(of: Float.self) else {
+        guard let file = await domain.getStaticFile(type: type, httpClient: httpClient, logger: logger) else {
             return nil
         }
         return try await domain.grid.readFromStaticFile(gridpoint: position, file: file)

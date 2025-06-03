@@ -278,7 +278,7 @@ extension GenericDomain {
         return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil, ensembleMember: 0, previousDay: 0)
     }
 
-    func openBiasCorrectionFile(for variable: String, client: HTTPClient, logger: Logger) async throws -> (any OmFileReaderProtocol)? {
+    func openBiasCorrectionFile(for variable: String, client: HTTPClient, logger: Logger) async throws -> (any OmFileReaderArrayProtocol<Float>)? {
         return try await RemoteOmFileManager.instance.get(file: getBiasCorrectionFile(for: variable), client: client, logger: logger)
     }
 }

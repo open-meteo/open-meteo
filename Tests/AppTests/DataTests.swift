@@ -102,11 +102,11 @@ final class DataTests: XCTestCase {
 
         let logger = Logger(label: "testElevationMatching")
         let client = HTTPClient.shared
-        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!.asArray(of: Float.self)!)!
+        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
         XCTAssertEqual(optimised.gridpoint, 225405)
         XCTAssertEqual(optimised.gridElevation.numeric, 600)
 
-        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!.asArray(of: Float.self)!)!
+        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
         XCTAssertEqual(nearest.gridpoint, 225406)
         XCTAssertEqual(nearest.gridElevation.numeric, 1006.0)
     }

@@ -40,7 +40,7 @@ extension GenericDomain {
     }
 
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient, logger: Logger) async -> (any OmFileReaderProtocol)? {
+    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
         guard let domainRegistryStatic else {
             return nil
         }
