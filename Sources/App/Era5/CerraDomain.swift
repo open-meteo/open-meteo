@@ -58,71 +58,71 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
 
     typealias Derived = CerraVariableDerived
 
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
-        guard let reader = try GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        guard let reader = try await GenericReader<Domain, Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
 
-    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) throws {
-        let reader = try GenericReader<Domain, Variable>(domain: domain, position: gridpoint)
+    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
+        let reader = try await GenericReader<Domain, Variable>(domain: domain, position: gridpoint, options: options)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
 
-    func prefetchData(variables: [CerraHourlyVariable], time: TimerangeDtAndSettings) throws {
+    func prefetchData(variables: [CerraHourlyVariable], time: TimerangeDtAndSettings) async throws {
         for variable in variables {
             switch variable {
             case .raw(let v):
-                try prefetchData(raw: v, time: time)
+                try await prefetchData(raw: v, time: time)
             case .derived(let v):
-                try prefetchData(derived: v, time: time)
+                try await prefetchData(derived: v, time: time)
             }
         }
     }
 
-    func prefetchData(derived: CerraVariableDerived, time: TimerangeDtAndSettings) throws {
+    func prefetchData(derived: CerraVariableDerived, time: TimerangeDtAndSettings) async throws {
         switch derived {
         case .apparent_temperature:
-            try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .wind_speed_10m, time: time)
-            try prefetchData(raw: .relative_humidity_2m, time: time)
-            try prefetchData(raw: .direct_radiation, time: time)
-            try prefetchData(raw: .shortwave_radiation, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
+            try await prefetchData(raw: .wind_speed_10m, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(raw: .shortwave_radiation, time: time)
         case .dew_point_2m, .dewpoint_2m:
-            try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .relative_humidity_2m, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
         case .vapour_pressure_deficit, .vapor_pressure_deficit:
-            try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .relative_humidity_2m, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
         case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation:
-            try prefetchData(raw: .shortwave_radiation, time: time)
-            try prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(raw: .shortwave_radiation, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
         case .et0_fao_evapotranspiration:
-            try prefetchData(raw: .direct_radiation, time: time)
-            try prefetchData(derived: .diffuse_radiation, time: time)
-            try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .relative_humidity_2m, time: time)
-            try prefetchData(raw: .wind_speed_10m, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(derived: .diffuse_radiation, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
+            try await prefetchData(raw: .wind_speed_10m, time: time)
         case .surface_pressure:
-            try prefetchData(raw: .pressure_msl, time: time)
+            try await prefetchData(raw: .pressure_msl, time: time)
         case .snowfall:
-            try prefetchData(raw: .snowfall_water_equivalent, time: time)
+            try await prefetchData(raw: .snowfall_water_equivalent, time: time)
         case .cloud_cover, .cloudcover:
-            try prefetchData(raw: .cloud_cover_low, time: time)
-            try prefetchData(raw: .cloud_cover_mid, time: time)
-            try prefetchData(raw: .cloud_cover_high, time: time)
+            try await prefetchData(raw: .cloud_cover_low, time: time)
+            try await prefetchData(raw: .cloud_cover_mid, time: time)
+            try await prefetchData(raw: .cloud_cover_high, time: time)
         case .direct_normal_irradiance:
-            try prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
         case .rain:
-            try prefetchData(raw: .precipitation, time: time)
-            try prefetchData(raw: .snowfall_water_equivalent, time: time)
+            try await prefetchData(raw: .precipitation, time: time)
+            try await prefetchData(raw: .snowfall_water_equivalent, time: time)
         case .weather_code, .weathercode:
-            try prefetchData(derived: .cloudcover, time: time)
-            try prefetchData(raw: .precipitation, time: time)
-            try prefetchData(derived: .snowfall, time: time)
+            try await prefetchData(derived: .cloudcover, time: time)
+            try await prefetchData(raw: .precipitation, time: time)
+            try await prefetchData(derived: .snowfall, time: time)
         case .is_day:
             break
         case .terrestrial_radiation:
@@ -130,108 +130,108 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .terrestrial_radiation_instant:
             break
         case .shortwave_radiation_instant:
-            try prefetchData(raw: .shortwave_radiation, time: time)
+            try await prefetchData(raw: .shortwave_radiation, time: time)
         case .diffuse_radiation_instant:
-            try prefetchData(derived: .diffuse_radiation, time: time)
+            try await prefetchData(derived: .diffuse_radiation, time: time)
         case .direct_radiation_instant:
-            try prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
         case .direct_normal_irradiance_instant:
-            try prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
         case .wet_bulb_temperature_2m:
-            try prefetchData(raw: .temperature_2m, time: time)
-            try prefetchData(raw: .relative_humidity_2m, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
         case .wind_speed_10m:
-            try prefetchData(raw: .wind_speed_10m, time: time)
+            try await prefetchData(raw: .wind_speed_10m, time: time)
         case .wind_direction_10m:
-            try prefetchData(raw: .wind_direction_10m, time: time)
+            try await prefetchData(raw: .wind_direction_10m, time: time)
         case .wind_gusts_10m:
-            try prefetchData(raw: .wind_gusts_10m, time: time)
+            try await prefetchData(raw: .wind_gusts_10m, time: time)
         case .relative_humidity_2m:
-            try prefetchData(raw: .relative_humidity_2m, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
         case .cloud_cover_low:
-            try prefetchData(raw: .cloud_cover_low, time: time)
+            try await prefetchData(raw: .cloud_cover_low, time: time)
         case .cloud_cover_mid:
-            try prefetchData(raw: .cloud_cover_mid, time: time)
+            try await prefetchData(raw: .cloud_cover_mid, time: time)
         case .cloud_cover_high:
-            try prefetchData(raw: .cloud_cover_high, time: time)
+            try await prefetchData(raw: .cloud_cover_high, time: time)
         case .wind_speed_100m:
-            try prefetchData(raw: .wind_speed_100m, time: time)
+            try await prefetchData(raw: .wind_speed_100m, time: time)
         case .wind_direction_100m:
-            try prefetchData(raw: .wind_speed_100m, time: time)
+            try await prefetchData(raw: .wind_speed_100m, time: time)
         case .sunshine_duration:
-            try prefetchData(raw: .direct_radiation, time: time)
+            try await prefetchData(raw: .direct_radiation, time: time)
         }
     }
 
-    func get(variable: CerraHourlyVariable, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(variable: CerraHourlyVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
         case .raw(let variable):
-            return try get(raw: variable, time: time)
+            return try await get(raw: variable, time: time)
         case .derived(let variable):
-            return try get(derived: variable, time: time)
+            return try await get(derived: variable, time: time)
         }
     }
 
-    func get(derived: CerraVariableDerived, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(derived: CerraVariableDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch derived {
         case .dew_point_2m, .dewpoint_2m:
-            let relhum = try get(raw: .relative_humidity_2m, time: time)
-            let temperature = try get(raw: .temperature_2m, time: time)
+            let relhum = try await get(raw: .relative_humidity_2m, time: time)
+            let temperature = try await get(raw: .temperature_2m, time: time)
             return DataAndUnit(zip(temperature.data, relhum.data).map(Meteorology.dewpoint), temperature.unit)
         case .apparent_temperature:
-            let windspeed = try get(raw: .wind_speed_10m, time: time).data
-            let temperature = try get(raw: .temperature_2m, time: time).data
-            let relhum = try get(raw: .relative_humidity_2m, time: time).data
-            let radiation = try get(raw: .shortwave_radiation, time: time).data
+            let windspeed = try await get(raw: .wind_speed_10m, time: time).data
+            let temperature = try await get(raw: .temperature_2m, time: time).data
+            let relhum = try await get(raw: .relative_humidity_2m, time: time).data
+            let radiation = try await get(raw: .shortwave_radiation, time: time).data
             return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature, relativehumidity_2m: relhum, windspeed_10m: windspeed, shortwave_radiation: radiation), .celsius)
         case .vapour_pressure_deficit, .vapor_pressure_deficit:
-            let temperature = try get(raw: .temperature_2m, time: time).data
-            let dewpoint = try get(derived: .dewpoint_2m, time: time).data
+            let temperature = try await get(raw: .temperature_2m, time: time).data
+            let dewpoint = try await get(derived: .dewpoint_2m, time: time).data
             return DataAndUnit(zip(temperature, dewpoint).map(Meteorology.vaporPressureDeficit), .kilopascal)
         case .et0_fao_evapotranspiration:
             let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: modelLat, longitude: modelLon, timerange: time.time)
-            let swrad = try get(raw: .shortwave_radiation, time: time).data
-            let temperature = try get(raw: .temperature_2m, time: time).data
-            let windspeed = try get(raw: .wind_speed_10m, time: time).data
-            let dewpoint = try get(derived: .dewpoint_2m, time: time).data
+            let swrad = try await get(raw: .shortwave_radiation, time: time).data
+            let temperature = try await get(raw: .temperature_2m, time: time).data
+            let windspeed = try await get(raw: .wind_speed_10m, time: time).data
+            let dewpoint = try await get(derived: .dewpoint_2m, time: time).data
 
             let et0 = swrad.indices.map { i in
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: self.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
             }
             return DataAndUnit(et0, .millimetre)
         case .diffuse_radiation:
-            let swrad = try get(raw: .shortwave_radiation, time: time).data
-            let direct = try get(raw: .direct_radiation, time: time).data
+            let swrad = try await get(raw: .shortwave_radiation, time: time).data
+            let direct = try await get(raw: .direct_radiation, time: time).data
             let diff = zip(swrad, direct).map(-)
             return DataAndUnit(diff, .wattPerSquareMetre)
         case .surface_pressure:
-            let temperature = try get(raw: .temperature_2m, time: time).data
-            let pressure = try get(raw: .pressure_msl, time: time)
+            let temperature = try await get(raw: .temperature_2m, time: time).data
+            let pressure = try await get(raw: .pressure_msl, time: time)
             return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: targetElevation), pressure.unit)
         case .cloud_cover, .cloudcover:
-            let low = try get(raw: .cloud_cover_low, time: time).data
-            let mid = try get(raw: .cloud_cover_mid, time: time).data
-            let high = try get(raw: .cloud_cover_high, time: time).data
+            let low = try await get(raw: .cloud_cover_low, time: time).data
+            let mid = try await get(raw: .cloud_cover_mid, time: time).data
+            let high = try await get(raw: .cloud_cover_high, time: time).data
             return DataAndUnit(Meteorology.cloudCoverTotal(low: low, mid: mid, high: high), .percentage)
         case .snowfall:
-            let snowwater = try get(raw: .snowfall_water_equivalent, time: time).data
+            let snowwater = try await get(raw: .snowfall_water_equivalent, time: time).data
             let snowfall = snowwater.map { $0 * 0.7 }
             return DataAndUnit(snowfall, .centimetre)
         case .direct_normal_irradiance:
-            let dhi = try get(raw: .direct_radiation, time: time).data
+            let dhi = try await get(raw: .direct_radiation, time: time).data
             let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi, latitude: modelLat, longitude: modelLon, timerange: time.time)
             return DataAndUnit(dni, .wattPerSquareMetre)
         case .rain:
-            let snowwater = try get(raw: .snowfall_water_equivalent, time: time)
-            let precip = try get(raw: .precipitation, time: time)
+            let snowwater = try await get(raw: .snowfall_water_equivalent, time: time)
+            let precip = try await get(raw: .precipitation, time: time)
             let rain = zip(precip.data, snowwater.data).map({
                 return max($0.0 - $0.1, 0)
             })
             return DataAndUnit(rain, precip.unit)
         case .weather_code, .weathercode:
-            let cloudcover = try get(derived: .cloudcover, time: time).data
-            let precipitation = try get(raw: .precipitation, time: time).data
-            let snowfall = try get(derived: .snowfall, time: time).data
+            let cloudcover = try await get(derived: .cloudcover, time: time).data
+            let precipitation = try await get(raw: .precipitation, time: time).data
+            let snowfall = try await get(derived: .snowfall, time: time).data
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
@@ -253,58 +253,58 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(solar, .wattPerSquareMetre)
         case .shortwave_radiation_instant:
-            let sw = try get(raw: .shortwave_radiation, time: time)
+            let sw = try await get(raw: .shortwave_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
         case .direct_normal_irradiance_instant:
-            let direct = try get(raw: .direct_radiation, time: time)
+            let direct = try await get(raw: .direct_radiation, time: time)
             let dni = Zensun.calculateBackwardsDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertToInstant: true)
             return DataAndUnit(dni, direct.unit)
         case .direct_radiation_instant:
-            let direct = try get(raw: .direct_radiation, time: time)
+            let direct = try await get(raw: .direct_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
         case .diffuse_radiation_instant:
-            let diff = try get(derived: .diffuse_radiation, time: time)
+            let diff = try await get(derived: .diffuse_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
         case .wet_bulb_temperature_2m:
-            let relhum = try get(raw: .relative_humidity_2m, time: time)
-            let temperature = try get(raw: .temperature_2m, time: time)
+            let relhum = try await get(raw: .relative_humidity_2m, time: time)
+            let temperature = try await get(raw: .temperature_2m, time: time)
             return DataAndUnit(zip(temperature.data, relhum.data).map(Meteorology.wetBulbTemperature), temperature.unit)
         case .wind_speed_10m:
-            return try get(raw: .wind_speed_10m, time: time)
+            return try await get(raw: .wind_speed_10m, time: time)
         case .wind_direction_10m:
-            return try get(raw: .wind_direction_10m, time: time)
+            return try await get(raw: .wind_direction_10m, time: time)
         case .wind_speed_100m:
-            return try get(raw: .wind_speed_10m, time: time)
+            return try await get(raw: .wind_speed_10m, time: time)
         case .wind_direction_100m:
-            return try get(raw: .wind_direction_100m, time: time)
+            return try await get(raw: .wind_direction_100m, time: time)
         case .wind_gusts_10m:
-            return try get(raw: .wind_gusts_10m, time: time)
+            return try await get(raw: .wind_gusts_10m, time: time)
         case .relative_humidity_2m:
-            return try get(raw: .relative_humidity_2m, time: time)
+            return try await get(raw: .relative_humidity_2m, time: time)
         case .cloud_cover_low:
-            return try get(raw: .cloud_cover_low, time: time)
+            return try await get(raw: .cloud_cover_low, time: time)
         case .cloud_cover_mid:
-            return try get(raw: .cloud_cover_mid, time: time)
+            return try await get(raw: .cloud_cover_mid, time: time)
         case .cloud_cover_high:
-            return try get(raw: .cloud_cover_high, time: time)
+            return try await get(raw: .cloud_cover_high, time: time)
         case .sunshine_duration:
-            let directRadiation = try get(raw: .direct_radiation, time: time)
+            let directRadiation = try await get(raw: .direct_radiation, time: time)
             let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(duration, .seconds)
         case .global_tilted_irradiance:
-            let directRadiation = try get(raw: .direct_radiation, time: time).data
-            let ghi = try get(raw: .shortwave_radiation, time: time).data
+            let directRadiation = try await get(raw: .direct_radiation, time: time).data
+            let ghi = try await get(raw: .shortwave_radiation, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
             return DataAndUnit(gti, .wattPerSquareMetre)
         case .global_tilted_irradiance_instant:
-            let directRadiation = try get(raw: .direct_radiation, time: time).data
-            let ghi = try get(raw: .shortwave_radiation, time: time).data
+            let directRadiation = try await get(raw: .direct_radiation, time: time).data
+            let ghi = try await get(raw: .shortwave_radiation, time: time).data
             let diffuseRadiation = zip(ghi, directRadiation).map(-)
-            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: try options.getTilt(), azimuth: try options.getAzimuth(), latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
+            let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
         }
     }

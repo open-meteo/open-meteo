@@ -10,7 +10,7 @@ import SwiftNetCDF
   - Convert to NetCDF: openmeteo-api convert-om data.om --format netcdf -o output.nc --domain ecmwf_ifs025
   - Convert between OM versions: openmeteo-api convert-om data.om --format om3 -o data.om3 --domain ecmwf_ifs025
  */
-struct ConvertOmCommand: Command {
+struct ConvertOmCommand: AsyncCommand {
     var help: String {
         return "Convert between om file format version or convert to NetCDF"
     }
@@ -32,7 +32,7 @@ struct ConvertOmCommand: Command {
         var domain: String?
     }
 
-    func run(using context: CommandContext, signature: Signature) throws {
+    func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
         logger.info("Processing file: \(signature.infile)")
 
@@ -52,18 +52,18 @@ struct ConvertOmCommand: Command {
             guard let grid = domainObj.getDomain()?.grid else {
                 fatalError("Did not get domain grid")
             }
-            try convertOmv3(src: signature.infile, dest: outfile, grid: grid)
+            try await convertOmv3(src: signature.infile, dest: outfile, grid: grid)
             return
         } else if format == "netcdf" {
             // Handle conversion to NetCDF
-            guard let om = try OmFileReader(file: signature.infile).asArray(of: Float.self) else {
+            guard let om = try await OmFileReader(file: signature.infile).asArray(of: Float.self) else {
                 throw ConvertOmError("Not a float array")
             }
             let dimensions = Array(om.getDimensions())
             let chunks = Array(om.getChunkDimensions())
             logger.info("File dimensions: \(dimensions), chunks: \(chunks)")
 
-            let data = try om.read()
+            let data = try await om.read()
             let outfile = signature.outfile ?? signature.infile.withoutOmSuffix + ".nc"
             logger.info("Converting to NetCDF: \(outfile)")
             try convertToNetCDF(data: data, dimensions: dimensions, outfile: outfile, transpose: signature.transpose, domain: signature.domain, logger: logger)
@@ -164,9 +164,9 @@ struct ConvertOmCommand: Command {
     }
 
     /// Read om file and write it as version 3 and reshape data to proper 3d files
-    func convertOmv3(src: String, dest: String, grid: Gridable) throws {
+    func convertOmv3(src: String, dest: String, grid: Gridable) async throws {
         // Read data from the input OM file
-        guard let readfile = try? OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
+        guard let readfile = try? await OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
               let reader = readfile.asArray(of: Float.self) else {
             throw ConvertOmError("Failed to open file: \(src)")
         }
@@ -238,7 +238,7 @@ struct ConvertOmCommand: Command {
 
                     var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for (row, y) in yRange.enumerated() {
-                        try reader.read(
+                        try await reader.read(
                             into: &chunk,
                             range: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, tRange],
                             intoCubeOffset: [UInt64(row * xRange.count), 0],

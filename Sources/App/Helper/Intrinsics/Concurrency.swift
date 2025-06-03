@@ -1,5 +1,16 @@
 import Foundation
 
+/*extension Optional {
+    func asyncMap<T>(
+        _ transform: (WrappedType) async throws -> T
+    ) async rethrows -> T? {
+        guard let value = self else {
+            return nil
+        }
+        return try await transform(value)
+    }
+}*/
+
 extension Sequence {
     func asyncMap<T>(
         _ transform: (Element) async throws -> T

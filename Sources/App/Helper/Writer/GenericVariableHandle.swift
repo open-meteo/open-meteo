@@ -18,12 +18,12 @@ struct GenericVariableHandle: Sendable {
         self.fn = fn
     }
 
-    public func makeReader() throws -> OmFileReaderArray<MmapFile, Float> {
-        try OmFileReader(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
+    public func makeReader() async throws -> OmFileReaderArray<MmapFile, Float> {
+        try await OmFileReader(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
     }
 
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: CompressionType = .pfor_delta2d_int16) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16) async throws {
         let startTime = DispatchTime.now()
         try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
         logger.info("Convert completed in \(startTime.timeElapsedPretty())")
@@ -83,22 +83,22 @@ struct GenericVariableHandle: Sendable {
         }
     }
 
-    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: CompressionType) async throws {
+    private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
         if concurrent > 1 {
             try await handles
                 .filter({ onlyGeneratePreviousDays == false || $0.variable.storePreviousForecast })
                 .groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" })
                 .evenlyChunked(in: concurrent)
                 .foreachConcurrent(nConcurrent: concurrent, body: {
-                    try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap { $0.values }, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+                    try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: $0.flatMap { $0.values }, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
             })
         } else {
-            try convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
+            try await convertSerial3D(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: onlyGeneratePreviousDays, compression: compression)
         }
     }
 
     /// Process each variable and update time-series optimised files
-    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: CompressionType) throws {
+    private static func convertSerial3D(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, compression: OmCompressionType) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -106,9 +106,9 @@ struct GenericVariableHandle: Sendable {
         let dtSeconds = domain.dtSeconds
 
         for (_, handles) in handles.groupedPreservedOrder(by: { "\($0.variable.omFileName.file)" }) {
-            let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try handles.grouped(by: { $0.time }).flatMap { time, h in
-                return try h.map {
-                    let reader = try $0.makeReader()
+            let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try await handles.grouped(by: { $0.time }).asyncFlatMap { time, h in
+                return try await h.asyncMap {
+                    let reader = try await $0.makeReader()
                     let dimensions = reader.getDimensions()
                     let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
                     guard dimensions[0] == ny && dimensions[1] == nx else {
@@ -196,7 +196,7 @@ struct GenericVariableHandle: Sendable {
                 try ncVariable.setAttribute("add_offset", Float(0))
                 try ncVariable.setAttribute("_FillValue", Int16.max)
                 for reader in readers {
-                    let data = try reader.reader.read()
+                    let data = try await reader.reader.read()
                     let nt = reader.time.count
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
                     if nt > 1 {
@@ -218,7 +218,7 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            try om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
@@ -229,11 +229,11 @@ struct GenericVariableHandle: Sendable {
                     if dimensions.count == 3 {
                         /// Number of time steps in this file
                         let nt = dimensions[2]
-                        try reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
+                        try await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
                         data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
                     } else {
                         // Single time step
-                        try reader.reader.read(into: &readTemp, range: [yRange, xRange])
+                        try await reader.reader.read(into: &readTemp, range: [yRange, xRange])
                         data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
                     }
                 }

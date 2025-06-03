@@ -278,8 +278,8 @@ extension GenericDomain {
         return .domainChunk(domain: domainRegistry, variable: variable, type: .linear_bias_seasonal, chunk: nil, ensembleMember: 0, previousDay: 0)
     }
 
-    func openBiasCorrectionFile(for variable: String) throws -> OmFileReaderArray<MmapFile, Float>? {
-        return try OmFileManager.get(getBiasCorrectionFile(for: variable))
+    func openBiasCorrectionFile(for variable: String, client: HTTPClient, logger: Logger) async throws -> (any OmFileReaderArrayProtocol<Float>)? {
+        return try await RemoteOmFileManager.instance.get(file: getBiasCorrectionFile(for: variable), client: client, logger: logger)
     }
 }
 
@@ -1203,8 +1203,8 @@ struct DownloadCmipCommand: AsyncCommand {
                 let locationRange = dim0..<min(dim0+200, writer.dim0)
                 var bias = Array2DFastTime(nLocations: locationRange.count, nTime: binsPerYear)
                 for (l,gridpoint) in locationRange.enumerated() {
-                    let reader = Cmip6ReaderPreBiasCorrection(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint), domain: domain)
-                    try reader.prefetchData(variable: variable, time: time)
+                    let reader = Cmip6ReaderPreBiasCorrection(reader: try GenericReader<Cmip6Domain, Cmip6Variable>(domain: domain, position: gridpoint, options: options), domain: domain)
+                    try await reader.prefetchData(variable: variable, time: time)
                     let data = try reader.get(variable: variable, time: time).data
                     bias[l, 0..<binsPerYear] = ArraySlice(BiasCorrectionSeasonalLinear(ArraySlice(data), time: time.time, binsPerYear: binsPerYear).meansPerYear)
                 }

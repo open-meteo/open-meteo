@@ -41,68 +41,68 @@ enum ProbabilityVariable: String, CaseIterable, GenericVariable, GenericVariable
  */
 enum ProbabilityReader {
     /// Read probabilities from GFS ensemble models 0.25° and 0.5°
-    static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderMixerSameDomain<GenericReader<GfsDomain, ProbabilityVariable>> {
-        return GenericReaderMixerSameDomain(reader: [
-            try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode),
-            try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeGfsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameDomain<GenericReader<GfsDomain, ProbabilityVariable>> {
+        return await GenericReaderMixerSameDomain(reader: [
+            try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs05_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+            try GenericReader<GfsDomain, ProbabilityVariable>(domain: .gfs025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         ].compactMap({ $0 }))
     }
 
     /// Notes: Does not use ICON-D2, because it has fewer members. It need some kind of mixing
-    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReaderMixerSameDomain<GenericReader<IconDomains, ProbabilityVariable>> {
-        return GenericReaderMixerSameDomain(reader: [
-            try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode),
-            try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeIconReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReaderMixerSameDomain<GenericReader<IconDomains, ProbabilityVariable>> {
+        return await GenericReaderMixerSameDomain(reader: [
+            try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+            try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         ].compactMap({ $0 }))
     }
 
     /// Reader for probabilities based on ICON EPS
-    static func makeIconGlobalReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<IconDomains, ProbabilityVariable> {
-        guard let reader = try GenericReader<IconDomains, ProbabilityVariable>(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    static func makeIconGlobalReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable> {
+        guard let reader = try await GenericReader<IconDomains, ProbabilityVariable>(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             throw ModelError.domainInitFailed(domain: IconDomains.icon.rawValue)
         }
         return reader
     }
 
     /// Reader for probabilities based on NCEP NBM
-    static func makeNbmReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<NbmDomain, ProbabilityVariable>? {
-        return try GenericReader<NbmDomain, ProbabilityVariable>(domain: .nbm_conus, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeNbmReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<NbmDomain, ProbabilityVariable>? {
+        return try await GenericReader<NbmDomain, ProbabilityVariable>(domain: .nbm_conus, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 
     /// Reader for probabilities based on MeteoFrance ARPEGE Europe 0.1°
-    static func makeMeteoFranceEuropeReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<MeteoFranceDomain, ProbabilityVariable>? {
-        return try GenericReader<MeteoFranceDomain, ProbabilityVariable>(domain: .arpege_europe_probabilities, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeMeteoFranceEuropeReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<MeteoFranceDomain, ProbabilityVariable>? {
+        return try await GenericReader<MeteoFranceDomain, ProbabilityVariable>(domain: .arpege_europe_probabilities, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 
     /// Reader for probabilities based on ICON EU EPS
-    static func makeIconEuReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<IconDomains, ProbabilityVariable>? {
-        return try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeIconEuReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable>? {
+        return try await GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 
     /// Reader for probabilities based on ICON D2 EPS
-    static func makeIconD2Reader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<IconDomains, ProbabilityVariable>? {
-        return try GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode)
+    static func makeIconD2Reader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable>? {
+        return try await GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 
     /// Reader for probabilities based on BOM ACCESS GLOBAL ENSEMBLE
-    static func makeBomReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<BomDomain, ProbabilityVariable> {
-        guard let reader = try GenericReader<BomDomain, ProbabilityVariable>(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    static func makeBomReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<BomDomain, ProbabilityVariable> {
+        guard let reader = try await GenericReader<BomDomain, ProbabilityVariable>(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             throw ModelError.domainInitFailed(domain: BomDomain.access_global_ensemble.rawValue)
         }
         return reader
     }
 
     /// Reader for probabilities based on GEM ENSEMBLE
-    static func makeGemReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<GemDomain, ProbabilityVariable> {
-        guard let reader = try GenericReader<GemDomain, ProbabilityVariable>(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    static func makeGemReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<GemDomain, ProbabilityVariable> {
+        guard let reader = try await GenericReader<GemDomain, ProbabilityVariable>(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             throw ModelError.domainInitFailed(domain: GemDomain.gem_global_ensemble.rawValue)
         }
         return reader
     }
 
     /// Reader for probabilities based on IFS0.25 ensemble
-    static func makeEcmwfReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode) throws -> GenericReader<EcmwfDomain, ProbabilityVariable> {
-        guard let reader = try GenericReader<EcmwfDomain, ProbabilityVariable>(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode) else {
+    static func makeEcmwfReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<EcmwfDomain, ProbabilityVariable> {
+        guard let reader = try await GenericReader<EcmwfDomain, ProbabilityVariable>(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             throw ModelError.domainInitFailed(domain: EcmwfDomain.ifs025_ensemble.rawValue)
         }
         return reader
@@ -146,13 +146,13 @@ extension Array where Element == GenericVariableHandle {
     /// Calculate precipitation >0.1mm/h probability. BOM downloads multiple timesteps, uncompress handles and calculate probabilities
     /// `precipitationVariable` is used to filter only precipitation variables
     /// `domain` must be set to generate a temporary file handle afterwards
-    func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain, run: Timestamp) throws -> [GenericVariableHandle] {
+    func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
         var previousTimesamp: Timestamp?
-        return try self
+        return try await self
             .filter({ $0.variable.omFileName == precipitationVariable.omFileName })
             .groupedPreservedOrder(by: { $0.time })
             .sorted(by: { $0.key < $1.key })
-            .compactMap({ timestamp, handles -> GenericVariableHandle? in
+            .asyncCompactMap({ timestamp, handles -> GenericVariableHandle? in
                 let nMember = handles.count
                 guard nMember > 1 else {
                     return nil
@@ -162,8 +162,8 @@ extension Array where Element == GenericVariableHandle {
                 var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
                 let threshold = Float(0.1) * Float(dt)
                 for d in handles {
-                    let reader = try d.makeReader()
-                    for (i, value) in try reader.read().enumerated() {
+                    let reader = try await d.makeReader()
+                    for (i, value) in try await reader.read().enumerated() {
                         if value >= threshold {
                             precipitationProbability01[i] += 1
                         }

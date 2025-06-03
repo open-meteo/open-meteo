@@ -86,11 +86,11 @@ struct MigrationCommand: AsyncCommand {
         FileManager.default.waitIfFileWasRecentlyModified(at: temporary)
         try FileManager.default.removeItemIfExists(at: temporary)
         // Read data from the input OM file
-        guard let readfile = try? OmFileReader(file: file) else {
+        guard let readfile = try? await OmFileReader(mmapFile: file) else {
             logger.warning("Failed to open file: \(file)")
             return
         }
-        guard let reader = readfile.asArray(of: Float.self), readfile.isLegacyFormat() else {
+        guard let reader = readfile.asArray(of: Float.self), try await readfile.isLegacyFormat() else {
             logger.info("File already in new format \(file)")
             return
         }
@@ -120,7 +120,7 @@ struct MigrationCommand: AsyncCommand {
                 scale_factor: reader.scaleFactor,
                 add_offset: reader.addOffset
             )
-            let data = try reader.read()
+            let data = try await reader.read()
             try writer.writeData(array: data)
             let variable = try fileWriter.write(
                 array: try writer.finalise(),
@@ -131,7 +131,7 @@ struct MigrationCommand: AsyncCommand {
             try writeFn.close()
 
             /// Read data again to ensure the written data matches exactly
-            guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self)?.read() else {
+            guard let verify = try await OmFileReader(mmapFile: temporary).asArray(of: Float.self)?.read() else {
                 fatalError("Could not read temporary file")
             }
             guard data.isSimilar(verify) else {
@@ -178,7 +178,7 @@ struct MigrationCommand: AsyncCommand {
 
                     var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for (row, y) in yRange.enumerated() {
-                        try reader.read(
+                        try await reader.read(
                             into: &chunk,
                             range: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, tRange],
                             intoCubeOffset: [UInt64(row * xRange.count), 0],
@@ -205,7 +205,7 @@ struct MigrationCommand: AsyncCommand {
         try writeFn.close()
 
         /// Read data again to ensure the written data matches exactly
-        guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self) else {
+        guard let verify = try await OmFileReader(mmapFile: temporary).asArray(of: Float.self) else {
             fatalError("Could not read temporary file")
         }
         let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensions.reduce(1, *)), name: "Verify")
@@ -218,14 +218,14 @@ struct MigrationCommand: AsyncCommand {
 
                     var chunk = [Float](repeating: .nan, count: yRange.count * xRange.count * tRange.count)
                     for (row, y) in yRange.enumerated() {
-                        try reader.read(
+                        try await reader.read(
                             into: &chunk,
                             range: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, tRange],
                             intoCubeOffset: [UInt64(row * xRange.count), 0],
                             intoCubeDimension: [UInt64(yRange.count * xRange.count), UInt64(tRange.count)]
                         )
                     }
-                    let verifyData = try verify.read(range: [yRange, xRange, tRange])
+                    let verifyData = try await verify.read(range: [yRange, xRange, tRange])
                     guard chunk.isSimilar(verifyData) else {
                         fatalError("Data does not match \(yRange) \(xRange) \(tRange)")
                     }

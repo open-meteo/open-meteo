@@ -27,11 +27,11 @@ extension ModelFlatbufferSerialisable {
 
 fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable: RawRepresentableString> {
     let model: Model
-    let section: () throws -> ApiSection<Variable>
+    let section: () async throws -> ApiSection<Variable>
 
-    static func run(sections: [Self]) throws -> ApiSectionString {
-        let run = try sections.compactMap({ m in
-            let h = try m.section()
+    static func run(sections: [Self]) async throws -> ApiSectionString {
+        let run = try await sections.asyncCompactMap({ m in
+            let h = try await m.section()
             return ApiSectionString(name: h.name, time: h.time, columns: h.columns.flatMap { c in
                 return c.variables.enumerated().map { member, data in
                     let member = member + Model.memberOffset
@@ -87,18 +87,18 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             timezone.utcOffsetSeconds
         }
 
-        func runAllSections() throws -> [ApiSectionString] {
-            return [try minutely15?(), try hourly?(), try sixHourly?(), try daily?()].compactMap({ $0 })
+        func runAllSections() async throws -> [ApiSectionString] {
+            return [try await minutely15?(), try await hourly?(), try await sixHourly?(), try await daily?()].compactMap({ $0 })
         }
 
-        var current: (() throws -> ApiSectionSingle<String>)? {
+        var current: (() async throws -> ApiSectionSingle<String>)? {
             let run = results.compactMap({ m in m.current.map { (model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
             return {
-                let run = try run.compactMap({ m in
-                    let h = try m.section()
+                let run = try await run.asyncCompactMap({ m in
+                    let h = try await m.section()
                     return ApiSectionSingle<String>(name: h.name, time: h.time, dtSeconds: h.dtSeconds, columns: h.columns.map { c in
                         let variable = run.count > 1 ? "\(c.variable.rawValue)_\(m.model.rawValue)" : c.variable.rawValue
                         return ApiColumnSingle<String>(variable: variable, unit: c.unit, value: c.value)
@@ -112,41 +112,41 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
 
         /// Merge all hourly sections and prefix with the domain name if required
-        var hourly: (() throws -> ApiSectionString)? {
+        var hourly: (() async throws -> ApiSectionString)? {
             let run = results.compactMap({ m in m.hourly.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
             return {
-                try ModelAndSection.run(sections: run)
+                try await ModelAndSection.run(sections: run)
             }
         }
 
-        var daily: (() throws -> ApiSectionString)? {
+        var daily: (() async throws -> ApiSectionString)? {
             let run = results.compactMap({ m in m.daily.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
             return {
-                try ModelAndSection.run(sections: run)
+                try await ModelAndSection.run(sections: run)
             }
         }
-        var sixHourly: (() throws -> ApiSectionString)? {
+        var sixHourly: (() async throws -> ApiSectionString)? {
             let run = results.compactMap({ m in m.sixHourly.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
             return {
-                try ModelAndSection.run(sections: run)
+                try await ModelAndSection.run(sections: run)
             }
         }
-        var minutely15: (() throws -> ApiSectionString)? {
+        var minutely15: (() async throws -> ApiSectionString)? {
             let run = results.compactMap({ m in m.minutely15.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
             return {
-                try ModelAndSection.run(sections: run)
+                try await ModelAndSection.run(sections: run)
             }
         }
     }
@@ -159,12 +159,12 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         /// Desired elevation from a DEM. Used in statistical downscaling
         let elevation: Float?
 
-        let prefetch: (() throws -> Void)
-        let current: (() throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
-        let hourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let daily: (() throws -> ApiSection<Model.DailyVariable>)?
-        let sixHourly: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let minutely15: (() throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let prefetch: (() async throws -> Void)
+        let current: (() async throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
+        let hourly: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let daily: (() async throws -> ApiSection<Model.DailyVariable>)?
+        let sixHourly: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
+        let minutely15: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
 
         /// e.g. `52.52N13.42E38m`
         var formatedCoordinatesFilename: String {
@@ -245,27 +245,27 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
-        let loop = ForecastapiController.runLoop
-        return try await loop.next().submit {
+        //let loop = ForecastapiController.runLoop
+        //return try await loop.next() {
             if format == .xlsx && results.count > 100 {
                 throw ForecastapiError.generic(message: "XLSX supports only up to 100 locations")
             }
             for location in results {
                 for model in location.results {
-                    try model.prefetch()
+                    try await model.prefetch()
                 }
             }
             switch format ?? .json {
             case .json:
                 return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
             case .xlsx:
-                return try toXlsxResponse(timestamp: timestamp)
+                return try await toXlsxResponse(timestamp: timestamp)
             case .csv:
                 return try toCsvResponse(concurrencySlot: concurrencySlot)
             case .flatbuffers:
                 return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
             }
-        }.get()
+        //}.get()
     }
 
     /// Calculate excess weight of an API query. The following factors are considered:

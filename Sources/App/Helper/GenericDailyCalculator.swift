@@ -53,46 +53,46 @@ enum DailyAggregation<WeatherVariable> {
 }*/
 
 extension GenericReaderMulti {
-    func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDtAndSettings) throws -> DataAndUnit? where V.Variable == Variable {
+    func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit? where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
 
         switch variable.aggregation {
         case .none:
             return nil
         case .max(let variable):
-            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
+            guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .min(let variable):
-            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
+            guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .mean(let variable):
-            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
+            guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .sum(let variable):
-            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
+            guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.sum(by: 24), data.unit)
         case .radiationSum(let variable):
-            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
+            guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             // 3600s only for hourly data of source
             return DataAndUnit(data.data.map({ $0 * 0.0036 }).sum(by: 24).round(digits: 2), .megajoulePerSquareMetre)
         case .precipitationHours(let variable):
-            guard let data = try get(variable: variable, time: time)?.convertAndRound(params: params) else {
+            guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
             }
             return DataAndUnit(data.data.map({ $0 > 0.001 ? 1 : 0 }).sum(by: 24), .hours)
         case .dominantDirection(velocity: let velocity, direction: let direction):
-            guard let speed = try get(variable: velocity, time: time)?.data,
-                let direction = try get(variable: direction, time: time)?.data else {
+            guard let speed = try await get(variable: velocity, time: time)?.data,
+                  let direction = try await get(variable: direction, time: time)?.data else {
                 return nil
             }
             // vector addition
@@ -100,33 +100,33 @@ extension GenericReaderMulti {
             let v = zip(speed, direction).map(Meteorology.vWind).sum(by: 24)
             return DataAndUnit(Meteorology.windirectionFast(u: u, v: v), .degreeDirection)
         case .dominantDirectionComponents(u: let u, v: let v):
-            guard let u = try get(variable: u, time: time)?.data,
-                let v = try get(variable: v, time: time)?.data else {
+            guard let u = try await get(variable: u, time: time)?.data,
+                  let v = try await get(variable: v, time: time)?.data else {
                 return nil
             }
             return DataAndUnit(Meteorology.windirectionFast(u: u.sum(by: 24), v: v.sum(by: 24)), .degreeDirection)
         }
     }
 
-    func prefetchData<V: DailyVariableCalculatable>(variables: [V], time timeDaily: TimerangeDtAndSettings) throws where V.Variable == Variable {
+    func prefetchData<V: DailyVariableCalculatable>(variables: [V], time timeDaily: TimerangeDtAndSettings) async throws where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             if let v0 = variable.aggregation.variables.0 {
-                try prefetchData(variable: v0, time: time)
+                try await prefetchData(variable: v0, time: time)
             }
             if let v1 = variable.aggregation.variables.1 {
-                try prefetchData(variable: v1, time: time)
+                try await prefetchData(variable: v1, time: time)
             }
         }
     }
     
-    func prefetchData<V: DailyVariableCalculatable>(variable: V, time timeDaily: TimerangeDtAndSettings) throws where V.Variable == Variable {
+    func prefetchData<V: DailyVariableCalculatable>(variable: V, time timeDaily: TimerangeDtAndSettings) async throws where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
         if let v0 = variable.aggregation.variables.0 {
-            try prefetchData(variable: v0, time: time)
+            try await prefetchData(variable: v0, time: time)
         }
         if let v1 = variable.aggregation.variables.1 {
-            try prefetchData(variable: v1, time: time)
+            try await prefetchData(variable: v1, time: time)
         }
     }
 }

@@ -145,7 +145,7 @@ struct DownloadEra5Command: AsyncCommand {
                     let readerNext = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpointNext)), options: options)])
                     try readerNext.prefetchData(variables: [era5Variable], time: time)
                     
-                    let reader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint)), options: options)])
+                    let reader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: MultiDomains.era5, reader: [Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: domain, position: gridpoint, options: options)), options: options)])
                     
                     guard let dataFlat = try reader.getDaily(variable: era5Variable, params: units, time: time)?.data else {
                         fatalError("Could not get \(era5Variable)")

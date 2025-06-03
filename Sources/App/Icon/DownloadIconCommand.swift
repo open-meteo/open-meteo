@@ -101,6 +101,7 @@ struct DownloadIconCommand: AsyncCommand {
     /// Download ICON global, eu and d2 *.grid2.bz2 files
     func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
+        let client = application.http.client.shared
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
 
@@ -129,8 +130,8 @@ struct DownloadIconCommand: AsyncCommand {
         let deaverager15min = GribDeaverager()
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
-        let domainElevation = {
-            guard let elevation = try? domain.getStaticFile(type: .elevation)?.read() else {
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read(range: nil) else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation

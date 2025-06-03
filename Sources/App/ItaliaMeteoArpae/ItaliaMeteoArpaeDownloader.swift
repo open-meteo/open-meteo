@@ -77,11 +77,11 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         let runString = run.format_YYYYMMddHH
 
         let grid = domain.grid
-        let urlLand = "https://meteohub.mistralportal.it/nwp/ICON-2I_all2km/\(runString)/FR_LAND/icon_2I_\(runString)_surface-0.grib"
+        let urlLand = "https://meteohub.mistralportal.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/FR_LAND/icon_2I_\(runString)_surface-0.grib"
         /// fraction 0=sea, 1=land
         let landmask = try await curl.downloadGrib(url: urlLand, bzip2Decode: false)[0].to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
 
-        let urlElevation = "https://meteohub.mistralportal.it/nwp/ICON-2I_all2km/\(runString)/HSURF/icon_2I_\(runString)_surface-0.grib"
+        let urlElevation = "https://meteohub.mistralportal.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/HSURF/icon_2I_\(runString)_surface-0.grib"
         var elevation = try await curl.downloadGrib(url: urlElevation, bzip2Decode: false)[0].to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
 
         for i in elevation.array.data.indices {
@@ -95,6 +95,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
 
     func download(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
+        let client = application.http.client.shared
         let deadLineHours = Double(6)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
@@ -105,8 +106,8 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         }
 
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
-        let domainElevation = {
-            guard let elevation = try? domain.getStaticFile(type: .elevation)?.read() else {
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read(range: nil) else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation
@@ -128,7 +129,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
             /*if !(v.variable == .T_SO || v.variable == .W_SO) {
                 continue
             }*/
-            let url = "https://meteohub.mistralportal.it/nwp/ICON-2I_all2km/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
+            let url = "https://meteohub.mistralportal.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
             let deaverager = GribDeaverager()
             for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                 let attributes = try message.getAttributes()

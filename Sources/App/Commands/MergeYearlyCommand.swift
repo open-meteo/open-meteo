@@ -43,7 +43,7 @@ struct MergeYearlyCommand: AsyncCommand {
 
         for year in years {
             for variable in variables {
-                try Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force, allowMissing: signature.allowMissing)
+                try await Self.generateYearlyFile(logger: logger, domain: domain, year: year, variable: variable, force: signature.force, allowMissing: signature.allowMissing)
             }
         }
 
@@ -66,7 +66,7 @@ struct MergeYearlyCommand: AsyncCommand {
     }
 
     /// Generate a yearly file for a specified domain, variable and year
-    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool) throws {
+    static func generateYearlyFile(logger: Logger, domain: GenericDomain, year: Int, variable: String, force: Bool, allowMissing: Bool) async throws {
         let registry = domain.domainRegistry
         logger.info("Processing variable \(variable) for year \(year)")
         let yearlyFilePath = "\(registry.directory)\(variable)/year_\(year).om"
@@ -86,13 +86,13 @@ struct MergeYearlyCommand: AsyncCommand {
         let nt = UInt64(yearTime.count)
         let indexTime = yearTime.toIndexTime()
         let chunkRange = indexTime.divideRoundedUp(divisor: omFileLength)
-        let chunkFiles = try chunkRange.compactMap { chunkIndex -> (file: OmFileReaderArray<MmapFile, Float>, indexTime: Range<Int>)? in
+        let chunkFiles = try await chunkRange.asyncCompactMap { chunkIndex -> (file: OmFileReaderArray<MmapFile, Float>, indexTime: Range<Int>)? in
             let file = "\(registry.directory)/\(variable)/chunk_\(chunkIndex).om"
             guard fileManager.fileExists(atPath: file) else {
                 logger.info("Chunk file \(variable)/chunk_\(chunkIndex).om does not exist. Skipping.")
                 return nil
             }
-            guard let reader = try OmFileReader(file: file).asArray(of: Float.self) else {
+            guard let reader = try await OmFileReader(mmapFile: file).asArray(of: Float.self) else {
                 return nil
             }
             let indexTime = chunkIndex * omFileLength ..< (chunkIndex + 1) * omFileLength
@@ -136,7 +136,7 @@ struct MergeYearlyCommand: AsyncCommand {
                         case 2:
                             // legacy 2D case
                             for (row, y) in yRange.enumerated() {
-                                try chunk.file.read(
+                                try await chunk.file.read(
                                     into: &data,
                                     range: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, offsets.file.toUInt64()],
                                     intoCubeOffset: [UInt64(row * xRange.count), UInt64(offsets.array.lowerBound)],
@@ -144,7 +144,7 @@ struct MergeYearlyCommand: AsyncCommand {
                                 )
                             }
                         case 3:
-                            try chunk.file.read(
+                            try await chunk.file.read(
                                 into: &data,
                                 range: [yRange, xRange, offsets.file.toUInt64()],
                                 intoCubeOffset: [0, 0, UInt64(offsets.array.lowerBound)],
@@ -174,7 +174,7 @@ struct MergeYearlyCommand: AsyncCommand {
         try writeFn.close()
 
         /// Read data again to ensure the written data matches exactly
-        guard let verify = try OmFileReader(file: temporary).asArray(of: Float.self) else {
+        guard let verify = try await OmFileReader(mmapFile: temporary).asArray(of: Float.self) else {
             throw MergeYearlyError.couldNotReadData
         }
         let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensionsOut.reduce(1, *)), name: "Verify")
@@ -195,7 +195,7 @@ struct MergeYearlyCommand: AsyncCommand {
                         case 2:
                             // legacy 2D case
                             for (row, y) in yRange.enumerated() {
-                                try chunk.file.read(
+                                try await chunk.file.read(
                                     into: &data,
                                     range: [y * nx + xRange.startIndex ..< y * nx + xRange.endIndex, offsets.file.toUInt64()],
                                     intoCubeOffset: [UInt64(row * xRange.count), UInt64(offsets.array.lowerBound)],
@@ -203,7 +203,7 @@ struct MergeYearlyCommand: AsyncCommand {
                                 )
                             }
                         case 3:
-                            try chunk.file.read(
+                            try await chunk.file.read(
                                 into: &data,
                                 range: [yRange, xRange, offsets.file.toUInt64()],
                                 intoCubeOffset: [0, 0, UInt64(offsets.array.lowerBound)],
@@ -213,7 +213,7 @@ struct MergeYearlyCommand: AsyncCommand {
                             throw MergeYearlyError.unexpectedDimensionsCount
                         }
                     }
-                    let verifyData = try verify.read(range: [yRange, xRange, tRange])
+                    let verifyData = try await verify.read(range: [yRange, xRange, tRange])
                     guard data.isSimilar(verifyData) else {
                         logger.error("Data does not match \(yRange) \(xRange) \(tRange)")
                         throw MergeYearlyError.validationFailed

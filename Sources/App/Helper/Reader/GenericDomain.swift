@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import Vapor
 
 /**
  Generic domain that is required for the reader
@@ -39,18 +40,22 @@ extension GenericDomain {
     }
 
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable) -> OmFileReaderArray<MmapFile, Float>? {
+    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
         guard let domainRegistryStatic else {
             return nil
         }
         switch type {
         case .soilType:
-            return try? OmFileManager.get(
-                .staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil)
+            return try? await RemoteOmFileManager.instance.get(
+                file: .staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
+                client: httpClient,
+                logger: logger
             )
         case .elevation:
-            return try? OmFileManager.get(
-                .staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil)
+            return try? await RemoteOmFileManager.instance.get(
+                file: .staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
+                client: httpClient,
+                logger: logger
             )
         }
     }

@@ -36,7 +36,6 @@ struct SeasonalForecastDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        let logger = context.application.logger
         let domain = try SeasonalForecastDomain.load(rawValue: signature.domain)
 
         switch domain {
@@ -57,7 +56,7 @@ struct SeasonalForecastDownload: AsyncCommand {
             try await downloadCfsElevation(application: context.application, domain: domain, run: run)
 
             try await downloadCfs(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting)
-            try convertCfs(logger: logger, domain: domain, run: run)
+            try await convertCfs(application: context.application, domain: domain, run: run)
         case .jma:
             fatalError()
         case .eccc:
@@ -109,40 +108,42 @@ struct SeasonalForecastDownload: AsyncCommand {
     }
 
     /// Process each variable and update time-series optimised files
-    func convertCfs(logger: Logger, domain: SeasonalForecastDomain, run: Timestamp) throws {
+    func convertCfs(application: Application, domain: SeasonalForecastDomain, run: Timestamp) async throws {
+        let logger = application.logger
+        let client = application.http.client.shared
         let om = OmFileSplitter(domain)
 
         for member in 1..<domain.nMembers + 1 {
-            try GribFile.readAndConvert(logger: logger, gribName: "tmin", member: member, domain: domain, add: -273.15).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "tmin", member: member, domain: domain, add: -273.15).first!.value
                     .writeCfs(om: om, logger: logger, variable: .temperature_2m_min, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "tmax", member: member, domain: domain, add: -273.15).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "tmax", member: member, domain: domain, add: -273.15).first!.value
                     .writeCfs(om: om, logger: logger, variable: .temperature_2m_max, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilt1", member: member, domain: domain, add: -273.15).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "soilt1", member: member, domain: domain, add: -273.15).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_temperature_0_to_10cm, member: member, run: run, dtSeconds: domain.dtSeconds)
 
-            try GribFile.readAndConvert(logger: logger, gribName: "dswsfc", member: member, domain: domain).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "dswsfc", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .shortwave_radiation, member: member, run: run, dtSeconds: domain.dtSeconds)
 
-            try GribFile.readAndConvert(logger: logger, gribName: "cprat", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "cprat", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
                     .writeCfs(om: om, logger: logger, variable: .showers, member: member, run: run, dtSeconds: domain.dtSeconds)
 
-            try GribFile.readAndConvert(logger: logger, gribName: "prate", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "prate", member: member, domain: domain, multiply: Float(domain.dtSeconds)).first!.value
                     .writeCfs(om: om, logger: logger, variable: .precipitation, member: member, run: run, dtSeconds: domain.dtSeconds)
 
-            try GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "tcdcclm", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .cloud_cover, member: member, run: run, dtSeconds: domain.dtSeconds)
 
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "soilm1", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_moisture_0_to_10cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm2", member: member, domain: domain).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "soilm2", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_moisture_10_to_40cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm3", member: member, domain: domain).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "soilm3", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_moisture_40_to_100cm, member: member, run: run, dtSeconds: domain.dtSeconds)
-            try GribFile.readAndConvert(logger: logger, gribName: "soilm4", member: member, domain: domain).first!.value
+            try await GribFile.readAndConvert(logger: logger, gribName: "soilm4", member: member, domain: domain).first!.value
                     .writeCfs(om: om, logger: logger, variable: .soil_moisture_100_to_200cm, member: member, run: run, dtSeconds: domain.dtSeconds)
 
             // in a closure to release memory
-            try {
+            try await {
                 let wind = try GribFile.readAndConvert(logger: logger, gribName: "wnd10m", member: member, domain: domain)
                 guard let uwind = wind["10u"] else {
                     fatalError()
@@ -150,26 +151,26 @@ struct SeasonalForecastDownload: AsyncCommand {
                 guard let vwind = wind["10v"] else {
                     fatalError()
                 }
-                try uwind.writeCfs(om: om, logger: logger, variable: .wind_u_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
-                try vwind.writeCfs(om: om, logger: logger, variable: .wind_v_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
+                try await uwind.writeCfs(om: om, logger: logger, variable: .wind_u_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
+                try await vwind.writeCfs(om: om, logger: logger, variable: .wind_v_component_10m, member: member, run: run, dtSeconds: domain.dtSeconds)
             }()
 
             let tmp2m = try GribFile.readAndConvert(logger: logger, gribName: "tmp2m", member: member, domain: domain, add: -273.15).first!.value
-            try tmp2m.writeCfs(om: om, logger: logger, variable: .temperature_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try await tmp2m.writeCfs(om: om, logger: logger, variable: .temperature_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
 
             /// hPa
             var surfacePressure = try GribFile.readAndConvert(logger: logger, gribName: "pressfc", member: member, domain: domain, multiply: 1 / 100).first!.value
 
-            try {
+            try await {
                 /// g/kg water/air mixing ratio
                 let specificHumidity = try GribFile.readAndConvert(logger: logger, gribName: "q2m", member: member, domain: domain, multiply: 1000).first!.value
 
                 let relativeHumidity = Array2DFastTime(data: Meteorology.specificToRelativeHumidity(specificHumidity: specificHumidity.data, temperature: tmp2m.data, pressure: surfacePressure.data), nLocations: tmp2m.nLocations, nTime: tmp2m.nTime)
-                try relativeHumidity.writeCfs(om: om, logger: logger, variable: .relative_humidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
+                try await relativeHumidity.writeCfs(om: om, logger: logger, variable: .relative_humidity_2m, member: member, run: run, dtSeconds: domain.dtSeconds)
             }()
 
             /// -999 for sea
-            let elevations = try domain.getStaticFile(type: .elevation)!.read()
+            let elevations = try await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)!.read(range: nil)
 
             /// convert surface pressure to mean sea level pressure
             for l in 0..<tmp2m.nLocations {
@@ -181,17 +182,17 @@ struct SeasonalForecastDownload: AsyncCommand {
                     surfacePressure[l, t] *= Meteorology.sealevelPressureFactor(temperature: tmp2m[l, t], elevation: elevation)
                 }
             }
-            try surfacePressure.writeCfs(om: om, logger: logger, variable: .pressure_msl, member: member, run: run, dtSeconds: domain.dtSeconds)
+            try await surfacePressure.writeCfs(om: om, logger: logger, variable: .pressure_msl, member: member, run: run, dtSeconds: domain.dtSeconds)
         }
     }
 }
 
 fileprivate extension Array2DFastTime {
-    func writeCfs(om: OmFileSplitter, logger: Logger, variable: CfsVariable, member: Int, run: Timestamp, dtSeconds: Int) throws {
+    func writeCfs(om: OmFileSplitter, logger: Logger, variable: CfsVariable, member: Int, run: Timestamp, dtSeconds: Int) async throws {
         let startOm = DispatchTime.now()
         let time = TimerangeDt(start: run, nTime: nTime, dtSeconds: dtSeconds)
 
-        try om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))", array2d: self, time: time, scalefactor: variable.scalefactor)
+        try await om.updateFromTimeOriented(variable: "\(variable.rawValue)_member\(member.zeroPadded(len: 2))", array2d: self, time: time, scalefactor: variable.scalefactor)
         logger.info("Update om \(variable) finished in \(startOm.timeElapsedPretty())")
     }
 }

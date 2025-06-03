@@ -3,7 +3,7 @@ import Vapor
 
 extension BodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(concurrencySlot: Int?, _ task: @escaping () async throws -> Void) {
+    func submit(concurrencySlot: Int?, _ task: @Sendable @escaping () async throws -> Void) {
         _ = eventLoop.makeFutureWithTask {
             if let concurrencySlot {
                 try await apiConcurrencyLimiter.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
@@ -70,8 +70,8 @@ extension ForecastapiResult.PerLocation {
         guard let first = results.first else {
             throw ForecastapiError.noDataAvilableForThisLocation
         }
-        let sections = try runAllSections()
-        let current = try first.current?()
+        let sections = try await runAllSections()
+        let current = try await first.current?()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 
         b.buffer.writeString("""

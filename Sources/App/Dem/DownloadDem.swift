@@ -45,20 +45,20 @@ struct Dem90: GenericDomain {
     }
 
     /// Get elevation for coordinate. Access to om files is cached.
-    static func read(lat: Float, lon: Float) throws -> Float {
+    static func read(lat: Float, lon: Float, logger: Logger, httpClient: HTTPClient) async throws -> Float {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }
         let lati = lat < 0 ? Int(lat) - 1 : Int(lat)
-        guard let om = try OmFileManager.get(.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)) else {
-            // file not available
-            return .nan
-        }
         let latrow = UInt64(lat * 1200 + 90 * 1200) % 1200
         let px = pixel(latitude: lati)
         let lonrow = UInt64((lon + 180) * Float(px))
         var value: Float = .nan
-        try om.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1])
+        
+        let file = OmFileManagerReadable.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
+        try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { reader in
+            try await reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
+        }
         return value
     }
 
@@ -208,13 +208,13 @@ struct DownloadDemCommand: AsyncCommand {
                             continue
                         }
 
-                        guard let om = try OmFileReader(file: omFile).asArray(of: Float.self) else {
+                        guard let om = try await OmFileReader(file: omFile).asArray(of: Float.self) else {
                             fatalError("not a float array")
                         }
                         let dimensions = om.getDimensions()
                         precondition(dimensions[0] == 1200)
                         precondition(dimensions[1] == px)
-                        let data = try om.read()
+                        let data = try await om.read()
                         for i in 0..<1200 {
                             line[i * (px * 360) + (lon + 180) * px ..< i * (px * 360) + (lon + 180) * px + px] = data[i * px ..< (i + 1) * px]
                         }

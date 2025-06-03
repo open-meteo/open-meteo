@@ -6,7 +6,7 @@ Process.setOpenFileLimitto64k()
 
 /// Xcode sets current working directory to something in derived data
 #if Xcode
-let projectHome = String(#file[...#file.range(of: "/Sources/")!.lowerBound])
+let projectHome = String(#filePath[...#filePath.range(of: "/Sources/")!.lowerBound])
 FileManager.default.changeCurrentDirectoryPath(projectHome)
 #endif
 

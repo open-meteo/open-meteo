@@ -1,4 +1,5 @@
 import Vapor
+import OmFileFormat
 // import Leaf
 
 enum OpenMeteo {
@@ -11,6 +12,37 @@ enum OpenMeteo {
             return dir
         }
         return  "./data/"
+    }()
+    
+    /// Remote data directory like `https://openmeteo.s3.amazonaws.com/data/`
+    static let remoteDataDirectory: String? = {
+        if let dir = Environment.get("REMOTE_DATA_DIRECTORY") {
+            guard dir.starts(with: "http") else {
+                fatalError("REMOTE_DATA_DIRECTORY must start with 'http'")
+            }
+            guard dir.last == "/" else {
+                fatalError("REMOTE_DATA_DIRECTORY must end with a trailing slash")
+            }
+            return dir
+        }
+        return nil
+    }()
+    
+    /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
+    static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
+        let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
+        let cacheSize = Environment.get("CACHE_SIZE") ?? "10GB"
+        // Make sure string ends with GB
+        guard cacheSize.hasSuffix("GB") else {
+            fatalError("CACHE_SIZE must end with 'GB")
+        }
+        // Convert strings like 100GB to 10
+        guard let sizeGb = Int(cacheSize.dropLast(2)) else {
+            fatalError("CACHE_SIZE must be a valid number ending in GB")
+        }
+        let blockSize = 65536
+        let blockCount = sizeGb * 1028 * 1028 * 1024 / (blockSize + 2 * MemoryLayout<Int64>.size)
+        return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
     }()
     
     /// Data directory with trailing slash
@@ -128,7 +160,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(SyncCommand(), as: "sync")
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
-    app.commands.use(ConvertOmCommand(), as: "convert-om")
+    app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
@@ -153,16 +185,15 @@ public func configure(_ app: Application) throws {
         delay: .seconds(10),
         ApiKeyManager.update
     )
-
-    app.lifecycle.repeatedTask(
-        initialDelay: .seconds(0),
-        delay: .seconds(2),
-        OmFileManager.instance.backgroundTask
-    )
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(2),
         MetaFileManager.instance.backgroundTask
+    )
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(0),
+        delay: .seconds(10),
+        RemoteOmFileManager.instance.backgroundTask
     )
 
     app.lifecycle.repeatedTask(

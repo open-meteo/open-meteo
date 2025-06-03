@@ -3,29 +3,45 @@ import AsyncHTTPClient
 import NIOCore
 import Logging
 
+enum CurlErrorNonRetry: NonRetryError {
+    case unauthorized
+    case fileModifiedSinceLastDownload
+}
+
+enum CurlErrorRetry: Error {
+    case requestTimeout
+    case tooManyRequests
+    case internalServerError
+    case badGateway
+    case serviceUnavailable
+    case gatewayTimeout
+}
+
 extension HTTPClientResponse {
-    /// Throw if a transient error occurred. A retry could be successful
-    func throwOnTransientError() throws {
-        if isTransientError {
-            throw CurlError.downloadFailed(code: status)
-        }
-    }
-
-    /// True is status code contains an error that is retirable. E.g. Gateway timeout or too many requests
-    var isTransientError: Bool {
-        return [
-            .requestTimeout,
-            .tooManyRequests,
-            .internalServerError,
-            .badGateway,
-            .serviceUnavailable,
-            .gatewayTimeout
-        ].contains(status)
-    }
-
-    func throwOnFatalError() throws {
-        if status == .unauthorized {
+    /// Throw if a transient error occurred. A retry could be successful. E.g. Gateway timeout or too many requests
+    /// `CurlErrorNonRetry` is thrown for error that should not be retried
+    func throwOnError() throws {
+        switch status {
+        case .notFound:
+            throw CurlError.fileNotFound
+        case .requestTimeout:
+            throw CurlErrorRetry.requestTimeout
+        case .tooManyRequests:
+            throw CurlErrorRetry.tooManyRequests
+        case .internalServerError:
+            throw CurlErrorRetry.internalServerError
+        case .badGateway:
+            throw CurlErrorRetry.badGateway
+        case .serviceUnavailable:
+            throw CurlErrorRetry.serviceUnavailable
+        case .gatewayTimeout:
+            throw CurlErrorRetry.gatewayTimeout
+        case .unauthorized:
             throw CurlErrorNonRetry.unauthorized
+        case .preconditionFailed:
+            throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        default:
+            break
         }
     }
 }
@@ -49,15 +65,14 @@ extension HTTPClient {
                 n += 1
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
                 logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status), from URL \(request.url)")
-                try response.throwOnTransientError()
-                try response.throwOnFatalError()
-                if error404WaitTime != nil && response.status == .notFound {
-                    throw CurlError.fileNotFound
-                }
+                try response.throwOnError()
                 return response
             } catch CurlErrorNonRetry.unauthorized {
                 logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key.")
                 throw CurlErrorNonRetry.unauthorized
+            } catch let error as CurlErrorNonRetry {
+                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key.")
+                throw error
             } catch {
                 var wait = TimeAmount.nanoseconds(min(backoffFactor.nanoseconds * Int64(pow(2, Double(n - 1))), backoffMaximum.nanoseconds))
 
@@ -66,7 +81,10 @@ extension HTTPClient {
                     /// Immediately retry twice
                     wait = .zero
                 }
-                if let error404WaitTime, case CurlError.fileNotFound = error {
+                if case CurlError.fileNotFound = error {
+                    guard let error404WaitTime else {
+                        throw error
+                    }
                     wait = error404WaitTime
                 }
 

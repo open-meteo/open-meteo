@@ -20,9 +20,6 @@ enum CurlError: Error {
     case couldNotGetContentLengthForConcurrentDownload
 }
 
-enum CurlErrorNonRetry: NonRetryError {
-    case unauthorized
-}
 
 /// Download http files to disk, or memory. decode GRIB messages and perform retries for failed downloads
 final class Curl: Sendable {

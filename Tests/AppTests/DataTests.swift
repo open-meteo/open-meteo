@@ -1,12 +1,13 @@
 import Foundation
 @testable import App
 import XCTest
+import Vapor
 // import NIOFileSystem
 
 final class DataTests: XCTestCase {
     override func setUp() {
         #if Xcode
-        let projectHome = String(#file[...#file.range(of: "/Tests/")!.lowerBound])
+        let projectHome = String(#filePath[...#filePath.range(of: "/Tests/")!.lowerBound])
         FileManager.default.changeCurrentDirectoryPath(projectHome)
         #endif
     }
@@ -40,26 +41,43 @@ final class DataTests: XCTestCase {
         }
     }*/
 
-    func testDem90() throws {
+    func testDem90() async throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
+        let logger = Logger(label: "test")
+        let httpClient = HTTPClient.shared
+        
+        let value1 = try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value1, 25) // beach, SE south africa
+        
+        let value2 = try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value2, 0) // water, SE south africa
 
-        XCTAssertEqual(try Dem90.read(lat: -32.878000, lon: 28.101000), 25) // beach, SE south africa
-        XCTAssertEqual(try Dem90.read(lat: -32.878000, lon: 28.120000), 0) // water, SE south africa
-
-        XCTAssertEqual(try Dem90.read(lat: 46.885748, lon: 8.670080), 991)
-        XCTAssertEqual(try Dem90.read(lat: 46.885748, lon: 8.669093), 1028)
-        XCTAssertEqual(try Dem90.read(lat: 46.885748, lon: 8.670988), 1001)
+        let value3 = try await Dem90.read(lat: 46.885748, lon: 8.670080, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value3, 991)
+        let value4 = try await Dem90.read(lat: 46.885748, lon: 8.669093, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value4, 1028)
+        let value5 = try await Dem90.read(lat: 46.885748, lon: 8.668106, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value5, 1001)
+        
         // island
-        XCTAssertEqual(try Dem90.read(lat: 65.03738, lon: -17.75940), 715)
+        let value6 = try await Dem90.read(lat: 65.03738, lon: -17.75940, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value6, 715)
+        
         // greenland
-        XCTAssertEqual(try Dem90.read(lat: 72.71190, lon: -31.81641), 2878.0)
+        let value7 = try await Dem90.read(lat: 72.71190, lon: -31.81641, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value7, 2878.0)
         // bolivia
-        XCTAssertEqual(try Dem90.read(lat: -15.11455, lon: -65.74219), 162.0)
+        let value8 = try await Dem90.read(lat: -15.11455, lon: -65.74219, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value8, 162.0)
         // antarctica
-        XCTAssertEqual(try Dem90.read(lat: -70.52490, lon: -65.30273), 1749.0)
-        XCTAssertEqual(try Dem90.read(lat: -80.95610, lon: -70.66406), 124.0)
-        XCTAssertEqual(try Dem90.read(lat: -81.20142, lon: 2.10938), 2342.0)
-        XCTAssertEqual(try Dem90.read(lat: -80.58973, lon: 108.28125), 3348.0)
+        let value9 = try await Dem90.read(lat: -70.52490, lon: -65.30273, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value9, 1749.0)
+        let value10 = try await Dem90.read(lat: -80.95610, lon: -70.66406, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value10, 124.0)
+        let value11 = try await Dem90.read(lat: -81.20142, lon: 2.10938, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value11, 2342.0)
+        let value12 = try await Dem90.read(lat: -80.58973, lon: 108.28125, logger: logger, httpClient: httpClient)
+        XCTAssertEqual(value12, 3348.0)
     }
 
     func testRegularGrid() {
@@ -79,14 +97,16 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(lon2, -179.875, accuracy: 0.001)
     }
 
-    func testElevationMatching() throws {
+    func testElevationMatching() async throws {
         try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
 
-        let optimised = try IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
+        let logger = Logger(label: "testElevationMatching")
+        let client = HTTPClient.shared
+        let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
         XCTAssertEqual(optimised.gridpoint, 225405)
         XCTAssertEqual(optimised.gridElevation.numeric, 600)
 
-        let nearest = try IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation)!)!
+        let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
         XCTAssertEqual(nearest.gridpoint, 225406)
         XCTAssertEqual(nearest.gridElevation.numeric, 1006.0)
     }

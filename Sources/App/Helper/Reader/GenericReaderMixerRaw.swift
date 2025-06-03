@@ -16,7 +16,7 @@ protocol GenericReaderMixerRaw: GenericReaderProtocol {
 protocol GenericReaderMixer: GenericReaderMixerRaw {
     associatedtype Domain: GenericDomain
 
-    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws -> Reader?
+    static func makeReader(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Reader?
 }
 
 struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReaderMixerRaw, GenericReaderProtocol {
@@ -26,12 +26,12 @@ struct GenericReaderMixerSameDomain<Reader: GenericReaderProtocol>: GenericReade
 }
 
 extension GenericReaderMixer {
-    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) throws {
+    public init?(domains: [Domain], lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         /// Initiaise highest resolution domain first. If `elevation` is NaN, use the elevation of the highest domain,
         var elevation = elevation
 
-        let reader: [Reader] = try domains.reversed().compactMap { domain -> (Reader?) in
-            guard let domain = try Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+        let reader: [Reader] = try await domains.reversed().asyncCompactMap { domain -> (Reader?) in
+            guard let domain = try await Self.makeReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return nil
             }
             if elevation.isNaN {
@@ -64,30 +64,30 @@ extension GenericReaderMixerRaw {
         reader.last!.modelDtSeconds
     }
 
-    func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) throws {
+    func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws {
         for reader in reader {
-            try reader.prefetchData(variable: variable, time: time)
+            try await reader.prefetchData(variable: variable, time: time)
         }
     }
 
-    func prefetchData(variables: [Reader.MixingVar], time: TimerangeDtAndSettings) throws {
-        try variables.forEach { variable in
-            try prefetchData(variable: variable, time: time)
+    func prefetchData(variables: [Reader.MixingVar], time: TimerangeDtAndSettings) async throws {
+        for variable in variables {
+            try await prefetchData(variable: variable, time: time)
         }
     }
 
-    func getStatic(type: ReaderStaticVariable) throws -> Float? {
-        return try reader.last?.getStatic(type: type)
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.last?.getStatic(type: type)
     }
 
-    func get(variable: Reader.MixingVar, time: TimerangeDtAndSettings) throws -> DataAndUnit {
+    func get(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var data: [Float]?
         var unit: SiUnit?
         if variable.requiresOffsetCorrectionForMixing {
             for r in reader.reversed() {
-                let d = try r.get(variable: variable, time: time)
+                let d = try await r.get(variable: variable, time: time)
                 if data == nil {
                     // first iteration
                     data = d.data
@@ -106,7 +106,7 @@ extension GenericReaderMixerRaw {
         } else {
             // default case, just place new data in 1:1
             for r in reader.reversed() {
-                let d = try r.get(variable: variable, time: time)
+                let d = try await r.get(variable: variable, time: time)
                 if data == nil {
                     // first iteration
                     data = d.data

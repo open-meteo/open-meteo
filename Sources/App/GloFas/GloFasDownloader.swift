@@ -198,14 +198,14 @@ struct GloFasDownloader: AsyncCommand {
             logger.info("Reading \(date.format_YYYYMMdd)")
             let file = "\(downloadDir)glofas_\(date.format_YYYYMMdd).om"
             guard FileManager.default.fileExists(atPath: file),
-                    let dailyFile = try OmFileReader(file: file).asArray(of: Float.self)
+                  let dailyFile = try await OmFileReader(file: file).asArray(of: Float.self)
             else {
                 continue
             }
-            data2d[0..<nx * ny, i] = try dailyFile.read()
+            data2d[0..<nx * ny, i] = try await dailyFile.read()
         }
         logger.info("Update om database")
-        try om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
+        try await om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
     }
 
     /// Convert a single file

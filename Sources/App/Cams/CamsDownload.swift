@@ -67,12 +67,12 @@ struct DownloadCamsCommand: AsyncCommand {
                 for month in YearMonth(timestamp: interval.lowerBound)..<YearMonth(timestamp: interval.upperBound) {
                     let run = month.timestamp
                     try await downloadCamsEuropeReanalysis(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
-                    try convertCamsEuropeReanalysis(logger: logger, domain: domain, run: run, variables: variables)
+                    try await convertCamsEuropeReanalysis(logger: logger, domain: domain, run: run, variables: variables)
                 }
                 return
             }
             try await downloadCamsEuropeReanalysis(application: context.application, domain: domain, run: run, skipFilesIfExisting: signature.skipExisting, variables: variables, cdskey: cdskey)
-            try convertCamsEuropeReanalysis(logger: logger, domain: domain, run: run, variables: variables)
+            try await convertCamsEuropeReanalysis(logger: logger, domain: domain, run: run, variables: variables)
         case .cams_global:
             guard let ftpuser = signature.ftpuser else {
                 fatalError("ftpuser is required")
@@ -255,7 +255,7 @@ struct DownloadCamsCommand: AsyncCommand {
     }
 
     /// Process each variable and update time-series optimised files
-    func convertCamsEuropeReanalysis(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) throws {
+    func convertCamsEuropeReanalysis(logger: Logger, domain: CamsDomain, run: Timestamp, variables: [CamsVariable]) async throws {
         let om = OmFileSplitter(domain)
 
         let type2: String
@@ -297,7 +297,7 @@ struct DownloadCamsCommand: AsyncCommand {
             logger.info("Create om file")
             let startOm = DispatchTime.now()
             let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
-            try om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, scalefactor: variable.scalefactor)
+            try await om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
     }

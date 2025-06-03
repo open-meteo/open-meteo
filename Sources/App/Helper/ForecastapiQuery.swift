@@ -114,8 +114,12 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return timeformat ?? .iso8601
     }
 
-    var readerOptions: GenericReaderOptions {
-        return GenericReaderOptions(tilt: tilt, azimuth: azimuth)
+    func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
+    }
+    
+    func readerOptions(for request: Request) throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: request.application.http.client.shared)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps
@@ -161,7 +165,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
-    func prepareCoordinates(allowTimezones: Bool) throws -> ApiRequestGeometry {
+    func prepareCoordinates(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> ApiRequestGeometry {
         let dates = try getStartEndDates()
         if let bb = try getBoundingBox() {
             let timezones = allowTimezones ? try TimeZoneOrAuto.load(commaSeparatedOptional: timezone) ?? [] : []
@@ -179,7 +183,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return .boundingBox(bb, dates: dates, timezone: timezone)
         }
 
-        let coordinates = try getCoordinatesWithTimezone(allowTimezones: allowTimezones)
+        let coordinates = try await getCoordinatesWithTimezone(allowTimezones: allowTimezones, logger: logger, httpClient: httpClient)
 
         /// If no start/end dates are set, leav it `nil`
         guard dates.count > 0 else {
@@ -239,8 +243,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Reads coordinates and timezone fields
     /// If only one timezone is given, use the same timezone for all coordinates
     /// Throws errors on invalid coordinates, timezones or invalid counts
-    private func getCoordinatesWithTimezone(allowTimezones: Bool) throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
-        let coordinates = try getCoordinates()
+    private func getCoordinatesWithTimezone(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
+        let coordinates = try await getCoordinates(logger: logger, httpClient: httpClient)
         let timezones = allowTimezones ? try TimeZoneOrAuto.load(commaSeparatedOptional: timezone) : nil
 
         guard let timezones else {
@@ -265,7 +269,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Parse latitude, longitude and elevation arrays to an array of coordinates
     /// If no elevation is provided, a DEM is used to resolve the elevation
     /// Throws errors on invalid coordinate ranges
-    private func getCoordinates() throws -> [CoordinatesAndElevation] {
+    private func getCoordinates(logger: Logger, httpClient: HTTPClient) async throws -> [CoordinatesAndElevation] {
         let latitude = try Float.load(commaSeparated: self.latitude)
         let longitude = try Float.load(commaSeparated: self.longitude)
         let elevation = try Float.load(commaSeparatedOptional: self.elevation)
@@ -282,21 +286,25 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             guard elevation.count == longitude.count else {
                 throw ForecastapiError.coordinatesAndElevationCountMustBeTheSame
             }
-            return try zip(latitude, zip(longitude, elevation)).enumerated().map({
-                try CoordinatesAndElevation(
+            return try await zip(latitude, zip(longitude, elevation)).enumerated().asyncMap({
+                try await CoordinatesAndElevation(
                     latitude: $0.element.0,
                     longitude: $0.element.1.0,
                     locationId: locationIds?[$0.offset] ?? $0.offset,
-                    elevation: $0.element.1.1
+                    elevation: $0.element.1.1,
+                    logger: logger,
+                    httpClient: httpClient
                 )
             })
         }
-        return try zip(latitude, longitude).enumerated().map({
-            try CoordinatesAndElevation(
+        return try await zip(latitude, longitude).enumerated().asyncMap({
+            try await CoordinatesAndElevation(
                 latitude: $0.element.0,
                 longitude: $0.element.1,
                 locationId: locationIds?[$0.offset] ?? $0.offset,
-                elevation: nil
+                elevation: nil,
+                logger: logger,
+                httpClient: httpClient
             )
         })
     }
@@ -496,7 +504,7 @@ struct CoordinatesAndElevation {
     let locationId: Int
 
     /// If elevation is `nil` it will resolve it from DEM. If `NaN` it stays `NaN`.
-    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan) throws {
+    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan, logger: Logger, httpClient: HTTPClient) async throws {
         if latitude > 90 || latitude < -90 || latitude.isNaN {
             throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
         }
@@ -505,7 +513,11 @@ struct CoordinatesAndElevation {
         }
         self.latitude = latitude
         self.longitude = longitude
-        self.elevation = try elevation ?? Dem90.read(lat: latitude, lon: longitude)
+        if let elevation {
+            self.elevation = elevation
+        } else {
+            self.elevation = try await Dem90.read(lat: latitude, lon: longitude, logger: logger, httpClient: httpClient)
+        }
         self.locationId = locationId
     }
 }
