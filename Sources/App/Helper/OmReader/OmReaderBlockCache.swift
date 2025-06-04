@@ -20,7 +20,7 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
     
     
     func prefetchData(offset: Int, count: Int) async throws {
-        let blockSize = 65536
+        let blockSize = cache.cache.blockSize
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         for block in blocks {
             cache.prefetchData(key: cacheKey &+ UInt64(block))
@@ -32,7 +32,7 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
     }
     
     func withData<T: Sendable>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
-        let blockSize = 65536
+        let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
         let totalCount = self.backend.count
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
@@ -64,7 +64,7 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
     
     
     func getData(offset: Int, count: Int) async throws -> Data {
-        let blockSize = 65536
+        let blockSize = cache.cache.blockSize
         let dataRange = offset ..< (offset + count)
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         

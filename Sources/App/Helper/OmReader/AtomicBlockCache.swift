@@ -35,16 +35,15 @@ extension DataAsClass: AtomicBlockCacheStorable {
 
 extension AtomicBlockCache where Backend == MmapFile {
     init(file: String, blockSize: Int, blockCount: Int) throws {
-        let fn: FileHandle
         let size = (MemoryLayout<WordPair>.size + blockSize) * blockCount
         if FileManager.default.fileExists(atPath: file) {
-            fn = try .openFileReadWrite(file: file)
-            guard try fn.seekToEnd() == size else {
-                fatalError("Cache file has the wrong size")
+            let fn = try FileHandle.openFileReadWrite(file: file)
+            if try fn.seekToEnd() == size {
+                self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
+                return
             }
-        } else {
-            fn = try .createNewFile(file: file, size: size, overwrite: false)
         }
+        let fn = try FileHandle.createNewFile(file: file, size: size, overwrite: true)
         self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
     }
 }
