@@ -12,7 +12,7 @@ final class HelperTests: XCTestCase {
             return $0
         }.collect()
         XCTAssertEqual(res, a)
-
+        
         let a2 = (0..<5).map { $0 }
         let res2 = try! await a2.mapStream(nConcurrent: 10) {
             try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
@@ -20,7 +20,7 @@ final class HelperTests: XCTestCase {
         }.collect()
         XCTAssertEqual(res2, a2)
     }
-
+    
     func testIndexedCurl() {
         let index = """
             1:0:d=2022080800:UFLX:surface:anl:
@@ -43,29 +43,29 @@ final class HelperTests: XCTestCase {
         }
         XCTAssertEqual(range?.range, "104746-276986,344851-430542,564311-")
         XCTAssertEqual(range?.minSize, 257933)
-
+        
         let range2 = index.split(separator: "\n").indexToRange { _ in
             return true
         }
         XCTAssertEqual(range2?.range, "0-")
         XCTAssertEqual(range2?.minSize, 564311)
-
+        
         let range3 = index.split(separator: "\n").indexToRange { _ in
             return false
         }
         XCTAssertTrue(range3 == nil)
-
+        
         let range4 = index.split(separator: "\n").indexToRange { line in
             line.contains("TMP") || line.contains("UFLX")
         }
         XCTAssertEqual(range4?.range, "0-52675,191888-276986,344851-430542")
         XCTAssertEqual(range4?.minSize, 223467)
         /*let curl = Curl(logger: Logger(label: ""))
-        try! curl.downloadIndexedGrib(url: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/00/6hrly_grib_01/flxf2022080812.01.2022080800.grb2", to: "/Users/patrick/Downloads/test.grib", include: { line in
-            line.contains(":")
-        })*/
+         try! curl.downloadIndexedGrib(url: "https://nomads.ncep.noaa.gov/pub/data/nccf/com/cfs/prod/cfs.20220808/00/6hrly_grib_01/flxf2022080812.01.2022080800.grb2", to: "/Users/patrick/Downloads/test.grib", include: { line in
+         line.contains(":")
+         })*/
     }
-
+    
     func testDecodeEcmwfIndex() throws {
         var buffer = ByteBuffer()
         buffer.writeString("""
@@ -81,7 +81,7 @@ final class HelperTests: XCTestCase {
         let range = index.indexToRange()[0]
         XCTAssertEqual(range.range, "0-3857388")
         XCTAssertEqual(range.minSize, 3857388)
-
+        
         var buffer2 = ByteBuffer()
         buffer2.writeString("""
         {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "levtype": "sfc", "number": "21", "step": "102", "param": "tp", "_offset": 0, "_length": 812043}
@@ -97,23 +97,36 @@ final class HelperTests: XCTestCase {
         XCTAssertEqual(range2.range, "0-812043,812044-2639250,2639249-3248317,3248319-3857388")
         XCTAssertEqual(range2.minSize, 3857386)
     }
-
+    
     /*func testSpawn() async throws {
-        let time = DispatchTime.now()
-        async let a: () = try Process.spawn(cmd: "sleep", args: ["1"])
-        async let b: () = try Process.spawn(cmd: "sleep", args: ["1"])
-        try await a
-        try await b
-        let elapsedMs = Double((DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds) / 1_000_000)
-        XCTAssertLessThan(elapsedMs, 1200)
-    }*/
-
+     let time = DispatchTime.now()
+     async let a: () = try Process.spawn(cmd: "sleep", args: ["1"])
+     async let b: () = try Process.spawn(cmd: "sleep", args: ["1"])
+     try await a
+     try await b
+     let elapsedMs = Double((DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds) / 1_000_000)
+     XCTAssertLessThan(elapsedMs, 1200)
+     }*/
+    
     func testNativeSpawn() throws {
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["Hello"]), 0)
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "echo", args: ["World"]), 0)
-
+        
         try "exit 70".write(toFile: "temp.sh", atomically: true, encoding: .utf8)
         XCTAssertEqual(try Process.spawnWithExitCode(cmd: "bash", args: ["temp.sh"]), 70)
         try FileManager.default.removeItem(atPath: "temp.sh")
+    }
+    
+    func testByteSizeParser() throws {
+        let bytes = try ByteSizeParser.parseSizeStringToBytes("2KB")
+        XCTAssertEqual(bytes, 2 * 1024)
+        let bytes2 = try ByteSizeParser.parseSizeStringToBytes("1.5MB")
+        XCTAssertEqual(bytes2, Int(1.5 * 1024 * 1024))
+        let bytes3 = try ByteSizeParser.parseSizeStringToBytes("1GB")
+        XCTAssertEqual(bytes3, 1 * 1024 * 1024 * 1024)
+        let bytes4 = try ByteSizeParser.parseSizeStringToBytes("0.5TB")
+        XCTAssertEqual(bytes4, Int(0.5 * 1024 * 1024 * 1024 * 1024))
+        let bytes5 = try ByteSizeParser.parseSizeStringToBytes("3.25MB")
+        XCTAssertEqual(bytes5, Int(3.25 * 1024 * 1024))
     }
 }

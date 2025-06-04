@@ -35,16 +35,15 @@ extension DataAsClass: AtomicBlockCacheStorable {
 
 extension AtomicBlockCache where Backend == MmapFile {
     init(file: String, blockSize: Int, blockCount: Int) throws {
-        let fn: FileHandle
         let size = (MemoryLayout<WordPair>.size + blockSize) * blockCount
         if FileManager.default.fileExists(atPath: file) {
-            fn = try .openFileReadWrite(file: file)
-            guard try fn.seekToEnd() == size else {
-                fatalError("Cache file has the wrong size")
+            let fn = try FileHandle.openFileReadWrite(file: file)
+            if try fn.seekToEnd() == size {
+                self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
+                return
             }
-        } else {
-            fn = try .createNewFile(file: file, size: size, overwrite: false)
         }
+        let fn = try FileHandle.createNewFile(file: file, size: size, overwrite: true)
         self = .init(data: try MmapFile(fn: fn, mode: .readWrite), blockSize: blockSize)
     }
 }
@@ -71,7 +70,8 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         return data.count / (blockSize + MemoryLayout<WordPair>.size)
     }
     
-    func set<DataIn: ContiguousBytes & Sendable>(key: UInt64, value: DataIn) {
+    @discardableResult
+    func set<DataIn: ContiguousBytes & Sendable>(key: UInt64, value: DataIn) -> UnsafeRawBufferPointer {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         /// For in-flight requests set bit 0 to zero
         let inFlightKey = WordPair(first: UInt(key), second: time & ~0x1)
@@ -80,11 +80,10 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         /// The maximum number of slots to check for an empty space. Afterwards overwrite LRU value
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
-        data.withMutableUnsafeBytes { bytes in
+        return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
-            let keyRange = key ..< key + lookAheadCount
-            for slot in keyRange {
-                let slot = Int(slot % UInt64(blockCount))
+            for lookAhead in 0..<lookAheadCount {
+                let slot = Int((key &+ lookAhead) % UInt64(blockCount))
                 while true {
                     let entry = entries[slot].load(ordering: .relaxed)
                     guard entry.second == 0 || entry.first == key else {
@@ -101,14 +100,14 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
                         continue // another thread stole the slot
                     }
-                    return
+                    return UnsafeRawBufferPointer(start: dest, count: blockSize)
                 }
             }
             // If we are here, no slots were free. Search lowest timestamp and overwrite this slot
             // Remember that other threads might do the same at the same time
             while true {
-                let (slot, entry) = keyRange.reduce((0, WordPair(first: 0, second: UInt.max)), { (compare, slot) in
-                    let slot = Int(slot % UInt64(blockCount))
+                let (slot, entry) = (0..<lookAheadCount).reduce((0, WordPair(first: 0, second: UInt.max)), { (compare, lookAhead) in
+                    let slot = Int((key &+ lookAhead) % UInt64(blockCount))
                     let entry = entries[slot].load(ordering: .relaxed)
                     return entry.second < compare.1.second ? (slot,entry) : compare
                 })
@@ -123,7 +122,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 guard entries[slot].compareExchange(expected: inFlightKey, desired: committedKey, ordering: .relaxed).exchanged else {
                     continue // another thread stole the slot
                 }
-                return
+                return UnsafeRawBufferPointer(start: dest, count: blockSize)
             }
         }
     }
@@ -134,9 +133,8 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         let blockCount = blockCount
         data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
-            let keyRange = key ..< key + lookAheadCount
-            for slot in keyRange {
-                let slot = slot % UInt64(blockCount)
+            for lookAhead in 0..<lookAheadCount {
+                let slot = (key &+ lookAhead) % UInt64(blockCount)
                 while true {
                     let entry = entries[Int(slot)].load(ordering: .relaxed)
                     // check if keys match
@@ -159,11 +157,10 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         let blockCount = blockCount
         return data.withMutableUnsafeBytes { bytes in
             let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
-            let keyRange = key ..< key + lookAheadCount
-            for slot in keyRange {
-                let slot = slot % UInt64(blockCount)
+            for lookAhead in 0..<lookAheadCount {
+                let slot = Int((key &+ lookAhead) % UInt64(blockCount))
                 while true {
-                    let entry = entries[Int(slot)].load(ordering: .relaxed)
+                    let entry = entries[slot].load(ordering: .relaxed)
                     // check if keys match
                     // ignore any entries that are being modified right now
                     guard entry.first == key && entry.second & 0x1 == 1 else {
@@ -171,7 +168,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     }
                     // Update last modified timestamp
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
-                    let updated = entries[Int(slot)].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
+                    let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
                     guard updated.exchanged || (updated.original.first == key && updated.original.second & 0x1 == 1 ) else {
                         // Another thread changed the key or started an update
                         continue
@@ -179,9 +176,51 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     
                     // Get data pointer and execute closure on data
                     // There is a slight chance, that data is modified while reading, but it should practically never happen
-                    let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
+                    let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * slot)
                     return UnsafeRawBufferPointer(start: dest, count: blockSize)
                 }
+            }
+            return nil
+        }
+    }
+    
+    /// Return if all keys are available sequentially in the cache
+    func get(key: UInt64, count: UInt64) -> UnsafeRawBufferPointer? {
+        let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
+        let lookAheadCount: UInt64 = 1024
+        let blockCount = blockCount
+        return data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            outer: for lookAhead in 0..<lookAheadCount {
+                let slot = UInt64(key &+ lookAhead) % UInt64(blockCount)
+                if slot + count > blockCount {
+                    continue // Key range would hit the end of the cache block
+                }
+                for i in 0..<count {
+                    let slot = Int((slot &+ i) % UInt64(blockCount))
+                    let key = (key &+ UInt64(i))
+                    while true {
+                        let entry = entries[slot].load(ordering: .relaxed)
+                        // check if keys match
+                        // ignore any entries that are being modified right now
+                        guard entry.first == key && entry.second & 0x1 == 1 else {
+                            continue outer
+                        }
+                        // Update last modified timestamp
+                        let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
+                        let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
+                        guard updated.exchanged || (updated.original.first == key && updated.original.second & 0x1 == 1 ) else {
+                            // Another thread changed the key or started an update
+                            continue
+                        }
+                        // Slot ok
+                        break
+                    }
+                }
+                // Get data pointer and execute closure on data
+                // There is a slight chance, that data is modified while reading, but it should practically never happen
+                let dest = bytes.baseAddress?.advanced(by: blockCount * MemoryLayout<WordPair>.size + blockSize * Int(slot))
+                return UnsafeRawBufferPointer(start: dest, count: blockSize * Int(count))
             }
             return nil
         }

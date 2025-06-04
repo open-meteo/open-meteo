@@ -31,17 +31,9 @@ enum OpenMeteo {
     /// Cache remote data if `REMOTE_DATA_DIRECTORY` is set. Default 10GB stored in `cache.bin` inside the data directory.
     static let dataBlockCache: AtomicCacheCoordinator<MmapFile> = { () -> AtomicCacheCoordinator<MmapFile> in
         let cacheFile = Environment.get("CACHE_FILE") ?? "\(dataDirectory)/cache.bin"
-        let cacheSize = Environment.get("CACHE_SIZE") ?? "10GB"
-        // Make sure string ends with GB
-        guard cacheSize.hasSuffix("GB") else {
-            fatalError("CACHE_SIZE must end with 'GB")
-        }
-        // Convert strings like 100GB to 10
-        guard let sizeGb = Int(cacheSize.dropLast(2)) else {
-            fatalError("CACHE_SIZE must be a valid number ending in GB")
-        }
-        let blockSize = 65536
-        let blockCount = sizeGb * 1028 * 1028 * 1024 / (blockSize + 2 * MemoryLayout<Int64>.size)
+        let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_SIZE") ?? "10GB")
+        let blockSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("BLOCK_SIZE") ?? "64KB")
+        let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
         return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
     }()
     
@@ -77,6 +69,8 @@ enum OpenMeteo {
         return Environment.get("CACHE_DIRECTORY")
     }()*/
 }
+
+
 
 extension Application {
     fileprivate struct HttpClientKey: StorageKey, LockKey {

@@ -249,7 +249,8 @@ final actor RemoteOmFileManagerCache {
                             entry.value = nil
                             continue
                         }
-                        entry.value = .remote(reader)                    }
+                        entry.value = .remote(reader)
+                    }
                 } else {
                     statistics.remoteModified += 1
                     entry.value = nil
