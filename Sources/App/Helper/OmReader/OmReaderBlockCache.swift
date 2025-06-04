@@ -39,7 +39,9 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
         
         /// Check if all blocks are available sequentially in cache
         if let ptr = cache.cache.get(key: cacheKey &+ UInt64(blocks.lowerBound), count: UInt64(blocks.count)) {
-            return try fn(ptr)
+            let blockRange = blocks.lowerBound * blockSize ..< blocks.upperBound * blockSize
+            let range = dataRange.intersect(fileTime: blockRange)!
+            return try fn(UnsafeRawBufferPointer(rebasing: ptr[range.file]))
         }
         
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
@@ -68,7 +70,9 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
         
         /// Check if all blocks are available sequentially in cache
         if let ptr = cache.cache.get(key: cacheKey &+ UInt64(blocks.lowerBound), count: UInt64(blocks.count)) {
-            return Data(ptr)
+            let blockRange = blocks.lowerBound * blockSize ..< blocks.upperBound * blockSize
+            let range = dataRange.intersect(fileTime: blockRange)!
+            return Data(ptr[range.file])
         }
         
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
