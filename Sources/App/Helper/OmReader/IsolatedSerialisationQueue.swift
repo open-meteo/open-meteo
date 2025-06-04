@@ -1,7 +1,7 @@
 /**
  Ensure that only a single task is running to return a resource
  */
-/*final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
+final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
     private var queue: [Key: [CheckedContinuation<Value, any Error>]] = [:]
     
     /**
@@ -33,7 +33,7 @@
 /**
  KV cache, but a resource is resolved not in parallel
  */
-final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable> {
+/*final actor IsolatedSerialisationCache<Key: Hashable & Sendable, Value: Sendable> {
     enum State {
         case cached(Value)
         case running([CheckedContinuation<Value, any Error>])

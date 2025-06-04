@@ -51,13 +51,12 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
             let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
-            try await cache.with(
+            let ptr = try await cache.get(
                 key: cacheKey &+ UInt64(block),
                 backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }), callback: ({ ptr in
-                let _ = ptr[range.file].copyBytes(to: dest)
             }))
+            let _ = ptr[range.file].copyBytes(to: dest)
         }
         return try fn(UnsafeRawBufferPointer(data))
     }
@@ -84,14 +83,12 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
             let range = dataRange.intersect(fileTime: blockRange)!
             let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
-            try await cache.with(
+            let ptr = try await cache.get(
                 key: cacheKey &+ UInt64(block),
                 backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }), callback: ({ ptr in
-                //data.replaceSubrange(range.array, with: ptr[range.file])
-                let _ = ptr[range.file].copyBytes(to: dest)
             }))
+            let _ = ptr[range.file].copyBytes(to: dest)
         }
         return dataRet
     }
