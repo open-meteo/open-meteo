@@ -71,6 +71,7 @@ final class OmReaderTests: XCTestCase {
         cache.set(key: 234923+50, value: Data(repeating: 142, count: 64))
         XCTAssertEqual(cache.get(key: 234923)!.data, Data(repeating: 123, count: 64))
         XCTAssertEqual(cache.get(key: 234923+50)!.data, Data(repeating: 142, count: 64))
+        XCTAssertEqual(cache.blockCount, 50)
         
         for i in 0..<50 {
             cache.set(key: UInt64(1000+i), value: Data(repeating: UInt8(123+i), count: 64))
@@ -81,5 +82,16 @@ final class OmReaderTests: XCTestCase {
         // Cache got overwritten
         XCTAssertNil(cache.get(key: 234923))
         XCTAssertNil(cache.get(key: 234923+50))
+        
+        // First 23 keys are sequentially in cache
+        XCTAssertNotNil(cache.get(key: 1000, count: 23))
+        XCTAssertNil(cache.get(key: 1022, count: 2))
+        // Key 1023 is offset by 2 slots
+        XCTAssertNotNil(cache.get(key: 1023, count: 25))
+        // Keys 1048 until 1050 are sequentially in cache again, but offset by 2 and wraps at the end of the cache
+        XCTAssertNotNil(cache.get(key: 1048, count: 2))
+        
+        cache.set(key: .max, value: Data(repeating: 123, count: 64))
+        XCTAssertEqual(cache.get(key: .max)!.data, Data(repeating: 123, count: 64))
     }
 }

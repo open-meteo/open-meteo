@@ -37,21 +37,9 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
         let totalCount = self.backend.count
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         
-        /// TODO: check if cached data is sequentially available in cache
-        /// Single block read, can directly execute closure on cached data
-        /// No extra allocation
-        if blocks.count == 1 {
-            //print("withData single block")
-            let block = offset / blockSize
-            let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
-            let range = dataRange.intersect(fileTime: blockRange)!
-            return try await cache.with(
-                key: cacheKey &+ UInt64(block),
-                backendFetch: ({
-                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }), callback: ({ ptr in
-                return try fn(UnsafeRawBufferPointer(rebasing: ptr[range.file]))
-            }))
+        /// Check if all blocks are available sequentially in cache
+        if let ptr = cache.cache.get(key: cacheKey &+ UInt64(blocks.lowerBound), count: UInt64(blocks.count)) {
+            return try fn(ptr)
         }
         
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
@@ -76,11 +64,17 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
     func getData(offset: Int, count: Int) async throws -> Data {
         let blockSize = 65536
         let dataRange = offset ..< (offset + count)
+        let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
+        
+        /// Check if all blocks are available sequentially in cache
+        if let ptr = cache.cache.get(key: cacheKey &+ UInt64(blocks.lowerBound), count: UInt64(blocks.count)) {
+            return Data(ptr)
+        }
+        
         let data = UnsafeMutableRawBufferPointer.allocate(byteCount: count, alignment: 1)
         let dataRet = Data(bytesNoCopy: data.baseAddress!, count: count, deallocator: .free)
         let totalCount = self.backend.count
         
-        let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         //rint("getData \(blocks.count) blocks")
         for block in blocks {
             let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
