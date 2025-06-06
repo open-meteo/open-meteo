@@ -103,6 +103,18 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
+    
+    func availableFor(domain: IconWaveDomain) -> Bool {
+        guard domain == .gwam else {
+            return true
+        }
+        switch self {
+        case .wave_height, .wave_direction:
+            return true
+        default:
+            return false
+        }
+    }
 
     /// Name used on the dwd open data server
     var dwdName: String {
