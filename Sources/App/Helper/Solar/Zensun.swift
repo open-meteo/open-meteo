@@ -448,7 +448,11 @@ public enum Zensun {
         let grid = RegularGrid(nx: 1, ny: 1, latMin: latitude, lonMin: longitude, dx: 1, dy: 1)
         let sunElevation = calculateSunElevationBackwards(grid: grid, timerange: timerange).data
         return zip(shortwaveRadiation, sunElevation).map { ghi, sinAlpha in
-            let exrad = sinAlpha * Self.solarConstant
+            if sinAlpha <= 5 / Zensun.solarConstant {
+                // At low solar angles and at night, assume GHI is diffuse
+                return ghi
+            }
+            let exrad = min(sinAlpha * Self.solarConstant, 0.95 * Self.solarConstant)
 
             /// clearness index [0;1], must be relative to extraterrestrial radiation NOT cleasky
             let kt = ghi / exrad
@@ -480,7 +484,7 @@ public enum Zensun {
                 kd = max(0.486 * kt - 0.182 * sinAlpha, 0.1)
             }*/
 
-            return kd * ghi
+            return min(kd * ghi, ghi)
         }
     }
 }
