@@ -26,27 +26,16 @@ struct RotatedLatLonProjection: Projectable {
         let y2 = -sin(ϕ) * x + cos(ϕ) * y
         let z2 = -sin(θ) * cos(ϕ) * x - sin(θ) * sin(ϕ) * y + cos(θ) * z
 
-        return (atan2(y2, x2).radiansToDegrees, asin(z2).radiansToDegrees)
+        return (-1 * atan2(y2, x2).radiansToDegrees, -1 * asin(z2).radiansToDegrees)
     }
 
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float) {
         let lon = x.degreesToRadians
         let lat = y.degreesToRadians
 
-        let θ = -1 * θ
-        let ϕ = -1 * ϕ
-
-        /*let x = cos(lon) * cos(lat)
-        let y = sin(lon) * cos(lat)
-        let z = sin(lat)
-        let x2 = cos(θ) * cos(ϕ) * x + sin(ϕ) * y + sin(θ) * cos(ϕ) * z
-        let y2 = -cos(θ) * sin(ϕ) * x + cos(ϕ) * y - sin(θ) * sin(ϕ) * z
-        let z2 = -sin(θ) * x + cos(θ) * z*/
-        // return (asin(z2).radiansToDegrees, atan2(y2, x2).radiansToDegrees)
-
         // quick solution without conversion in cartesian space
-        let lat2 = asin(cos(θ) * sin(lat) - cos(lon) * sin(θ) * cos(lat))
-        let lon2 = atan2(sin(lon), tan(lat) * sin(θ) + cos(lon) * cos(θ)) - ϕ
-        return (lat2.radiansToDegrees, lon2.radiansToDegrees)
+        let lat2 = -1 * asin(cos(θ) * sin(lat) - cos(lon) * sin(θ) * cos(lat))
+        let lon2 = -1 * (atan2(sin(lon), tan(lat) * sin(θ) + cos(lon) * cos(θ)) - ϕ)
+        return (lat2.radiansToDegrees, (lon2.radiansToDegrees + 180).truncatingRemainder(dividingBy: 360) - 180)
     }
 }

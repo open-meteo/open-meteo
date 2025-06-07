@@ -112,13 +112,11 @@ struct MeteoSwissDownload: AsyncCommand {
                 print("\(gridIndex)/\(count)")
             }
             let (gridLat, gridLon) = grid.getCoordinates(gridpoint: gridIndex)
-            return zip(latitudes.indices, zip(latitudes, longitudes)).min(by: { a, b in
-                let (_, coord1) = a
-                let (_, coord2) = b
-                let d1 = pow(coord1.0 - gridLat, 2) + pow(coord1.1 - gridLon, 2)
-                let d2 = pow(coord2.0 - gridLat, 2) + pow(coord2.1 - gridLon, 2)
+            return zip(latitudes, longitudes).enumerated().min(by: { a, b in
+                let d1 = pow(a.element.0 - gridLat, 2) + pow(a.element.1 - gridLon, 2)
+                let d2 = pow(b.element.0 - gridLat, 2) + pow(b.element.1 - gridLon, 2)
                 return d1 < d2
-            })?.0 ?? 0
+            })?.offset ?? 0
         }
     }
     
@@ -157,15 +155,17 @@ fileprivate extension HTTPClient {
 
     struct Feature: Codable {
         let assets: [String: Asset]
+        struct Asset: Codable {
+            let href: String
+        }
     }
     
     struct Assets: Codable {
         let assets: [Asset]
-    }
-
-    struct Asset: Codable {
-        let id: String
-        let href: String
+        struct Asset: Codable {
+            let id: String
+            let href: String
+        }
     }
     
     func resolveMeteoSwissDownloadURL(
@@ -205,7 +205,7 @@ fileprivate extension HTTPClient {
     func getMeteoSwissAssets(
         logger: Logger,
         collection: String
-    ) async throws -> [Asset] {
+    ) async throws -> [Assets.Asset] {
         let url = "https://data.geo.admin.ch/api/stac/v1/collections/\(collection)/assets"
         let req = HTTPClientRequest(url: url)
         let response = try await executeRetry(req, logger: logger, timeoutPerRequest: .seconds(5))
