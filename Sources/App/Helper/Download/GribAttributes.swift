@@ -85,7 +85,7 @@ extension GribMessage {
         return try GribAttributes(message: self)
     }
 
-    fileprivate func getOrThrow(attribute: String) throws -> String {
+    func getOrThrow(attribute: String) throws -> String {
         guard let value = get(attribute: attribute) else {
             throw GribAttributeError.couldNotGetAttribute(attribute: attribute)
         }
@@ -96,5 +96,9 @@ extension GribMessage {
         let validityTime = try getOrThrow(attribute: "validityTime")
         let validityDate = try getOrThrow(attribute: "validityDate")
         return try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+    }
+    
+    func getFloats() throws -> [Float] {
+        return try getDouble().map(Float.init)
     }
 }

@@ -2,6 +2,7 @@ import Foundation
 @preconcurrency import SwiftEccodes
 import CHelper
 
+
 extension Curl {
     /// Download all grib files and return an array of grib messages
     func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> [GribMessage] {
@@ -26,15 +27,16 @@ extension Curl {
             do {
                 var messages = [GribMessage]()
                 let contentLength = try response.contentLength()
+                let checksum = response.headers["x-amz-meta-sha256"].first
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    for try await m in response.body.tracker(tracker).decompressBzip2().decodeGrib() {
+                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decompressBzip2().decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
                         chelper_malloc_trim()
                     }
                 } else {
-                    for try await m in response.body.tracker(tracker).decodeGrib() {
+                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
                         chelper_malloc_trim()
