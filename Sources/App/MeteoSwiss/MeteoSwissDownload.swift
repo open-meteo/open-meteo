@@ -84,7 +84,7 @@ struct MeteoSwissDownload: AsyncCommand {
             let timestamp = run.add(hours: hour)
             let url = try await client.resolveMeteoSwissDownloadURL(
                 logger: logger,
-                collection: "ch.meteoschweiz.ogd-forecasting-icon-ch2",
+                collection: collection,
                 forecastReferenceDatetime: run,
                 forecastVariable: "T_2M",
                 forecastPerturbed: false,

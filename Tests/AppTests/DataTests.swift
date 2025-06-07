@@ -601,6 +601,18 @@ final class DataTests: XCTestCase {
         let pos4 = grid.getCoordinates(gridpoint: 1919620/2)
         XCTAssertEqual(pos4.latitude, 50.663414)
         XCTAssertEqual(pos4.longitude, 5.652588)
+        
+        let pos5 = grid.getCoordinates(gridpoint: grid.nx-1)
+        XCTAssertEqual(pos5.latitude, 42.338978)
+        XCTAssertEqual(pos5.longitude, 16.52089)
+        
+        let coords = grid.findPointXy(lat: 47.215658, lon: 3.698824)!
+        XCTAssertEqual(coords.x, 258)
+        XCTAssertEqual(coords.y, 485)
+        
+        let coords2 = grid.findPointXy(lat: 49.159088, lon:14.926517)!
+        XCTAssertEqual(coords2.x, 1008)
+        XCTAssertEqual(coords2.y, 672)
     }
     
     
