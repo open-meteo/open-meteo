@@ -36,9 +36,23 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         // 30 min delay
         return t.with(hour: t.hour)
     }
+    
+    var forecastLength: Int {
+        switch self {
+        case .icon_ch1:
+            return 33
+        case .icon_ch2:
+            return 120
+        }
+    }
 
     var omFileLength: Int {
-        return 64 + 2 * 24
+        switch self {
+        case .icon_ch1:
+            return 48
+        case .icon_ch2:
+            return 144
+        }
     }
 
     var grid: Gridable {
@@ -93,6 +107,15 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             return 3*3600
         case .icon_ch2:
             return 6*3600
+        }
+    }
+    
+    var collection: String {
+        switch self {
+        case .icon_ch1:
+            "ch.meteoschweiz.ogd-forecasting-icon-ch1"
+        case .icon_ch2:
+            "ch.meteoschweiz.ogd-forecasting-icon-ch2"
         }
     }
 }
