@@ -4,7 +4,10 @@ import Vapor
 import AsyncHTTPClient
 import OmFileFormat
 
-
+/**
+ https://opendatadocs.meteoswiss.ch/e-forecast-data/e2-e3-numerical-weather-forecasting-model?download-options=restapi
+ 
+ */
 struct MeteoSwissDownload: AsyncCommand {
     struct Signature: CommandSignature {
         @Argument(name: "domain")
@@ -76,6 +79,7 @@ struct MeteoSwissDownload: AsyncCommand {
             try OmFileWriter.write(file: weightsFile, data: mapping)
         }
         let mapping: [Int] = try await OmFileReader.read(file: weightsFile)!
+        //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")
         
         return try await (0...domain.forecastLength).asyncFlatMap { hour -> [GenericVariableHandle] in
             logger.info("Downloading hour \(hour)")
