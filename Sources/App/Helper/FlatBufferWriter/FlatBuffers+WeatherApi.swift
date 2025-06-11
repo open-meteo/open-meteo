@@ -649,7 +649,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .gem_global:
             return .gemGlobal
         case .gem_regional:
-            return .gemGlobal
+            return .gemRegional
         case .gem_hrdps_continental:
             return .gemHrdpsContinental
         case .icon_mix, .icon_seamless:
