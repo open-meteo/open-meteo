@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import OrderedCollections
 
 enum ModelTimeVariable: String, GenericVariable {
     case initialisation_time
@@ -47,8 +48,8 @@ enum ModelTimeVariable: String, GenericVariable {
  - forecast length (per run?)
  - model forecast steps with 1,3,6 hour switching?
  */
-struct ModelUpdateMetaJson: Codable {
-    /// Model initilsiation time as unix timestamp. E.g. 0z
+struct ModelUpdateMetaJson: Codable, Sendable {
+    /// Model initialisation time as unix timestamp. E.g. 0z
     let last_run_initialisation_time: Int
 
     /// Last modification time. The time the conversion finished on the download and processing server
@@ -60,14 +61,26 @@ struct ModelUpdateMetaJson: Codable {
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
     let temporal_resolution_seconds: Int
 
-    /// First date of available data -> Also different per server / variable etc
-    // let data_start_time: Int
-
     /// End of updated timerange. The last timestep is not included! -> Probably not reliable at all.... Short runs, upper model runs, etc....
     let data_end_time: Int
 
     /// E.g. `3600` for updates every 1 hour
     let update_interval_seconds: Int
+
+
+    enum DimensionName: String, Codable, Hashable {
+        case nx
+        case ny
+        case nt
+    }
+
+    /// Chunk files dimensions
+    let chunk_file_dimensions: [DimensionName: Int]?
+    let grid_mapping_name: GridMappingName?
+    let grid_mapping_parameters: OrderedDictionary<String, Float>?
+    let grid_bounds: GridBounds?
+    let proj_string: String?
+
 
     /// Time at which that model run has been available on the current server
     var lastRunAvailabilityTime: Timestamp {
@@ -83,7 +96,16 @@ struct ModelUpdateMetaJson: Codable {
             temporal_resolution_seconds: domain.dtSeconds,
             // data_start_time: 0,
             data_end_time: end.timeIntervalSince1970,
-            update_interval_seconds: domain.updateIntervalSeconds
+            update_interval_seconds: domain.updateIntervalSeconds,
+            chunk_file_dimensions: [
+                .nx: domain.grid.nx,
+                .ny: domain.grid.ny,
+                .nt: domain.omFileLength
+            ],
+            grid_mapping_name: domain.grid.cfProjectionParameters.gridMappingName,
+            grid_mapping_parameters: domain.grid.cfProjectionParameters.gridMappingAttributes,
+            grid_bounds: domain.grid.gridBounds,
+            proj_string: domain.grid.cfProjectionParameters.toProj4String()
         )
         let path = OmFileManagerReadable.meta(domain: domain.domainRegistry)
         try path.createDirectory()
@@ -99,7 +121,12 @@ struct ModelUpdateMetaJson: Codable {
             last_run_availability_time: last_run_availability_time.timeIntervalSince1970,
             temporal_resolution_seconds: temporal_resolution_seconds,
             data_end_time: data_end_time,
-            update_interval_seconds: update_interval_seconds
+            update_interval_seconds: update_interval_seconds,
+            chunk_file_dimensions: chunk_file_dimensions,
+            grid_mapping_name: grid_mapping_name,
+            grid_mapping_parameters: grid_mapping_parameters,
+            grid_bounds: grid_bounds,
+            proj_string: proj_string
         )
     }
 }

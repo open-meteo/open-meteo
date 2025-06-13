@@ -124,7 +124,7 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
              alternativeRowScanning = 1;
              gridType = polar_stereographic;
              */
-            let proj = StereograpicProjection(latitude: 90, longitude: 210, radius: 6371200)
+            let proj = StereographicProjection(latitude: 90, longitude: 210, radius: 6371200)
             // Note dx/dy would need to be scaled, because they are defined as 60° latitude
             // ProjectionGrid(nx: 1649, ny: 1105, latitude: 40.53, longitude: 181.429-360, dx: 2976.56, dy: 2976.56, projection: proj)
             return ProjectionGrid(nx: 1649, ny: 1105, latitude: 40.53...63.97579, longitude: (181.429 - 360)...(-93.689514), projection: proj)
