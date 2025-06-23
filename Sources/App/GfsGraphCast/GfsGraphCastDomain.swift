@@ -34,8 +34,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        // GraphCast has a delay of 15 hours hours after initialisation. Cronjobs starts at 15:20
-        return t.add(hours: -15).floor(toNearestHour: 6)
+        // GraphCast has a delay of 9-10 hours hours after initialisation. Cronjobs starts at 9:05
+        return t.add(hours: -9).floor(toNearestHour: 6)
     }
 
     func forecastHours(run: Int) -> [Int] {
