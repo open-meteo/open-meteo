@@ -16,13 +16,10 @@ struct StereographicProjection: Projectable {
     var R: Float
 
     var cfProjectionParameters: CfProjectionParameters {
-        CfProjectionParameters(
-            gridMappingName: .stereographic,
-            gridMappingAttributes: [
-                "latitude_of_projection_origin": sinϕ1.radiansToDegrees,
-                "straight_vertical_longitude_from_pole": λ0.radiansToDegrees,
-                "earth_radius": R
-            ]
+        CfProjectionParameters.stereographic(
+            straightVerticalLongitudeFromPole: λ0.radiansToDegrees,
+            latitudeOfProjectionOrigin: sinϕ1.radiansToDegrees,
+            earthRadius: R
         )
     }
 

@@ -14,15 +14,12 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
      radius of earth
      */
     init(λ0 λ0_dec: Float, ϕ1 ϕ1_dec: Float, radius: Float = 6371229) {
-        self.cfProjectionParameters = CfProjectionParameters(
-            gridMappingName: .lambertAzimuthalEqualArea,
-            gridMappingAttributes: [
-                "longitude_of_projection_origin": λ0_dec,
-                "latitude_of_projection_origin": ϕ1_dec,
-                "false_easting": 0,
-                "false_northing": 0,
-                "earth_radius": radius
-            ]
+        self.cfProjectionParameters = CfProjectionParameters.lambertAzimuthalEqualArea(
+            longitudeOfProjectionOrigin: λ0_dec,
+            latitudeOfProjectionOrigin: ϕ1_dec,
+            falseEasting: 0,
+            falseNorthing: 0,
+            earthRadius: radius
         )
         λ0 = λ0_dec.degreesToRadians
         ϕ1 = ϕ1_dec.degreesToRadians

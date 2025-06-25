@@ -16,17 +16,16 @@ struct LambertConformalConicProjection: Projectable {
     /// ϕ0  reference latitude in degrees. `LaDInDegrees` in grib
     /// ϕ1 and ϕ2 standard parallels in degrees `Latin1InDegrees` and `Latin2InDegrees` in grib
     public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float, radius: Float = 6370.997) {
-        self.cfProjectionParameters = CfProjectionParameters(
-            gridMappingName: .lambertConformalConic,
-            gridMappingAttributes: [
-                "standard_parallel": ϕ1_dec,
-                "latitude_of_projection_origin": ϕ0_dec,
-                "longitude_of_central_meridian": λ0_dec,
-                "false_easting": 0.0,
-                "false_northing": 0.0,
-                "earth_radius": radius // FIXME: Radius should be in meters
-            ]
-        )
+        self.cfProjectionParameters = CfProjectionParameters.lambertConformalConic(
+                standardParallel: ϕ1_dec, // TODO: Check this is correct
+                longitudeOfCentralMeridian: λ0_dec,
+                latitudeOfProjectionOrigin: ϕ0_dec,
+                falseEasting: 0.0,
+                falseNorthing: 0.0,
+                earthRadius: radius // FIXME: Radius should be in meters
+            )
+
+
         // https://mathworld.wolfram.com/LambertConformalConicProjection.html
         // https://pubs.usgs.gov/pp/1395/report.pdf page 104
         λ0 = ((λ0_dec + 180).truncatingRemainder(dividingBy: 360) - 180).degreesToRadians

@@ -51,41 +51,6 @@ enum GridMappingName: String, Codable {
     }
 }
 
-public struct CfProjectionParameters: Sendable {
-    let gridMappingName: GridMappingName
-    let gridMappingAttributes: OrderedDictionary<String, Float>
-
-    func toProj4String() -> String {
-        var proj4String = "+proj=\(gridMappingName.proj4Name)"
-        // convert cf-conformant attributes to proj4
-        for (key, value) in gridMappingAttributes {
-            if key == "latitude_of_projection_origin" {
-                proj4String += " +lat_0=\(value)"
-            } else if key == "longitude_of_projection_origin" || key == "straight_vertical_longitude_from_pole" || key == "longitude_of_central_meridian" {
-                proj4String += " +lon_0=\(value)"
-            } else if key == "grid_north_pole_latitude" {
-                proj4String += " +o_lat_p=\(value)"
-            } else if key == "grid_north_pole_longitude" {
-                proj4String += " +o_lon_p=\(value)"
-            } else if key == "north_pole_grid_longitude" {
-                proj4String += " +lon_1=\(value)"
-            } else if key == "standard_parallel" {
-                proj4String += " +lat_1=\(value)"
-            } else if key == "false_easting" {
-                proj4String += " +x_0=\(value)"
-            } else if key == "false_northing" {
-                proj4String += " +y_0=\(value)"
-            } else if key == "earth_radius" {
-                proj4String += " +R=\(value)"
-            } else {
-                fatalError("Unknown CF attribute \(key) for projection \(gridMappingName.rawValue)")
-            }
-        }
-        // add default attributes
-        proj4String += " +units=m +datum=WGS84 +no_defs +type=crs"
-        return proj4String
-    }
-}
 
 public struct GridBounds: Equatable, Codable, Sendable {
     let lat_bounds: ClosedRange<Float>
