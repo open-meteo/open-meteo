@@ -65,18 +65,13 @@ extension CfProjectionConvertible {
         let cfAttributes = toCfAttributes()
         var proj4String = "+proj=\(gridMappingName.proj4Name)"
 
-        // Handle special case for rotated lat/lon. FIXME: Improve me in a generic way
-        if gridMappingName == .rotatedLatLon {
-            proj4String += " +o_proj=longlat"
-        }
-
         // Map CF attributes to proj4 parameters using type-safe enums
         cfAttributes.forEach { cfKey, value in
             proj4String += " +\(cfKey.proj4Parameter.rawValue)=\(value)"
         }
 
         // Add default attributes
-        proj4String += " +datum=WGS84 +no_defs +type=crs"
+        proj4String += " +units=m +datum=WGS84 +no_defs +type=crs"
 
         return proj4String
     }
@@ -118,9 +113,6 @@ struct LambertConformalConicParameters: CfProjectionConvertible {
     func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
         var attributes: OrderedDictionary<CfAttributeName, Float> = [:]
 
-        attributes[.longitudeOfCentralMeridian] = longitudeOfCentralMeridian
-        attributes[.latitudeOfProjectionOrigin] = latitudeOfProjectionOrigin
-
         // if standardParallel.count >= 1 {
         //     attributes[.standardParallel] = standardParallel[0]
         // }
@@ -128,6 +120,9 @@ struct LambertConformalConicParameters: CfProjectionConvertible {
         //     attributes[.standardParallel2] = standardParallel[1]
         // }
         attributes[.standardParallel] = standardParallel
+
+        attributes[.latitudeOfProjectionOrigin] = latitudeOfProjectionOrigin
+        attributes[.longitudeOfCentralMeridian] = longitudeOfCentralMeridian
 
         if let falseEasting = falseEasting {
             attributes[.falseEasting] = falseEasting
@@ -184,8 +179,8 @@ struct StereographicParameters: CfProjectionConvertible {
     func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
         var attributes: OrderedDictionary<CfAttributeName, Float> = [:]
 
-        attributes[.straightVerticalLongitudeFromPole] = straightVerticalLongitudeFromPole
         attributes[.latitudeOfProjectionOrigin] = latitudeOfProjectionOrigin
+        attributes[.straightVerticalLongitudeFromPole] = straightVerticalLongitudeFromPole
 
         if let earthRadius = earthRadius {
             attributes[.earthRadius] = earthRadius

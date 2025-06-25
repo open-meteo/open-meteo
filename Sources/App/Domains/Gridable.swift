@@ -44,7 +44,14 @@ enum GridMappingName: String, Codable {
         case .stereographic:
             return "stere"
         case .rotatedLatLon:
-            return "ob_tran"
+            // This is a tiny hack to correctly support rotated lat/lon grids
+            // They are generally defined as a oblique spherical projection,
+            // where the projection to be used needs to be specified via the
+            // +o_proj parameter. There is no real equivalent to the o_proj
+            // parameter in the CF conventions.
+            // https://proj.org/en/stable/operations/projections/ob_tran.html
+            // https://cfconventions.org/cf-conventions/cf-conventions.html#_rotated_pole
+            return "ob_tran +o_proj=longlat"
         case .latitudeLongitude:
             return "longlat"
         }
