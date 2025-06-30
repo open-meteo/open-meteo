@@ -7,6 +7,10 @@ final class MeteorologyTests: XCTestCase {
     func testWetbulbTemperature() {
         XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 10, relativeHumidity: 50), 5.10125499, accuracy: 0.001)
         XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 5, relativeHumidity: 90), 3.99465138, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 23.1, relativeHumidity: 99), 23.001404, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 23.1, relativeHumidity: 100), 23.1, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 23.1, relativeHumidity: 1), 7.469844, accuracy: 0.001)
+        XCTAssertEqual(Meteorology.wetBulbTemperature(temperature: 23.1, relativeHumidity: 5), 7.2715874, accuracy: 0.001)
     }
 
     func testRelativeHumidity() {
