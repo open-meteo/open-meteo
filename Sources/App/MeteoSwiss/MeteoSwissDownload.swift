@@ -10,6 +10,7 @@ import OmFileFormat
  TODO:
  - DONE 404 download retry
  - DONE last run selection
+ - snowfall calculation
  - ensemble models
  - atmospheric levels
  */

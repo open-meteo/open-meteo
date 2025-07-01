@@ -101,11 +101,11 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
             return 0.1
         case .convective_inhibition: return 1
         case .sunshine_duration:
-            return 60/1
+            return 1/60
         case .snow_depth:
-            return 0.1
+            return 100 // 1cm res
         case .snowfall_height:
-            return 10
+            return 0.1
         case .dew_point_2m:
             return 20
         }
@@ -201,7 +201,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
 
     var multiplyAdd: (offset: Float, scalefactor: Float)? {
         switch self {
-        case .temperature_2m, .surface_temperature, .dew_point_2m, .snow_depth:
+        case .temperature_2m, .surface_temperature, .dew_point_2m:
             return (-273.15, 1) // kelvin to celsius
         case .pressure_msl:
             return (0, 1 / 100)
