@@ -7,6 +7,8 @@ import OmFileFormat
 /**
  https://opendatadocs.meteoswiss.ch/e-forecast-data/e2-e3-numerical-weather-forecasting-model?download-options=restapi
  
+ TODO:
+- 404 download retry
  */
 struct MeteoSwissDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -212,15 +214,28 @@ fileprivate extension HTTPClient {
             }
             """
         req.body = .bytes(ByteBufferAllocator().buffer(string: json))
-        let response = try await executeRetry(req, logger: logger, timeoutPerRequest: .seconds(5))
-        guard let result = try await response.checkCode200AndReadJSONDecodable(FeatureCollection.self) else {
-            let error = try await response.readStringImmutable() ?? ""
-            fatalError("Could not decode \(error)")
+        let backoff = ExponentialBackOff()
+        let deadline = Date.hours(1)
+        var n = 0
+        while true {
+            n += 1
+            let response = try await executeRetry(req, logger: logger, timeoutPerRequest: .seconds(5))
+            guard let result = try await response.checkCode200AndReadJSONDecodable(FeatureCollection.self) else {
+                let error = try await response.readStringImmutable() ?? ""
+                fatalError("Could not decode \(error)")
+            }
+            guard let url = result.features.first?.assets.first?.value.href else {
+                if Date() > deadline {
+                    throw CurlError.fileNotFound
+                }
+                if n == 1 {
+                    logger.info("File missing, waiting up to 1 hour")
+                }
+                try await backoff.sleep(attempt: n)
+                continue
+            }
+            return url
         }
-        guard let url = result.features.first?.assets.first?.value.href else {
-            throw CurlError.fileNotFound
-        }
-        return url
     }
     
     func getMeteoSwissAssets(
