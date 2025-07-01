@@ -649,7 +649,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .gem_global:
             return .gemGlobal
         case .gem_regional:
-            return .gemGlobal
+            return .gemRegional
         case .gem_hrdps_continental:
             return .gemHrdpsContinental
         case .icon_mix, .icon_seamless:
@@ -762,6 +762,12 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .kmaLdps
         case .italia_meteo_arpae_icon_2i:
             return .italiaMeteoArpaeIcon2i
+        case .meteofrance_arome_france_hd_15min:
+            // TODO add 15min entry to SDK
+            return .meteofranceAromeFranceHd
+        case .meteofrance_arome_france_15min:
+            // TODO add 15min entry to SDK
+            return .meteofranceAromeFranceHd
         }
     }
 }

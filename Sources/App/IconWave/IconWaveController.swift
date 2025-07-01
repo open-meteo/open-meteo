@@ -128,7 +128,7 @@ struct IconWaveController {
             let logger = req.logger
             let httpClient = req.application.http.client.shared
 
-            let prepared = try await params.prepareCoordinates(allowTimezones: false, logger: logger, httpClient: httpClient)
+            let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
                 throw ForecastapiError.generic(message: "Bounding box not supported")
             }

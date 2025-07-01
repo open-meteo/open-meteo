@@ -222,13 +222,14 @@ enum Meteorology {
         }
     }
 
-    /// Wetbulb temperature
+    /// Wetbulb temperature Stull’s Approximation
     /// See https://www.omnicalculator.com/physics/wet-bulb
     public static func wetBulbTemperature(temperature t: Float, relativeHumidity rh: Float) -> Float {
-        return t * atan(0.151977 * pow(rh + 8.313659, 1 / 2))
+        let twet = t * atan(0.151977 * sqrt(rh + 8.313659))
         + atan(t + rh) - atan(rh - 1.676331)
         + 0.00391838 * pow(rh, 3 / 2) * atan(0.023101 * rh)
         - 4.686035
+        return min(twet, t)
     }
 
     /// Convert pressure vertical velocity `omega` (Pa/s) to geometric vertical velocity `w` (m/s)
