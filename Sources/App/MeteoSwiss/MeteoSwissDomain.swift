@@ -57,45 +57,32 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
 
     var grid: Gridable {
         let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
+        // Domain area selected by OpenMeteo to exclude
+        // ICON CH2: 2 pixel at the boarder contain invalid data. Additional 18 pixel are removed because the model is not stable at the border
+        let border: Float = 20*0.02
+        let x: ClosedRange<Float> = -6.86 + border ... 4.82 - border
+        let y: ClosedRange<Float> = -4.46 + border ... 3.38 - border
         switch self {
         case .icon_ch1:
-            /*
-             dx: 0.01
-             dy: 0.01
-             xmin: -6.86
-             xmax: 4.83
-             ymin: -4.46
-             ymax: 3.39
-             north_pole_lon: 190.0
-             north_pole_lat: 43.0
-             */
+            let dx: Float = 0.01, dy: Float = 0.01
             return ProjectionGrid(
-                nx: Int((6.86+4.83)/0.01+1),
-                ny: Int((4.46+3.39)/0.01+1),
-                latitudeProjectionOrigion: -4.46,
-                longitudeProjectionOrigion: -6.86,
-                dx: 0.01,
-                dy: 0.01,
+                nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
+                ny: Int((y.upperBound - y.lowerBound) / dy) + 1,
+                latitudeProjectionOrigion: y.lowerBound,
+                longitudeProjectionOrigion: x.lowerBound,
+                dx: dx,
+                dy: dy,
                 projection: projection
             )
         case .icon_ch2:
-            /*
-             dx: 0.02
-             dy: 0.02
-             xmin: -6.82
-             xmax: 4.8
-             ymin: -4.42
-             ymax: 3.36
-             north_pole_lon: 190.0
-             north_pole_lat: 43.0
-             */
+            let dx: Float = 0.01, dy: Float = 0.01
             return ProjectionGrid(
-                nx: Int((6.82+4.8)/0.02+1),
-                ny: Int((4.42+3.36)/0.02+1),
-                latitudeProjectionOrigion: -4.42,
-                longitudeProjectionOrigion: -6.82,
-                dx: 0.02,
-                dy: 0.02,
+                nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
+                ny: Int((y.upperBound - y.lowerBound) / dy) + 1,
+                latitudeProjectionOrigion: y.lowerBound,
+                longitudeProjectionOrigion: x.lowerBound,
+                dx: dx,
+                dy: dy,
                 projection: projection
             )
         }

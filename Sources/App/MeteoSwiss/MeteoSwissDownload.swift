@@ -73,10 +73,20 @@ struct MeteoSwissDownload: AsyncCommand {
         try FileManager.default.createDirectory(atPath: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static", withIntermediateDirectories: true)
         let weightsFile = "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.om"
         if !FileManager.default.fileExists(atPath: weightsFile) {
-            let (latitudes, longitudes) = try await fetchCoordinates(logger: logger, client: client, collection: collection)
+            let (latitudes, longitudes, landmask, elevation) = try await fetchCoordinates(logger: logger, client: client, collection: collection)
             logger.info("Calculating NN mapping")
             let mapping = await calculateNNMapping(latitudes: latitudes, longitudes: longitudes, grid: grid)
             try OmFileWriter.write(file: weightsFile, data: mapping)
+            
+            logger.info("Generate elevation file")
+            var elevationRemapped = mapping.map { elevation[$0] }
+            let landmaskRemapped = mapping.map { landmask[$0] }
+            for i in elevationRemapped.indices {
+                if landmaskRemapped[i] < 0.5 {
+                    elevationRemapped[i] = -999
+                }
+            }
+            try elevationRemapped.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
         }
         let mapping: [Int] = try await OmFileReader.read(file: weightsFile)!
         //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")
@@ -126,7 +136,7 @@ struct MeteoSwissDownload: AsyncCommand {
     }
     
     /// Check latitude and
-    func fetchCoordinates(logger: Logger, client: HTTPClient, collection: String) async throws -> (latitudes: [Float], longitudes: [Float]) {
+    func fetchCoordinates(logger: Logger, client: HTTPClient, collection: String) async throws -> (latitudes: [Float], longitudes: [Float], landmask: [Float], height: [Float]) {
         let assets = try await client.getMeteoSwissAssets(logger: logger, collection: collection)
         guard let horizontalConstantsUrl = assets.first(where: {$0.id.hasPrefix("horizontal_constants")  && $0.id.hasSuffix(".grib2")})?.href else {
             fatalError("Could not find horizontal constants URL in assets")
@@ -135,6 +145,8 @@ struct MeteoSwissDownload: AsyncCommand {
         let horizontalConstants = try await curl.downloadGrib(url: horizontalConstantsUrl, bzip2Decode: false)
         var latitudes: [Float]? = nil
         var longitudes: [Float]? = nil
+        var landmask: [Float]? = nil
+        var height: [Float]? = nil
         for message in horizontalConstants {
             let name = try message.getOrThrow(attribute: "shortName")
             switch name {
@@ -142,14 +154,18 @@ struct MeteoSwissDownload: AsyncCommand {
                 longitudes = try message.getFloats()
             case "tlat":
                 latitudes = try message.getFloats()
+            case "lsm":
+                landmask = try message.getFloats()
+            case "h":
+                height = try message.getFloats()
             default:
                 break
             }
         }
-        guard let longitudes, let latitudes else {
+        guard let longitudes, let latitudes, let landmask, let height else {
             fatalError("Could not find latitudes or longitudes in horizontal constants")
         }
-        return (latitudes, longitudes)
+        return (latitudes, longitudes, landmask, height)
     }
 }
 
