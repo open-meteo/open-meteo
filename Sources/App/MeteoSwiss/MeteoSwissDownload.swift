@@ -8,7 +8,10 @@ import OmFileFormat
  https://opendatadocs.meteoswiss.ch/e-forecast-data/e2-e3-numerical-weather-forecasting-model?download-options=restapi
  
  TODO:
-- 404 download retry
+ - DONE 404 download retry
+ - DONE last run selection
+ - ensemble models
+ - atmospheric levels
  */
 struct MeteoSwissDownload: AsyncCommand {
     struct Signature: CommandSignature {

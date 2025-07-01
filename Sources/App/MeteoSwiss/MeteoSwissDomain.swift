@@ -30,11 +30,17 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         return false
     }
 
-    /// Based on the current time , guess the current run that should be available soon on the open-data server
+    /// Based on the current time, guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        // 30 min delay
-        return t.with(hour: t.hour)
+        switch self {
+        case .icon_ch1:
+            // 1:15 delay, update every 3 hours
+            return t.subtract(hours: 1, minutes: 15).with(hour: 3)
+        case .icon_ch2:
+            // 2:30 delay, update every 6 hours
+            return t.subtract(hours: 2, minutes: 30).with(hour: 6)
+        }
     }
     
     var forecastLength: Int {
