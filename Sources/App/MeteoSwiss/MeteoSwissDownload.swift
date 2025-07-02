@@ -73,7 +73,8 @@ struct MeteoSwissDownload: AsyncCommand {
         let nx = grid.nx
         let ny = grid.ny
         let collection = domain.collection
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+        let storeOnDisk = domain.ensembleMembers <= 1
+        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
         
         let directory = (domain.domainRegistryStatic ?? domain.domainRegistry).directory
         try FileManager.default.createDirectory(atPath: "\(directory)static", withIntermediateDirectories: true)
