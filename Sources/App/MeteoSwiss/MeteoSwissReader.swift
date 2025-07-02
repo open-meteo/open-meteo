@@ -26,7 +26,6 @@ enum MeteoSwissVariableDerivedSurface: String, CaseIterable, GenericVariableMixa
     case showers
     case rain
     case wet_bulb_temperature_2m
-    case sunshine_duration
 
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -155,8 +154,6 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
             case .wet_bulb_temperature_2m:
                 try await prefetchData(variable: .temperature_2m, time: time)
                 try await prefetchData(variable: .relative_humidity_2m, time: time)
-            case .sunshine_duration:
-                try await prefetchData(variable: .direct_radiation, time: time)
             case .showers:
                 try await prefetchData(variable: .precipitation, time: time)
             case .wind_speed_10m, .wind_direction_10m:
@@ -298,10 +295,6 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try await get(raw: .temperature_2m, time: time)
                 let rh = try await get(raw: .relative_humidity_2m, time: time)
                 return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
-            case .sunshine_duration:
-                let directRadiation = try await get(raw: .direct_radiation, time: time)
-                let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(duration, .seconds)
             case .global_tilted_irradiance:
                 let directRadiation = try await get(raw: .direct_radiation, time: time).data
                 let diffuseRadiation = try await get(derived: .surface(.diffuse_radiation), time: time).data
