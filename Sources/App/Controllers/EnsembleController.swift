@@ -132,6 +132,7 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 
     case ecmwf_ifs04
     case ecmwf_ifs025
+    case ecmwf_aifs025
 
     case gem_global
 
@@ -162,6 +163,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return try await EcmwfReader(domain: .ifs04_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs025:
             return try await EcmwfReader(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ecmwf_aifs025:
+            return try await EcmwfReader(domain: .aifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs025:
             return try await GfsReader(domains: [.gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs05:
@@ -194,6 +197,8 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return EcmwfDomain.ifs04_ensemble.ensembleMembers
         case .ecmwf_ifs025:
             return EcmwfDomain.ifs025_ensemble.ensembleMembers
+        case .ecmwf_aifs025:
+            return EcmwfDomain.aifs025_ensemble.ensembleMembers
         case .gfs025:
             return GfsDomain.gfs025_ens.ensembleMembers
         case .gfs05:
