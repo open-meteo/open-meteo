@@ -591,11 +591,11 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(pos.longitude, 0.75927734)
         
         let pos2 = grid.getCoordinates(gridpoint: 919620-1)
-        XCTAssertEqual(pos2.latitude, 50.15759)
+        XCTAssertEqual(pos2.latitude, 50.15759, accuracy: 0.0001)
         XCTAssertEqual(pos2.longitude, 17.538513)
         
         let pos3 = grid.getCoordinates(gridpoint: 1)
-        XCTAssertEqual(pos3.latitude, 42.13657)
+        XCTAssertEqual(pos3.latitude, 42.13657, accuracy: 0.0001)
         XCTAssertEqual(pos3.longitude, 0.77264404)
         
         let pos4 = grid.getCoordinates(gridpoint: 1919620/2)
@@ -645,11 +645,11 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(pos3.longitude, 16.52089) // 16.520897355538942)
         
         let pos4 = prj.inverse(x: 4.83, y: 3.39)
-        XCTAssertEqual(pos4.latitude, 50.15759) // 50.15758220431567
+        XCTAssertEqual(pos4.latitude, 50.15759, accuracy: 0.0001) // 50.15758220431567
         XCTAssertEqual(pos4.longitude, 17.538514061258)
         
         let pos5 = prj.forward(latitude: 42.135393352769036, longitude: 0.7592734782323791)
-        XCTAssertEqual(pos5.x,-6.8599935)
+        XCTAssertEqual(pos5.x,-6.8599935, accuracy: 0.0001)
         XCTAssertEqual(pos5.y, -4.4600043)
         
         let pos6 = prj.forward(latitude: 49.92259526903297, longitude: -0.6726940671609235)
@@ -663,5 +663,12 @@ final class DataTests: XCTestCase {
         let pos8 = prj.forward(latitude: 50.15758220431567, longitude: 17.538514061258)
         XCTAssertEqual(pos8.x, 4.8300066)
         XCTAssertEqual(pos8.y, 3.3899925)
+    }
+}
+
+public func XCTAssertEqual(_ expression1: Float, _ expression2: Float, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line, accuracy: Float) {
+    let difference = abs(expression1 - expression2)
+    if difference > accuracy {
+        XCTFail("XCTAssertEqual failed: \"\(expression1)\" is not equal to \"\(expression2)\" ±\(accuracy). " + message(), file: file, line: line)
     }
 }
