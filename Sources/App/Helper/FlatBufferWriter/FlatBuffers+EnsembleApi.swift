@@ -261,6 +261,8 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
         case .ukmo_uk_ensemble_2km:
             // TODO register in SDK
             return .ukmoGlobalEnsemble20km
+        case .ecmwf_aifs025:
+            return .ecmwfAifs025
         }
     }
 }
