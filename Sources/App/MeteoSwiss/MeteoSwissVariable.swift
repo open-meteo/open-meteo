@@ -10,7 +10,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
     //case latent_heat_flux
     //case sensible_heat_flux
     ///
-    case diffuse_radiation
+    case shortwave_radiation
     case direct_radiation
     //case longwave_radiation
     /// using most unstable
@@ -32,7 +32,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
     case snow_depth
     case pressure_msl
     case snowfall_height
-    case dew_point_2m
+    case relative_humidity_2m
     
     case temperature_2m
     //case temperature_2m_max
@@ -48,19 +48,17 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
     //case roughness_length
 
     var storePreviousForecast: Bool {
-        /*switch self {
+        switch self {
         case .temperature_2m, .relative_humidity_2m: return true
-        case .rain, .snowfall_water_equivalent, .precipitation, .showers: return true
-        case .wind_speed_10m, .wind_direction_10m: return true
+        case .snowfall_height, .precipitation: return true
+        case .wind_u_component_10m, .wind_v_component_10m: return true
         case .pressure_msl: return true
         case .cloud_cover: return true
-        case .cape: return true
+        case .cape, .convective_inhibition: return true
         case .shortwave_radiation, .direct_radiation: return true
         case .wind_gusts_10m: return true
-        case .visibility: return true
         default: return false
-        }*/
-        return false
+        }
     }
 
     var requiresOffsetCorrectionForMixing: Bool {
@@ -87,7 +85,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
             return 10
         case .pressure_msl:
             return 10
-        case .diffuse_radiation, .direct_radiation:
+        case .shortwave_radiation, .direct_radiation:
             return 1
         case .wind_u_component_10m, .wind_v_component_10m:
             return 10
@@ -106,14 +104,14 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
             return 100 // 1cm res
         case .snowfall_height:
             return 0.1
-        case .dew_point_2m:
+        case .relative_humidity_2m:
             return 20
         }
     }
 
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m, .surface_temperature, .dew_point_2m:
+        case .temperature_2m, .surface_temperature, .relative_humidity_2m:
             return .hermite(bounds: nil)
         case .cloud_cover:
             return .hermite(bounds: 0...100)
@@ -131,7 +129,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
             return .backwards_sum
         case .wind_gusts_10m:
             return .hermite(bounds: nil)
-        case .diffuse_radiation, .direct_radiation:
+        case .shortwave_radiation, .direct_radiation:
             return .hermite(bounds: 0...10e9)
         case .freezing_level_height:
             return .linear
@@ -152,8 +150,10 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
 
     var unit: SiUnit {
         switch self {
-        case .temperature_2m, .surface_temperature, .dew_point_2m:
+        case .temperature_2m, .surface_temperature:
             return .celsius
+        case .relative_humidity_2m:
+            return .percentage
         case .cloud_cover:
             return .percentage
         case .cloud_cover_low:
@@ -168,7 +168,7 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
             return .metrePerSecond
         case .pressure_msl:
             return .hectopascal
-        case .diffuse_radiation, .direct_radiation:
+        case .shortwave_radiation, .direct_radiation:
             return .wattPerSquareMetre
         case .wind_u_component_10m, .wind_v_component_10m:
             return .metrePerSecond
@@ -201,7 +201,8 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
 
     var multiplyAdd: (offset: Float, scalefactor: Float)? {
         switch self {
-        case .temperature_2m, .surface_temperature, .dew_point_2m:
+        case .temperature_2m, .surface_temperature, .relative_humidity_2m:
+            // RH is dewpoint initially
             return (-273.15, 1) // kelvin to celsius
         case .pressure_msl:
             return (0, 1 / 100)
@@ -221,7 +222,8 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
     
     var gribName: String {
         switch self {
-        case .diffuse_radiation:
+        case .shortwave_radiation:
+            // Diffuse radiation is selected here. Direct radiation is added in the downloader
             return "ASWDIFD_S"
         case .direct_radiation:
             return "ASWDIR_S"
@@ -249,7 +251,8 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
             return "PMSL"
         case .snowfall_height:
             return "SNOWLMT"
-        case .dew_point_2m:
+        case .relative_humidity_2m:
+            // dewpoint selected, converted to RH later
             return "TD_2M"
         case .temperature_2m:
             return "T_2M"

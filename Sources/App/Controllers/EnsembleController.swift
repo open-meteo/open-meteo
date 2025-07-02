@@ -144,6 +144,9 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
 
     case ukmo_global_ensemble_20km
     case ukmo_uk_ensemble_2km
+    
+    case meteoswiss_icon_ch1
+    case meteoswiss_icon_ch2
 
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -179,6 +182,10 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return try await UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ukmo_uk_ensemble_2km:
             return try await UkmoReader(domain: .uk_ensemble_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .meteoswiss_icon_ch1:
+            return try await MeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .meteoswiss_icon_ch2:
+            return try await MeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         }
     }
 
@@ -213,6 +220,10 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
             return UkmoDomain.global_ensemble_20km.ensembleMembers
         case .ukmo_uk_ensemble_2km:
             return UkmoDomain.uk_ensemble_2km.ensembleMembers
+        case .meteoswiss_icon_ch1:
+            return MeteoSwissDomain.icon_ch1_ensemble.ensembleMembers
+        case .meteoswiss_icon_ch2:
+            return MeteoSwissDomain.icon_ch2_ensemble.ensembleMembers
         }
     }
 
