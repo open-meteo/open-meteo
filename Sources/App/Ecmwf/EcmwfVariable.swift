@@ -688,7 +688,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .pressure_msl:
             return (1 / 100, 0)
         case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
-            if domain == .aifs025_single {
+            if domain == .aifs025_single || domain == .aifs025_ensemble {
                 // AIFS Single is already kg/m2
                 return (1, 0)
             }
