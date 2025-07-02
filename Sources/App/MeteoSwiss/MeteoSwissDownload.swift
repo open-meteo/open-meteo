@@ -10,8 +10,9 @@ import OmFileFormat
  TODO:
  - DONE 404 download retry
  - DONE last run selection
+ - write controllers
  - snowfall calculation
- - ensemble models
+ - DONE ensemble models
  - atmospheric levels
  */
 struct MeteoSwissDownload: AsyncCommand {
@@ -76,8 +77,9 @@ struct MeteoSwissDownload: AsyncCommand {
         let collection = domain.collection
         let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
         
-        try FileManager.default.createDirectory(atPath: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static", withIntermediateDirectories: true)
-        let weightsFile = "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.om"
+        let directory = (domain.domainRegistryStatic ?? domain.domainRegistry).directory
+        try FileManager.default.createDirectory(atPath: "\(directory)static", withIntermediateDirectories: true)
+        let weightsFile = "\(directory)static/nn_weights.om"
         if !FileManager.default.fileExists(atPath: weightsFile) {
             let (latitudes, longitudes, landmask, elevation) = try await fetchCoordinates(logger: logger, client: client, collection: collection)
             logger.info("Calculating NN mapping")
@@ -99,30 +101,48 @@ struct MeteoSwissDownload: AsyncCommand {
         
         return try await (0...domain.forecastLength).asyncFlatMap { hour -> [GenericVariableHandle] in
             logger.info("Downloading hour \(hour)")
-            return try await variables.mapConcurrent(nConcurrent: 4) { variable -> GenericVariableHandle?in
-                let member = 0
+            return try await variables.mapConcurrent(nConcurrent: 4) { variable -> [GenericVariableHandle] in
                 let timestamp = run.add(hours: hour)
-                let url = try await client.resolveMeteoSwissDownloadURL(
+                var urls = [try await client.resolveMeteoSwissDownloadURL(
                     logger: logger,
                     collection: collection,
                     forecastReferenceDatetime: run,
                     forecastVariable: variable.gribName,
                     forecastPerturbed: false,
                     forecastHorizon: "P0DT\(hour.zeroPadded(len: 2))H00M00S"
-                )
-                let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
-                let stepRange = try message.getOrThrow(attribute: "stepRange")
-                let stepType = try message.getOrThrow(attribute: "stepType")
-                let rawData = try message.getFloats()
-                var array2d = Array2D(data: mapping.map { rawData[$0] }, nx: nx, ny: ny)
-                if let fma = variable.multiplyAdd {
-                    array2d.data.multiplyAdd(multiply: fma.scalefactor, add: fma.offset)
+                )]
+                if domain.ensembleMembers > 1 {
+                    urls.append(try await client.resolveMeteoSwissDownloadURL(
+                        logger: logger,
+                        collection: collection,
+                        forecastReferenceDatetime: run,
+                        forecastVariable: variable.gribName,
+                        forecastPerturbed: true,
+                        forecastHorizon: "P0DT\(hour.zeroPadded(len: 2))H00M00S"
+                    ))
                 }
-                guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
-                    return nil
+                var handles = try await urls.asyncCompactMap({ url -> GenericVariableHandle? in
+                    let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
+                    let stepRange = try message.getOrThrow(attribute: "stepRange")
+                    let stepType = try message.getOrThrow(attribute: "stepType")
+                    let rawData = try message.getFloats()
+                    let member = message.getLong(attribute: "perturbationNumber") ?? 0
+                    var array2d = Array2D(data: mapping.map { rawData[$0] }, nx: nx, ny: ny)
+                    if let fma = variable.multiplyAdd {
+                        array2d.data.multiplyAdd(multiply: fma.scalefactor, add: fma.offset)
+                    }
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
+                        return nil
+                    }
+                    return try writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
+                })
+                if variable == .precipitation {
+                    logger.info("Calculating precipitation probability")
+                    let precipitationProbability = try await handles.calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: variable, domain: domain, run: run)
+                    handles.append(contentsOf: precipitationProbability)
                 }
-                return try writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
-            }.asyncCompactMap({$0})
+                return handles
+            }.asyncFlatMap({$0})
         }
     }
     

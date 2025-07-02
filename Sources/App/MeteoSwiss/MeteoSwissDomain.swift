@@ -2,6 +2,9 @@
 enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
     case icon_ch1
     case icon_ch2
+    
+    case icon_ch1_ensemble
+    case icon_ch2_ensemble
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -9,11 +12,20 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             return .meteoswiss_icon_ch1
         case .icon_ch2:
             return .meteoswiss_icon_ch2
+        case .icon_ch1_ensemble:
+            return .meteoswiss_icon_ch1_ensemble
+        case .icon_ch2_ensemble:
+            return .meteoswiss_icon_ch2_ensemble
         }
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .icon_ch1, .icon_ch1_ensemble:
+            return .meteoswiss_icon_ch1
+        case .icon_ch2, .icon_ch2_ensemble:
+            return .meteoswiss_icon_ch2
+        }
     }
 
     var hasYearlyFiles: Bool {
@@ -34,10 +46,10 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble:
             // 1:15 delay, update every 3 hours
             return t.subtract(hours: 1, minutes: 15).with(hour: 3)
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble:
             // 2:30 delay, update every 6 hours
             return t.subtract(hours: 2, minutes: 30).with(hour: 6)
         }
@@ -45,18 +57,18 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
     
     var forecastLength: Int {
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble:
             return 33
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble:
             return 120
         }
     }
 
     var omFileLength: Int {
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble:
             return 48
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble:
             return 144
         }
     }
@@ -69,7 +81,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         let x: ClosedRange<Float> = -6.86 + border ... 4.82 - border
         let y: ClosedRange<Float> = -4.46 + border ... 3.38 - border
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble:
             let dx: Float = 0.01, dy: Float = 0.01
             return ProjectionGrid(
                 nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
@@ -80,7 +92,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
                 dy: dy,
                 projection: projection
             )
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble:
             let dx: Float = 0.01, dy: Float = 0.01
             return ProjectionGrid(
                 nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
@@ -96,19 +108,32 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble:
             return 3*3600
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble:
             return 6*3600
         }
     }
     
     var collection: String {
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble:
             "ch.meteoschweiz.ogd-forecasting-icon-ch1"
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble:
             "ch.meteoschweiz.ogd-forecasting-icon-ch2"
+        }
+    }
+    
+    var ensembleMembers: Int {
+        switch self {
+        case .icon_ch1:
+            return 1
+        case .icon_ch2:
+            return 1
+        case .icon_ch1_ensemble:
+            return 11
+        case .icon_ch2_ensemble:
+            return 21
         }
     }
 }

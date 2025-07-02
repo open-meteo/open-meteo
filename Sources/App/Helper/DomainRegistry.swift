@@ -130,6 +130,8 @@ enum DomainRegistry: String, CaseIterable {
     
     case meteoswiss_icon_ch1
     case meteoswiss_icon_ch2
+    case meteoswiss_icon_ch1_ensemble
+    case meteoswiss_icon_ch2_ensemble
 
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
@@ -350,6 +352,10 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoSwissDomain.icon_ch1
         case .meteoswiss_icon_ch2:
             return MeteoSwissDomain.icon_ch2
+        case .meteoswiss_icon_ch1_ensemble:
+            return MeteoSwissDomain.icon_ch1_ensemble
+        case .meteoswiss_icon_ch2_ensemble:
+            return MeteoSwissDomain.icon_ch2_ensemble
         }
     }
 }
