@@ -324,7 +324,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
 
-                if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single].contains(domain) {
+                if shortName == "z" && [EcmwfDomain.aifs025, .aifs025_single, .aifs025_ensemble].contains(domain) {
                     grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
                 }
 
@@ -335,7 +335,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
                 // For AIFS keep specific humidity and temperature in memory
                 // geopotential and vertical velocity for wind calculation
-                if [EcmwfDomain.aifs025, .aifs025_single].contains(domain) && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
+                if [EcmwfDomain.aifs025, .aifs025_single, .aifs025_ensemble].contains(domain) && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                 }
                 if ["w", "q"].contains(variable.gribName) {
@@ -540,7 +540,7 @@ extension EcmwfDomain {
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
-        case .aifs025, .aifs025_single:
+        case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
             return twoHoursAgo.with(hour: ((t.hour - 5 + 24) % 24) / 6 * 6)
         }
@@ -571,6 +571,9 @@ extension EcmwfDomain {
         case .aifs025_single:
             // https://data.ecmwf.int/forecasts/20250220/00z/aifs-single/0p25/experimental/oper/
             return "\(base)\(dateStr)/\(runStr)z/aifs-single/0p25/oper/\(dateStr)\(runStr)0000-\(hour)h-oper-fc.grib2"
+        case .aifs025_ensemble:
+            // control and perturbed runs are stored in different files
+            return "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-pf.grib2"
         }
     }
 }
