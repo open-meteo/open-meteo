@@ -204,8 +204,6 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
         case .temperature_2m, .surface_temperature, .relative_humidity_2m:
             // RH is dewpoint initially
             return (-273.15, 1) // kelvin to celsius
-        case .precipitation:
-            return (0, 1000/3600)
         case .pressure_msl:
             return (0, 1 / 100)
         default:
