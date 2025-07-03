@@ -77,17 +77,14 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
         // Domain area selected by OpenMeteo to exclude
         // ICON CH2: 2 pixel at the boarder contain invalid data. Additional 18 pixel are removed because the model is not stable at the border
-        let border: Float = 20*0.02
-        let x: ClosedRange<Float> = -6.86 + border ... 4.82 - border
-        let y: ClosedRange<Float> = -4.46 + border ... 3.38 - border
         switch self {
         case .icon_ch1, .icon_ch1_ensemble:
             let dx: Float = 0.01, dy: Float = 0.01
             return ProjectionGrid(
-                nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
-                ny: Int((y.upperBound - y.lowerBound) / dy) + 1,
-                latitudeProjectionOrigion: y.lowerBound,
-                longitudeProjectionOrigion: x.lowerBound,
+                nx: 1089,
+                ny: 705,
+                latitudeProjectionOrigion: -4.06,
+                longitudeProjectionOrigion: -6.46,
                 dx: dx,
                 dy: dy,
                 projection: projection
@@ -95,10 +92,10 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         case .icon_ch2, .icon_ch2_ensemble:
             let dx: Float = 0.02, dy: Float = 0.02
             return ProjectionGrid(
-                nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
-                ny: Int((y.upperBound - y.lowerBound) / dy) + 1,
-                latitudeProjectionOrigion: y.lowerBound,
-                longitudeProjectionOrigion: x.lowerBound,
+                nx: 545,
+                ny: 353,
+                latitudeProjectionOrigion: -4.06,
+                longitudeProjectionOrigion: -6.46,
                 dx: dx,
                 dy: dy,
                 projection: projection
