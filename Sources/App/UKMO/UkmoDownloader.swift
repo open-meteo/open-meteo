@@ -47,8 +47,8 @@ struct UkmoDownload: AsyncCommand {
         @Flag(name: "skip-missing", help: "Ignore missing files while downloading")
         var skipMissing: Bool
 
-        // @Flag(name: "fix-solar", help: "Fix old solar files")
-        // var fixSolar: Bool
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {

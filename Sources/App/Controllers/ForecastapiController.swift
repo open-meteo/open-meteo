@@ -362,6 +362,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
 
     case italia_meteo_arpae_icon_2i
 
+    case meteoswiss_icon_ch1
+    case meteoswiss_icon_ch2
+    case meteoswiss_icon_seamless
+    
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
     func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> [any GenericReaderProtocol] {
@@ -620,6 +624,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .italia_meteo_arpae_icon_2i:
             let reader = try await ItaliaMeteoArpaeReader(domain: .icon_2i, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [reader].compactMap({ $0 })
+        case .meteoswiss_icon_ch1:
+            let probabilities: (any GenericReaderProtocol) = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let reader: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, reader].compactMap({ $0 })
+        case .meteoswiss_icon_ch2:
+            let probabilities: (any GenericReaderProtocol) = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let reader: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilities, reader].compactMap({ $0 })
+        case .meteoswiss_icon_seamless:
+            let probabilitiesCh1: (any GenericReaderProtocol) = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let probabilitiesCh2: (any GenericReaderProtocol) = try await ProbabilityReader.makeMeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ch1: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ch2: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [probabilitiesCh2, probabilitiesCh1, ch2, ch1].compactMap({ $0 })
         }
     }
 

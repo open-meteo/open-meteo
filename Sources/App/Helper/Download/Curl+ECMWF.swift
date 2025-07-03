@@ -78,7 +78,8 @@ extension Curl {
             var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)?offset=\(offset)&limit=500")
             request.headers.add(name: "From", value: email)
             request.headers.add(name: "X-ECMWF-KEY", value: apikey)
-            let response = try await client.executeRetry(request, logger: logger, backoffMaximum: .seconds(1))
+            let backoff = ExponentialBackOff(maximum: .seconds(1))
+            let response = try await client.executeRetry(request, logger: logger, backOffSettings: backoff)
 
             if (300..<400).contains(response.status.code) {
                 guard let location = response.headers.first(name: "Location") else {

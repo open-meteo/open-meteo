@@ -66,11 +66,11 @@ extension GenericDomain {
 
     /// Filename of the surface elevation file
     var surfaceElevationFileOm: OmFileManagerReadable {
-        .staticFile(domain: domainRegistry, variable: "HSURF", chunk: nil)
+        .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "HSURF", chunk: nil)
     }
 
     var soilTypeFileOm: OmFileManagerReadable {
-        .staticFile(domain: domainRegistry, variable: "soil_type", chunk: nil)
+        .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "soil_type", chunk: nil)
     }
 }
 

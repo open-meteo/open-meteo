@@ -573,4 +573,102 @@ final class DataTests: XCTestCase {
         XCTAssertEqual(pos.latitude, 17.541664, accuracy: 0.0005)
         XCTAssertEqual(pos.longitude, 176.45836)
     }
+    
+    func testStereographicIconMCH1() {
+        let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
+        let grid = ProjectionGrid(nx: Int((6.86+4.83)/0.01+1), ny: Int((4.46+3.39)/0.01+1), latitudeProjectionOrigion: -4.46, longitudeProjectionOrigion: -6.86, dx: 0.01, dy: 0.01, projection: projection)
+        
+        XCTAssertEqual(grid.nx, 1170)
+        XCTAssertEqual(grid.ny, 786)
+        XCTAssertEqual(grid.count, 919620)
+
+        //let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
+        //XCTAssertEqual(pos % nx, 420)
+        //XCTAssertEqual(pos / nx, 468)
+        
+        let pos = grid.getCoordinates(gridpoint: 0)
+        XCTAssertEqual(pos.latitude, 42.135387)
+        XCTAssertEqual(pos.longitude, 0.75927734)
+        
+        let pos2 = grid.getCoordinates(gridpoint: 919620-1)
+        XCTAssertEqual(pos2.latitude, 50.15759, accuracy: 0.0001)
+        XCTAssertEqual(pos2.longitude, 17.538513)
+        
+        let pos3 = grid.getCoordinates(gridpoint: 1)
+        XCTAssertEqual(pos3.latitude, 42.13657, accuracy: 0.0001)
+        XCTAssertEqual(pos3.longitude, 0.77264404)
+        
+        let pos4 = grid.getCoordinates(gridpoint: 1919620/2)
+        XCTAssertEqual(pos4.latitude, 50.663414)
+        XCTAssertEqual(pos4.longitude, 5.652588)
+        
+        let pos5 = grid.getCoordinates(gridpoint: grid.nx-1)
+        XCTAssertEqual(pos5.latitude, 42.338978)
+        XCTAssertEqual(pos5.longitude, 16.52089)
+        
+        let coords = grid.findPointXy(lat: 47.215658, lon: 3.698824)!
+        XCTAssertEqual(coords.x, 258)
+        XCTAssertEqual(coords.y, 485)
+        
+        let coords2 = grid.findPointXy(lat: 49.159088, lon:14.926517)!
+        XCTAssertEqual(coords2.x, 1008)
+        XCTAssertEqual(coords2.y, 672)
+    }
+    
+    
+    func testRotatedLatLon() {
+        /*
+         xmin, xmax = -6.86, 4.83
+         ymin, ymax = -4.46, 3.39
+         
+         print(geodetic.transform_point(xmin, ymin, rotated_crs))
+         print(geodetic.transform_point(xmin, ymax, rotated_crs))
+         print(geodetic.transform_point(xmax, ymin, rotated_crs))
+         print(geodetic.transform_point(xmax, ymax, rotated_crs))
+         
+         (np.float64(0.7592734782323791), np.float64(42.135393352769036))
+         (np.float64(-0.6726940671609235), np.float64(49.92259526903297))
+         (np.float64(16.520897355538942), np.float64(42.33897767617745))
+         (np.float64(17.538514061258), np.float64(50.15758220431567))
+         */
+        let prj = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
+        let pos = prj.inverse(x: -6.86, y: -4.46)
+        XCTAssertEqual(pos.latitude, 42.135387) // 42.135393352769036
+        XCTAssertEqual(pos.longitude, 0.75927734) // 0.7592734782323791
+        
+        let pos2 = prj.inverse(x: -6.86, y: 3.39)
+        XCTAssertEqual(pos2.latitude, 49.92259526903297)
+        XCTAssertEqual(pos2.longitude, -0.6727295) // -0.6726940671609235
+        
+        let pos3 = prj.inverse(x: 4.83, y: -4.46)
+        XCTAssertEqual(pos3.latitude, 42.33897767617745)
+        XCTAssertEqual(pos3.longitude, 16.52089) // 16.520897355538942)
+        
+        let pos4 = prj.inverse(x: 4.83, y: 3.39)
+        XCTAssertEqual(pos4.latitude, 50.15759, accuracy: 0.0001) // 50.15758220431567
+        XCTAssertEqual(pos4.longitude, 17.538514061258)
+        
+        let pos5 = prj.forward(latitude: 42.135393352769036, longitude: 0.7592734782323791)
+        XCTAssertEqual(pos5.x,-6.8599935, accuracy: 0.0001)
+        XCTAssertEqual(pos5.y, -4.4600043)
+        
+        let pos6 = prj.forward(latitude: 49.92259526903297, longitude: -0.6726940671609235)
+        XCTAssertEqual(pos6.x, -6.859994)
+        XCTAssertEqual(pos6.y, 3.3899972)
+        
+        let pos7 = prj.forward(latitude: 42.33897767617745, longitude: 16.520897355538942)
+        XCTAssertEqual(pos7.x, 4.8300076)
+        XCTAssertEqual(pos7.y, -4.4600024)
+        
+        let pos8 = prj.forward(latitude: 50.15758220431567, longitude: 17.538514061258)
+        XCTAssertEqual(pos8.x, 4.8300066)
+        XCTAssertEqual(pos8.y, 3.3899925)
+    }
+}
+
+public func XCTAssertEqual(_ expression1: Float, _ expression2: Float, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line, accuracy: Float) {
+    let difference = abs(expression1 - expression2)
+    if difference > accuracy {
+        XCTFail("XCTAssertEqual failed: \"\(expression1)\" is not equal to \"\(expression2)\" ±\(accuracy). " + message(), file: file, line: line)
+    }
 }

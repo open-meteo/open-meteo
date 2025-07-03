@@ -263,6 +263,12 @@ extension EnsembleMultiDomains: ModelFlatbufferSerialisable {
             return .ukmoGlobalEnsemble20km
         case .ecmwf_aifs025:
             return .ecmwfAifs025
+        case .meteoswiss_icon_ch1:
+            // todo register
+            return .iconD2
+        case .meteoswiss_icon_ch2:
+            // todo register
+            return .iconD2
         }
     }
 }

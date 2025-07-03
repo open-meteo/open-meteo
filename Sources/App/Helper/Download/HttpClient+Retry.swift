@@ -46,6 +46,30 @@ extension HTTPClientResponse {
     }
 }
 
+/// Calculate exponential backoff times with jtter
+struct ExponentialBackOff {
+    let factor: TimeAmount
+    let maximum: TimeAmount
+    
+    init(factor: TimeAmount = .milliseconds(1000), maximum: TimeAmount = .seconds(30)) {
+        self.factor = factor
+        self.maximum = maximum
+    }
+    
+    func waitTime(attempt n: Int) -> TimeAmount {
+        let baseWait = min(factor.nanoseconds * Int64(pow(2, Double(n - 1))), maximum.nanoseconds)
+        let jitterRange = Int64(baseWait / 4)
+        let jitter = Int64.random(in: -jitterRange...jitterRange)
+        let jitteredWait = max(0, baseWait + jitter)
+        return TimeAmount.nanoseconds(jitteredWait)
+    }
+    
+    func sleep(attempt n: Int) async throws {
+        let wait = waitTime(attempt: n)
+        try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
+    }
+}
+
 extension HTTPClient {
     /**
      Retry HTTP requests on error
@@ -54,8 +78,7 @@ extension HTTPClient {
                       logger: Logger,
                       deadline: Date = .minutes(60),
                       timeoutPerRequest: TimeAmount = .seconds(30),
-                      backoffFactor: TimeAmount = .milliseconds(1000),
-                      backoffMaximum: TimeAmount = .seconds(30),
+                      backOffSettings: ExponentialBackOff = .init(),
                       error404WaitTime: TimeAmount? = nil) async throws -> HTTPClientResponse {
         var lastPrint = Date(timeIntervalSince1970: 0)
         let startTime = Date()
@@ -74,7 +97,7 @@ extension HTTPClient {
                 logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key.")
                 throw error
             } catch {
-                var wait = TimeAmount.nanoseconds(min(backoffFactor.nanoseconds * Int64(pow(2, Double(n - 1))), backoffMaximum.nanoseconds))
+                var wait = backOffSettings.waitTime(attempt: n)
 
                 if let ioerror = error as? IOError, [104, 54].contains(ioerror.errnoCode), n <= 2 {
                     /// MeteoFrance API resets the connection very frequently causing large delays in downloading

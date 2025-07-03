@@ -127,6 +127,11 @@ enum DomainRegistry: String, CaseIterable {
     case kma_ldps
 
     case italia_meteo_arpae_icon_2i
+    
+    case meteoswiss_icon_ch1
+    case meteoswiss_icon_ch2
+    case meteoswiss_icon_ch1_ensemble
+    case meteoswiss_icon_ch2_ensemble
 
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
@@ -343,6 +348,14 @@ enum DomainRegistry: String, CaseIterable {
             return ItaliaMeteoArpaeDomain.icon_2i
         case .ukmo_uk_ensemble_2km:
             return UkmoDomain.uk_ensemble_2km
+        case .meteoswiss_icon_ch1:
+            return MeteoSwissDomain.icon_ch1
+        case .meteoswiss_icon_ch2:
+            return MeteoSwissDomain.icon_ch2
+        case .meteoswiss_icon_ch1_ensemble:
+            return MeteoSwissDomain.icon_ch1_ensemble
+        case .meteoswiss_icon_ch2_ensemble:
+            return MeteoSwissDomain.icon_ch2_ensemble
         }
     }
 }

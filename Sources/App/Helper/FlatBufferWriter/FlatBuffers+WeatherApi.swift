@@ -768,6 +768,15 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .meteofrance_arome_france_15min:
             // TODO add 15min entry to SDK
             return .meteofranceAromeFranceHd
+        case .meteoswiss_icon_ch1:
+            // TODO register
+            return .iconSeamless
+        case .meteoswiss_icon_ch2:
+            // TODO register
+            return .iconSeamless
+        case .meteoswiss_icon_seamless:
+            // TODO register
+            return .iconSeamless
         }
     }
 }
