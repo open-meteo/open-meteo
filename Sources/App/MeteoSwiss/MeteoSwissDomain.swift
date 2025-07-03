@@ -93,7 +93,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
                 projection: projection
             )
         case .icon_ch2, .icon_ch2_ensemble:
-            let dx: Float = 0.01, dy: Float = 0.01
+            let dx: Float = 0.02, dy: Float = 0.02
             return ProjectionGrid(
                 nx: Int((x.upperBound - x.lowerBound) / dx) + 1,
                 ny: Int((y.upperBound - y.lowerBound) / dy) + 1,
