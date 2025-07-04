@@ -111,7 +111,7 @@ enum ProbabilityReader {
     /// Reader for probabilities based on MeteoSwiss CH1 or CH2
     static func makeMeteoSwissReader(domain: MeteoSwissDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<MeteoSwissDomain, ProbabilityVariable> {
         guard let reader = try await GenericReader<MeteoSwissDomain, ProbabilityVariable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            throw ModelError.domainInitFailed(domain: EcmwfDomain.ifs025_ensemble.rawValue)
+            throw ModelError.domainInitFailed(domain: "\(domain)")
         }
         return reader
     }
