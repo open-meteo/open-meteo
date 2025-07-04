@@ -49,20 +49,14 @@ struct MeteoSwissDownload: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, uploadS3Bucket: signature.uploadS3Bucket)
         let nConcurrent = signature.concurrent ?? 1
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
-            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
-        }
-
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// Process each variable and update time-series optimised files
-    func download(application: Application, domain: MeteoSwissDomain, variables: [MeteoSwissSurfaceVariable], run: Timestamp) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: MeteoSwissDomain, variables: [MeteoSwissSurfaceVariable], run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
         let logger = application.logger
@@ -101,9 +95,9 @@ struct MeteoSwissDownload: AsyncCommand {
         return try await (0...domain.forecastLength).asyncFlatMap { hour -> [GenericVariableHandle] in
             logger.info("Downloading hour \(hour)")
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
+            let timestamp = run.add(hours: hour)
             
-            return try await variables.mapConcurrent(nConcurrent: 4) { variable -> [GenericVariableHandle] in
-                let timestamp = run.add(hours: hour)
+            let handles = try await variables.mapConcurrent(nConcurrent: 4) { variable -> [GenericVariableHandle] in
                 var urls = [try await client.resolveMeteoSwissDownloadURL(
                     logger: logger,
                     collection: collection,
@@ -160,6 +154,10 @@ struct MeteoSwissDownload: AsyncCommand {
                 }
                 return handles
             }.asyncFlatMap({$0})
+            if let uploadS3Bucket {
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+            }
+            return handles
         }
     }
     
