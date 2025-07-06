@@ -11,6 +11,19 @@ final class DataTests: XCTestCase {
         FileManager.default.changeCurrentDirectoryPath(projectHome)
         #endif
     }
+    
+    func testAggregation() {
+        let values: [Float] = [1,2,3,4,5,6]
+        XCTAssertEqualArray(values.mean(by: 2), [1.5, 3.5, 5.5], accuracy: 0.01)
+        XCTAssertEqualArray(values.mean(by: 3), [2.0, 5.0], accuracy: 0.01)
+        let values2: [Float] = [1,2,3,4,.nan,.nan]
+        XCTAssertEqualArray(values2.mean(by: 2), [1.5, 3.5, .nan], accuracy: 0.01)
+        XCTAssertEqualArray(values2.mean(by: 3), [2.0, .nan], accuracy: 0.01)
+        XCTAssertEqualArray(values2.min(by: 2), [1.0, 3.0, .nan], accuracy: 0.01)
+        XCTAssertEqualArray(values2.min(by: 3), [1.0, .nan], accuracy: 0.01)
+        XCTAssertEqualArray(values2.max(by: 2), [2.0, 4.0, .nan], accuracy: 0.01)
+        XCTAssertEqualArray(values2.max(by: 3), [3.0, .nan], accuracy: 0.01)
+    }
 
     /*func testGribDecode() throws {
         let file = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-010-7a527896970b09a4fc90fa37bf98d3ff-wvAa7C.grib"
