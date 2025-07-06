@@ -23,12 +23,14 @@ extension Sequence where Element == Float {
 extension Array where Element == Float {
     func max(by: Int) -> [Float] {
         return stride(from: 0, through: count - by, by: by).map { i in
-            return self[i..<i + by].max() ?? .nan
+            // Note: `.max()` ignores NaN values
+            return self[i..<i + by].reduce(-Float.greatestFiniteMagnitude, {$1 < $0 ? $0 : $1})
         }
     }
     func min(by: Int) -> [Float] {
         return stride(from: 0, through: count - by, by: by).map { i in
-            return self[i..<i + by].min() ?? .nan
+            // Note: `.min()` ignores NaN values
+            return self[i..<i + by].reduce(Float.greatestFiniteMagnitude, {$1 > $0 ? $0 : $1})
         }
     }
     func sum(by: Int) -> [Float] {
