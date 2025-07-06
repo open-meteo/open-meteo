@@ -6,9 +6,6 @@ public struct ForecastapiController: RouteCollection {
     public func boot(routes: RoutesBuilder) throws {
         let categoriesRoute = routes.grouped("v1")
         let era5 = WeatherApiController(
-            forecastDay: 1,
-            forecastDaysMax: 1,
-            historyStartDate: Timestamp(1940, 1, 1),
             has15minutely: false,
             hasCurrentWeather: false,
             defaultModel: .archive_best_match,
@@ -19,7 +16,6 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.getAndPost("archive", use: era5.query)
 
         categoriesRoute.getAndPost("forecast", use: WeatherApiController(
-            historyStartDate: Timestamp(2016, 1, 1),
             defaultModel: .best_match,
             alias: ["historical-forecast-api", "previous-runs-api"]).query
         )
@@ -31,7 +27,6 @@ public struct ForecastapiController: RouteCollection {
             defaultModel: .gfs_seamless).query
         )
         categoriesRoute.getAndPost("meteofrance", use: WeatherApiController(
-            forecastDay: 4,
             has15minutely: true,
             defaultModel: .meteofrance_seamless).query
         )
@@ -40,7 +35,6 @@ public struct ForecastapiController: RouteCollection {
             defaultModel: .jma_seamless).query
         )
         categoriesRoute.getAndPost("metno", use: WeatherApiController(
-            forecastDay: 3,
             has15minutely: false,
             defaultModel: .metno_nordic).query
         )
@@ -49,7 +43,6 @@ public struct ForecastapiController: RouteCollection {
             defaultModel: .gem_seamless).query
         )
         categoriesRoute.getAndPost("ecmwf", use: WeatherApiController(
-            forecastDay: 10,
             has15minutely: false,
             hasCurrentWeather: false,
             defaultModel: .ecmwf_ifs025).query
@@ -78,35 +71,87 @@ public struct ForecastapiController: RouteCollection {
 }
 
 struct WeatherApiController {
-    let forecastDay: Int
-    let forecastDaysMax: Int
-    let historyStartDate: Timestamp
     let has15minutely: Bool
     let hasCurrentWeather: Bool
     let defaultModel: MultiDomains
     let subdomain: String
     let alias: [String]
 
-    init(forecastDay: Int = 7, forecastDaysMax: Int = 16, historyStartDate: Timestamp = Timestamp(2020, 1, 1), has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = []) {
-        self.forecastDay = forecastDay
-        self.forecastDaysMax = forecastDaysMax
-        self.historyStartDate = historyStartDate
+    init(has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = []) {
         self.has15minutely = has15minutely
         self.hasCurrentWeather = hasCurrentWeather
         self.defaultModel = defaultModel
         self.subdomain = subdomain
         self.alias = alias
     }
+    
+    enum ApiType {
+        /// Self-host or localhost
+        case none
+        case forecast
+        case archive
+        case historicalForecast
+        case previousRuns
+        case satellite
+        
+        static func detect(host: String?) -> Self {
+            guard let host else {
+                return .none
+            }
+            if host.starts(with: "historical-forecast-api") || host.starts(with: "customer-historical-forecast-api") {
+                return .historicalForecast
+            }
+            if host.starts(with: "previous-runs-api") || host.starts(with: "customer-previous-runs-api") {
+                return .previousRuns
+            }
+            if host.starts(with: "archive-api") || host.starts(with: "customer-archive-api") {
+                return .archive
+            }
+            if host.starts(with: "satellite-api") || host.starts(with: "customer-satellite-api") {
+                return .satellite
+            }
+            return .forecast
+        }
+    }
 
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter(subdomain, alias: alias) { host, params in
-            /// True if running on `historical-forecast-api.open-meteo.com` -> Limit to current day, disable forecast
-            let isHistoricalForecastApi = host?.starts(with: "historical-forecast-api") == true || host?.starts(with: "customer-historical-api") == true
-            let forecastDaysMax = isHistoricalForecastApi ? 1 : self.forecastDaysMax
-            let forecastDayDefault = isHistoricalForecastApi ? 1 : self.forecastDay
-
+            let type = ApiType.detect(host: host)
             let currentTime = Timestamp.now()
-            let allowedRange = historyStartDate ..< currentTime.with(hour: 0).add(days: forecastDaysMax)
+            let currentTimeHour0 = currentTime.with(hour: 0)
+            
+            let forecastDaysMax: Int
+            let forecastDayDefault: Int
+            let historyStartDate: Timestamp
+            switch type {
+            case .none:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(1940, 1, 1)
+            case .forecast:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = currentTimeHour0.subtract(days: 93)
+            case .archive:
+                forecastDaysMax = 1
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(1940, 1, 1)
+            case .historicalForecast:
+                forecastDaysMax = 1
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(2016, 1, 1)
+            case .previousRuns:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2016, 1, 1)
+            case .satellite:
+                forecastDaysMax = 1
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(1983, 1, 1)
+            }
+            
+            let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
+            let allowedRange = historyStartDate ..< currentTimeHour0.add(days: forecastDaysMax)
 
             let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
             let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
@@ -123,7 +168,7 @@ struct WeatherApiController {
 
             /// Prepare readers based on geometry
             /// Readers are returned as a callback to release memory after data has been retrieved
-            let prepared = try await GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: 92, allowedRange: allowedRange)
+            let prepared = try await GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: pastDaysMax, allowedRange: allowedRange)
 
             let locations: [ForecastapiResult<MultiDomains>.PerLocation] = try await prepared.asyncMap { prepared in
                 let timezone = prepared.timezone
