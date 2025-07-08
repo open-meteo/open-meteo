@@ -174,22 +174,26 @@ extension DomainRegistry {
                     continue
                 }
                 let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
-                let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }
+                for bucket in bucket.split(separator: ",") {
+                    let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
+                    try Process.spawnRetried(
+                        cmd: "aws",
+                        args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                    )
+                }
+            }
+        } else {
+            let src = "\(OpenMeteo.dataDirectory)\(dir)"
+            for bucket in bucket.split(separator: ",") {
+                let dest = "s3://\(bucket)/data/\(dir)"
                 try Process.spawnRetried(
                     cmd: "aws",
                     args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
                 )
             }
-        } else {
-            let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            let dest = "s3://\(bucket)/data/\(dir)"
-            try Process.spawnRetried(
-                cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
-            )
         }
     }
     
@@ -200,15 +204,17 @@ extension DomainRegistry {
             return
         }
         for timestep in timesteps {
-            let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
-            let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
-            if !FileManager.default.fileExists(atPath: src) {
-                continue
+            for bucket in bucket.split(separator: ",") {
+                let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
+                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
+                if !FileManager.default.fileExists(atPath: src) {
+                    continue
+                }
+                try Process.spawnRetried(
+                    cmd: "aws",
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                )
             }
-            try Process.spawnRetried(
-                cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
-            )
         }
     }
 }
