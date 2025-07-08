@@ -359,3 +359,61 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 }
+
+extension DomainRegistry {
+    /// Upload all data to a specified S3 bucket
+    func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
+        let dir = rawValue
+        if let variables {
+            let vDirectories = variables.map { $0.omFileName.file } + ["static"]
+            for variable in vDirectories {
+                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
+                if !FileManager.default.fileExists(atPath: src) {
+                    continue
+                }
+                for bucket in bucket.split(separator: ",") {
+                    if variable.contains("_previous_day") && bucket == "openmeteo" {
+                        // do not upload data from past days yet
+                        continue
+                    }
+                    let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
+                    try Process.spawnRetried(
+                        cmd: "aws",
+                        args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                    )
+                }
+            }
+        } else {
+            let src = "\(OpenMeteo.dataDirectory)\(dir)"
+            for bucket in bucket.split(separator: ",") {
+                let dest = "s3://\(bucket)/data/\(dir)"
+                try Process.spawnRetried(
+                    cmd: "aws",
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                )
+            }
+        }
+    }
+    
+    /// Upload spatial files to S3 `/data_spatial/<domain>/<run>/<timestamp>/<variable>.om`
+    /// Run timestamp is split into directories `YYYY/MM/DD/HH:MMZ`
+    func syncToS3Spatial(bucket: String, timesteps: [Timestamp]) throws {
+        let dir = rawValue
+        guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
+            return
+        }
+        for timestep in timesteps {
+            for bucket in bucket.split(separator: ",") {
+                let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
+                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
+                if !FileManager.default.fileExists(atPath: src) {
+                    continue
+                }
+                try Process.spawnRetried(
+                    cmd: "aws",
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                )
+            }
+        }
+    }
+}
