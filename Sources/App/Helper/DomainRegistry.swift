@@ -372,6 +372,9 @@ extension DomainRegistry {
                     continue
                 }
                 for bucket in bucket.split(separator: ",") {
+                    let bucketSplit = bucket.split(separator: ";")
+                    let bucket = bucketSplit.first ?? bucket
+                    let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                     if variable.contains("_previous_day") && bucket == "openmeteo" {
                         // do not upload data from past days yet
                         continue
@@ -379,17 +382,20 @@ extension DomainRegistry {
                     let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
                     try Process.spawnRetried(
                         cmd: "aws",
-                        args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                        args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
                     )
                 }
             }
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             for bucket in bucket.split(separator: ",") {
+                let bucketSplit = bucket.split(separator: ";")
+                let bucket = bucketSplit.first ?? bucket
+                let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                 let dest = "s3://\(bucket)/data/\(dir)"
                 try Process.spawnRetried(
                     cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
                 )
             }
         }
@@ -397,6 +403,7 @@ extension DomainRegistry {
     
     /// Upload spatial files to S3 `/data_spatial/<domain>/<run>/<timestamp>/<variable>.om`
     /// Run timestamp is split into directories `YYYY/MM/DD/HH:MMZ`
+    /// `bucket` bucket is a coma separated list of all buckets. If semicolons are used, it is using a different profile
     func syncToS3Spatial(bucket: String, timesteps: [Timestamp], run: Timestamp) throws {
         let dir = rawValue
         guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
@@ -406,6 +413,9 @@ extension DomainRegistry {
         for timestep in timesteps {
             let timeFormatted = timestep.iso8601_YYYYMMddTHHmm
             for bucket in bucket.split(separator: ",") {
+                let bucketSplit = bucket.split(separator: ";")
+                let bucket = bucketSplit.first ?? bucket
+                let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                 let src = "\(directorySpatial)\(dir)/\(runFormatted)/\(timeFormatted)/"
                 let dest = "s3://\(bucket)/data_spatial/\(dir)/\(runFormatted)/\(timeFormatted)/"
                 if !FileManager.default.fileExists(atPath: src) {
@@ -413,7 +423,7 @@ extension DomainRegistry {
                 }
                 try Process.spawnRetried(
                     cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
                 )
             }
         }
