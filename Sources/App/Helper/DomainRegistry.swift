@@ -397,15 +397,17 @@ extension DomainRegistry {
     
     /// Upload spatial files to S3 `/data_spatial/<domain>/<run>/<timestamp>/<variable>.om`
     /// Run timestamp is split into directories `YYYY/MM/DD/HH:MMZ`
-    func syncToS3Spatial(bucket: String, timesteps: [Timestamp]) throws {
+    func syncToS3Spatial(bucket: String, timesteps: [Timestamp], run: Timestamp) throws {
         let dir = rawValue
         guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
             return
         }
+        let runFormatted = run.format_directoriesYYYYMMddhhmm
         for timestep in timesteps {
+            let timeFormatted = timestep.iso8601_YYYYMMddTHHmm
             for bucket in bucket.split(separator: ",") {
-                let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
-                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
+                let src = "\(directorySpatial)\(dir)/\(runFormatted)/\(timeFormatted)/"
+                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(runFormatted)/\(timeFormatted)/"
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }

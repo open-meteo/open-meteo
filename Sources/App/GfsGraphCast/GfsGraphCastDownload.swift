@@ -247,7 +247,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
             ]
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             return handles + handles2 + handles3 + handlesClouds
         }
