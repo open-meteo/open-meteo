@@ -413,8 +413,8 @@ extension DomainRegistry {
                 let bucketSplit = bucket.split(separator: ";")
                 let bucket = bucketSplit.first ?? bucket
                 let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
-                let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
-                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
+                let src = "\(directorySpatial)\(dir)/\(timeFormatted)/"
+                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timeFormatted)"
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }

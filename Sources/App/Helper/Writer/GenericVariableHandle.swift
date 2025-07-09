@@ -82,6 +82,67 @@ struct GenericVariableHandle: Sendable {
             logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty())")
         }
     }
+    
+    static func generateFullRunData(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType) async throws {
+        
+        
+        let grid = domain.grid
+        let nx = grid.nx
+        let ny = grid.ny
+        // let nLocations = grid.count
+        let dtSeconds = domain.dtSeconds
+
+        for (_, handles) in handles.filter(\.variable.storePreviousForecast).groupedPreservedOrder(by: \.variable.omFileName.file) {
+            let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try await handles.grouped(by: { $0.time }).asyncFlatMap { time, h in
+                return try await h.asyncMap {
+                    let reader = try await $0.makeReader()
+                    let dimensions = reader.getDimensions()
+                    let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
+                    guard dimensions[0] == ny && dimensions[1] == nx else {
+                        fatalError("Dimensions do not match \(dimensions). Ny \(ny), Nx \(nx)")
+                    }
+                    let time = TimerangeDt(start: time, nTime: nt, dtSeconds: dtSeconds)
+                    return(time, reader, $0.member)
+                }
+            }
+            let variable = handles[0].variable
+            let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
+            let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
+            let nTimeSteps = readers.count
+            
+            let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * nTimeSteps * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(nTimeSteps) timesteps")
+            
+            let file = OmFileManagerReadable.run(domain: domain.domainRegistry, variable: variable.rawValue, run: run)
+            try file.createDirectory()
+            let filePath = file.getFilePath()
+            let fileTemp = "\(filePath)~"
+            try FileManager.default.removeItemIfExists(at: fileTemp)
+            let fn = try FileHandle.createNewFile(file: fileTemp)
+            
+            let chunks = nMembers > 1 ? [1, max(1, min(1024 / nTimeSteps / nMembers, nx)), nTimeSteps] : [1, max(1, min(1024 / nTimeSteps, nx)), nTimeSteps]
+            let dimensions = nMembers > 1 ? [ny, nx, nMembers, nTimeSteps] : [ny, nx, nTimeSteps]
+            
+            let writeFile = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
+            let writer = try writeFile.prepareArray(
+                type: Float.self,
+                dimensions: dimensions.map(UInt64.init),
+                chunkDimensions: chunks.map(UInt64.init),
+                compression: compression,
+                scale_factor: variable.scalefactor,
+                add_offset: 0
+            )
+            try writer.writeData(array: self)
+            let runTime: OmOffsetSize? = try run.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "forecast_reference_time", children: []) }
+            let validTime: OmOffsetSize? = try time.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "time", children: []) }
+            let coordinates = dimensions.count == 2 ? try writeFile.write(value: "lat lon", name: "coordinates", children: []) : nil
+            let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+            let root = try writeFile.write(array: writer.finalise(), name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
+            try writeFile.writeTrailer(rootVariable: root)
+            
+            try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)
+            progress.finish()
+        }
+    }
 
     private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
         if concurrent > 1 {

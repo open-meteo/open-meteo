@@ -15,10 +15,13 @@ enum OmFileManagerReadable: Hashable {
     case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
     case meta(domain: DomainRegistry)
+    
+    /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
+    case run(domain: DomainRegistry, variable: String, run: Timestamp)
 
     /// Assemble the full file system path
     func getFilePath() -> String {
-        return "\(OpenMeteo.dataDirectory)\(getRelativeFilePath())"
+        return "\(getDataDirectoryPath())\(getRelativeFilePath())"
     }
     
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
@@ -39,10 +42,27 @@ enum OmFileManagerReadable: Hashable {
             return "\(domain.rawValue)/static/\(variable).om"
         case .meta(let domain):
             return "\(domain.rawValue)/static/meta.json"
+        case .run(domain: let domain, variable: let variable, run: let run):
+            return "\(domain.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(variable).om"
+        }
+    }
+    
+    /// `./data/` or `./data_run/`
+    func getDataDirectoryPath() -> String {
+        switch self {
+        case .domainChunk(_, _, _, _, _, _):
+            return OpenMeteo.dataDirectory
+        case .staticFile(_, _, _):
+            return OpenMeteo.dataDirectory
+        case .meta(_):
+            return OpenMeteo.dataDirectory
+        case .run(_, _, _):
+            return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
         }
     }
 
-    func createDirectory(dataDirectory: String = OpenMeteo.dataDirectory) throws {
+    func createDirectory() throws {
+        let dataDirectory = getDataDirectoryPath()
         let file = getRelativeFilePath()
         guard let last = file.lastIndex(of: "/") else {
             return
