@@ -270,18 +270,18 @@ struct OmFileSplitter {
         }
 
         let nIndexTime = indexTime.count
-        guard let actualDomain = domain.getDomain() else {
-            fatalError("Did not get domain")
-        }
 
         /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
-        let spatialChunks = OmFileSplitter.calculateSpatialXYChunk(domain: actualDomain, nMembers: nMembers, nTime: 1)
-        var fileData = [Float](repeating: .nan, count: spatialChunks.y * spatialChunks.x * nTimePerFile * nMembers)
+        let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTimePerFile / nMembers / chunknLocations * chunknLocations))
+        let processChunkY = max(1, min(ny, 2 * 1024 * 1024 / nTimePerFile / nMembers / processChunkX))
+        // print("Chunks [\(processChunkY),\(processChunkX)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
+        
+        var fileData = [Float](repeating: .nan, count: processChunkY * processChunkX * nTimePerFile * nMembers)
 
-        for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(spatialChunks.y)) {
-            for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(spatialChunks.x)) {
-                let yRange = yStart ..< min(yStart + UInt64(spatialChunks.y), UInt64(ny))
-                let xRange = xStart ..< min(xStart + UInt64(spatialChunks.x), UInt64(nx))
+        for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(processChunkY)) {
+            for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(processChunkX)) {
+                let yRange = yStart ..< min(yStart + UInt64(processChunkY), UInt64(ny))
+                let xRange = xStart ..< min(xStart + UInt64(processChunkX), UInt64(nx))
                 let memberRange = 0 ..< UInt64(nMembers)
 
                 // Contains the entire time-series to be updated for a chunks of locations
@@ -372,18 +372,6 @@ extension OmFileSplitter {
             return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx, nTime], chunks: [y, x, nTime])
         }
         return OmFileWriterHelper(dimensions: [domain.grid.ny, domain.grid.nx], chunks: [y, x])
-    }
-
-    static func calculateSpatialXYChunk(domain: GenericDomain, nMembers: Int, nTime: Int) -> (y: Int, x: Int) {
-        let splitter = OmFileSplitter(domain, nMembers: nMembers/*, chunknLocations: nMembers > 1 ? nMembers : nil*/)
-        let nx = domain.grid.nx
-        let ny = domain.grid.ny
-        let nTimePerFile = splitter.nTimePerFile // domain.omFileLength
-        let chunknLocations = splitter.chunknLocations // max(6, 3072 / nTimePerFile)
-        let xchunks = max(1, min(nx, 8 * 1024 * 1024 / MemoryLayout<Float>.stride / nTimePerFile / nTime / nMembers / chunknLocations * chunknLocations))
-        let ychunks = max(1, min(ny, 8 * 1024 * 1024 / MemoryLayout<Float>.stride / nTimePerFile / nTime / nMembers / xchunks))
-        // print("Chunks [\(ychunks),\(xchunks)] nTimePerFile=\(nTimePerFile) chunknLocations=\(chunknLocations)")
-        return (ychunks, xchunks)
     }
 }
 
