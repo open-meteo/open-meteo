@@ -454,7 +454,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             previousHour = hour
         }
@@ -525,7 +525,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }.collect().compactMap({ $0 })
             handles.append(contentsOf: h)
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
         }
         await curl.printStatistics()

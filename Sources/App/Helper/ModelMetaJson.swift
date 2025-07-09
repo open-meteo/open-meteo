@@ -37,7 +37,7 @@ enum ModelTimeVariable: String, GenericVariable {
 /**
  TODO:
  - CAMS, IconWave, GloFas, seasonal forecast, CMIP, satellite
- - run end lenght might be too short for side-runs
+ - run end length might be too short for side-runs
  - license
  - name of provider
  - spatial resolution
@@ -48,7 +48,7 @@ enum ModelTimeVariable: String, GenericVariable {
  - model forecast steps with 1,3,6 hour switching?
  */
 struct ModelUpdateMetaJson: Codable {
-    /// Model initilsiation time as unix timestamp. E.g. 0z
+    /// Model initialisation time as unix timestamp. E.g. 0z
     let last_run_initialisation_time: Int
 
     /// Last modification time. The time the conversion finished on the download and processing server

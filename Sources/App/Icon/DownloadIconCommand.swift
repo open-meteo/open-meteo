@@ -402,7 +402,7 @@ struct DownloadIconCommand: AsyncCommand {
                 await handles15minIconD2.append(try writer.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
             }
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             previousHour = hour
         }

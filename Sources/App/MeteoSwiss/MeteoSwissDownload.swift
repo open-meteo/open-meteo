@@ -155,7 +155,7 @@ struct MeteoSwissDownload: AsyncCommand {
                 return handles
             }.asyncFlatMap({$0})
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             return handles
         }

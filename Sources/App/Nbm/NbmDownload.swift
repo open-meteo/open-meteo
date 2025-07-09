@@ -180,7 +180,7 @@ struct NbmDownload: AsyncCommand {
                 handles.append(try writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
             }
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             previousForecastHour = forecastHour
         }

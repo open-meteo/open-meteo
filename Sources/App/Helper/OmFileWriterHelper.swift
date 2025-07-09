@@ -22,8 +22,8 @@ struct OmRunSpatialWriter: Sendable {
     func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
         let fn: FileHandle
         if storeOnDisk, let directorySpatial = domain.domainRegistry.directorySpatial {
-            //let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
-            let path = "\(directorySpatial)/\(time.format_directoriesYYYYMMddhhmm)/"
+            let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
+            //let path = "\(directorySpatial)/\(time.format_directoriesYYYYMMddhhmm)/"
             let file = "\(path)\(variable.omFileName.file).om"
             try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
             let fileTemp = "\(file)~"

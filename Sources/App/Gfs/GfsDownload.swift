@@ -450,7 +450,7 @@ struct GfsDownload: AsyncCommand {
                 }
             }
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             previousHour = forecastHour
         }

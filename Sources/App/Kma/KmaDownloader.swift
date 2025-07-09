@@ -173,7 +173,7 @@ struct KmaDownload: AsyncCommand {
                 precipCorrections = try await inMemory.sumUp(var1: .precipitation, var2: .snowfall_water_equivalent, outVariable: KmaSurfaceVariable.precipitation, writer: writer)
             }
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp], run: run)
             }
             return handles + wind10 + wind50 + precipCorrections
         }

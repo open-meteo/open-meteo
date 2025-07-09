@@ -359,3 +359,114 @@ enum DomainRegistry: String, CaseIterable {
         }
     }
 }
+
+extension DomainRegistry {
+    /// Upload all data to a specified S3 bucket
+    func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
+        let dir = rawValue
+        if let variables {
+            let vDirectories = variables.map { $0.omFileName.file } + ["static"]
+            for variable in vDirectories {
+                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
+                if !FileManager.default.fileExists(atPath: src) {
+                    continue
+                }
+                for bucket in bucket.split(separator: ",") {
+                    let bucketSplit = bucket.split(separator: ";")
+                    let bucket = bucketSplit.first ?? bucket
+                    let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+                    if variable.contains("_previous_day") && bucket == "openmeteo" {
+                        // do not upload data from past days yet
+                        continue
+                    }
+                    let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
+                    try Process.spawnRetried(
+                        cmd: "aws",
+                        args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+                    )
+                }
+            }
+        } else {
+            let src = "\(OpenMeteo.dataDirectory)\(dir)"
+            for bucket in bucket.split(separator: ",") {
+                let bucketSplit = bucket.split(separator: ";")
+                let bucket = bucketSplit.first ?? bucket
+                let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+                let dest = "s3://\(bucket)/data/\(dir)"
+                try Process.spawnRetried(
+                    cmd: "aws",
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+                )
+            }
+        }
+    }
+    
+    /// Upload spatial files to S3 `/data_spatial/<domain>/<run>/<timestamp>/<variable>.om`
+    /// Run timestamp is split into directories `YYYY/MM/DD/HH:MMZ`
+    /// `bucket` bucket is a coma separated list of all buckets. If semicolons are used, it is using a different profile
+    func syncToS3Spatial(bucket: String, timesteps: [Timestamp], run: Timestamp) throws {
+        let dir = rawValue
+        guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
+            return
+        }
+        let runFormatted = run.format_directoriesYYYYMMddhhmm
+        for timestep in timesteps {
+            let timeFormatted = timestep.iso8601_YYYYMMddTHHmm
+            for bucket in bucket.split(separator: ",") {
+                let bucketSplit = bucket.split(separator: ";")
+                let bucket = bucketSplit.first ?? bucket
+                let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+                let src = "\(directorySpatial)\(dir)/\(runFormatted)/\(timeFormatted)/"
+                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(runFormatted)/\(timeFormatted)/"
+                if !FileManager.default.fileExists(atPath: src) {
+                    continue
+                }
+                try Process.spawnRetried(
+                    cmd: "aws",
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+                )
+            }
+        }
+    }
+}
+
+
+struct DataSpatialJson: Encodable {
+    let reference_time: String
+    let last_modified_time: String
+    let completed: Bool
+    let valid_times: [String]
+    let variables: [VariableSpatialJson]
+    
+    /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
+    let temporal_resolution_seconds: Int
+    
+    // grid attributes?
+    
+    public init(domain: GenericDomain, run: Timestamp, handles: [GenericVariableHandle], completed: Bool) {
+        let variables = handles.map(\.variable).uniqued(on: \.rawValue).map {
+            
+            return VariableSpatialJson(name: $0.rawValue, unit: $0.unit.abbreviation, skip_hour0: false, step_type: .instantaneous)
+        }
+        let valid_times = handles.map(\.time).uniqued()
+        
+        
+        fatalError()
+    }
+    
+    struct VariableSpatialJson: Encodable {
+        /// E.g. `temperature_2m`
+        let name: String
+        let unit: String
+        let skip_hour0: Bool
+        let step_type: StepType
+    }
+    
+    enum StepType: Encodable {
+        case instantaneous
+        case mean
+        case sum
+        case maximum
+        case minimum
+    }
+}

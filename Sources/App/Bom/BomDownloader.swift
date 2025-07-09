@@ -64,7 +64,7 @@ struct DownloadBomCommand: AsyncCommand {
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
-            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
+            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps, run: run)
         }
     }
 

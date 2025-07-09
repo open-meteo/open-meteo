@@ -266,7 +266,7 @@ struct DmiDownload: AsyncCommand {
                 return h + windHandles
             }
             if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [t])
+                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [t], run: run)
             }
             return handles
         }
