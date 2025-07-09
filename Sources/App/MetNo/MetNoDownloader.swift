@@ -162,57 +162,6 @@ struct MetNoDownloader: AsyncCommand {
     }
 }
 
-extension DomainRegistry {
-    /// Upload all data to a specified S3 bucket
-    func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
-        let dir = rawValue
-        if let variables {
-            let vDirectories = variables.map { $0.omFileName.file } + ["static"]
-            for variable in vDirectories {
-                if variable.contains("_previous_day") {
-                    // do not upload data from past days yet
-                    continue
-                }
-                let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
-                let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
-                if !FileManager.default.fileExists(atPath: src) {
-                    continue
-                }
-                try Process.spawnRetried(
-                    cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
-                )
-            }
-        } else {
-            let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            let dest = "s3://\(bucket)/data/\(dir)"
-            try Process.spawnRetried(
-                cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
-            )
-        }
-    }
-    
-    /// Upload spatial files to S3 `/data_spatial/<domain>/YYYY/MM/DD/HHMMZ/<variable>.om`
-    func syncToS3Spatial(bucket: String, timesteps: [Timestamp]) throws {
-        let dir = rawValue
-        guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
-            return
-        }
-        for timestep in timesteps {
-            let src = "\(directorySpatial)\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)/"
-            let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timestep.format_directoriesYYYYMMddhhmm)"
-            if !FileManager.default.fileExists(atPath: src) {
-                continue
-            }
-            try Process.spawnRetried(
-                cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--no-progress", src, dest]
-            )
-        }
-    }
-}
-
 extension NetCDF {
     /// Try to open a file. If it does not excist, wait 10 seconds and try again until deadline is reached
     /// Works with OpenDap urls
