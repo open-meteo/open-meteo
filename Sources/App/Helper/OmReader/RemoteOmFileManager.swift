@@ -74,6 +74,8 @@ enum OmFileLocalOrRemote {
 
 extension OmFileManagerReadable {
     func newReader(client: HTTPClient, logger: Logger) async throws -> OmFileLocalOrRemote? {
+        /// TODO: for data_run support there needs to be a switch here
+        /// Also needs fix in revalidate
         let file = self.getRelativeFilePath()
         let localFile = "\(OpenMeteo.dataDirectory)\(file)"
         
