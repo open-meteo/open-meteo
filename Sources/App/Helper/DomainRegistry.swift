@@ -429,3 +429,44 @@ extension DomainRegistry {
         }
     }
 }
+
+
+struct DataSpatialJson: Encodable {
+    let reference_time: String
+    let last_modified_time: String
+    let completed: Bool
+    let valid_times: [String]
+    let variables: [VariableSpatialJson]
+    
+    /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
+    let temporal_resolution_seconds: Int
+    
+    // grid attributes?
+    
+    public init(domain: GenericDomain, run: Timestamp, handles: [GenericVariableHandle], completed: Bool) {
+        let variables = handles.map(\.variable).uniqued(on: \.rawValue).map {
+            
+            return VariableSpatialJson(name: $0.rawValue, unit: $0.unit.abbreviation, skip_hour0: false, step_type: .instantaneous)
+        }
+        let valid_times = handles.map(\.time).uniqued()
+        
+        
+        fatalError()
+    }
+    
+    struct VariableSpatialJson: Encodable {
+        /// E.g. `temperature_2m`
+        let name: String
+        let unit: String
+        let skip_hour0: Bool
+        let step_type: StepType
+    }
+    
+    enum StepType: Encodable {
+        case instantaneous
+        case mean
+        case sum
+        case maximum
+        case minimum
+    }
+}
