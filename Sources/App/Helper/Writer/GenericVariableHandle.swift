@@ -3,6 +3,15 @@ import SwiftNetCDF
 import Foundation
 import Logging
 
+/// TODO: Move to library
+extension OmFileWriter {
+    public func writeArray<OmType: OmFileArrayDataTypeProtocol>(data: [OmType], dimensions: [UInt64], chunkDimensions: [UInt64], compression: OmCompressionType, scale_factor: Float, add_offset: Float) throws -> OmFileWriterArrayFinalised {
+        let prepare = try self.prepareArray(type: OmType.self, dimensions: dimensions, chunkDimensions: chunkDimensions, compression: compression, scale_factor: scale_factor, add_offset: add_offset)
+        try prepare.writeData(array: data)
+        return try prepare.finalise()
+    }
+}
+
 /// Downloaders return FileHandles to keep files open while downloading
 /// If another download starts and would overlap, this still keeps the old file open
 struct GenericVariableHandle: Sendable {
@@ -84,8 +93,6 @@ struct GenericVariableHandle: Sendable {
     }
     
     static func generateFullRunData(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType) async throws {
-        
-        
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -108,9 +115,10 @@ struct GenericVariableHandle: Sendable {
             let variable = handles[0].variable
             let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
-            let nTimeSteps = readers.count
+            let time: [Timestamp] = readers.flatMap({Array($0.time)}).uniqued().sorted()
+            let nTime = time.count
             
-            let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * nTimeSteps * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(nTimeSteps) timesteps")
+            let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * nTime * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(nTime) timesteps")
             
             let file = OmFileManagerReadable.run(domain: domain.domainRegistry, variable: variable.rawValue, run: run)
             try file.createDirectory()
@@ -119,8 +127,13 @@ struct GenericVariableHandle: Sendable {
             try FileManager.default.removeItemIfExists(at: fileTemp)
             let fn = try FileHandle.createNewFile(file: fileTemp)
             
-            let chunks = nMembers > 1 ? [1, max(1, min(1024 / nTimeSteps / nMembers, nx)), nTimeSteps] : [1, max(1, min(1024 / nTimeSteps, nx)), nTimeSteps]
-            let dimensions = nMembers > 1 ? [ny, nx, nMembers, nTimeSteps] : [ny, nx, nTimeSteps]
+            let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
+            let chunks = nMembers > 1 ? [1, chunknLocations, nTime] : [1, chunknLocations, nTime]
+            let dimensions = nMembers > 1 ? [ny, nx, nMembers, nTime] : [ny, nx, nTime]
+            let coordinatesString =  nMembers > 1 ? "lat lon member time" : "lat lon time"
+            
+            let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTime / nMembers / chunknLocations * chunknLocations))
+            let processChunkY = max(1, min(ny, 2 * 1024 * 1024 / nTime / nMembers / processChunkX))
             
             let writeFile = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
             let writer = try writeFile.prepareArray(
@@ -131,12 +144,53 @@ struct GenericVariableHandle: Sendable {
                 scale_factor: variable.scalefactor,
                 add_offset: 0
             )
-            try writer.writeData(array: self)
-            let runTime: OmOffsetSize? = try run.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "forecast_reference_time", children: []) }
-            let validTime: OmOffsetSize? = try time.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "time", children: []) }
-            let coordinates = dimensions.count == 2 ? try writeFile.write(value: "lat lon", name: "coordinates", children: []) : nil
+            for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(processChunkY)) {
+                for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(processChunkX)) {
+                    let yRange = yStart ..< min(yStart + UInt64(processChunkY), UInt64(ny))
+                    let xRange = xStart ..< min(xStart + UInt64(processChunkX), UInt64(nx))
+                    let memberRange = 0 ..< UInt64(nMembers)
+                    
+                    let thisChunkDimensions = nMembers <= 1 ?
+                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nTime)] :
+                        [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(nTime)]
+                    
+                    let nLoc = yRange.count * xRange.count
+                    var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: nTime)
+                    var readTemp = [Float](repeating: .nan, count: nLoc * nTime)
+                    for reader in readers {
+                        let dimensions = reader.reader.getDimensions()
+                        let timeArrayIndex = time.firstIndex(of: reader.time.range.lowerBound)!
+                        if dimensions.count == 3 {
+                            /// Number of time steps in this file
+                            let nt = dimensions[2]
+                            try await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
+                            data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
+                        } else {
+                            // Single time step
+                            try await reader.reader.read(into: &readTemp, range: [yRange, xRange])
+                            data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
+                        }
+                    }
+                    try writer.writeData(
+                        array: data3d.data,
+                        arrayDimensions: thisChunkDimensions
+                    )
+                }
+            }
+            let arrayFinalised = try writer.finalise()
             let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
-            let root = try writeFile.write(array: writer.finalise(), name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
+            let coordinates = try writeFile.write(value: coordinatesString, name: "coordinates", children: [])
+            let runTime: OmOffsetSize? = try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
+            let validTimeArray = try writeFile.writeArray(
+                data: time.map(\.timeIntervalSince1970),
+                dimensions: [UInt64(nTime)],
+                chunkDimensions: [UInt64(nTime)],
+                compression: .pfor_delta2d,
+                scale_factor: 1,
+                add_offset: 0
+            )
+            let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
+            let root = try writeFile.write(array: arrayFinalised, name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
             
             try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)
@@ -283,7 +337,6 @@ struct GenericVariableHandle: Sendable {
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)
-                data3d.data.fillWithNaNs()
                 for reader in readers {
                     let dimensions = reader.reader.getDimensions()
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!

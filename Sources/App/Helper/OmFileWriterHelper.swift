@@ -146,11 +146,12 @@ extension Array where Element == Float {
             add_offset: 0
         )
         try writer.writeData(array: self)
+        let writerFinalised = try writer.finalise()
         let runTime: OmOffsetSize? = try run.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "forecast_reference_time", children: []) }
         let validTime: OmOffsetSize? = try time.map { try writeFile.write(value: $0.timeIntervalSince1970, name: "time", children: []) }
         let coordinates = dimensions.count == 2 ? try writeFile.write(value: "lat lon", name: "coordinates", children: []) : nil
         let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
-        let root = try writeFile.write(array: writer.finalise(), name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
+        let root = try writeFile.write(array: writerFinalised, name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
         try writeFile.writeTrailer(rootVariable: root)
     }
 
