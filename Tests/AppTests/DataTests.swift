@@ -46,7 +46,7 @@ final class DataTests: XCTestCase {
     /*func testGribStream() async throws {
         let url = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-009-d4755d5b313f7cded016e66ba0cd989b-hyELHH.grib"
         let fileSystem = FileSystem.shared
-        
+
         try await fileSystem.withFileHandle(forReadingAt: FilePath(url)) { fn in
             for try await message in fn.readChunks().decodeGrib() {
                 print(message.get(attribute: "shortName")!)
@@ -221,7 +221,7 @@ final class DataTests: XCTestCase {
 
     func testLambertAzimuthalEqualAreaProjection() {
         let proj = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
-        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigion: -1036000, longitudeProjectionOrigion: -1158000, dx: 2000, dy: 2000, projection: proj)
+        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigin: -1036000, longitudeProjectionOrigin: -1158000, dx: 2000, dy: 2000, projection: proj)
         // peak north denmark 57.745566, 10.620785
         let coords = proj.forward(latitude: 57.745566, longitude: 10.620785)
         XCTAssertEqual(coords.x, 773650.5, accuracy: 0.0001) // around 774000.0
@@ -280,7 +280,7 @@ final class DataTests: XCTestCase {
 
     func testStereographic() {
         let nx = 935
-        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
+        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
 
         let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
         XCTAssertEqual(pos % nx, 420)
@@ -318,7 +318,7 @@ final class DataTests: XCTestCase {
     }
 
     func testCerraGrid() {
-        // 
+        //
         let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
 
         var pos = grid.findPoint(lat: 20.29228, lon: -17.485962)!
@@ -468,7 +468,7 @@ final class DataTests: XCTestCase {
 
         let bologna = grid.findPoint(lat: 45.45, lon: 11.35)!
         XCTAssertEqual(bologna % grid.nx, 363) // x
-        XCTAssertEqual(bologna / grid.nx, 265) // y        
+        XCTAssertEqual(bologna / grid.nx, 265) // y
     }
 
     /**
