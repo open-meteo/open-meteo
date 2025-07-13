@@ -134,7 +134,7 @@ struct GenericVariableHandle: Sendable {
         // let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
 
-        for (_, handles) in handles.filter({PreviousRunsVariableSurface.includes($0.variable.omFileName.file)}).groupedPreservedOrder(by: \.variable.omFileName.file) {
+        for (_, handles) in handles.filter({FullRunsVariables.includes($0.variable.omFileName.file)}).groupedPreservedOrder(by: \.variable.omFileName.file) {
             let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try await handles.grouped(by: { $0.time }).asyncFlatMap { time, h in
                 return try await h.asyncMap {
                     let reader = try await $0.makeReader()

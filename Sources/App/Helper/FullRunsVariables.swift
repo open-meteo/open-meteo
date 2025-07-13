@@ -1,11 +1,11 @@
 
 
-fileprivate struct PreviousRunsPressureVariable: PressureVariableRespresentable {
-    let variable: PreviousRunsPressureVariableType
+fileprivate struct FullRunsPressureVariable: PressureVariableRespresentable {
+    let variable: FullRunsPressureVariableType
     let level: Int
 }
 
-fileprivate enum PreviousRunsPressureVariableType: String {
+fileprivate enum FullRunsPressureVariableType: String {
     case temperature
     case geopotential_height
     case wind_v_component
@@ -18,13 +18,13 @@ fileprivate enum PreviousRunsPressureVariableType: String {
     case dew_point
 }
 
-/// List of all variables that should be stored as previous runs
-enum PreviousRunsVariableSurface: String {
+/// List of all variables that should be stored as full run data in `./data_run`
+enum FullRunsVariables: String {
     static func includes(_ variable: String) -> Bool {
-        if let pres = PreviousRunsPressureVariable(rawValue: variable) {
-            return PreviousRunsVariableSurface.levelsToKeep.contains(pres.level)
+        if let pres = FullRunsPressureVariable(rawValue: variable) {
+            return FullRunsVariables.levelsToKeep.contains(pres.level)
         }
-        return PreviousRunsVariableSurface.init(rawValue: variable) != nil
+        return FullRunsVariables.init(rawValue: variable) != nil
     }
     
     static let levelsToKeep = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
