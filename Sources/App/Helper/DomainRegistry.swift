@@ -409,7 +409,7 @@ extension DomainRegistry {
             return
         }
         for timestep in timesteps {
-            let timeFormatted = timestep.iso8601_YYYYMMddTHHmm
+            let timeFormatted = timestep.format_directoriesYYYYMMddhhmm
             for bucket in bucket.split(separator: ",") {
                 let bucketSplit = bucket.split(separator: ";")
                 let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
@@ -433,7 +433,7 @@ extension DomainRegistry {
         guard let directory = OpenMeteo.dataRunDirectory else {
             return
         }
-        let timeFormatted = run.iso8601_YYYYMMddTHHmm
+        let timeFormatted = run.format_directoriesYYYYMMddhhmm
         for bucket in bucket.split(separator: ",") {
             let bucketSplit = bucket.split(separator: ";")
             let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
