@@ -392,10 +392,11 @@ extension DomainRegistry {
                 let bucketSplit = bucket.split(separator: ";")
                 let bucket = bucketSplit.first ?? bucket
                 let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+                let excludePreviousDay = bucket == "openmeteo" ? ["--exclude", "*_previous_day*"] : []
                 let dest = "s3://\(bucket)/data/\(dir)"
                 try Process.spawnRetried(
                     cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + excludePreviousDay + profileArgs + [src, dest]
                 )
             }
         }
@@ -423,6 +424,29 @@ extension DomainRegistry {
                     args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
                 )
             }
+        }
+    }
+    
+    /// Upload time-series optimised per RUN files to S3 `/data_run/<domain>/<run>/<variable>.om`
+    func syncToS3PerRun(bucket: String, run: Timestamp) throws {
+        let dir = rawValue
+        guard let directory = OpenMeteo.dataRunDirectory else {
+            return
+        }
+        let timeFormatted = run.iso8601_YYYYMMddTHHmm
+        for bucket in bucket.split(separator: ",") {
+            let bucketSplit = bucket.split(separator: ";")
+            let bucket = bucketSplit.first ?? bucket
+            let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+            let src = "\(directory)\(dir)/\(timeFormatted)/"
+            let dest = "s3://\(bucket)/data_run/\(dir)/\(timeFormatted)"
+            if !FileManager.default.fileExists(atPath: src) {
+                continue
+            }
+            try Process.spawnRetried(
+                cmd: "aws",
+                args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+            )
         }
     }
 }

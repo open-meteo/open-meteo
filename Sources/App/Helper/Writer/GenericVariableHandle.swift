@@ -70,17 +70,17 @@ struct GenericVariableHandle: Sendable {
 
         if let uploadS3Bucket = uploadS3Bucket {
             logger.info("AWS upload to bucket \(uploadS3Bucket)")
-            let startTimeAws = DispatchTime.now()
             let variables = handles.map { $0.variable }.uniqued(on: { $0.omFileName.file })
             do {
+                let startTimeAws = DispatchTime.now()
                 try domain.domainRegistry.syncToS3(
                     bucket: uploadS3Bucket,
                     variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
                 )
+                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
             } catch {
                 logger.error("Sync to AWS failed: \(error)")
             }
-            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
 
         if let run {
@@ -89,10 +89,49 @@ struct GenericVariableHandle: Sendable {
             let startTimePreviousDays = DispatchTime.now()
             try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: true, concurrent: concurrent, compression: compression)
             logger.info("Previous day convert in \(startTimePreviousDays.timeElapsedPretty())")
+            
+            /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
+            if !uploadS3OnlyProbabilities, let uploadS3Bucket {
+                do {
+                    let startTimeAws = DispatchTime.now()
+                    try domain.domainRegistry.syncToS3(
+                        bucket: uploadS3Bucket,
+                        variables: nil
+                    )
+                    logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
+                } catch {
+                    logger.error("Sync to AWS failed: \(error)")
+                }
+            }
+        }
+        
+        if let run {
+            logger.info("Generate full run data")
+            guard OpenMeteo.dataRunDirectory != nil else {
+                logger.info("Skipping full run data generation as DATA_RUN_DIRECTORY is nil")
+                return
+            }
+            let startTimeFullRun = DispatchTime.now()
+            try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
+            logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty())")
+            
+            if let uploadS3Bucket {
+            do {
+                let startTimeAws = DispatchTime.now()
+                try domain.domainRegistry.syncToS3PerRun(
+                    bucket: uploadS3Bucket,
+                    run:run
+                )
+                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
+                } catch {
+                    logger.error("Sync to AWS failed: \(error)")
+                }
+            }
         }
     }
     
-    static func generateFullRunData(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType) async throws {
+    /// Generate time-series optimised files for each variable per run. `/data_run/<domain>/<run>/<variable>.om`
+    static func generateFullRunData(logger: Logger, domain: GenericDomain, run: Timestamp, handles: [Self], concurrent: Int, compression: OmCompressionType) async throws {
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
@@ -128,7 +167,7 @@ struct GenericVariableHandle: Sendable {
             let fn = try FileHandle.createNewFile(file: fileTemp)
             
             let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
-            let chunks = nMembers > 1 ? [1, chunknLocations, nTime] : [1, chunknLocations, nTime]
+            let chunks = nMembers > 1 ? [1, 1, chunknLocations, nTime] : [1, chunknLocations, nTime]
             let dimensions = nMembers > 1 ? [ny, nx, nMembers, nTime] : [ny, nx, nTime]
             let coordinatesString =  nMembers > 1 ? "lat lon member time" : "lat lon time"
             
@@ -144,10 +183,9 @@ struct GenericVariableHandle: Sendable {
                 scale_factor: variable.scalefactor,
                 add_offset: 0
             )
-            for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(processChunkY)) {
-                for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(processChunkX)) {
-                    let yRange = yStart ..< min(yStart + UInt64(processChunkY), UInt64(ny))
-                    let xRange = xStart ..< min(xStart + UInt64(processChunkX), UInt64(nx))
+            
+            for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
+                for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
                     let memberRange = 0 ..< UInt64(nMembers)
                     
                     let thisChunkDimensions = nMembers <= 1 ?
@@ -156,25 +194,25 @@ struct GenericVariableHandle: Sendable {
                     
                     let nLoc = yRange.count * xRange.count
                     var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: nTime)
-                    var readTemp = [Float](repeating: .nan, count: nLoc * nTime)
                     for reader in readers {
                         let dimensions = reader.reader.getDimensions()
                         let timeArrayIndex = time.firstIndex(of: reader.time.range.lowerBound)!
                         if dimensions.count == 3 {
                             /// Number of time steps in this file
                             let nt = dimensions[2]
-                            try await reader.reader.read(into: &readTemp, range: [yRange, xRange, 0..<nt])
-                            data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = readTemp[0..<nLoc * Int(nt)]
+                            let read = try await reader.reader.read(range: [yRange, xRange, 0..<nt])
+                            data3d[0..<nLoc, reader.member, timeArrayIndex ..< timeArrayIndex + Int(nt)] = read[0..<nLoc * Int(nt)]
                         } else {
                             // Single time step
-                            try await reader.reader.read(into: &readTemp, range: [yRange, xRange])
-                            data3d[0..<nLoc, reader.member, timeArrayIndex] = readTemp[0..<nLoc]
+                            let read = try await reader.reader.read(range: [yRange, xRange])
+                            data3d[0..<nLoc, reader.member, timeArrayIndex] = read[0..<nLoc]
                         }
                     }
                     try writer.writeData(
                         array: data3d.data,
                         arrayDimensions: thisChunkDimensions
                     )
+                    progress.add(data3d.data.count * MemoryLayout<Float>.size)
                 }
             }
             let arrayFinalised = try writer.finalise()
@@ -269,28 +307,6 @@ struct GenericVariableHandle: Sendable {
                                     chunknLocations: nMembers > 1 ? nMembers : nil*/
             )
             // let nLocationsPerChunk = om.nLocationsPerChunk
-            
-            /*if false && !onlyGeneratePreviousDays {
-                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-                let fn = try FileHandle.createNewFile(file: "\(domain.downloadDirectory)\(variable.omFileName.file).om", overwrite: true)
-                let writeFile = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
-                let writer = try writeFile.prepareArray(
-                    type: Float.self,
-                    dimensions: [ny, nx, readers.count].map(UInt64.init),
-                    chunkDimensions: [1, 12, UInt64(readers.count)],
-                    compression: .pfor_delta2d_int16,
-                    scale_factor: variable.scalefactor,
-                    add_offset: 0
-                )
-                var data = [Float]()
-                data.reserveCapacity(grid.count * readers.count)
-                for (i,reader) in readers.enumerated() {
-                    data.append(contentsOf: try reader.reader.read())
-                }
-                try writer.writeData(array: Array2DFastSpace(data: data, nLocations: grid.count, nTime: readers.count).transpose().data)
-                let root = try writeFile.write(array: writer.finalise(), name: "", children: [])
-                try writeFile.writeTrailer(rootVariable: root)
-            }*/
 
             // Create netcdf file for debugging
             if createNetcdf && !onlyGeneratePreviousDays {
