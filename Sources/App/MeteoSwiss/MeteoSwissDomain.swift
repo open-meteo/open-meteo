@@ -48,10 +48,10 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .icon_ch1, .icon_ch1_ensemble:
             // 1:15 delay, update every 3 hours
-            return t.subtract(hours: 1, minutes: 15).with(hour: 3)
+            return t.subtract(hours: 1, minutes: 15).floor(toNearestHour: 3)
         case .icon_ch2, .icon_ch2_ensemble:
             // 2:30 delay, update every 6 hours
-            return t.subtract(hours: 2, minutes: 30).with(hour: 6)
+            return t.subtract(hours: 2, minutes: 30).floor(toNearestHour: 3)
         }
     }
     

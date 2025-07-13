@@ -64,7 +64,7 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .grapes_global:
             // Delay of 4:20 hours after initialisation with 4 runs a day
-            return t.with(hour: ((t.hour - 4 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 4).floor(toNearestHour: 6)
         }
     }
 }

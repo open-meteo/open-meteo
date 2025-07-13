@@ -536,16 +536,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
 extension EcmwfDomain {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     fileprivate var lastRun: Timestamp {
-        // 18z run starts downloading on the next day
-        let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
-            return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 6).floor(toNearestHour: 6)
         case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
-            return twoHoursAgo.with(hour: ((t.hour - 5 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 4).floor(toNearestHour: 6)
         }
     }
     /// Get download url for a given domain and timestep
