@@ -373,7 +373,7 @@ extension DomainRegistry {
                 }
                 for bucket in bucket.split(separator: ",") {
                     let bucketSplit = bucket.split(separator: ";")
-                    let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue)
+                    let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
                     let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                     if variable.contains("_previous_day") && bucket == "openmeteo" {
                         // do not upload data from past days yet
@@ -390,7 +390,7 @@ extension DomainRegistry {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             for bucket in bucket.split(separator: ",") {
                 let bucketSplit = bucket.split(separator: ";")
-                let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue)
+                let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
                 let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                 let excludePreviousDay = bucket == "openmeteo" ? ["--exclude", "*_previous_day*"] : []
                 let dest = "s3://\(bucket)/data/\(dir)"
@@ -412,7 +412,7 @@ extension DomainRegistry {
             let timeFormatted = timestep.iso8601_YYYYMMddTHHmm
             for bucket in bucket.split(separator: ",") {
                 let bucketSplit = bucket.split(separator: ";")
-                let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue)
+                let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
                 let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                 let src = "\(directorySpatial)\(dir)/\(timeFormatted)/"
                 let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timeFormatted)"
@@ -436,7 +436,7 @@ extension DomainRegistry {
         let timeFormatted = run.iso8601_YYYYMMddTHHmm
         for bucket in bucket.split(separator: ",") {
             let bucketSplit = bucket.split(separator: ";")
-            let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue)
+            let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
             let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
             let src = "\(directory)\(dir)/\(timeFormatted)/"
             let dest = "s3://\(bucket)/data_run/\(dir)/\(timeFormatted)"
