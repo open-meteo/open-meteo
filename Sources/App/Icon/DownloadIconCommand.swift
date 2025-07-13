@@ -6,6 +6,7 @@ import Dispatch
 /**
  TODO:
  - Elevation files should not mask out sea level locations -> this breaks surface pressure correction as a lake can be above sea level
+ - Add z0
  */
 struct DownloadIconCommand: AsyncCommand {
     enum VariableGroup: String, RawRepresentable, CaseIterable {

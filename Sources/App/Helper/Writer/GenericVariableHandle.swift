@@ -105,12 +105,8 @@ struct GenericVariableHandle: Sendable {
             }
         }
         
-        if let run {
+        if OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
             logger.info("Generate full run data")
-            guard OpenMeteo.dataRunDirectory != nil else {
-                logger.info("Skipping full run data generation as DATA_RUN_DIRECTORY is nil")
-                return
-            }
             let startTimeFullRun = DispatchTime.now()
             try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
             logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty())")
@@ -138,7 +134,7 @@ struct GenericVariableHandle: Sendable {
         // let nLocations = grid.count
         let dtSeconds = domain.dtSeconds
 
-        for (_, handles) in handles.filter(\.variable.storePreviousForecast).groupedPreservedOrder(by: \.variable.omFileName.file) {
+        for (_, handles) in handles.filter({PreviousRunsVariableSurface.includes($0.variable.omFileName.file)}).groupedPreservedOrder(by: \.variable.omFileName.file) {
             let readers: [(time: TimerangeDt, reader: OmFileReaderArray<MmapFile, Float>, member: Int)] = try await handles.grouped(by: { $0.time }).asyncFlatMap { time, h in
                 return try await h.asyncMap {
                     let reader = try await $0.makeReader()

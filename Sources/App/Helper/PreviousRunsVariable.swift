@@ -1,7 +1,34 @@
 
+
+fileprivate struct PreviousRunsPressureVariable: PressureVariableRespresentable {
+    let variable: PreviousRunsPressureVariableType
+    let level: Int
+}
+
+fileprivate enum PreviousRunsPressureVariableType: String {
+    case temperature
+    case geopotential_height
+    case wind_v_component
+    case wind_u_component
+    case vertical_velocity
+    case relative_humidity
+    case wind_speed
+    case wind_direction
+    case cloud_cover
+    case dew_point
+}
+
 /// List of all variables that should be stored as previous runs
-/// TODO roughness length
-enum PreviousRunsVariable: String {
+enum PreviousRunsVariableSurface: String {
+    static func includes(_ variable: String) -> Bool {
+        if let pres = PreviousRunsPressureVariable(rawValue: variable) {
+            return PreviousRunsVariableSurface.levelsToKeep.contains(pres.level)
+        }
+        return PreviousRunsVariableSurface.init(rawValue: variable) != nil
+    }
+    
+    static let levelsToKeep = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
+    
     case temperature_2m
     case temperature_80m
     case temperature_100m
@@ -38,6 +65,8 @@ enum PreviousRunsVariable: String {
     case wind_direction_120m
     case wind_speed_150m
     case wind_direction_150m
+    case wind_speed_180m
+    case wind_direction_180m
     case wind_speed_200m
     case wind_direction_200m
     case wind_speed_250m
@@ -58,37 +87,26 @@ enum PreviousRunsVariable: String {
     case wind_u_component_180m
     case wind_v_component_180m
     
-    case geopotential_height_1000hPa
-    case wind_u_component_1000hPa
-    case wind_v_component_1000hPa
-    case temperature_1000hPa
-    case cloud_cover_1000hPa
-    case relative_humidity_1000hPa
-    case dew_point_1000hPa
+    case soil_temperature_0_to_10cm
+    case soil_temperature_10_to_35cm
+    case soil_temperature_35_to_100cm
+    case soil_temperature_100_to_300cm
+
+    case soil_moisture_0_to_10cm
+    case soil_moisture_10_to_35cm
+    case soil_moisture_35_to_100cm
+    case soil_moisture_100_to_300cm
     
-    case geopotential_height_925hPa
-    case wind_u_component_925hPa
-    case wind_v_component_925hPa
-    case temperature_925hPa
-    case cloud_cover_925hPa
-    case relative_humidity_925hPa
-    case dew_point_925hPa
-    
-    case geopotential_height_850hPa
-    case wind_u_component_850hPa
-    case wind_v_component_850hPa
-    case temperature_850hPa
-    case cloud_cover_850hPa
-    case relative_humidity_850hPa
-    case dew_point_850hPa
-    
-    case geopotential_height_500hPa
-    case wind_u_component_500hPa
-    case wind_v_component_500hPa
-    case temperature_500hPa
-    case cloud_cover_500hPa
-    case relative_humidity_500hPa
-    case dew_point_500hPa
+    case soil_temperature_0cm
+    case soil_temperature_6cm
+    case soil_temperature_18cm
+    case soil_temperature_54cm
+
+    case soil_moisture_0_to_1cm
+    case soil_moisture_1_to_3cm
+    case soil_moisture_3_to_9cm
+    case soil_moisture_9_to_27cm
+    case soil_moisture_27_to_81cm
 }
 
 
