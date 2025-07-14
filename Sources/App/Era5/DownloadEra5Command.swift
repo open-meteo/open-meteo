@@ -87,7 +87,7 @@ struct DownloadEra5Command: AsyncCommand {
         /// Select the desired timerange, or use last 14 day
         let timeinterval = try signature.getTimeinterval(domain: domain)
         let handles = try await downloadDailyFiles(application: context.application, cdskey: cdskey, email: signature.email, timeinterval: timeinterval, domain: domain, variables: variables, concurrent: concurrent, forceUpdate: signature.force)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time < $1.time })?.time ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: handles.min(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound ?? Timestamp(0), handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
     /// Generate seasonal averages for bias corrections for CMIP climate data
@@ -410,11 +410,12 @@ struct DownloadEra5Command: AsyncCommand {
                             guard let fn = try? FileHandle.openFileReading(file: file) else {
                                 continue
                             }
-                            handles.append(GenericVariableHandle(
+                            handles.append(try await GenericVariableHandle(
                                 variable: variable,
                                 time: t,
                                 member: 0,
-                                fn: fn
+                                fn: fn,
+                                domain: domain
                             ))
                         }
                     }
@@ -461,7 +462,7 @@ struct DownloadEra5Command: AsyncCommand {
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                        return try await GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, domain: domain)
                     }.collect().compactMap({ $0 })
                 }
                 handles.append(contentsOf: h)
@@ -524,11 +525,12 @@ struct DownloadEra5Command: AsyncCommand {
                             guard let fn = try? FileHandle.openFileReading(file: file) else {
                                 continue
                             }
-                            handles.append(GenericVariableHandle(
+                            handles.append(try await GenericVariableHandle(
                                 variable: variable,
                                 time: t,
                                 member: 0,
-                                fn: fn
+                                fn: fn,
+                                domain: domain
                             ))
                         }
                     }
@@ -626,7 +628,7 @@ struct DownloadEra5Command: AsyncCommand {
                         let omFile = "\(domain.downloadDirectory)\(timestamp.format_YYYYMMdd)/\(variable.rawValue)_\(timestamp.format_YYYYMMddHH).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                        return try await GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, domain: domain)
                     }.collect().compactMap({ $0 })
                 }
                 handles.append(contentsOf: h)
@@ -737,7 +739,7 @@ struct DownloadEra5Command: AsyncCommand {
                         let omFile = "\(domain.downloadDirectory)\(date)/\(variable.rawValue)_\(date)\(hour.zeroPadded(len: 2)).om"
                         try FileManager.default.removeItemIfExists(at: omFile)
                         let fn = try writer.write(file: omFile, compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
-                        return GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn)
+                        return try await GenericVariableHandle(variable: variable, time: timestamp, member: 0, fn: fn, domain: domain)
                     }.collect().compactMap({ $0 })
                 }
                 handles.append(contentsOf: h)

@@ -66,7 +66,7 @@ extension DownloadCamsCommand {
                         grib2d.array.data.multiplyAdd(multiply: scaling, add: 0)
                     }
                     grib2d.array.shift180LongitudeAndFlipLatitude()
-                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
         }
     }

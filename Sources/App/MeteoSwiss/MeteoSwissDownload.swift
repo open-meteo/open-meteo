@@ -138,7 +138,7 @@ struct MeteoSwissDownload: AsyncCommand {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
                         logger.info("Processing \(variable) for \(timestamp.format_YYYYMMddHH) member \(member)")
-                        return try writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
+                        return try await writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
                     }
                 })
                 /// Calculate global shortwave radiation from diffuse and direct components

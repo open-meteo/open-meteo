@@ -93,7 +93,7 @@ struct MeteoFranceDownload: AsyncCommand {
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
             try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
         }
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -250,7 +250,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     let variable = ProbabilityVariable.precipitation_probability
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect()
             }
             handles.append(contentsOf: h)
@@ -388,7 +388,7 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
 
                         logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                        return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true)
+                        return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true)
                     }.collect()
 
                     let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer, overwrite: true)
@@ -561,7 +561,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                handles.append(try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true))
+                handles.append(try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true))
             }
         }
         // await curl.printStatistics()
@@ -571,10 +571,10 @@ struct MeteoFranceDownload: AsyncCommand {
 
 extension VariablePerMemberStorage {
     /// Sum up rain, snow and graupel for total precipitation
-    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
-        return try self.data
+    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
+        return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .compactMap({ t, handles -> GenericVariableHandle? in
+            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
                 guard
                     let tgrp = handles.first(where: { $0.key.variable == tgrp }),
                     let tsnowp = handles.first(where: { $0.key.variable == tsnowp }),
@@ -582,7 +582,7 @@ extension VariablePerMemberStorage {
                     return nil
                 }
                 let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({ $0 + $1.0 + $1.1 })
-                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: precip)
+                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: precip)
             }
         )
     }

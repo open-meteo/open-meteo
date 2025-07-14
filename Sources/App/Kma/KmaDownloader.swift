@@ -157,7 +157,7 @@ struct KmaDownload: AsyncCommand {
                     }
                 }
                 logger.info("Processing \(variable) timestep \(timestamp.format_YYYYMMddHH)")
-                return try writer.write(time: timestamp, member: 0, variable: variable, data: array2d.array.data)
+                return try await writer.write(time: timestamp, member: 0, variable: variable, data: array2d.array.data)
             }.compactMap({ $0 })
             logger.info("Calculating wind speed, direction and snow")
             // Convert U/V wind components to speed and direction
@@ -193,17 +193,17 @@ extension KmaDomain {
 
 extension VariablePerMemberStorage {
     /// Sum up 2 variables
-    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
-        return try self.data
+    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
+        return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .compactMap({ t, handles -> GenericVariableHandle? in
+            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
                 guard
                     let var1 = handles.first(where: { $0.key.variable == var1 }),
                     let var2 = handles.first(where: { $0.key.variable == var2 }) else {
                     return nil
                 }
                 let sum = zip(var1.value.data, var2.value.data).map(+)
-                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: sum)
+                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: sum)
             }
         )
     }

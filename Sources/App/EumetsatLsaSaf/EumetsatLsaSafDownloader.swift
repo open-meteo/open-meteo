@@ -82,7 +82,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let handles = try await downloadRange.asyncFlatMap { run in
             try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
         }
-        if let last = handles.max(by: { $0.time < $1.time })?.time {
+        if let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
@@ -126,50 +126,50 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             return (760 - Double(3201 - line) / 5) / 3600
         }
 
-        return try data.withUnsafeReadableBytes { memory in
-            guard let nc = try NetCDF.open(memory: memory) else {
-                fatalError("Could not open netcdf from memory")
-            }
-            guard var shortwave_radiation = try nc.getVariable(name: "DSSF_TOT")?.readAndScale() else {
-                fatalError("Could not open variable DSSF_TOT")
-            }
-            shortwave_radiation.flipLatitude(nt: 1, ny: ny, nx: nx)
-            guard var diffuse_fraction = try nc.getVariable(name: "FRACTION_DIFFUSE")?.readAndScale() else {
-                fatalError("Could not open variable FRACTION_DIFFUSE")
-            }
-            diffuse_fraction.flipLatitude(nt: 1, ny: ny, nx: nx)
-
-            let start = DispatchTime.now()
-            let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
-            Zensun.instantaneousSolarRadiationToBackwardsAverages(
-                timeOrientedData: &shortwave_radiation,
-                grid: domain.grid,
-                locationRange: 0..<domain.grid.count,
-                timerange: timerange,
-                scanTimeDifferenceHours: scanTimeDifferenceHours,
-                sunDeclinationCutOffDegrees: 1
-            )
-            logger.info("conversion took \(start.timeElapsedPretty())")
-
-            let direct_radiation = zip(shortwave_radiation, diffuse_fraction).map { sw, df -> Float in
-                return sw * (1 - df)
-            }
-
-            let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
-            let sw = GenericVariableHandle(
-                variable: EumetsatLsaSafVariable.shortwave_radiation,
-                time: run,
-                member: 0,
-                fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: EumetsatLsaSafVariable.shortwave_radiation.scalefactor, all: shortwave_radiation)
-            )
-            let direct = GenericVariableHandle(
-                variable: EumetsatLsaSafVariable.direct_radiation,
-                time: run,
-                member: 0,
-                fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: EumetsatLsaSafVariable.direct_radiation.scalefactor, all: direct_radiation)
-            )
-            return [sw, direct]
+        guard let nc = try NetCDF.open(memory: data) else {
+            fatalError("Could not open netcdf from memory")
         }
+        guard var shortwave_radiation = try nc.getVariable(name: "DSSF_TOT")?.readAndScale() else {
+            fatalError("Could not open variable DSSF_TOT")
+        }
+        shortwave_radiation.flipLatitude(nt: 1, ny: ny, nx: nx)
+        guard var diffuse_fraction = try nc.getVariable(name: "FRACTION_DIFFUSE")?.readAndScale() else {
+            fatalError("Could not open variable FRACTION_DIFFUSE")
+        }
+        diffuse_fraction.flipLatitude(nt: 1, ny: ny, nx: nx)
+
+        let start = DispatchTime.now()
+        let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+        Zensun.instantaneousSolarRadiationToBackwardsAverages(
+            timeOrientedData: &shortwave_radiation,
+            grid: domain.grid,
+            locationRange: 0..<domain.grid.count,
+            timerange: timerange,
+            scanTimeDifferenceHours: scanTimeDifferenceHours,
+            sunDeclinationCutOffDegrees: 1
+        )
+        logger.info("conversion took \(start.timeElapsedPretty())")
+
+        let direct_radiation = zip(shortwave_radiation, diffuse_fraction).map { sw, df -> Float in
+            return sw * (1 - df)
+        }
+
+        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
+        let sw = try await GenericVariableHandle(
+            variable: EumetsatLsaSafVariable.shortwave_radiation,
+            time: run,
+            member: 0,
+            fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: EumetsatLsaSafVariable.shortwave_radiation.scalefactor, all: shortwave_radiation),
+            domain: domain
+        )
+        let direct = try await GenericVariableHandle(
+            variable: EumetsatLsaSafVariable.direct_radiation,
+            time: run,
+            member: 0,
+            fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: EumetsatLsaSafVariable.direct_radiation.scalefactor, all: direct_radiation),
+            domain: domain
+        )
+        return [sw, direct]
     }
 }
 

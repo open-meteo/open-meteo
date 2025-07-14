@@ -42,12 +42,12 @@ struct MetNoDownloader: AsyncCommand {
 
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        let handles = try download(logger: logger, domain: domain, variables: variables, run: run)
+        let handles = try await download(logger: logger, domain: domain, variables: variables, run: run)
         let nConcurrent = signature.concurrent ?? 1
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
             try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
         }
 
@@ -55,7 +55,7 @@ struct MetNoDownloader: AsyncCommand {
     }
 
     /// Process each variable and update time-series optimised files
-    func download(logger: Logger, domain: MetNoDomain, variables: [MetNoVariable], run: Timestamp) throws -> [GenericVariableHandle] {
+    func download(logger: Logger, domain: MetNoDomain, variables: [MetNoVariable], run: Timestamp) async throws -> [GenericVariableHandle] {
         Process.alarm(seconds: 3 * 3600)
         defer { Process.alarm(seconds: 0) }
 
@@ -129,7 +129,7 @@ struct MetNoDownloader: AsyncCommand {
             return
         }*/
 
-        return try variables.flatMap { variable in
+        return try await variables.asyncFlatMap { variable in
             logger.info("Download \(variable)")
 
             guard let ncVar = ncFile.getVariable(name: variable.netCdfName) else {
@@ -153,10 +153,10 @@ struct MetNoDownloader: AsyncCommand {
                 }
             }
 
-            return try (0..<nTime).map { t in
+            return try await (0..<nTime).asyncMap { t in
                 let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
                 let data = Array(spatial[t, 0..<spatial.nLocations])
-                return try writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
+                return try await writer.write(time: run.add(hours: t), member: 0, variable: variable, data: data)
             }
         }
     }

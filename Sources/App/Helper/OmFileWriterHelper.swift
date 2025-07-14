@@ -19,7 +19,7 @@ struct OmRunSpatialWriter: Sendable {
         self.storeOnDisk = storeOnDisk
     }
     
-    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16, overwrite: Bool = false) throws -> GenericVariableHandle {
+    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16, overwrite: Bool = false) async throws -> GenericVariableHandle {
         let fn: FileHandle
         if storeOnDisk, let directorySpatial = domain.domainRegistry.directorySpatial {
             //let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
@@ -38,7 +38,7 @@ struct OmRunSpatialWriter: Sendable {
             try FileManager.default.removeItem(atPath: file)
             try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor)
         }
-        return GenericVariableHandle(variable: variable, time: time, member: member, fn: fn)
+        return try await GenericVariableHandle(variable: variable, time: time, member: member, fn: fn, domain: domain)
     }
 }
 

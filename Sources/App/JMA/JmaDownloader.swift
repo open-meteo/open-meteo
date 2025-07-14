@@ -138,11 +138,11 @@ struct JmaDownload: AsyncCommand {
 
                     // try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
-                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
             if let uploadS3Bucket = uploadS3Bucket {
-                let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+                let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
             }
             return handles

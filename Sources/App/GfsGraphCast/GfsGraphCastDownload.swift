@@ -166,7 +166,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     }
 
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
 
@@ -186,7 +186,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 let rhVariable = GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
                 // Store to calculate cloud cover
                 await storage.set(variable: rhVariable, timestamp: timestamp, member: 0, data: Array2D(data: data, nx: t.nx, ny: t.ny))
-                return try writer.write(time: timestamp, member: 0, variable: rhVariable, data: data)
+                return try await writer.write(time: timestamp, member: 0, variable: rhVariable, data: data)
             }.compactMap({ $0 })
 
             // convert pressure vertical velocity to geometric velocity
@@ -200,7 +200,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     fatalError("Requires temperature_2m")
                 }
                 let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
-                return try writer.write(time: v.timestamp, member: 0, variable: v.variable, data: data)
+                return try await writer.write(time: v.timestamp, member: 0, variable: v.variable, data: data)
             }.compactMap({ $0 })
 
             // Calculate cloud cover mid/low/high/total
@@ -240,7 +240,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 mid: cloudcover_mid,
                 high: cloudcover_high
             )
-            let handlesClouds = [
+            let handlesClouds = await [
                 try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_low, data: cloudcover_low),
                 try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid),
                 try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high),

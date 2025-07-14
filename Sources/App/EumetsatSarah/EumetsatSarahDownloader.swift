@@ -136,11 +136,12 @@ struct EumetsatSarahDownload: AsyncCommand {
 
             let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: time.count)
             let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: dataFastTime)
-            return GenericVariableHandle(
+            return try await GenericVariableHandle(
                 variable: variable,
                 time: time[0],
                 member: 0,
-                fn: fn
+                fn: fn,
+                domain: domain
             )
         })
     }

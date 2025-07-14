@@ -122,7 +122,7 @@ extension VariablePerMemberStorage {
     /// `precipitationVariable` is used to filter only precipitation variables
     /// `domain` must be set to generate a temporary file handle afterwards
     /// `dtHoursOfCurrentStep` should be set to the correct delta time in hours for this timestep if the step width changes. E.g. 3 to 6 hours after 120h. If no dt switching takes place, just use `domain.dtHours`.
-    func calculatePrecipitationProbability(precipitationVariable: V, domain: GenericDomain, timestamp: Timestamp, run: Timestamp, dtHoursOfCurrentStep: Int) throws -> GenericVariableHandle? {
+    func calculatePrecipitationProbability(precipitationVariable: V, domain: GenericDomain, timestamp: Timestamp, run: Timestamp, dtHoursOfCurrentStep: Int) async throws -> GenericVariableHandle? {
         // Usefull probs, precip >0.1, >1, clouds <20%, clouds 20-50, 50-80, >80, snowfall eq >0.1, >1.0, wind >20kt, temp <0, temp >25
         // However, more and more probabilities takes up more resources than analysing raw member data
         let handles = self.data.filter({ $0.key.variable == precipitationVariable })
@@ -146,7 +146,7 @@ extension VariablePerMemberStorage {
         }
         precipitationProbability01.multiplyAdd(multiply: 100 / Float(nMember), add: 0)
         let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-        return try writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
+        return try await writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
     }
 }
 
@@ -158,7 +158,7 @@ extension Array where Element == GenericVariableHandle {
         var previousTimesamp: Timestamp?
         return try await self
             .filter({ $0.variable.omFileName == precipitationVariable.omFileName })
-            .groupedPreservedOrder(by: { $0.time })
+            .groupedPreservedOrder(by: { val -> Timestamp in val.time.range.lowerBound })
             .sorted(by: { $0.key < $1.key })
             .asyncCompactMap({ timestamp, handles -> GenericVariableHandle? in
                 let nMember = handles.count
@@ -170,8 +170,7 @@ extension Array where Element == GenericVariableHandle {
                 var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
                 let threshold = Float(0.1) * Float(dt)
                 for d in handles {
-                    let reader = try await d.makeReader()
-                    for (i, value) in try await reader.read().enumerated() {
+                    for (i, value) in try await d.reader.read().enumerated() {
                         if value >= threshold {
                             precipitationProbability01[i] += 1
                         }
@@ -180,7 +179,7 @@ extension Array where Element == GenericVariableHandle {
                 previousTimesamp = timestamp
                 precipitationProbability01.multiplyAdd(multiply: 100 / Float(nMember), add: 0)
                 let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-                return try writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
+                return try await writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
             })
     }
 }

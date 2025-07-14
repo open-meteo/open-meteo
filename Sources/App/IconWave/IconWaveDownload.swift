@@ -106,7 +106,7 @@ struct DownloadIconWaveCommand: AsyncCommand {
                     try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                 }
                 
-                return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
             }
             if let uploadS3Bucket {
                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])

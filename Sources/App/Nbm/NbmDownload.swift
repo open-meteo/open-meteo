@@ -177,7 +177,7 @@ struct NbmDownload: AsyncCommand {
                 if let fma = variable.variable.multiplyAdd(domain: domain) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                handles.append(try writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
+                handles.append(try await writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
             }
             if let uploadS3Bucket {
                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
