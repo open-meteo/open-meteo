@@ -445,7 +445,11 @@ extension DomainRegistry {
             }
             try Process.spawnRetried(
                 cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+                args: ["s3", "sync", "--exclude", "*~", "--exclude", "meta.json", "--no-progress"] + profileArgs + [src, dest]
+            )
+            try Process.spawnRetried(
+                cmd: "aws",
+                args: ["s3", "sync", "--no-progress"] + profileArgs + ["\(src)meta.json", "\(dest)meta.json"]
             )
         }
     }

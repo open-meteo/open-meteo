@@ -230,6 +230,7 @@ struct GenericVariableHandle: Sendable {
             try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)
             progress.finish()
         }
+        try FullRunMetaJson.write(domain: domain, run: run)
     }
 
     private static func convertConcurrent(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], onlyGeneratePreviousDays: Bool, concurrent: Int, compression: OmCompressionType) async throws {
@@ -379,6 +380,33 @@ struct GenericVariableHandle: Sendable {
             }
             progress.finish()
         }
+    }
+}
+
+fileprivate struct FullRunMetaJson: Encodable {
+    let forecast_reference_time: String
+    let created_at: String
+    let variables: [String]
+
+    /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
+    let temporal_resolution_seconds: Int
+    
+    // valid_times? Params like precipitation do not have the first step. Some MeteoFrance variables are also missing steps...
+    
+    /// Use directory listing to get all variables. Model or pressure levels might be downloaded at a different time
+    public init(domain: GenericDomain, run: Timestamp) throws {
+        let path = "\(domain.dataRunDirectory!)\(run.format_directoriesYYYYMMddhhmm)/"
+        let items = try FileManager.default.contentsOfDirectory(atPath: path)
+        self.variables = items.filter({$0.hasSuffix(".om")}).map({String($0.dropLast(3))})
+        self.forecast_reference_time = run.iso8601_YYYY_MM_dd_HH_mmZ
+        self.created_at = Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ
+        self.temporal_resolution_seconds = domain.dtSeconds
+    }
+    
+    static func write(domain: GenericDomain, run: Timestamp) throws {
+        let meta = try FullRunMetaJson(domain: domain, run: run)
+        let path = "\(domain.dataRunDirectory!)\(run.format_directoriesYYYYMMddhhmm)/meta.json"
+        try meta.writeTo(path: path)
     }
 }
 
