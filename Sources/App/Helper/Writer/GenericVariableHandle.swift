@@ -32,7 +32,7 @@ struct GenericVariableHandle: Sendable {
     }
 
     /// Process concurrently
-    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16) async throws {
+    static func convert(logger: Logger, domain: GenericDomain, createNetcdf: Bool, run: Timestamp?, handles: [Self], concurrent: Int, writeUpdateJson: Bool, uploadS3Bucket: String?, uploadS3OnlyProbabilities: Bool, compression: OmCompressionType = .pfor_delta2d_int16, generateFullRun: Bool = true) async throws {
         let startTime = DispatchTime.now()
         try await convertConcurrent(logger: logger, domain: domain, createNetcdf: createNetcdf, run: run, handles: handles, onlyGeneratePreviousDays: false, concurrent: concurrent, compression: compression)
         logger.info("Convert completed in \(startTime.timeElapsedPretty())")
@@ -105,7 +105,7 @@ struct GenericVariableHandle: Sendable {
             }
         }
         
-        if OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
+        if generateFullRun, OpenMeteo.dataRunDirectory != nil, let run, run.hour % 3 == 0 {
             logger.info("Generate full run data")
             let startTimeFullRun = DispatchTime.now()
             try await generateFullRunData(logger: logger, domain: domain, run: run, handles: handles, concurrent: concurrent, compression: compression)
