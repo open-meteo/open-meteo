@@ -372,7 +372,7 @@ extension DomainRegistry {
                     continue
                 }
                 for bucket in bucket.split(separator: ",") {
-                    let bucketSplit = bucket.split(separator: ";")
+                    let bucketSplit = bucket.split(separator: "@")
                     let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
                     let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                     if variable.contains("_previous_day") && bucket == "openmeteo" {
@@ -389,7 +389,7 @@ extension DomainRegistry {
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             for bucket in bucket.split(separator: ",") {
-                let bucketSplit = bucket.split(separator: ";")
+                let bucketSplit = bucket.split(separator: "@")
                 let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
                 let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                 let excludePreviousDay = bucket == "openmeteo" ? ["--exclude", "*_previous_day*"] : []
@@ -411,7 +411,7 @@ extension DomainRegistry {
         for timestep in timesteps {
             let timeFormatted = timestep.format_directoriesYYYYMMddhhmm
             for bucket in bucket.split(separator: ",") {
-                let bucketSplit = bucket.split(separator: ";")
+                let bucketSplit = bucket.split(separator: "@")
                 let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
                 let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
                 let src = "\(directorySpatial)\(dir)/\(timeFormatted)/"
@@ -435,7 +435,7 @@ extension DomainRegistry {
         }
         let timeFormatted = run.format_directoriesYYYYMMddhhmm
         for bucket in bucket.split(separator: ",") {
-            let bucketSplit = bucket.split(separator: ";")
+            let bucketSplit = bucket.split(separator: "@")
             let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
             let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
             let src = "\(directory)\(dir)/\(timeFormatted)/"
