@@ -62,12 +62,11 @@ enum OmFileManagerReadable: Hashable {
     }
 
     func createDirectory() throws {
-        let dataDirectory = getDataDirectoryPath()
-        let file = getRelativeFilePath()
+        let file = getFilePath()
         guard let last = file.lastIndex(of: "/") else {
             return
         }
-        let path = "\(dataDirectory)\(file[file.startIndex..<last])"
+        let path = "\(file[file.startIndex..<last])"
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
 
