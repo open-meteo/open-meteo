@@ -1,0 +1,143 @@
+import OmFileFormat
+import Foundation
+
+/**
+ multiple files
+ data_spatial/<domain>/last_run.json
+ data_spatial/<domain>/current_run.json
+ data_spatial/<domain>/<run>/meta.json -> contains list of variables + timestamps
+ data_spatial/<domain>/<run>/<timestamp>.om
+ 
+ data_spatial/<domain>/last_run._model-levels.json
+ data_spatial/<domain>/current_run_model-levels.json
+ data_spatial/<domain>/<run>/meta_model-levels.json -> contains list of variables + timestamps
+ data_spatial/<domain>/<run>/<timestamp>_model-levels.om (only late icon runs)
+ */
+
+extension OmFileWriterArrayFinalised: @retroactive @unchecked Sendable {
+    
+}
+
+/// Write multiple spatial oriented variables into one file per time-step
+actor OmSpatialTimestepWriter {
+    var variables: [(variable: GenericVariable, member: Int, finalised: OmFileWriterArrayFinalised)] = .init()
+    let filename: String?
+    let writer: OmFileWriter<FileHandle>
+    let domain: GenericDomain
+    let run: Timestamp
+    let time: Timestamp
+    let fn: FileHandle
+    
+    /// Create new OM file in data_spatial directory for a given run, timestamp and realm
+    /// `realm` can be used if upper or model levels are generated at a later stage
+    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?) throws {
+        if storeOnDisk, let directorySpatial = domain.domainRegistry.directorySpatial {
+            let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
+            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
+            let realm = realm.map { "_\($0)" } ?? ""
+            let filename = "\(path)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
+            let fileTemp = "\(filename)~"
+            try FileManager.default.removeItemIfExists(at: fileTemp)
+            self.fn = try FileHandle.createNewFile(file: fileTemp)
+            self.filename = filename
+        } else {
+            let file = "\(OpenMeteo.tempDirectory)\(Int.random(in: 0..<Int.max)).om"
+            try FileManager.default.removeItemIfExists(at: file)
+            self.fn = try FileHandle.createNewFile(file: file)
+            try FileManager.default.removeItem(atPath: file)
+            filename = nil
+        }
+        self.writer = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
+        self.domain = domain
+        self.run = run
+        self.time = time
+    }
+    
+    /// Write a single variable to the file
+    func write(member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
+        let y = min(domain.grid.ny, 32)
+        let x = min(domain.grid.nx, 1024 / y)
+        let dimensions = [domain.grid.ny, domain.grid.nx]
+        let chunks = [y, x]
+        guard dimensions.reduce(1, *) == data.count else {
+            fatalError(#function + ": Array size \(data.count) does not match dimensions \(dimensions)")
+        }
+        let arrayWriter = try writer.prepareArray(
+            type: Float.self,
+            dimensions: dimensions.map(UInt64.init),
+            chunkDimensions: chunks.map(UInt64.init),
+            compression: compressionType,
+            scale_factor: variable.scalefactor,
+            add_offset: 0
+        )
+        try arrayWriter.writeData(array: data)
+        self.variables.append((variable, member, try arrayWriter.finalise()))
+    }
+    
+    /// Finalise the time step and return all handles
+    func finalise() async throws -> [GenericVariableHandle] {
+        let runTime = try writer.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
+        let validTime =  try writer.write(value: time.timeIntervalSince1970, name: "valid_time", children: [])
+        //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
+        let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+        let variables = try self.variables.map {
+            let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
+            return try writer.write(array: $0.finalised, name: "\($0.variable.omFileName.file)\(member)", children: [])
+        }
+        let root = try writer.writeNone(name: "", children: variables + [runTime, validTime, /*coordinates,*/ createdAt])
+        try writer.writeTrailer(rootVariable: root)
+        if let filename {
+            try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
+        }
+        let reader = try await OmFileReader(fn: try MmapFile(fn: self.fn))
+        let time = self.time
+        let dtSeconds = domain.dtSeconds
+        let handles = try await self.variables.enumerated().asyncMap { (i, variable) in
+            guard let arrayReader = try await reader.getChild(UInt32(i))?.asArray(of: Float.self) else {
+                fatalError("Could not read variable \(variable.variable.omFileName.file) as Float array")
+            }
+            return GenericVariableHandle(variable: variable.variable, time: TimerangeDt(start: time, nTime: 1, dtSeconds: dtSeconds), member: variable.member, reader: arrayReader)
+        }
+        return handles
+    }
+}
+
+
+/// Write mutliple timesteps
+actor OmSpatialMultistepWriter {
+    var writer = [OmSpatialTimestepWriter]()
+    let storeOnDisk: Bool
+    let realm: String?
+    let run: Timestamp
+    let domain: GenericDomain
+    
+    /// `realm` can be used if upper or model levels are generated at a later stage
+    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?) {
+        self.storeOnDisk = storeOnDisk
+        self.realm = realm
+        self.domain = domain
+        self.run = run
+    }
+    
+    /// Write a single variable to the file
+    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
+        try await getWriter(time: time).write(member: member, variable: variable, data: data, compressionType: compressionType)
+    }
+    
+    func getWriter(time: Timestamp) throws -> OmSpatialTimestepWriter {
+        if let writer = writer.first(where: {$0.time == time}) {
+            return writer
+        }
+        let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm)
+        self.writer.append(writer)
+        return writer
+    }
+    
+    /// Finalise the time step and return all handles
+    func finalise() async throws -> [GenericVariableHandle] {
+        return try await writer.asyncFlatMap({
+            try await $0.finalise()
+        })
+    }
+}
+

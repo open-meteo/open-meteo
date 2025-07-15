@@ -16,6 +16,17 @@ struct DownloadIconCommand: AsyncCommand {
         case pressureLevel
         case pressureLevelGt500
         case pressureLevelLtE500
+        
+        var realm: String? {
+            switch self {
+            case .modelLevel:
+                return "model-level"
+            case .pressureLevel:
+                return "pressure-level"
+            default:
+                return nil
+            }
+        }
     }
 
     struct Signature: CommandSignature {
@@ -100,7 +111,7 @@ struct DownloadIconCommand: AsyncCommand {
     }
 
     /// Download ICON global, eu and d2 *.grid2.bz2 files
-    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
+    func downloadIcon(application: Application, domain: IconDomains, run: Timestamp, variables: [any IconVariableDownloadable], concurrent: Int, uploadS3Bucket: String?, realm: String?) async throws -> (handles: [GenericVariableHandle], handles15minIconD2: [GenericVariableHandle]) {
         let logger = application.logger
         let client = application.http.client.shared
         let downloadDirectory = domain.downloadDirectory
@@ -114,18 +125,12 @@ struct DownloadIconCommand: AsyncCommand {
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
-        let storeOnDisk = domain == .icon || domain == .iconD2 || domain == .iconEu
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
+        let isEnsemble = domain.ensembleMembers > 1
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
         let serverPrefix = "http://opendata.dwd.de/weather/nwp/\(domain.rawValue)/grib/\(run.hour.zeroPadded(len: 2))/"
         let dateStr = run.format_YYYYMMddHH
-
-        // let nMembers = domain.ensembleMembers
-
-        let handles = GenericVariableHandleStorage()
-        let handles15minIconD2 = GenericVariableHandleStorage()
 
         let deaverager = GribDeaverager()
         let deaverager15min = GribDeaverager()
@@ -140,17 +145,20 @@ struct DownloadIconCommand: AsyncCommand {
 
         let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
         var previousHour = 0
-        for hour in forecastSteps {
+        let handles = try await forecastSteps.asyncMap { hour in
+        //for hour in forecastSteps {
             logger.info("Downloading hour \(hour)")
             let timestamp = run.add(hours: hour)
             let h3 = hour.zeroPadded(len: 3)
 
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
+            
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm)
+            let writerProbabilities = isEnsemble ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer15Min = OmSpatialMultistepWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: true, realm: nil)
 
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
-                //var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-
                 if variable.skipHour(hour: hour, domain: domain, forDownload: true, run: run) {
                     return
                 }
@@ -166,9 +174,6 @@ struct DownloadIconCommand: AsyncCommand {
                 var messages = try await cdo.downloadAndRemap(url)
                 if domain == .iconD2 && messages.count > 1 {
                     // Write 15min D2 icon data
-                    let downloadDirectory = IconDomains.iconD2_15min.downloadDirectory
-                    try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)
-                    let writer = OmRunSpatialWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: false)
                     for (i, (message, array2d)) in messages.enumerated() {
                         var array2d = array2d
                         guard let stepRange = message.get(attribute: "stepRange"),
@@ -189,7 +194,7 @@ struct DownloadIconCommand: AsyncCommand {
                                 continue
                             }
                         }
-                        await handles15minIconD2.append(try writer.write(time: timestamp, member: 0, variable: variable, data: array2d.data))
+                        try await writer15Min.write(time: timestamp, member: 0, variable: variable, data: array2d.data)
                     }
                     messages = [messages[0]]
                 }
@@ -225,19 +230,17 @@ struct DownloadIconCommand: AsyncCommand {
                         }
                     }
                     // logger.info("Compressing and writing data to \(filenameDest)")
-                    await handles.append(try writer.write(time: timestamp, member: member, variable: variable, data: array2d.data))
+                    try await writer.write(member: member, variable: variable, data: array2d.data)
                 }
             }
 
             /// Calculate precipitation >0.1mm/h probability
-            if domain.ensembleMembers > 1 {
-                try await handles.append(storage.calculatePrecipitationProbability(
+            if let writerProbabilities {
+                try await storage.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
-                    domain: domain,
-                    timestamp: timestamp,
-                    run: run,
-                    dtHoursOfCurrentStep: hour - previousHour
-                ))
+                    dtHoursOfCurrentStep: hour - previousHour,
+                    writer: writerProbabilities
+                )
             }
 
             /// All variables for this timestep have been downloaded. Selected variables are kept in memory.
@@ -334,13 +337,12 @@ struct DownloadIconCommand: AsyncCommand {
                     // We set them to 0 to be consistent with cloud_top and cloud_base in DMI Harmonie model
                     data.data = data.data.map { $0 < -499 ? 0 : $0 }
                 }
-                await handles.append(try writer.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
+                try await writer.write(member: v.member, variable: v.variable, data: data.data)
             }
 
             /// Post process 15 minutes data. Note: There is no temperature in 15min data
             try await storage15min.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
                 var data = data
-                let writer = OmRunSpatialWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: false)
                 /// Add snow to liquid rain if temperature is > 1.5°C or snowfall height is higher than 50 metre above groud
                 if v.variable == .rain, let snowfallWaterEquivalent = await storage15min.get(v.with(variable: .snowfall_water_equivalent)) {
                     /// Take temperature from 1-hourly data
@@ -400,15 +402,23 @@ struct DownloadIconCommand: AsyncCommand {
                     // Do not write snowfall_convective_water_equivalent to disk anymore
                     return
                 }
-                await handles15minIconD2.append(try writer.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data))
+                try await writer15Min.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data)
             }
+            
+            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
+            let handles15min = try await writer15Min.finalise()
+            
+            // TODO meta.json
+            
             if let uploadS3Bucket {
                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
             }
             previousHour = hour
+            return (handles, handles15min)
         }
+        
         await curl.printStatistics()
-        return await (handles.handles, handles15minIconD2.handles)
+        return (handles.flatMap({$0.0}), handles.flatMap({$0.1}))
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -478,7 +488,7 @@ struct DownloadIconCommand: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         try await convertSurfaceElevation(application: context.application, domain: domain, run: run)
 
-        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        let (handles, handles15minIconD2) = try await downloadIcon(application: context.application, domain: domain, run: run, variables: variables, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, realm: group.realm)
 
         if domain == .iconD2 {
             // ICON-D2 downloads 15min data as well
