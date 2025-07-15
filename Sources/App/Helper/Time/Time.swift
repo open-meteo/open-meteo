@@ -160,6 +160,10 @@ public struct Timestamp: Hashable, Sendable {
         let minute = Int(t.tm_min)
         return "\(year)-\(month.zeroPadded(len: 2))-\(day.zeroPadded(len: 2))T\(hour.zeroPadded(len: 2)):\(minute.zeroPadded(len: 2))"
     }
+    
+    var iso8601_YYYY_MM_dd_HH_mmZ: String {
+        return "\(iso8601_YYYY_MM_dd_HH_mm)Z"
+    }
 
     /// With format `yyyy-MM-dd'T'HHmm'`
     var iso8601_YYYY_MM_dd_HHmm: String {

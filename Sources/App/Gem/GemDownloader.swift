@@ -226,11 +226,11 @@ struct GemDownload: AsyncCommand {
                                     fatalError("Wind speed calculation requires \(windspeedVariable) to download")
                                 }
                                 let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                                handles.append(try writer.write(time: timestamp, member: member, variable: windspeedVariable, data: windspeed))
+                                handles.append(try await writer.write(time: timestamp, member: member, variable: windspeedVariable, data: windspeed))
                                 grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
                             }
                         }
-                        handles.append(try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
+                        handles.append(try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data))
                     }
                 } catch {
                     if !isSnowfallWaterEq {

@@ -97,7 +97,7 @@ struct MeteoSwissDownload: AsyncCommand {
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
             let timestamp = run.add(hours: hour)
             
-            let handles = try await variables.mapConcurrent(nConcurrent: 4) { variable -> [GenericVariableHandle] in
+            var handles = try await variables.mapConcurrent(nConcurrent: 4) { variable -> [GenericVariableHandle] in
                 var urls = [try await client.resolveMeteoSwissDownloadURL(
                     logger: logger,
                     collection: collection,
@@ -138,15 +138,9 @@ struct MeteoSwissDownload: AsyncCommand {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
                         logger.info("Processing \(variable) for \(timestamp.format_YYYYMMddHH) member \(member)")
-                        return try writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
+                        return try await writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
                     }
                 })
-                /// Calculate global shortwave radiation from diffuse and direct components
-                let sw = try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
-                /// Calculate relative humidity from temperature and dew point
-                let rh = try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
-                handles.append(contentsOf: sw)
-                handles.append(contentsOf: rh)
                 if variable == .precipitation {
                     logger.info("Calculating precipitation probability")
                     let precipitationProbability = try await handles.calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: variable, domain: domain, run: run)
@@ -154,6 +148,12 @@ struct MeteoSwissDownload: AsyncCommand {
                 }
                 return handles
             }.asyncFlatMap({$0})
+            /// Calculate global shortwave radiation from diffuse and direct components
+            let sw = try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
+            /// Calculate relative humidity from temperature and dew point
+            let rh = try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
+            handles.append(contentsOf: sw)
+            handles.append(contentsOf: rh)
             if let uploadS3Bucket {
                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
             }

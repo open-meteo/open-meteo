@@ -278,10 +278,8 @@ struct OmFileSplitter {
         
         var fileData = [Float](repeating: .nan, count: processChunkY * processChunkX * nTimePerFile * nMembers)
 
-        for yStart in stride(from: 0, to: UInt64(ny), by: UInt64.Stride(processChunkY)) {
-            for xStart in stride(from: 0, to: UInt64(nx), by: UInt64.Stride(processChunkX)) {
-                let yRange = yStart ..< min(yStart + UInt64(processChunkY), UInt64(ny))
-                let xRange = xStart ..< min(xStart + UInt64(processChunkX), UInt64(nx))
+        for yRange in (0..<UInt64(ny)).chunks(ofCount: processChunkY) {
+            for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
                 let memberRange = 0 ..< UInt64(nMembers)
 
                 // Contains the entire time-series to be updated for a chunks of locations

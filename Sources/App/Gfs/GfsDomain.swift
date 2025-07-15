@@ -135,7 +135,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs05_ens, .gfs025_ens, .gfswave025_ens, .gfs013, .gfs025, .gfswave025, .gfswave016:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
-            return t.with(hour: ((t.hour - 3 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 3).floor(toNearestHour: 6)
         // case .nam_conus:
             // NAM has a delay of 1:40 hours after initialisation. Cronjob starts at 1:40
             // return ((t.hour - 1 + 24) % 24) / 6 * 6

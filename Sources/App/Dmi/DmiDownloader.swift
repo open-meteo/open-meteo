@@ -245,7 +245,7 @@ struct DmiDownload: AsyncCommand {
                     guard await previousScoped.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return nil
                     }
-                    return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
 
                 previous = previousScoped

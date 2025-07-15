@@ -105,7 +105,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             }
             return h
         }
-        if let lastTimestampFile, let last = handles.max(by: { $0.time < $1.time })?.time {
+        if let lastTimestampFile, let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
@@ -173,11 +173,12 @@ struct JaxaHimawariDownload: AsyncCommand {
 
                 let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
-                return GenericVariableHandle(
+                return try await GenericVariableHandle(
                     variable: variable,
                     time: run,
                     member: 0,
-                    fn: fn
+                    fn: fn,
+                    domain: domain
                 )
             } catch NetCDFError.ncerror(let code, let error) {
                 logger.info("Skipping NetCDF error \(code): \(error)")

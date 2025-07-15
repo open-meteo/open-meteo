@@ -107,7 +107,7 @@ struct GloFasDownloader: AsyncCommand {
                     let writer = OmFileSplitter.makeSpatialWriter(domain: domain)
                     let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16_logarithmic, scalefactor: 1000, all: grib2d.array.data)
                     let variable = GloFasVariableAndMember(member: member)
-                    return GenericVariableHandle(variable: variable, time: attributes.timestamp, member: 0, fn: fn)
+                    return try await GenericVariableHandle(variable: variable, time: attributes.timestamp, member: 0, fn: fn, domain: domain)
                 }.collect().compactMap({ $0 })
             }
         }

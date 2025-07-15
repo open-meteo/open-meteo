@@ -242,7 +242,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     return
                 }
                 let data = Meteorology.specificToRelativeHumidity(specificHumidity: q.data, temperature: t.data, pressure: .init(repeating: hpa, count: t.count))
-                handles.append(try writer.write(time: timestamp, member: member, variable: rh, data: data))
+                handles.append(try await writer.write(time: timestamp, member: member, variable: rh, data: data))
             }
 
             /// AIFS025 ensemble stores control and perturbed forecast in different files
@@ -369,7 +369,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     // Note: skipHour0 needs still to be set for solar interpolation
                     logger.info("Processing \(variable) member \(member) timestep \(timestamp.format_YYYYMMddHH)")
-                    return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
                 handles.append(contentsOf: h)
             }
@@ -381,11 +381,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if let dewpoint = await inMemory.get(variable: .dew_point_2m, timestamp: timestamp, member: member)?.data,
                    let temperature = await inMemory.get(variable: .temperature_2m, timestamp: timestamp, member: member)?.data {
                     let rh = zip(temperature, dewpoint).map(Meteorology.relativeHumidity)
-                    handles.append(try writer.write(time: timestamp, member: member, variable: EcmwfVariable.relative_humidity_2m, data: rh))
+                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.relative_humidity_2m, data: rh))
                 }
 
                 // Relative humidity missing in AIFS
-                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.relative_humidity_1000hPa && $0.time == timestamp && $0.member == member }) {
+                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.relative_humidity_1000hPa && $0.time.range.lowerBound == timestamp && $0.member == member }) {
                     logger.info("Calculating relative humidity")
                     try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
                     try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
@@ -401,7 +401,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
                 }
 
-                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.cloud_cover && $0.time == timestamp && $0.member == member }) {
+                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.cloud_cover && $0.time.range.lowerBound == timestamp && $0.member == member }) {
                     logger.info("Calculating cloud cover")
                     guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
                           let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
@@ -433,10 +433,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
                     
-                    handles.append(try writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow))
-                    handles.append(try writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid))
-                    handles.append(try writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh))
-                    handles.append(try writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover))
+                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow))
+                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid))
+                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh))
+                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover))
                 }
             }
 
@@ -521,7 +521,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
-                return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
+                return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
             }.collect().compactMap({ $0 })
             handles.append(contentsOf: h)
             if let uploadS3Bucket {
@@ -536,16 +536,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
 extension EcmwfDomain {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     fileprivate var lastRun: Timestamp {
-        // 18z run starts downloading on the next day
-        let twoHoursAgo = Timestamp.now().add(-7200)
         let t = Timestamp.now()
         switch self {
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .ifs04, . ifs025, .wam025:
             // ECMWF has a delay of 7-8 hours after initialisation
-            return twoHoursAgo.with(hour: ((t.hour - 7 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 6).floor(toNearestHour: 6)
         case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
-            return twoHoursAgo.with(hour: ((t.hour - 5 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 4).floor(toNearestHour: 6)
         }
     }
     /// Get download url for a given domain and timestep

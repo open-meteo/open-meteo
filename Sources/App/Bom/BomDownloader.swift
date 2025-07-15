@@ -63,7 +63,7 @@ struct DownloadBomCommand: AsyncCommand {
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
             try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
         }
     }
@@ -161,16 +161,16 @@ struct DownloadBomCommand: AsyncCommand {
         ]
         let handles = try await map.mapConcurrent(nConcurrent: concurrent) { map -> [GenericVariableHandle] in
             logger.info("Calculate wind level \(map.level)")
-            return try zip(
+            return try await zip(
                 try combineAnalysisForecast(domain: domain, variable: "wnd_ucmp", run: run, level: map.level),
                 try combineAnalysisForecast(domain: domain, variable: "wnd_vcmp", run: run, level: map.level)
-            ).flatMap { u, v -> [GenericVariableHandle] in
+            ).asyncFlatMap { u, v -> [GenericVariableHandle] in
                 let timestamp = u.0
                 let speed = zip(u.1, v.1).map(Meteorology.windspeed)
                 let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
                 return [
-                    try writer.writeBom(time: timestamp, member: 0, variable: map.speed, data: speed),
-                    try writer.writeBom(time: timestamp, member: 0, variable: map.direction, data: direction)
+                    try await writer.writeBom(time: timestamp, member: 0, variable: map.speed, data: speed),
+                    try await writer.writeBom(time: timestamp, member: 0, variable: map.direction, data: direction)
                 ]
             }
         }.flatMap({ $0 })
@@ -241,8 +241,8 @@ struct DownloadBomCommand: AsyncCommand {
                     return []
                 }
                 logger.info("Compressing and writing data to member_\(member) \(omVariable.omFileName.file).om")
-                return try self.iterateForecast(domain: domain, member: member, variable: variable.name, run: run).map { timestamp, data in
-                    return try writer.writeBom(time: timestamp, member: member, variable: omVariable, data: data)
+                return try await self.iterateForecast(domain: domain, member: member, variable: variable.name, run: run).asyncMap { timestamp, data in
+                    return try await writer.writeBom(time: timestamp, member: member, variable: omVariable, data: data)
                 }
             }
             if domain == .access_global_ensemble && variable.om == .precipitation {
@@ -276,7 +276,7 @@ struct DownloadBomCommand: AsyncCommand {
                 let timestamp = conv_snow.0
                 let snow = zip(conv_snow.1, ls_snow.1).map(+)
                 let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: nil, liftedIndex: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds)
-                return [
+                return await [
                     try writer.writeBom(time: timestamp, member: member, variable: BomVariable.snowfall_water_equivalent, data: snow),
                     try writer.writeBom(time: timestamp, member: member, variable: BomVariable.weather_code, data: weather_code)
                 ]
@@ -292,7 +292,7 @@ struct DownloadBomCommand: AsyncCommand {
                 let (sfc_temp, dewpt_scrn) = arg
                 let timestamp = sfc_temp.0
                 let rh = zip(sfc_temp.1, dewpt_scrn.1).map({ Meteorology.relativeHumidity(temperature: $0.0 - 273.15, dewpoint: $0.1 - 273.15) })
-                return try writer.writeBom(time: timestamp, member: member, variable: .relative_humidity_2m, data: rh)
+                return try await writer.writeBom(time: timestamp, member: member, variable: .relative_humidity_2m, data: rh)
             }
         }
 
@@ -305,7 +305,7 @@ struct DownloadBomCommand: AsyncCommand {
                 let timestamp = u.0
                 let speed = zip(u.1, v.1).map(Meteorology.windspeed)
                 let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
-                return [
+                return await [
                     try writer.writeBom(time: timestamp, member: member, variable: .wind_speed_10m, data: speed),
                     try writer.writeBom(time: timestamp, member: member, variable: .wind_direction_10m, data: direction)
                 ]
@@ -382,8 +382,8 @@ struct DownloadBomCommand: AsyncCommand {
                 return []
             }
             logger.info("Compressing and writing data to \(omVariable.omFileName.file).om")
-            return try self.combineAnalysisForecast(domain: domain, variable: variable.name, run: run).map { timestamp, data in
-                return try writer.writeBom(time: timestamp, member: 0, variable: omVariable, data: data)
+            return try await self.combineAnalysisForecast(domain: domain, variable: variable.name, run: run).asyncMap { timestamp, data in
+                return try await writer.writeBom(time: timestamp, member: 0, variable: omVariable, data: data)
             }
         }
 
@@ -407,7 +407,7 @@ struct DownloadBomCommand: AsyncCommand {
             let timestamp = conv_snow.0
             let snow = zip(conv_snow.1, ls_snow.1).map(+)
             let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: cld_phys_thunder_p.1.map({ $0 * 3 }), liftedIndex: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds)
-            return [
+            return await [
                 try writer.writeBom(time: timestamp, member: 0, variable: BomVariable.snowfall_water_equivalent, data: snow),
                 try writer.writeBom(time: timestamp, member: 0, variable: BomVariable.weather_code, data: weather_code)
             ]
@@ -421,7 +421,7 @@ struct DownloadBomCommand: AsyncCommand {
             let timestamp = u.0
             let speed = zip(u.1, v.1).map(Meteorology.windspeed)
             let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
-            return [
+            return await [
                 try writer.writeBom(time: timestamp, member: 0, variable: .wind_speed_10m, data: speed),
                 try writer.writeBom(time: timestamp, member: 0, variable: .wind_direction_10m, data: direction)
             ]
@@ -617,7 +617,7 @@ struct DownloadBomCommand: AsyncCommand {
 }
 
 extension OmRunSpatialWriter {
-    fileprivate func writeBom(time: Timestamp, member: Int, variable: BomVariable, data: [Float]) throws -> GenericVariableHandle {
+    fileprivate func writeBom(time: Timestamp, member: Int, variable: BomVariable, data: [Float]) async throws -> GenericVariableHandle {
         guard data.count == domain.grid.count else {
             fatalError("invalid data array size")
         }
@@ -626,6 +626,6 @@ extension OmRunSpatialWriter {
         if let fma = variable.multiplyAdd {
             data.multiplyAdd(multiply: fma.multiply, add: fma.add)
         }
-        return try write(time: time, member: member, variable: variable, data: data)
+        return try await write(time: time, member: member, variable: variable, data: data)
     }
 }

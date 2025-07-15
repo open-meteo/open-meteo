@@ -114,10 +114,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .arpege_europe_probabilities, .arpege_world_probabilities, .arpege_europe, .arpege_world:
             // Delay of 3:40 hours after initialisation. Cronjobs starts at 3:00
-            return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 2).floor(toNearestHour: 6)
         case .arome_france, .arome_france_hd:
             // Delay of 3:40 hours after initialisation. Cronjobs starts at or 2:00
-            return t.with(hour: ((t.hour - 2 + 24) % 24) / 3 * 3)
+            return t.subtract(hours: 2).floor(toNearestHour: 3)
         case .arome_france_15min, .arome_france_hd_15min:
             return t.with(hour: t.hour)
         }

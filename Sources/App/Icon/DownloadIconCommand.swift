@@ -6,6 +6,7 @@ import Dispatch
 /**
  TODO:
  - Elevation files should not mask out sea level locations -> this breaks surface pressure correction as a lake can be above sea level
+ - Add z0
  */
 struct DownloadIconCommand: AsyncCommand {
     enum VariableGroup: String, RawRepresentable, CaseIterable {
@@ -496,13 +497,13 @@ extension IconDomains {
         switch self {
         case .iconEps, .icon:
             // Icon has a delay of 2-3 hours after initialisation  with 4 runs a day
-            return t.with(hour: ((t.hour - 2 + 24) % 24) / 6 * 6)
+            return t.subtract(hours: 2).floor(toNearestHour: 6)
         case .iconEuEps, .iconEu:
             // Icon-eu has a delay of 2:40 hours after initialisation with 8 runs a day
-            return t.with(hour: ((t.hour - 2 + 24) % 24) / 3 * 3)
+            return t.subtract(hours: 2).floor(toNearestHour: 3)
         case .iconD2Eps, .iconD2:
             // Icon d2 has a delay of 44 minutes and runs every 3 hours
-            return t.with(hour: t.hour / 3 * 3)
+            return t.floor(toNearestHour: 3)
         case .iconD2_15min:
             fatalError("ICON-D2 15minute data can not be downloaded individually")
         }

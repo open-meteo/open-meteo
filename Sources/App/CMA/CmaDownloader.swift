@@ -324,7 +324,7 @@ struct DownloadCmaCommand: AsyncCommand {
                     }
 
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    return try writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }.collect().compactMap({ $0 })
             }
             if let uploadS3Bucket {

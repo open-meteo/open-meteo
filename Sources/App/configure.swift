@@ -47,6 +47,17 @@ enum OpenMeteo {
         }
         return nil
     }()
+    
+    /// Data directory with trailing slash
+    static let dataRunDirectory: String? = {
+        if let dir = Environment.get("DATA_RUN_DIRECTORY") {
+            guard dir.last == "/" else {
+                fatalError("DATA_RUN_DIRECTORY must end with a trailing slash")
+            }
+            return dir
+        }
+        return nil
+    }()
 
     /// Temporary directory with trailing slash
     static let tempDirectory = {

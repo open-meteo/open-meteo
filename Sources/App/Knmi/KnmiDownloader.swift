@@ -42,7 +42,7 @@ struct KnmiDownload: AsyncCommand {
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time }.uniqued().sorted())
+            let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
             try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
         }
         logger.info("Finished in \(start.timeElapsedPretty())")
@@ -273,7 +273,7 @@ struct KnmiDownload: AsyncCommand {
                 guard await previous.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                     return nil
                 }
-                return try writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
+                return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
             }.collect().compactMap({ $0 })
 
             if generateElevationFile {

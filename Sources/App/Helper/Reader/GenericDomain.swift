@@ -38,6 +38,14 @@ extension GenericDomain {
     var downloadDirectory: String {
         return "\(OpenMeteo.tempDirectory)download-\(domainRegistry.rawValue)/"
     }
+    
+    /// Temporary directory to download data
+    var dataRunDirectory: String? {
+        guard let dataRunDirectory = OpenMeteo.dataRunDirectory else {
+            return nil
+        }
+        return "\(dataRunDirectory)\(domainRegistry.rawValue)/"
+    }
 
     /// The the file containing static information for elevation of soil types
     func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {

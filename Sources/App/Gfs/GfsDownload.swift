@@ -105,12 +105,12 @@ struct GfsDownload: AsyncCommand {
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
 
             let nConcurrent = signature.concurrent ?? 1
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: !signature.secondFlush)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
             let nConcurrent = signature.concurrent ?? 1
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: !signature.secondFlush)
         }
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -265,7 +265,7 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    handles.append(try writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
+                    handles.append(try await writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
                 }
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
@@ -434,7 +434,7 @@ struct GfsDownload: AsyncCommand {
                         // do not write pressure to disk
                         continue
                     }
-                    handles.append(try writer.write(time: timestamp, member: member, variable: variable.variable, data: grib2d.array.data))
+                    handles.append(try await writer.write(time: timestamp, member: member, variable: variable.variable, data: grib2d.array.data))
                 }
                 handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
             }
@@ -476,10 +476,10 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 
 extension VariablePerMemberStorage {
     /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
-        return try self.data
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
+        return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .compactMap({ t, handles -> GenericVariableHandle? in
+            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
                 guard
                     let precipitation = handles.first(where: { $0.key.variable == precipitation }),
                     let frozen_precipitation_percent = handles.first(where: { $0.key.variable == frozen_precipitation_percent }) else {
@@ -488,23 +488,23 @@ extension VariablePerMemberStorage {
                 let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
                     max($0 / 100 * $1 * 0.7, 0)
                 })
-                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: snowfall)
+                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: snowfall)
             }
         )
     }
     
     /// Calculate relative humidity
-    func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) throws -> [GenericVariableHandle] {
-        return try self.data
+    func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
+        return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .compactMap({ t, handles -> GenericVariableHandle? in
+            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
                 guard
                     let temperature = handles.first(where: { $0.key.variable == temperature }),
                     let dewpoint = handles.first(where: { $0.key.variable == dewpoint }) else {
                     return nil
                 }
                 let rh = zip(temperature.value.data, dewpoint.value.data).map(Meteorology.relativeHumidity)
-                return try writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: rh)
+                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: rh)
             }
         )
     }

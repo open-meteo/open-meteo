@@ -1,5 +1,5 @@
 {
-  "originHash" : "e49492439b9d8164c74d28bc7e7ef7367cf160e87b5130cdf7248b8803c06401",
+  "originHash" : "5ee2e28d5b5f46f6c8651dd4aab34373d87f7945f0150b810e80d6f39527058f",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -284,8 +284,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftNetCDF.git",
       "state" : {
-        "revision" : "1b79423176bd1be4a5512e8333f6da193f04d791",
-        "version" : "1.1.7"
+        "revision" : "d945826df984db4e1791745d19e484c3f5cbe0c8",
+        "version" : "1.2.0"
       }
     },
     {

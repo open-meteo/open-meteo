@@ -271,7 +271,7 @@ struct UkmoDownload: AsyncCommand {
                     let memory = try await curl.downloadInMemoryAsync(url: url, minSize: 1024)
                     let data = try memory.readUkmoNetCDF()
                     logger.info("Processing \(data.name) [\(data.unit)]")
-                    return try data.data.compactMap { level, member, data -> GenericVariableHandle? in
+                    return try await data.data.asyncCompactMap { level, member, data -> GenericVariableHandle? in
                         var data = data.data
                         if let scaling = variable.multiplyAdd {
                             data.multiplyAdd(multiply: scaling.scalefactor, add: scaling.offset)
@@ -296,7 +296,7 @@ struct UkmoDownload: AsyncCommand {
                             }
                         }
                         let variable = variable.withLevel(level: level)
-                        return try writer.write(time: timestamp, member: member, variable: variable, data: data)
+                        return try await writer.write(time: timestamp, member: member, variable: variable, data: data)
                     }
                 }.flatMap({ $0 })
                 handles.append(contentsOf: handle)
