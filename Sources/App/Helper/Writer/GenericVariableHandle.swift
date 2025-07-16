@@ -79,16 +79,12 @@ struct GenericVariableHandle: Sendable {
         if let uploadS3Bucket = uploadS3Bucket {
             logger.info("AWS upload to bucket \(uploadS3Bucket)")
             let variables = handles.map { $0.variable }.uniqued(on: { $0.omFileName.file })
-            do {
-                let startTimeAws = DispatchTime.now()
-                try domain.domainRegistry.syncToS3(
-                    bucket: uploadS3Bucket,
-                    variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
-                )
-                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
-            } catch {
-                logger.error("Sync to AWS failed: \(error)")
-            }
+            let startTimeAws = DispatchTime.now()
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
+            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
 
         if let run {
@@ -100,16 +96,12 @@ struct GenericVariableHandle: Sendable {
             
             /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
             if !uploadS3OnlyProbabilities, let uploadS3Bucket {
-                do {
-                    let startTimeAws = DispatchTime.now()
-                    try domain.domainRegistry.syncToS3(
-                        bucket: uploadS3Bucket,
-                        variables: nil
-                    )
-                    logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
-                } catch {
-                    logger.error("Sync to AWS failed: \(error)")
-                }
+                let startTimeAws = DispatchTime.now()
+                try domain.domainRegistry.syncToS3(
+                    bucket: uploadS3Bucket,
+                    variables: nil
+                )
+                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
             }
         }
         

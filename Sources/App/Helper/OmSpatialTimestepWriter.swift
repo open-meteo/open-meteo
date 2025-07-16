@@ -77,7 +77,7 @@ actor OmSpatialTimestepWriter {
     }
     
     /// Finalise the time step, update meta JSON and return all handles
-    func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws -> [GenericVariableHandle] {
         guard variables.count > 0 else {
             if let filename = filename {
                 try FileManager.default.removeItemIfExists(at: "\(filename)~")
@@ -95,40 +95,10 @@ actor OmSpatialTimestepWriter {
         }
         let root = try writer.writeNone(name: "", children: variablesOffset + [runTime, validTime, /*coordinates,*/ createdAt])
         try writer.writeTrailer(rootVariable: root)
-        if let filename, let directorySpatial = domain.domainRegistry.directorySpatial {
-            let meta = DataSpatialJson(
-                reference_time: run.iso8601_YYYY_MM_dd_HH_mmZ,
-                last_modified_time: Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ,
-                completed: completed,
-                valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
-                variables: self.variables.map {
-                    let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
-                    return "\($0.variable.omFileName.file)\(member)"
-                }.sorted()
-            )
-            let realm = realm.map { "_\($0)" } ?? ""
-            
-            // Commit OpenMeteo file
-            try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
-            
-            let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
-            try meta.writeTo(path: "\(path)meta\(realm).json")
-            try meta.writeTo(path: "\(directorySpatial)latest-run\(realm).json")
-            
-            if completed {
-                try meta.writeTo(path: "\(directorySpatial)current-run\(realm).json")
-            }
-            
-            // TODO sync to S3 now
-            // Strategy: Use single copy commands to transfer data
-            // For the final step do an additional sync, to make sure everything is there
-            /*
-             if let uploadS3Bucket {
-                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-             }
-             */
-        }
         
+        if let filename {
+            try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
+        }
         
         let reader = try await OmFileReader(fn: try MmapFile(fn: self.fn))
         let time = self.time
@@ -138,6 +108,56 @@ actor OmSpatialTimestepWriter {
                 fatalError("Could not read variable \(variable.variable.omFileName.file) as Float array")
             }
             return GenericVariableHandle(variable: variable.variable, time: TimerangeDt(start: time, nTime: 1, dtSeconds: dtSeconds), member: variable.member, reader: arrayReader)
+        }
+        
+        guard let filename, let directorySpatial = domain.domainRegistry.directorySpatial else {
+            // return early for temporary files that do not need a meta.json
+            return handles
+        }
+        
+        let meta = DataSpatialJson(
+            reference_time: run.iso8601_YYYY_MM_dd_HH_mmZ,
+            last_modified_time: Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ,
+            completed: completed,
+            valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
+            variables: self.variables.map {
+                let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
+                return "\($0.variable.omFileName.file)\(member)"
+            }.sorted()
+        )
+        let realm = realm.map { "_\($0)" } ?? ""
+        
+        let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
+        let metaRunMeta = "\(path)meta\(realm).json"
+        let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
+        let metaLatest = "\(directorySpatial)latest\(realm).json"
+        
+        try meta.writeTo(path: metaRunMeta)
+        try meta.writeTo(path: metaInProgress)
+        if completed {
+            try meta.writeTo(path: metaLatest)
+        }
+        
+        // Upload to AWS S3
+        // The single OM file will be uploaded + meta JSON files
+        if let uploadS3Bucket {
+            for (bucket, profile) in domain.domainRegistry.parseBucket(uploadS3Bucket) {
+                let destDomain = "s3://\(bucket)/data_spatial/\(domain.domainRegistry.rawValue)/"
+                let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
+                let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
+                let destMeta = "\(destRun)meta\(realm).json"
+                let destInProgress = "\(destDomain)in-progress\(realm).json"
+                let destLatest = "\(destDomain)latest\(realm).json"
+                
+                try Process.awsCopy(src: filename, dest: destFile, profile: profile)
+                if uploadMeta {
+                    try Process.awsCopy(src: metaRunMeta, dest: destMeta, profile: profile)
+                    try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
+                    if completed {
+                        try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)
+                    }
+                }
+            }
         }
         return handles
     }
@@ -178,10 +198,12 @@ actor OmSpatialMultistepWriter {
     /// If not validTimes are given, use all timestamps from the underlaying writer
     func finalise(completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let validTimes = validTimes ?? writer.map(\.time)
+        // Only upload META JSON for the last timestamp
+        let lastTimestamp = writer.last?.time
         let handles = try await writer.asyncFlatMap({
-            try await $0.finalise(completed: completed, validTimes: validTimes, uploadS3Bucket: nil)
+            let isLast = $0.time == lastTimestamp
+            return try await $0.finalise(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: isLast)
         })
-        // TODO upload S3 now
         return handles
     }
 }
