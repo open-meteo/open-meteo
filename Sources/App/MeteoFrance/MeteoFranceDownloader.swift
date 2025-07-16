@@ -85,13 +85,14 @@ struct MeteoFranceDownload: AsyncCommand {
         let useGribPackagesDownload = signature.useGribPackages && !domain.mfApiPackagesSurface.isEmpty
 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
-        let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, maxForecastHour: signature.maxForecastHour) : useGribPackagesDownload ?
-            try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour) :
+        let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
+        try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket) :
             try await download2(application: context.application, domain: domain, run: run, variables: variables)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
         
+        /// TODO REMOVEEEEEEEE
         if let uploadS3Bucket = signature.uploadS3Bucket {
             let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
             try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
@@ -200,7 +201,7 @@ struct MeteoFranceDownload: AsyncCommand {
     /**
      Download statistical ensemble forecast. See https://github.com/open-meteo/open-meteo/issues/1069
      */
-    func downloadProbabilities(application: Application, domain: MeteoFranceDomain, run: Timestamp, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func downloadProbabilities(application: Application, domain: MeteoFranceDomain, run: Timestamp, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -209,35 +210,30 @@ struct MeteoFranceDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-
         // let grid = domain.grid
-        var handles = [GenericVariableHandle]()
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
+        let timestamps = domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: false).map { run.add($0) }
+        
         // https://public-api.meteofrance.fr/public/DPStatsPEARPEGE/v1/models/PEARP-EUROPE/grids/0.1/groups/FFDDP1/productStatsPEARP?referencetime=2024-10-14T18%3A00%3A00Z&time=003H&format=grib2
 
-        for forecastSecond in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: false) {
-            if let maxForecastHour, forecastSecond / 3600 > maxForecastHour {
-                break
-            }
-            let timestamp = run.add(forecastSecond)
-            let f3 = (forecastSecond / 3600).zeroPadded(len: 3)
+        let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let f3 = ((timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600).zeroPadded(len: 3)
 
             let url = "https://public-api.meteofrance.fr/public/DPStatsPEARPEGE/v1/models/PEARP-EUROPE/grids/\(domain.mfApiGridName)/groups/RRP1/productStatsPEARP?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(f3)H&format=grib2"
 
-            let h = try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+            return try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                 // process sequentialy, as precipitation need to be in order for deaveraging
-                return try await stream.compactMap { message -> GenericVariableHandle? in
+                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+                for try await message in stream {
                     // Only select 3h precipitation probability from the grib file
                     guard let probabilityType = message.getLong(attribute: "probabilityType"),
                           probabilityType == 3,
                           let stepRange = message.get(attribute: "stepRange")?.splitTo2Integer(),
                           stepRange.1 - stepRange.0 == 3
                     else {
-                        return nil
+                        continue
                     }
-
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                     // message.dumpAttributes()
                     try grib2d.load(message: message)
@@ -248,12 +244,12 @@ struct MeteoFranceDownload: AsyncCommand {
                     }
 
                     let variable = ProbabilityVariable.precipitation_probability
-
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
-                }.collect()
+                    try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
+                }
+                let completed = i == timestamps.count - 1
+                return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
-            handles.append(contentsOf: h)
         }
         await curl.printStatistics()
         return handles
@@ -265,7 +261,7 @@ struct MeteoFranceDownload: AsyncCommand {
      - MF does not publish 15minutely data via GRIB packages
      - There is no GRIB inventory, so we have to download the entire GRIB file
      */
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -274,13 +270,10 @@ struct MeteoFranceDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
         
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-
         let grid = domain.grid
         let nx = grid.nx
         let ny = grid.ny
-        var handles = [GenericVariableHandle]()
-        var previous = GribDeaverager()
+        let previous = GribDeaverager()
         let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
@@ -288,117 +281,119 @@ struct MeteoFranceDownload: AsyncCommand {
         // https://object.data.gouv.fr/meteofrance-pnt/pnt/2024-06-23T03:00:00Z/arome/0025/SP1/arome__0025__SP1__00H06H__2024-06-23T03:00:00Z.grib2
         // https://object.data.gouv.fr/meteofrance-pnt/pnt/2024-06-23T00:00:00Z/arpege/01/HP1/arpege__01__HP1__000H012H__2024-06-23T00:00:00Z.grib2
 
-        for packageTime in domain.mfApiPackageTimes {
+        var validTimes: Set<Timestamp> = []
+        
+        let handles = try await domain.mfApiPackageTimes.asyncFlatMap { packageTime -> [GenericVariableHandle] in
             if let maxForecastHour {
                 if let start = packageTime.split(separator: "H").first.map(String.init)?.toInt() {
                     if start > maxForecastHour {
-                        continue
+                        return []
                     }
                 }
             }
-
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
             for package in packages {
                 let url = "https://public-api.meteofrance.fr/previnum/DPPaquet\(domain.family.mfApiDDP)/v1/models/\(domain.family.mfApiDDP)/grids/\(domain.mfApiGridName)/packages/\(package)/\(domain.family.mfApiProductName)?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(packageTime)&format=grib2"
 
                 let gridRes = domain.mfApiGridName.replacingOccurrences(of: ".", with: "")
                 let urlGov = "https://object.data.gouv.fr/meteofrance-pnt/pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
 
-                /// In case the stream is restarted, keep the old version the deaverager
-                let previousScoped = await previous.copy()
-                let h = try await curl.withGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
-                    let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
-                    let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
+                let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
+                let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
+                
+                
+                for message in try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) {
 
-                    // process sequentialy, as precipitation need to be in order for deaveraging
-                    let handles = try await stream.compactMap { message -> GenericVariableHandle? in
-                        guard let shortName = message.get(attribute: "shortName"),
-                              let stepRange = message.get(attribute: "stepRange"),
-                              let stepType = message.get(attribute: "stepType"),
-                              let levelStr = message.get(attribute: "level"),
-                              let typeOfLevel = message.get(attribute: "typeOfLevel"),
-                              let parameterName = message.get(attribute: "parameterName"),
-                              let parameterUnits = message.get(attribute: "parameterUnits"),
-                              let validityTime = message.get(attribute: "validityTime"),
-                              let validityDate = message.get(attribute: "validityDate"),
-                              let unit = message.get(attribute: "units"),
-                              let paramId = message.get(attribute: "paramId")
-                        else {
-                            fatalError("could not get attributes")
-                        }
-                        let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                    guard let shortName = message.get(attribute: "shortName"),
+                          let stepRange = message.get(attribute: "stepRange"),
+                          let stepType = message.get(attribute: "stepType"),
+                          let levelStr = message.get(attribute: "level"),
+                          let typeOfLevel = message.get(attribute: "typeOfLevel"),
+                          let parameterName = message.get(attribute: "parameterName"),
+                          let parameterUnits = message.get(attribute: "parameterUnits"),
+                          let validityTime = message.get(attribute: "validityTime"),
+                          let validityDate = message.get(attribute: "validityDate"),
+                          let unit = message.get(attribute: "units"),
+                          let paramId = message.get(attribute: "paramId")
+                    else {
+                        fatalError("could not get attributes")
+                    }
+                    let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
 
-                        if let temporary = MfVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
-                            logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
-                            var grib2d = GribArray2D(nx: nx, ny: ny)
-                            try grib2d.load(message: message)
-                            if domain.isGlobal {
-                                grib2d.array.shift180LongitudeAndFlipLatitude()
-                            } else {
-                                grib2d.array.flipLatitude()
-                            }
-                            await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
-                            return nil
-                        }
-
-                        if domain == .arome_france_hd, let temporary = MfVariablePrecipTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
-                            logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
-                            var grib2d = GribArray2D(nx: nx, ny: ny)
-                            try grib2d.load(message: message)
-                            if domain.isGlobal {
-                                grib2d.array.shift180LongitudeAndFlipLatitude()
-                            } else {
-                                grib2d.array.flipLatitude()
-                            }
-                            switch unit {
-                            case "kg m-2 s-1": // mm/s to mm/h
-                                grib2d.array.data.multiplyAdd(multiply: 3600, add: 0)
-                            default:
-                                break
-                            }
-                            // Deaccumulate precipitation
-                            guard await previousScoped.deaccumulateIfRequired(variable: temporary, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                                return nil
-                            }
-                            await inMemoryPrecip.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
-                            return nil
-                        }
-
-                        guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
-                            logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
-                            return nil
-                        }
-
+                    if let temporary = MfVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                        logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
                         var grib2d = GribArray2D(nx: nx, ny: ny)
-                        // message.dumpAttributes()
                         try grib2d.load(message: message)
                         if domain.isGlobal {
                             grib2d.array.shift180LongitudeAndFlipLatitude()
                         } else {
                             grib2d.array.flipLatitude()
                         }
+                        await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                        continue
+                    }
 
-                        // Scaling before compression with scalefactor
-                        if let fma = variable.multiplyAdd {
-                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    if domain == .arome_france_hd, let temporary = MfVariablePrecipTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                        logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                        var grib2d = GribArray2D(nx: nx, ny: ny)
+                        try grib2d.load(message: message)
+                        if domain.isGlobal {
+                            grib2d.array.shift180LongitudeAndFlipLatitude()
+                        } else {
+                            grib2d.array.flipLatitude()
                         }
-
+                        switch unit {
+                        case "kg m-2 s-1": // mm/s to mm/h
+                            grib2d.array.data.multiplyAdd(multiply: 3600, add: 0)
+                        default:
+                            break
+                        }
                         // Deaccumulate precipitation
-                        guard await previousScoped.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                            return nil
+                        guard await previous.deaccumulateIfRequired(variable: temporary, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            continue
                         }
+                        await inMemoryPrecip.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                        continue
+                    }
 
-                        logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                        return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true)
-                    }.collect()
+                    guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
+                        logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                        continue
+                    }
 
-                    let windGust = try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer, overwrite: true)
-                    let precip = try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
+                    var grib2d = GribArray2D(nx: nx, ny: ny)
+                    // message.dumpAttributes()
+                    try grib2d.load(message: message)
+                    if domain.isGlobal {
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                    } else {
+                        grib2d.array.flipLatitude()
+                    }
 
-                    return handles + windGust + precip
+                    // Scaling before compression with scalefactor
+                    if let fma = variable.multiplyAdd {
+                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+
+                    // Deaccumulate precipitation
+                    guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        continue
+                    }
+
+                    logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
+                    try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
                 }
-                previous = previousScoped
-                handles.append(contentsOf: h)
+                for writer in await writer.writer {
+                    try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
+                    try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
+                }
             }
+            
+            for writer in await writer.writer {
+                validTimes.insert(writer.time)
+            }
+            let completed = packageTime == domain.mfApiPackageTimes.last
+            return try await writer.finalise(completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles
@@ -571,6 +566,22 @@ struct MeteoFranceDownload: AsyncCommand {
 
 extension VariablePerMemberStorage {
     /// Sum up rain, snow and graupel for total precipitation
+    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
+            guard
+                t.timestamp == writer.time,
+                let tgrp = handles.first(where: { $0.key.variable == tgrp }),
+                let tsnowp = handles.first(where: { $0.key.variable == tsnowp }),
+                let tirf = handles.first(where: { $0.key.variable == tirf }) else {
+                continue
+            }
+            let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({ $0 + $1.0 + $1.1 })
+            try await writer.write(member: t.member, variable: outVariable, data: precip)
+        }
+    }
+    
+    /// Sum up rain, snow and graupel for total precipitation
+    @available(*, deprecated)
     func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
         return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })

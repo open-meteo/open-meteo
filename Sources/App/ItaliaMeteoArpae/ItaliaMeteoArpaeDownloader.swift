@@ -55,14 +55,9 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         try await downloadElevation(application: context.application, domain: domain, run: run)
-        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour)
+        let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
-        
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
-            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
-        }
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -93,7 +88,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         try elevation.array.data.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
     }
 
-    func download(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: ItaliaMeteoArpaeDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let client = application.http.client.shared
         let deadLineHours = Double(6)
@@ -114,8 +109,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         }()
 
         let grid = domain.grid
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-        let handles = GenericVariableHandleStorage()
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let variableLevel: [VariableLevel] = ItaliaMeteoArpaeVariablesDownload.allCases.flatMap({ variable in
             variable.levels.map { level in
@@ -163,8 +157,8 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     let vWind = array2d.array
                     let speed = zip(uWind.data, vWind.data).map(Meteorology.windspeed)
                     let direction = Meteorology.windirectionFast(u: uWind.data, v: vWind.data)
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.wind_speed_10m, data: speed))
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.wind_direction_10m, data: direction))
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.wind_speed_10m, data: speed)
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.wind_direction_10m, data: direction)
                 }
 
                 /// Calculate pressure level wind
@@ -175,8 +169,8 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     let vWind = array2d.array
                     let speed = zip(uWind.data, vWind.data).map(Meteorology.windspeed)
                     let direction = Meteorology.windirectionFast(u: uWind.data, v: vWind.data)
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaePressureVariable(variable: .wind_speed, level: Int(attributes.levelStr)!), data: speed))
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaePressureVariable(variable: .wind_direction, level: Int(attributes.levelStr)!), data: direction))
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaePressureVariable(variable: .wind_speed, level: Int(attributes.levelStr)!), data: speed)
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaePressureVariable(variable: .wind_direction, level: Int(attributes.levelStr)!), data: direction)
                 }
 
                 /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
@@ -239,9 +233,9 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                         showers[i] = rainCon.data[i] + (aboveFreezing ? snowCon.data[i] : 0)
                         snow[i] = aboveFreezing ? 0 : (snowGsp.data[i] + snowCon.data[i])
                     }
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.rain, data: rain))
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.showers, data: showers))
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.snowfall_water_equivalent, data: snow))
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.rain, data: rain)
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.showers, data: showers)
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.snowfall_water_equivalent, data: snow)
                 }
 
                 /// Calculate relative humidity from dew point
@@ -250,7 +244,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                         fatalError("T2M must be loaded before \(v.variable)")
                     }
                     let rh = zip(t2m.data, array2d.array.data).map( Meteorology.relativeHumidity)
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.relative_humidity_2m, data: rh))
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.relative_humidity_2m, data: rh)
                 }
 
                 /// Convert vertical pressure velocity to geometric velocity
@@ -260,7 +254,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     }
                     let level = Int(attributes.levelStr)!
                     let vv = Meteorology.verticalVelocityPressureToGeometric(omega: array2d.array.data, temperature: t.data, pressureLevel: Float(level))
-                    await handles.append(try writer.write(time: time, member: 0, variable: ItaliaMeteoArpaePressureVariable(variable: .vertical_velocity, level: level), data: vv))
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaePressureVariable(variable: .vertical_velocity, level: level), data: vv)
                 }
                 if v.variable == .T_SO {
                     guard let scaledValueOfFirstFixedSurface = message.getLong(attribute: "scaledValueOfFirstFixedSurface") else {
@@ -285,7 +279,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     default:
                         continue
                     }
-                    await handles.append(try writer.write(time: time, member: 0, variable: variable, data: array2d.array.data))
+                    try await writer.write(time: time, member: 0, variable: variable, data: array2d.array.data)
                 }
                 if v.variable == .W_SO {
                     guard let scaledValueOfFirstFixedSurface = message.getLong(attribute: "scaledValueOfFirstFixedSurface"),
@@ -315,14 +309,14 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     }
                     let depth = Float(scaledValueOfSecondFixedSurface - scaledValueOfFirstFixedSurface)
                     array2d.array.data.multiplyAdd(multiply: 0.1 / depth, add: 0)
-                    await handles.append(try writer.write(time: time, member: 0, variable: variable, data: array2d.array.data))
+                    try await writer.write(time: time, member: 0, variable: variable, data: array2d.array.data)
                 }
 
                 if let variable = v.variable.getGenericVariable(attributes: attributes) {
-                    await handles.append(try writer.write(time: time, member: 0, variable: variable, data: array2d.array.data))
+                    try await writer.write(time: time, member: 0, variable: variable, data: array2d.array.data)
                 }
             }
         }
-        return await handles.handles
+        return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
     }
 }
