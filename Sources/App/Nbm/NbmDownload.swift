@@ -121,22 +121,20 @@ struct NbmDownload: AsyncCommand {
         if let maxForecastHour {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
-
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+        let timestamps = forecastHours.map { run.add(hours: $0) }
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        var handles = [GenericVariableHandle]()
 
-        var previousForecastHour = 0
-
-        for forecastHour in forecastHours {
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading forecastHour \(forecastHour)")
-            let timestamp = run.add(hours: forecastHour)
 
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0)
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
 
             let variables: [NbmVariableAndDomain] = variables.map {
-                NbmVariableAndDomain(variable: $0, domain: domain, timestep: forecastHour, previousTimestep: previousForecastHour, run: run.hour)
+                let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+                return NbmVariableAndDomain(variable: $0, domain: domain, timestep: forecastHour, previousTimestep: previousHour, run: run.hour)
             }
 
             for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: false) {
@@ -177,12 +175,10 @@ struct NbmDownload: AsyncCommand {
                 if let fma = variable.variable.multiplyAdd(domain: domain) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                handles.append(try await writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
+                try await writer.write( member: 0, variable: variable.variable, data: grib2d.array.data)
             }
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
-            previousForecastHour = forecastHour
+            let completed = i == timestamps.count - 1
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles

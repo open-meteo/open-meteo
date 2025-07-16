@@ -87,16 +87,11 @@ struct MeteoFranceDownload: AsyncCommand {
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
         try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket) :
-            try await download2(application: context.application, domain: domain, run: run, variables: variables)
+        try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         // try convert(logger: logger, domain: domain, variables: variables, run: run, createNetcdf: signature.createNetcdf)
-        
-        /// TODO REMOVEEEEEEEE
-        if let uploadS3Bucket = signature.uploadS3Bucket {
-            let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
-            try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
-        }
+
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
@@ -502,7 +497,7 @@ struct MeteoFranceDownload: AsyncCommand {
     }
 
     /// Download one field at a time
-    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [any MeteoFranceVariableDownloadable]) async throws -> [GenericVariableHandle] {
+    func download2(application: Application, domain: MeteoFranceDomain, run: Timestamp, variables: [any MeteoFranceVariableDownloadable], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -514,12 +509,13 @@ struct MeteoFranceDownload: AsyncCommand {
         let grid = domain.grid
         var grib2d = GribArray2D(nx: grid.nx, ny: grid.ny)
         let subsetGrid = domain.mfSubsetGrid
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
-        var handles = [GenericVariableHandle]()
+        let timestamps = domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true).map { run.add($0) }
 
-        for seconds in domain.forecastSeconds(run: run.hour, hourlyForArpegeEurope: true) {
-            let timestamp = run.add(seconds)
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let seconds = timestamp.timeIntervalSince1970 - run.timeIntervalSince1970
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            
             for variable in variables {
                 guard variable.availableFor(domain: domain, forecastSecond: seconds) else {
                     continue
@@ -556,8 +552,11 @@ struct MeteoFranceDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                handles.append(try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data, overwrite: true))
+                try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
+            let completed = i == timestamps.count - 1
+            let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            return handles
         }
         // await curl.printStatistics()
         return handles
