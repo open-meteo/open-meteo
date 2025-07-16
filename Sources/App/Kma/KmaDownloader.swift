@@ -58,6 +58,8 @@ struct KmaDownload: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {
             return
         }
+        try surfaceElevationFileOm.createDirectory()
+        
         let logger = application.logger
         let ftp = FtpDownloader(connectTimeout: 5)
 
