@@ -82,11 +82,11 @@ actor OmSpatialTimestepWriter {
         let validTime =  try writer.write(value: time.timeIntervalSince1970, name: "valid_time", children: [])
         //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
         let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
-        let variables = try self.variables.map {
+        let variablesOffset = try self.variables.map {
             let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
             return try writer.write(array: $0.finalised, name: "\($0.variable.omFileName.file)\(member)", children: [])
         }
-        let root = try writer.writeNone(name: "", children: variables + [runTime, validTime, /*coordinates,*/ createdAt])
+        let root = try writer.writeNone(name: "", children: variablesOffset + [runTime, validTime, /*coordinates,*/ createdAt])
         try writer.writeTrailer(rootVariable: root)
         if let filename, let directorySpatial = domain.domainRegistry.directorySpatial {
             let meta = DataSpatialJson(
@@ -97,7 +97,7 @@ actor OmSpatialTimestepWriter {
                 variables: self.variables.map {
                     let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
                     return "\($0.variable.omFileName.file)\(member)"
-                }
+                }.sorted()
             )
             let realm = realm.map { "_\($0)" } ?? ""
             
@@ -187,6 +187,7 @@ fileprivate struct DataSpatialJson: Encodable {
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
     //let temporal_resolution_seconds: Int
 
+    // variables_step0?
     // grid attributes?
     // units? step types?
 
