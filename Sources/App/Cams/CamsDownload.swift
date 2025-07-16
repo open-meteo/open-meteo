@@ -138,7 +138,7 @@ struct DownloadCamsCommand: AsyncCommand {
         
         let timestamps = (0..<domain.forecastHours).map { run.add(hours: $0) }
 
-        let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) -> [GenericVariableHandle] in
+        let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
@@ -179,7 +179,7 @@ struct DownloadCamsCommand: AsyncCommand {
             return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
-        return handles.flatMap { $0 }
+        return handles
     }
 
     struct CamsEuropeQuery: Encodable {

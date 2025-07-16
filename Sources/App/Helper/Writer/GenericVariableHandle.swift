@@ -472,6 +472,31 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
 extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members an timesteps.
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
+        for (t, handles) in self.data
+            .groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
+            guard
+                t.timestamp == writer.time,
+                 let u = handles.first(where: { $0.key.variable == u }), let v = handles.first(where: { $0.key.variable == v }) else {
+                continue
+            }
+            let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
+            try await writer.write(member: t.member, variable: outSpeedVariable, data: speed)
+
+            if let outDirectionVariable {
+                var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
+                if let trueNorth {
+                    direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
+                }
+                try await writer.write(member: t.member, variable: outDirectionVariable, data: direction)
+            }
+        }
+    }
+    
+    
+    /// Calculate wind speed and direction from U/V components for all available members an timesteps.
+    /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
+    @available(*, deprecated)
     func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmRunSpatialWriter, trueNorth: [Float]? = nil, overwrite: Bool = false) async throws -> [GenericVariableHandle] {
         return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
