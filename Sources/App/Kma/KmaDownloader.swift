@@ -206,23 +206,6 @@ extension VariablePerMemberStorage {
             try await writer.write(member: t.member, variable: outVariable, data: sum)
         }
     }
-    
-    /// Sum up 2 variables
-    @available(*, deprecated)
-    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
-        return try await self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
-                guard
-                    let var1 = handles.first(where: { $0.key.variable == var1 }),
-                    let var2 = handles.first(where: { $0.key.variable == var2 }) else {
-                    return nil
-                }
-                let sum = zip(var1.value.data, var2.value.data).map(+)
-                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: sum)
-            }
-        )
-    }
 }
 
 protocol KmaVariableDownloadable {

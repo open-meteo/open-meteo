@@ -578,22 +578,4 @@ extension VariablePerMemberStorage {
             try await writer.write(member: t.member, variable: outVariable, data: precip)
         }
     }
-    
-    /// Sum up rain, snow and graupel for total precipitation
-    @available(*, deprecated)
-    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
-        return try await self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
-                guard
-                    let tgrp = handles.first(where: { $0.key.variable == tgrp }),
-                    let tsnowp = handles.first(where: { $0.key.variable == tsnowp }),
-                    let tirf = handles.first(where: { $0.key.variable == tirf }) else {
-                    return nil
-                }
-                let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({ $0 + $1.0 + $1.1 })
-                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: precip)
-            }
-        )
-    }
 }

@@ -243,8 +243,6 @@ struct UkmoDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: domain == .uk_deterministic_2km || domain == .global_deterministic_10km)
-
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"

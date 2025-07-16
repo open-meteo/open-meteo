@@ -125,8 +125,6 @@ struct DownloadCamsCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
 
-        //let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
