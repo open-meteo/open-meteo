@@ -12,6 +12,7 @@ struct DownloadIconCommand: AsyncCommand {
     enum VariableGroup: String, RawRepresentable, CaseIterable {
         case all
         case surface
+        case surfaceAndPressure
         case modelLevel
         case pressureLevel
         case pressureLevelGt500
@@ -452,6 +453,14 @@ struct DownloadIconCommand: AsyncCommand {
         case .surface:
             groupVariables = IconSurfaceVariable.allCases.filter {
                 !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
+            }
+        case .surfaceAndPressure:
+            groupVariables = IconSurfaceVariable.allCases.filter {
+                !($0.getVarAndLevel(domain: domain)?.cat == "model-level")
+            } + domain.levels.reversed().flatMap { level in
+                IconPressureVariableType.allCases.map { variable in
+                    IconPressureVariable(variable: variable, level: level)
+                }
             }
         case .modelLevel:
             groupVariables = IconSurfaceVariable.allCases.filter {
