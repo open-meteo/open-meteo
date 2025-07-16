@@ -3,13 +3,13 @@ import Foundation
 
 /**
  multiple files
- data_spatial/<domain>/last_run.json
- data_spatial/<domain>/current_run.json
+ data_spatial/<domain>/latest-run.json
+ data_spatial/<domain>/current-run.json
  data_spatial/<domain>/<run>/meta.json -> contains list of variables + timestamps
  data_spatial/<domain>/<run>/<timestamp>.om
  
- data_spatial/<domain>/last_run._model-levels.json
- data_spatial/<domain>/current_run_model-levels.json
+ data_spatial/<domain>/latest-run_model-levels.json
+ data_spatial/<domain>/current-run_model-levels.json
  data_spatial/<domain>/<run>/meta_model-levels.json -> contains list of variables + timestamps
  data_spatial/<domain>/<run>/<timestamp>_model-levels.om (only late icon runs)
  */
@@ -26,6 +26,7 @@ actor OmSpatialTimestepWriter {
     let domain: GenericDomain
     let run: Timestamp
     let time: Timestamp
+    let realm: String?
     let fn: FileHandle
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
@@ -51,6 +52,7 @@ actor OmSpatialTimestepWriter {
         self.domain = domain
         self.run = run
         self.time = time
+        self.realm = realm
     }
     
     /// Write a single variable to the file
@@ -74,8 +76,8 @@ actor OmSpatialTimestepWriter {
         self.variables.append((variable, member, try arrayWriter.finalise()))
     }
     
-    /// Finalise the time step and return all handles
-    func finalise() async throws -> [GenericVariableHandle] {
+    /// Finalise the time step, update meta JSON and return all handles
+    func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let runTime = try writer.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
         let validTime =  try writer.write(value: time.timeIntervalSince1970, name: "valid_time", children: [])
         //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
@@ -86,9 +88,40 @@ actor OmSpatialTimestepWriter {
         }
         let root = try writer.writeNone(name: "", children: variables + [runTime, validTime, /*coordinates,*/ createdAt])
         try writer.writeTrailer(rootVariable: root)
-        if let filename {
+        if let filename, let directorySpatial = domain.domainRegistry.directorySpatial {
+            let meta = DataSpatialJson(
+                reference_time: run.iso8601_YYYY_MM_dd_HH_mmZ,
+                last_modified_time: Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ,
+                completed: completed,
+                valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
+                variables: self.variables.map {
+                    let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
+                    return "\($0.variable.omFileName.file)\(member)"
+                }
+            )
+            let realm = realm.map { "_\($0)" } ?? ""
+            
+            // Commit OpenMeteo file
             try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
+            
+            let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
+            try meta.writeTo(path: "\(path)latest-run\(realm).json")
+            try meta.writeTo(path: "\(directorySpatial)latest-run\(realm).json")
+            
+            if completed {
+                try meta.writeTo(path: "\(path)current-run\(realm).json")
+                try meta.writeTo(path: "\(directorySpatial)current-run\(realm).json")
+            }
+            
+            // TODO sync to S3 now
+            /*
+             if let uploadS3Bucket {
+                 try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+             }
+             */
         }
+        
+        
         let reader = try await OmFileReader(fn: try MmapFile(fn: self.fn))
         let time = self.time
         let dtSeconds = domain.dtSeconds
@@ -134,10 +167,42 @@ actor OmSpatialMultistepWriter {
     }
     
     /// Finalise the time step and return all handles
-    func finalise() async throws -> [GenericVariableHandle] {
-        return try await writer.asyncFlatMap({
-            try await $0.finalise()
+    func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        let handles = try await writer.asyncFlatMap({
+            try await $0.finalise(completed: completed, validTimes: validTimes, uploadS3Bucket: nil)
         })
+        // TODO upload S3 now
+        return handles
     }
 }
 
+
+fileprivate struct DataSpatialJson: Encodable {
+    let reference_time: String
+    let last_modified_time: String
+    let completed: Bool
+    let valid_times: [String]
+    let variables: [String]
+
+    /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
+    //let temporal_resolution_seconds: Int
+
+    // grid attributes?
+    // units? step types?
+
+    /*struct VariableSpatialJson: Encodable {
+        /// E.g. `temperature_2m`
+        let name: String
+        let unit: String
+        let skip_hour0: Bool
+        let step_type: StepType
+    }
+
+    enum StepType: Encodable {
+        case instantaneous
+        case mean
+        case sum
+        case maximum
+        case minimum
+    }*/
+}

@@ -142,13 +142,11 @@ struct DownloadIconCommand: AsyncCommand {
             }
             return elevation
         }()
-
-        let forecastSteps = domain.getDownloadForecastSteps(run: run.hour)
-        var previousHour = 0
-        let handles = try await forecastSteps.asyncMap { hour in
-        //for hour in forecastSteps {
+        
+        let timestamps = domain.getDownloadForecastSteps(run: run.hour).map { run.add(hours: $0) }
+        let handles = try await timestamps.enumerated().asyncMap { (i,timestamp) in
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
-            let timestamp = run.add(hours: hour)
             let h3 = hour.zeroPadded(len: 3)
 
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
@@ -236,6 +234,7 @@ struct DownloadIconCommand: AsyncCommand {
 
             /// Calculate precipitation >0.1mm/h probability
             if let writerProbabilities {
+                let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
                 try await storage.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
                     dtHoursOfCurrentStep: hour - previousHour,
@@ -405,15 +404,11 @@ struct DownloadIconCommand: AsyncCommand {
                 try await writer15Min.write(time: v.timestamp, member: v.member, variable: v.variable, data: data.data)
             }
             
-            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
-            let handles15min = try await writer15Min.finalise()
+            let completed = i == timestamps.count - 1
+            let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
             
-            // TODO meta.json
-            
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
-            previousHour = hour
+            // TODO valid times and S3 upload for 15min data
+            let handles15min = try await writer15Min.finalise(completed: false, validTimes: [], uploadS3Bucket: nil)
             return (handles, handles15min)
         }
         
