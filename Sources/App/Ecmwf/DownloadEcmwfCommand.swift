@@ -464,34 +464,34 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
+        
+        if variables.isEmpty {
+            return []
+        }
 
         var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
         if let maxForecastHour {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: domain == .wam025)
+        let timestamps = forecastHours.map { run.add(hours: $0) }
 
-        var handles = [GenericVariableHandle]()
-
-        for hour in forecastHours {
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
-            let timestamp = run.add(hours: hour)
-
-            if variables.isEmpty {
-                continue
-            }
+            
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil)
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
-            let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
+            try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
                 })
-            }).mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+            }).foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName") else {
                     fatalError("could not get step range or type")
                 }
                 if shortName == "lsm" {
-                    return nil
+                    return
                 }
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
@@ -517,12 +517,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
-                return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
-            }.collect().compactMap({ $0 })
-            handles.append(contentsOf: h)
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
+            let completed = i == timestamps.count - 1
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles

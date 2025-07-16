@@ -510,21 +510,4 @@ extension VariablePerMemberStorage {
             try await writer.write(member: t.member, variable: outVariable, data: rh)
         }
     }
-    
-    /// Calculate relative humidity
-    @available(*, deprecated)
-    func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
-        return try await self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
-                guard
-                    let temperature = handles.first(where: { $0.key.variable == temperature }),
-                    let dewpoint = handles.first(where: { $0.key.variable == dewpoint }) else {
-                    return nil
-                }
-                let rh = zip(temperature.value.data, dewpoint.value.data).map(Meteorology.relativeHumidity)
-                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: rh)
-            }
-        )
-    }
 }

@@ -163,9 +163,7 @@ struct MeteoSwissDownload: AsyncCommand {
             try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
             /// Calculate relative humidity from temperature and dew point
             try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
+            
             let completed = i == timestamps.count - 1
             let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
             return handles

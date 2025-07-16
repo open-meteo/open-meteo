@@ -403,6 +403,7 @@ extension DomainRegistry {
     }
 
     /// Upload spatial files to S3 `/data_spatial/<domain>/YYYY/MM/DD/HHMMZ/<variable>.om`
+    @available(*, deprecated)
     func syncToS3Spatial(bucket: String, timesteps: [Timestamp]) throws {
         let dir = rawValue
         guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
