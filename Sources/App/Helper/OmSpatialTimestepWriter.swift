@@ -105,15 +105,16 @@ actor OmSpatialTimestepWriter {
             try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
             
             let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
-            try meta.writeTo(path: "\(path)latest-run\(realm).json")
+            try meta.writeTo(path: "\(path)meta\(realm).json")
             try meta.writeTo(path: "\(directorySpatial)latest-run\(realm).json")
             
             if completed {
-                try meta.writeTo(path: "\(path)current-run\(realm).json")
                 try meta.writeTo(path: "\(directorySpatial)current-run\(realm).json")
             }
             
             // TODO sync to S3 now
+            // Strategy: Use single copy commands to transfer data
+            // For the final step do an additional sync, to make sure everything is there
             /*
              if let uploadS3Bucket {
                  try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
@@ -167,7 +168,9 @@ actor OmSpatialMultistepWriter {
     }
     
     /// Finalise the time step and return all handles
-    func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    /// If not validTimes are given, use all timestamps from the underlaying writer
+    func finalise(completed: Bool, validTimes: [Timestamp]?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        let validTimes = validTimes ?? writer.map(\.time)
         let handles = try await writer.asyncFlatMap({
             try await $0.finalise(completed: completed, validTimes: validTimes, uploadS3Bucket: nil)
         })

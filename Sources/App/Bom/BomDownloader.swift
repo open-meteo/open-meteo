@@ -57,9 +57,9 @@ struct DownloadBomCommand: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await downloadElevation(application: context.application, domain: domain, server: server, run: run)
         let handles = domain == .access_global_ensemble ?
-            try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting) : signature.upperLevel ?
-            try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting) :
-            try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting)
+        try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) : signature.upperLevel ?
+            try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) :
+            try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         
         if let uploadS3Bucket = signature.uploadS3Bucket {
@@ -121,14 +121,15 @@ struct DownloadBomCommand: AsyncCommand {
     }
 
     /// Download model level wind on 40, 80 and 120 m. Model level have 1h delay
-    func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
+    func downloadModelLevel(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let variables = ["wnd_ucmp", "wnd_vcmp"]
         
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+        /// Use different realm, because model levels have 1 hour additional delay
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: "model-level")
 
         // Download u/v wind
         try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
@@ -159,36 +160,36 @@ struct DownloadBomCommand: AsyncCommand {
             (76.664, .wind_speed_80m, .wind_direction_80m),
             (130, .wind_speed_120m, .wind_direction_120m)
         ]
-        let handles = try await map.mapConcurrent(nConcurrent: concurrent) { map -> [GenericVariableHandle] in
+        try await map.foreachConcurrent(nConcurrent: concurrent) { map in
             logger.info("Calculate wind level \(map.level)")
-            return try await zip(
+            for (u, v) in zip(
                 try combineAnalysisForecast(domain: domain, variable: "wnd_ucmp", run: run, level: map.level),
                 try combineAnalysisForecast(domain: domain, variable: "wnd_vcmp", run: run, level: map.level)
-            ).asyncFlatMap { u, v -> [GenericVariableHandle] in
+            ) {
                 let timestamp = u.0
                 let speed = zip(u.1, v.1).map(Meteorology.windspeed)
                 let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
-                return [
-                    try await writer.writeBom(time: timestamp, member: 0, variable: map.speed, data: speed),
-                    try await writer.writeBom(time: timestamp, member: 0, variable: map.direction, data: direction)
-                ]
+                try await writer.writeBom(time: timestamp, member: 0, variable: map.speed, data: speed)
+                try await writer.writeBom(time: timestamp, member: 0, variable: map.direction, data: direction)
             }
-        }.flatMap({ $0 })
+        }
         await curl.printStatistics()
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         Process.alarm(seconds: 0)
         return handles
     }
 
     /// Download variables, convert to temporary om files and return all handles
     /// Ensemble do no have `rh_scrn` and `cld_phys_thunder_p`
-    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
+    func downloadEnsemble(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: false)
-
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
+        let writerProbabilities = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        
         // list of variables to download
         // http://www.bom.gov.au/nwp/doc/access/docs/ACCESS-G.all-flds.slv.surface.shtml
         let variables: [(name: String, om: BomVariable?)] = [
@@ -223,8 +224,9 @@ struct DownloadBomCommand: AsyncCommand {
             // ("cld_phys_thunder_p", nil)
         ]
 
-        let handles: [GenericVariableHandle] = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
-            var handles = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+        try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
+            let inMemoryPrecipitation = VariablePerMemberStorage<BomVariable>()
+            for member in 0..<domain.ensembleMembers {
                 let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
                 let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc_\(member).nc"
                 let memberStr = ((run.hour % 12 == 6) ? (member + 17) : member).zeroPadded(len: 3)
@@ -238,27 +240,31 @@ struct DownloadBomCommand: AsyncCommand {
                     )
                 }
                 guard let omVariable = variable.om else {
-                    return []
+                    continue
                 }
                 logger.info("Compressing and writing data to member_\(member) \(omVariable.omFileName.file).om")
-                return try await self.iterateForecast(domain: domain, member: member, variable: variable.name, run: run).asyncMap { timestamp, data in
-                    return try await writer.writeBom(time: timestamp, member: member, variable: omVariable, data: data)
+                for (timestamp, data) in try self.iterateForecast(domain: domain, member: member, variable: variable.name, run: run) {
+                    if omVariable == .precipitation && domain == .access_global_ensemble {
+                        await inMemoryPrecipitation.set(variable: omVariable, timestamp: timestamp, member: member, data: Array2D(data: data, nx: domain.grid.nx, ny: domain.grid.ny))
+                    }
+                    try await writer.writeBom(time: timestamp, member: member, variable: omVariable, data: data)
                 }
             }
             if domain == .access_global_ensemble && variable.om == .precipitation {
                 logger.info("Calculating precipitation probability")
-                try await handles.append(contentsOf: handles.calculatePrecipitationProbabilityMultipleTimestamps(
-                    precipitationVariable: BomVariable.precipitation,
-                    domain: domain,
-                    run: run
-                ))
+                for writer in await writer.writer {
+                    try await inMemoryPrecipitation.calculatePrecipitationProbability(
+                        precipitationVariable: .precipitation,
+                        dtHoursOfCurrentStep: domain.dtHours,
+                        writer: writer
+                    )
+                }
             }
-            return handles
-        }.flatMap({ $0 })
+        }
 
-        let handlesSnow = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+        for member in (0..<domain.ensembleMembers) {
             logger.info("Calculate weather codes and snow sum member_\(member)")
-            return try await zip(
+            try await zip(
                 zip(zip(
                     try iterateForecast(domain: domain, member: member, variable: "accum_conv_snow", run: run),
                     try iterateForecast(domain: domain, member: member, variable: "accum_ls_snow", run: run)
@@ -271,59 +277,56 @@ struct DownloadBomCommand: AsyncCommand {
                 ),
                     try iterateForecast(domain: domain, member: member, variable: "visibility", run: run)
                 )
-            ).mapConcurrent(nConcurrent: concurrent) { arg -> [GenericVariableHandle] in
+            ).foreachConcurrent(nConcurrent: concurrent) { arg in
                 let (((conv_snow, ls_snow), (ttl_cld, precipitation)), ((conv_rain, wndgust10m), visibility)) = arg
                 let timestamp = conv_snow.0
                 let snow = zip(conv_snow.1, ls_snow.1).map(+)
                 let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: nil, liftedIndex: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds)
-                return await [
-                    try writer.writeBom(time: timestamp, member: member, variable: BomVariable.snowfall_water_equivalent, data: snow),
-                    try writer.writeBom(time: timestamp, member: member, variable: BomVariable.weather_code, data: weather_code)
-                ]
-            }.flatMap({ $0 })
-        }
-
-        let handlesRh = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
-            logger.info("Calculate relative humidity member_\(member)")
-            return try await zip(
-                try iterateForecast(domain: domain, member: member, variable: "sfc_temp", run: run),
-                try iterateForecast(domain: domain, member: member, variable: "dewpt_scrn", run: run)
-            ).mapConcurrent(nConcurrent: concurrent) { arg -> GenericVariableHandle in
-                let (sfc_temp, dewpt_scrn) = arg
-                let timestamp = sfc_temp.0
-                let rh = zip(sfc_temp.1, dewpt_scrn.1).map({ Meteorology.relativeHumidity(temperature: $0.0 - 273.15, dewpoint: $0.1 - 273.15) })
-                return try await writer.writeBom(time: timestamp, member: member, variable: .relative_humidity_2m, data: rh)
+                try await writer.writeBom(time: timestamp, member: member, variable: BomVariable.snowfall_water_equivalent, data: snow)
+                try await writer.writeBom(time: timestamp, member: member, variable: BomVariable.weather_code, data: weather_code)
             }
         }
 
-        let handlesWind = try await (0..<domain.ensembleMembers).asyncFlatMap { member -> [GenericVariableHandle] in
+        for member in (0..<domain.ensembleMembers) {
+            logger.info("Calculate relative humidity member_\(member)")
+            try await zip(
+                try iterateForecast(domain: domain, member: member, variable: "sfc_temp", run: run),
+                try iterateForecast(domain: domain, member: member, variable: "dewpt_scrn", run: run)
+            ).foreachConcurrent(nConcurrent: concurrent) { arg in
+                let (sfc_temp, dewpt_scrn) = arg
+                let timestamp = sfc_temp.0
+                let rh = zip(sfc_temp.1, dewpt_scrn.1).map({ Meteorology.relativeHumidity(temperature: $0.0 - 273.15, dewpoint: $0.1 - 273.15) })
+                try await writer.writeBom(time: timestamp, member: member, variable: .relative_humidity_2m, data: rh)
+            }
+        }
+
+        for member in (0..<domain.ensembleMembers) {
             logger.info("Calculate wind member_\(member)")
-            return try await zip(
+            try await zip(
                 try iterateForecast(domain: domain, member: member, variable: "uwnd10m", run: run),
                 try iterateForecast(domain: domain, member: member, variable: "vwnd10m", run: run)
-            ).mapConcurrent(nConcurrent: concurrent) { u, v -> [GenericVariableHandle] in
+            ).foreachConcurrent(nConcurrent: concurrent) { u, v in
                 let timestamp = u.0
                 let speed = zip(u.1, v.1).map(Meteorology.windspeed)
                 let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
-                return await [
-                    try writer.writeBom(time: timestamp, member: member, variable: .wind_speed_10m, data: speed),
-                    try writer.writeBom(time: timestamp, member: member, variable: .wind_direction_10m, data: direction)
-                ]
-            }.flatMap({ $0 })
+                try await writer.writeBom(time: timestamp, member: member, variable: .wind_speed_10m, data: speed)
+                try await writer.writeBom(time: timestamp, member: member, variable: .wind_direction_10m, data: direction)
+            }
         }
         await curl.printStatistics()
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil) + writerProbabilities.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         Process.alarm(seconds: 0)
-        return handles + handlesSnow + handlesWind + handlesRh
+        return handles
     }
 
     /// Download variables, convert to temporary om files and return all handles
-    func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: BomDomain, run: Timestamp, server: String, concurrent: Int, skipFilesIfExisting: Bool, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModifiedBeforeDownload: TimeInterval(60 * 15))
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
 
         // list of variables to download
         // http://www.bom.gov.au/nwp/doc/access/docs/ACCESS-G.all-flds.slv.surface.shtml
@@ -358,7 +361,7 @@ struct DownloadBomCommand: AsyncCommand {
             ("cld_phys_thunder_p", nil)
         ]
 
-        let handles = try await variables.mapConcurrent(nConcurrent: concurrent) { variable -> [GenericVariableHandle] in
+        try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
             let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
             let analysisFile = "\(domain.downloadDirectory)\(variable.name)_an.nc"
             let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc.nc"
@@ -379,16 +382,16 @@ struct DownloadBomCommand: AsyncCommand {
                 )
             }
             guard let omVariable = variable.om else {
-                return []
+                return
             }
             logger.info("Compressing and writing data to \(omVariable.omFileName.file).om")
-            return try await self.combineAnalysisForecast(domain: domain, variable: variable.name, run: run).asyncMap { timestamp, data in
-                return try await writer.writeBom(time: timestamp, member: 0, variable: omVariable, data: data)
+            for (timestamp, data) in try self.combineAnalysisForecast(domain: domain, variable: variable.name, run: run) {
+                try await writer.writeBom(time: timestamp, member: 0, variable: omVariable, data: data)
             }
         }
 
         logger.info("Calculate weather codes and snow sum")
-        let handlesSnow = try await zip(
+        try await zip(
             zip(zip(
                 try combineAnalysisForecast(domain: domain, variable: "accum_conv_snow", run: run),
                 try combineAnalysisForecast(domain: domain, variable: "accum_ls_snow", run: run)
@@ -402,33 +405,30 @@ struct DownloadBomCommand: AsyncCommand {
                 try combineAnalysisForecast(domain: domain, variable: "cld_phys_thunder_p", run: run),
                 try combineAnalysisForecast(domain: domain, variable: "visibility", run: run)
             ))
-        ).mapConcurrent(nConcurrent: concurrent) { arg -> [GenericVariableHandle] in
+        ).foreachConcurrent(nConcurrent: concurrent) { arg in
             let (((conv_snow, ls_snow), (ttl_cld, precipitation)), ((conv_rain, wndgust10m), (cld_phys_thunder_p, visibility))) = arg
             let timestamp = conv_snow.0
             let snow = zip(conv_snow.1, ls_snow.1).map(+)
             let weather_code = WeatherCode.calculate(cloudcover: ttl_cld.1.map { $0 * 100 }, precipitation: precipitation.1, convectivePrecipitation: conv_rain.1, snowfallCentimeters: snow.map { $0 * 0.7 }, gusts: wndgust10m.1, cape: cld_phys_thunder_p.1.map({ $0 * 3 }), liftedIndex: nil, visibilityMeters: visibility.1, categoricalFreezingRain: nil, modelDtSeconds: domain.dtSeconds)
-            return await [
-                try writer.writeBom(time: timestamp, member: 0, variable: BomVariable.snowfall_water_equivalent, data: snow),
-                try writer.writeBom(time: timestamp, member: 0, variable: BomVariable.weather_code, data: weather_code)
-            ]
+            try await writer.writeBom(time: timestamp, member: 0, variable: BomVariable.snowfall_water_equivalent, data: snow)
+            try await writer.writeBom(time: timestamp, member: 0, variable: BomVariable.weather_code, data: weather_code)
         }
 
         logger.info("Calculate wind")
-        let handlesWind = try await zip(
+        try await zip(
             try combineAnalysisForecast(domain: domain, variable: "uwnd10m", run: run),
             try combineAnalysisForecast(domain: domain, variable: "vwnd10m", run: run)
-        ).mapConcurrent(nConcurrent: concurrent) { u, v -> [GenericVariableHandle] in
+        ).foreachConcurrent(nConcurrent: concurrent) { u, v in
             let timestamp = u.0
             let speed = zip(u.1, v.1).map(Meteorology.windspeed)
             let direction = Meteorology.windirectionFast(u: u.1, v: v.1)
-            return await [
-                try writer.writeBom(time: timestamp, member: 0, variable: .wind_speed_10m, data: speed),
-                try writer.writeBom(time: timestamp, member: 0, variable: .wind_direction_10m, data: direction)
-            ]
+            try await writer.writeBom(time: timestamp, member: 0, variable: .wind_speed_10m, data: speed)
+            try await writer.writeBom(time: timestamp, member: 0, variable: .wind_direction_10m, data: direction)
         }
         await curl.printStatistics()
+        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         Process.alarm(seconds: 0)
-        return handles.flatMap({ $0 }) + handlesSnow.flatMap({ $0 }) + handlesWind.flatMap({ $0 })
+        return handles
     }
 
     /// Process timsteps only on forecast
@@ -616,8 +616,8 @@ struct DownloadBomCommand: AsyncCommand {
     }
 }
 
-extension OmRunSpatialWriter {
-    fileprivate func writeBom(time: Timestamp, member: Int, variable: BomVariable, data: [Float]) async throws -> GenericVariableHandle {
+extension OmSpatialMultistepWriter {
+    fileprivate func writeBom(time: Timestamp, member: Int, variable: BomVariable, data: [Float]) async throws {
         guard data.count == domain.grid.count else {
             fatalError("invalid data array size")
         }
@@ -626,6 +626,6 @@ extension OmRunSpatialWriter {
         if let fma = variable.multiplyAdd {
             data.multiplyAdd(multiply: fma.multiply, add: fma.add)
         }
-        return try await write(time: time, member: member, variable: variable, data: data)
+        try await write(time: time, member: member, variable: variable, data: data)
     }
 }

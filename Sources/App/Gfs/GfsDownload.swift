@@ -203,7 +203,7 @@ struct GfsDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 2) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
+        //let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
         let isEnsemble = domain.ensembleMembers > 1
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)

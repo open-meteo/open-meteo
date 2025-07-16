@@ -153,6 +153,7 @@ extension Array where Element == GenericVariableHandle {
     /// Calculate precipitation >0.1mm/h probability. BOM downloads multiple timesteps, uncompress handles and calculate probabilities
     /// `precipitationVariable` is used to filter only precipitation variables
     /// `domain` must be set to generate a temporary file handle afterwards
+    @available(*, deprecated)
     func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
         var previousTimesamp: Timestamp?
         return try await self
