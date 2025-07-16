@@ -24,8 +24,8 @@ struct MeteoFranceDownload: AsyncCommand {
         @Option(name: "only-variables")
         var onlyVariables: String?
 
-        @Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
-        var upperLevel: Bool
+        //@Flag(name: "upper-level", help: "Download upper-level variables on pressure levels")
+        //var upperLevel: Bool
 
         @Flag(name: "use-grib-packages", help: "If true, download GRIB packages (SP1, SP2, ...) instead of individual records")
         var useGribPackages: Bool
@@ -52,9 +52,9 @@ struct MeteoFranceDownload: AsyncCommand {
         let logger = context.application.logger
         let domain = try MeteoFranceDomain.load(rawValue: signature.domain)
 
-        if signature.onlyVariables != nil && signature.upperLevel {
+        /*if signature.onlyVariables != nil && signature.upperLevel {
             fatalError("Parameter 'onlyVariables' and 'upperLevel' must not be used simultaneously")
-        }
+        }*/
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
@@ -74,7 +74,7 @@ struct MeteoFranceDownload: AsyncCommand {
         }
         let surfaceVariables = MeteoFranceSurfaceVariable.allCases
 
-        let variablesAll = onlyVariables ?? (signature.upperLevel ? pressureVariables : surfaceVariables)
+        let variablesAll = onlyVariables ?? surfaceVariables + pressureVariables //(signature.upperLevel ? pressureVariables : surfaceVariables)
 
         let variables = variablesAll.filter({ $0.availableFor(domain: domain, forecastSecond: 0) })
 
@@ -86,7 +86,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
-        try await download3(application: context.application, domain: domain, run: run, upperLevel: signature.upperLevel, useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket) :
+        try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
@@ -256,7 +256,7 @@ struct MeteoFranceDownload: AsyncCommand {
      - MF does not publish 15minutely data via GRIB packages
      - There is no GRIB inventory, so we have to download the entire GRIB file
      */
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, upperLevel: Bool, useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, /*upperLevel: Bool,*/ useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -269,7 +269,8 @@ struct MeteoFranceDownload: AsyncCommand {
         let nx = grid.nx
         let ny = grid.ny
         let previous = GribDeaverager()
-        let packages = upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
+        let packages =  domain.mfApiPackagesPressure + domain.mfApiPackagesSurface
+        //upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
         // https://public-api.meteofrance.fr/previnum/DPPaquetAROME/v1/models/AROME/grids/0.025/packages/SP2/productARO?referencetime=2024-06-20T21%3A00%3A00Z&time=00H06H&format=grib2
@@ -296,8 +297,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 
-                
-                for message in try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) {
+                try await curl.getGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 4) { message in
 
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
@@ -325,7 +325,7 @@ struct MeteoFranceDownload: AsyncCommand {
                             grib2d.array.flipLatitude()
                         }
                         await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
-                        continue
+                        return
                     }
 
                     if domain == .arome_france_hd, let temporary = MfVariablePrecipTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
@@ -345,15 +345,15 @@ struct MeteoFranceDownload: AsyncCommand {
                         }
                         // Deaccumulate precipitation
                         guard await previous.deaccumulateIfRequired(variable: temporary, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                            continue
+                            return
                         }
                         await inMemoryPrecip.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
-                        continue
+                        return
                     }
 
                     guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
                         logger.info("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
-                        continue
+                        return
                     }
 
                     var grib2d = GribArray2D(nx: nx, ny: ny)
@@ -372,7 +372,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
                     // Deaccumulate precipitation
                     guard await previous.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        continue
+                        return
                     }
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
