@@ -78,6 +78,13 @@ actor OmSpatialTimestepWriter {
     
     /// Finalise the time step, update meta JSON and return all handles
     func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        guard variables.count > 0 else {
+            if let filename = filename {
+                try FileManager.default.removeItemIfExists(at: "\(filename)~")
+            }
+            return []
+        }
+        
         let runTime = try writer.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
         let validTime =  try writer.write(value: time.timeIntervalSince1970, name: "valid_time", children: [])
         //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
