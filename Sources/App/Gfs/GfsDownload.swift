@@ -483,11 +483,11 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 extension VariablePerMemberStorage {
     /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
     func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        for (t, handles) in self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
+        for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
             guard
-                let precipitation = handles.first(where: { $0.key.variable == precipitation && $0.key.timestamp == writer.time }),
-                let frozen_precipitation_percent = handles.first(where: { $0.key.variable == frozen_precipitation_percent && $0.key.timestamp == writer.time }) else {
+                t.timestamp == writer.time,
+                let precipitation = handles.first(where: { $0.key.variable == precipitation }),
+                let frozen_precipitation_percent = handles.first(where: { $0.key.variable == frozen_precipitation_percent }) else {
                 continue
             }
             let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
@@ -498,6 +498,21 @@ extension VariablePerMemberStorage {
     }
     
     /// Calculate relative humidity
+    func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
+            guard
+                t.timestamp == writer.time,
+                let temperature = handles.first(where: { $0.key.variable == temperature }),
+                let dewpoint = handles.first(where: { $0.key.variable == dewpoint }) else {
+                continue
+            }
+            let rh = zip(temperature.value.data, dewpoint.value.data).map(Meteorology.relativeHumidity)
+            try await writer.write(member: t.member, variable: outVariable, data: rh)
+        }
+    }
+    
+    /// Calculate relative humidity
+    @available(*, deprecated)
     func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
         return try await self.data
             .groupedPreservedOrder(by: { $0.key.timestampAndMember })
