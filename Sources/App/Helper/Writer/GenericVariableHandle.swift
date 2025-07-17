@@ -465,7 +465,10 @@ extension VariablePerMemberStorage {
     /// Removes processed variables from `self.data`
     func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialMultistepWriter, trueNorth: [Float]? = nil) async throws {
         
-        while let uKey = data.first(where: {$0.key.variable == u })?.key {
+        for uKey in data.keys {
+            guard uKey.variable == u else {
+                continue
+            }
             let vKey = uKey.with(variable: v)
             guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
                 continue
@@ -488,7 +491,10 @@ extension VariablePerMemberStorage {
     /// Removes processed variables from `self.data`
     func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
         
-        while let uKey = data.first(where: {$0.key.variable == u && $0.key.timestamp == writer.time })?.key {
+        for uKey in data.keys {
+            guard uKey.variable == u && uKey.timestamp == writer.time else {
+                continue
+            }
             let vKey = uKey.with(variable: v)
             guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
                 continue
