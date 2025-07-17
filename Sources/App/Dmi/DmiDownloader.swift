@@ -110,14 +110,10 @@ struct DmiDownload: AsyncCommand {
      Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
      */
     func download(application: Application, domain: DmiDomain, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
-        /*guard let apikey = Environment.get("DMI_API_KEY")?.split(separator: ",").map(String.init) else {
-            fatalError("Please specify environment variable 'DMI_API_KEY'")
-        }*/
         let logger = application.logger
         let deadLineHours = Double(4)
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
         defer { Process.alarm(seconds: 0) }
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
 
         guard let grid = domain.grid as? ProjectionGrid<LambertConformalConicProjection> else {
             fatalError("Wrong grid")
@@ -137,22 +133,23 @@ struct DmiDownload: AsyncCommand {
         // Important: Wind U/V components are defined on a Lambert CC projection. They need to be corrected for true north.
         let trueNorth = grid.getTrueNorthDirection()
         var previous = GribDeaverager()
-        let timerange = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600)
+        let timestamps = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600).map{$0}
 
-        let handles = try await timerange.asyncFlatMap { t -> [GenericVariableHandle] in
+        let handles = try await timestamps.enumerated().asyncFlatMap { (i,t) -> [GenericVariableHandle] in
             // https://dmigw.govcloud.dk/v1/forecastdata/collections/harmonie_dini_sf/items/HARMONIE_DINI_SF_2025-01-15T090000Z_2025-01-17T210000Z.grib -> assets
             // https://download.dmi.dk/public/opendata/HARMONIE_DINI_SF_2025-01-15T090000Z_2025-01-17T210000Z.grib
             // let url = "https://dmigw.govcloud.dk/v1/forecastdata/download/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
             // let url = "https://download.dmi.dk/public/opendata/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
             let url = "https://dmi-opendata.s3-eu-north-1.amazonaws.com/forecastdata/\(dataset)/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
 
-            let handles = try await curl.withGribStream(url: url, bzip2Decode: false/*, headers: [("X-Gravitee-Api-Key", apikey.randomElement() ?? "")]*/) { stream in
+            return try await curl.withGribStream(url: url, bzip2Decode: false) { stream in
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
+                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
 
                 // process sequentialy, as precipitation need to be in order for deaveraging
-                let h = try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType"),
@@ -168,14 +165,14 @@ struct DmiDownload: AsyncCommand {
                           // let parameterNumber = message.getLong(attribute: "parameterNumber")
                     else {
                         logger.warning("could not get attributes")
-                        return nil
+                        return
                     }
                     let member = message.getLong(attribute: "perturbationNumber") ?? 0
                     let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
 
                     if let temporary = DmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                         if !generateElevationFile && [DmiVariableTemporary.elevation, .landmask].contains(temporary) {
-                            return nil
+                            return
                         }
                         logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                         var grib2d = GribArray2D(nx: nx, ny: ny)
@@ -187,17 +184,23 @@ struct DmiDownload: AsyncCommand {
                             break
                         }
                         await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
-                        return nil
+                        try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth)
+                        return
                     }
 
                     guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
                         logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
-                        return nil
+                        return
                     }
                     logger.info("Processing \(timestamp.format_YYYYMMddHH) \(variable) [\(unit)]")
 
                     if stepType == "accum" && timestamp == run {
-                        return nil // skip precipitation at timestep 0
+                        return // skip precipitation at timestep 0
                     }
 
                     var grib2d = GribArray2D(nx: nx, ny: ny)
@@ -243,34 +246,20 @@ struct DmiDownload: AsyncCommand {
 
                     // Deaccumulate precipitation
                     guard await previousScoped.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        return nil
+                        return
                     }
-                    return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
-                }.collect().compactMap({ $0 })
+                    try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+                }
 
                 previous = previousScoped
-
-                logger.info("Calculating wind speed and direction from U/V components and correcting for true north")
-                let windHandles = [
-                    try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth),
-                    try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth),
-                    try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth),
-                    try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth),
-                    try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth),
-                    try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth)
-                ].flatMap({ $0 })
-
+                
                 if generateElevationFile {
                     try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
                 }
-                return h + windHandles
+                let completed = i == timestamps.count - 1
+                return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [t])
-            }
-            return handles
         }
-
         await curl.printStatistics()
         return handles
     }

@@ -79,16 +79,12 @@ struct GenericVariableHandle: Sendable {
         if let uploadS3Bucket = uploadS3Bucket {
             logger.info("AWS upload to bucket \(uploadS3Bucket)")
             let variables = handles.map { $0.variable }.uniqued(on: { $0.omFileName.file })
-            do {
-                let startTimeAws = DispatchTime.now()
-                try domain.domainRegistry.syncToS3(
-                    bucket: uploadS3Bucket,
-                    variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
-                )
-                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
-            } catch {
-                logger.error("Sync to AWS failed: \(error)")
-            }
+            let startTimeAws = DispatchTime.now()
+            try domain.domainRegistry.syncToS3(
+                bucket: uploadS3Bucket,
+                variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+            )
+            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
 
         if let run {
@@ -100,16 +96,12 @@ struct GenericVariableHandle: Sendable {
             
             /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
             if !uploadS3OnlyProbabilities, let uploadS3Bucket {
-                do {
-                    let startTimeAws = DispatchTime.now()
-                    try domain.domainRegistry.syncToS3(
-                        bucket: uploadS3Bucket,
-                        variables: nil
-                    )
-                    logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
-                } catch {
-                    logger.error("Sync to AWS failed: \(error)")
-                }
+                let startTimeAws = DispatchTime.now()
+                try domain.domainRegistry.syncToS3(
+                    bucket: uploadS3Bucket,
+                    variables: nil
+                )
+                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
             }
         }
         
@@ -372,8 +364,8 @@ struct GenericVariableHandle: Sendable {
 }
 
 fileprivate struct FullRunMetaJson: Encodable {
-    let forecast_reference_time: String
-    let created_at: String
+    let reference_time: Date
+    let created_at: Date
     let variables: [String]
 
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
@@ -390,8 +382,8 @@ fileprivate struct FullRunMetaJson: Encodable {
         }
         let items = try FileManager.default.contentsOfDirectory(atPath: path)
         self.variables = items.filter({$0.hasSuffix(".om")}).map({String($0.dropLast(3))})
-        self.forecast_reference_time = run.iso8601_YYYY_MM_dd_HH_mmZ
-        self.created_at = Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ
+        self.reference_time = run.toDate()
+        self.created_at = Date()
         self.temporal_resolution_seconds = domain.dtSeconds
     }
     
@@ -463,36 +455,55 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
     }
 
     func getAndForget(_ variable: VariableAndMember) -> Array2D? {
-        let value = data[variable]
-        data.removeValue(forKey: variable)
-        return value
+        return data.removeValue(forKey: variable)
     }
 }
 
 extension VariablePerMemberStorage {
-    /// Calculate wind speed and direction from U/V components for all available members an timesteps.
+    /// Calculate wind speed and direction from U/V components for all available members for all timesteps
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmRunSpatialWriter, trueNorth: [Float]? = nil, overwrite: Bool = false) async throws -> [GenericVariableHandle] {
-        return try await self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .asyncFlatMap({ t, handles -> [GenericVariableHandle] in
-                guard let u = handles.first(where: { $0.key.variable == u }), let v = handles.first(where: { $0.key.variable == v }) else {
-                    return []
-                }
-                let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
-                let speedHandle = try await writer.write(time: t.timestamp, member: t.member, variable: outSpeedVariable, data: speed, overwrite: overwrite)
-
-                if let outDirectionVariable {
-                    var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
-                    if let trueNorth {
-                        direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
-                    }
-                    let directionHandle = try await writer.write(time: t.timestamp, member: t.member, variable: outDirectionVariable, data: direction, overwrite: overwrite)
-                    return [speedHandle, directionHandle]
-                }
-                return [speedHandle]
+    /// Removes processed variables from `self.data`
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialMultistepWriter, trueNorth: [Float]? = nil) async throws {
+        
+        while let uKey = data.first(where: {$0.key.variable == u })?.key {
+            let vKey = uKey.with(variable: v)
+            guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
+                continue
             }
-        )
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
+            try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outSpeedVariable, data: speed)
+
+            if let outDirectionVariable {
+                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+                if let trueNorth {
+                    direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
+                }
+                try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outDirectionVariable, data: direction)
+            }
+        }
+    }
+    
+    /// Calculate wind speed and direction from U/V components for all available members for the timestep in writer
+    /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
+    /// Removes processed variables from `self.data`
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
+        
+        while let uKey = data.first(where: {$0.key.variable == u && $0.key.timestamp == writer.time })?.key {
+            let vKey = uKey.with(variable: v)
+            guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
+                continue
+            }
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
+            try await writer.write(member: uKey.member, variable: outSpeedVariable, data: speed)
+
+            if let outDirectionVariable {
+                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+                if let trueNorth {
+                    direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
+                }
+                try await writer.write(member: uKey.member, variable: outDirectionVariable, data: direction)
+            }
+        }
     }
 
     /// Generate elevation file

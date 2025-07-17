@@ -120,6 +120,17 @@ public extension Process {
         }
         throw SpawnError.commandFailed(cmd: cmd, returnCode: terminationStatus, args: args)
     }
+    
+    static func spawnRetriedNoFail(cmd: String, args: [String], numerOfRetries: Int = 3) throws {
+        var terminationStatus: Int32 = .max
+        for _ in 0..<numerOfRetries {
+            terminationStatus = try Process.spawnWithExitCode(cmd: cmd, args: args)
+            if terminationStatus == 0 {
+                return
+            }
+        }
+        print("WARNING: Spawn failed with error code \(terminationStatus). Command was: \(cmd) \(args)")
+    }
 
     /// Call `posix_spawn` directly and wait for child to finish. Uses PATH variable to find executable
     static func spawnWithExitCode(cmd: String, args: [String]) throws -> Int32 {

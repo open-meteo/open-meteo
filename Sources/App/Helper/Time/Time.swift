@@ -281,6 +281,10 @@ public struct Timestamp: Hashable, Sendable {
         let date = toComponents()
         return Timestamp(year ?? date.year, month ?? date.month, day ?? date.day)
     }
+    
+    func toDate() -> Date {
+        return Date(timeIntervalSince1970: TimeInterval(timeIntervalSince1970))
+    }
 }
 
 extension Timestamp: Comparable {

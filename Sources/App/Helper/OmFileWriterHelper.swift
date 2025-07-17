@@ -2,47 +2,6 @@ import Foundation
 import OmFileFormat
 import SwiftNetCDF
 
-struct OmRunSpatialWriter: Sendable {
-    let dimensions: [Int]
-    let chunks: [Int]
-    let domain: GenericDomain
-    let run: Timestamp
-    let storeOnDisk: Bool
-    
-    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool) {
-        let y = min(domain.grid.ny, 32)
-        let x = min(domain.grid.nx, 1024 / y)
-        self.dimensions = [domain.grid.ny, domain.grid.nx]
-        self.chunks = [y, x]
-        self.domain = domain
-        self.run = run
-        self.storeOnDisk = storeOnDisk
-    }
-    
-    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16, overwrite: Bool = false) async throws -> GenericVariableHandle {
-        let fn: FileHandle
-        if storeOnDisk, let directorySpatial = domain.domainRegistry.directorySpatial {
-            //let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/\(time.iso8601_YYYYMMddTHHmm)/"
-            let path = "\(directorySpatial)/\(time.format_directoriesYYYYMMddhhmm)/"
-            let file = "\(path)\(variable.omFileName.file).om"
-            try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
-            let fileTemp = "\(file)~"
-            try FileManager.default.removeItemIfExists(at: fileTemp)
-            fn = try FileHandle.createNewFile(file: fileTemp)
-            try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor, run: run, time: time)
-            try FileManager.default.moveFileOverwrite(from: fileTemp, to: file)
-        } else {
-            let file = "\(OpenMeteo.tempDirectory)/\(Int.random(in: 0..<Int.max)).om"
-            try FileManager.default.removeItemIfExists(at: file)
-            fn = try FileHandle.createNewFile(file: file)
-            try FileManager.default.removeItem(atPath: file)
-            try data.writeOmFile(fn: fn, dimensions: dimensions, chunks: chunks, compression: compressionType, scalefactor: variable.scalefactor)
-        }
-        return try await GenericVariableHandle(variable: variable, time: time, member: member, fn: fn, domain: domain)
-    }
-}
-
-
 /// Small helper class to generate compressed files
 public final class OmFileWriterHelper: Sendable {
     public let dimensions: [Int]

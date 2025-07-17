@@ -216,21 +216,24 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if let maxForecastHour {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
-
-        var handles = [GenericVariableHandle]()
+        let timestamps = forecastHours.map { run.add(hours: $0) }
         let deaverager = GribDeaverager()
         
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: domain == .ifs025 || domain == .aifs025_single)
+        let storeOnDisk = domain == .ifs025 || domain == .aifs025_single
 
-        var previousHour = 0
-        for hour in forecastHours {
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
-            let timestamp = run.add(hours: hour)
+            let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             /// Delta time seconds considering irregular timesteps
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
+            
+            
+            let writerProbabilities = domain.ensembleMembers > 1 ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
 
             if variables.isEmpty {
-                continue
+                return []
             }
             let inMemory = VariablePerMemberStorage<EcmwfVariable>()
 
@@ -242,13 +245,13 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     return
                 }
                 let data = Meteorology.specificToRelativeHumidity(specificHumidity: q.data, temperature: t.data, pressure: .init(repeating: hpa, count: t.count))
-                handles.append(try await writer.write(time: timestamp, member: member, variable: rh, data: data))
+                try await writer.write(member: member, variable: rh, data: data)
             }
 
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
-                let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
+                try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if let level = entry.level {
                             // entry is a pressure level variable
@@ -259,14 +262,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         }
                         return entry.param == variable.gribName
                     })
-                }).mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+                }).foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let shortName = message.get(attribute: "shortName"),
                           var stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType") else {
                         fatalError("could not get step range or type")
                     }
                     if shortName == "lsm" {
-                        return nil
+                        return
                     }
                     let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
@@ -300,7 +303,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
                     /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
                     if [EcmwfVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min, .shortwave_radiation, .precipitation, .runoff].contains(variable) && hour == 0 {
-                        return nil
+                        return
                     }
                     
                     // logger.info("Processing \(variable)")
@@ -318,7 +321,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     
                     // Deaccumulate precipitation
                     guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        return nil
+                        return
                     }
                     
                     // Scaling before compression with scalefactor
@@ -342,7 +345,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     if ["w", "q"].contains(variable.gribName) {
                         // do not store specific humidity on disk
-                        return nil
+                        return
                     }
                     if variable == .temperature_2m {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
@@ -350,7 +353,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     
                     if variable == .dew_point_2m {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                        return nil
+                        return
                     }
                     // Keep precip in memory for probability
                     if domain == .ifs025_ensemble && variable == .precipitation {
@@ -359,19 +362,18 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     
                     if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
                         // do not generate some database files for ensemble
-                        return nil
+                        return
                     }
                     let skipHour0 = [.shortwave_radiation, .precipitation, .runoff].contains(variable)
                     // Shortwave radiation and precipitation contain always 0 values for hour 0.
                     if hour == 0 && skipHour0 {
-                        return nil
+                        return
                     }
                     //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     // Note: skipHour0 needs still to be set for solar interpolation
                     logger.info("Processing \(variable) member \(member) timestep \(timestamp.format_YYYYMMddHH)")
-                    return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
-                }.collect().compactMap({ $0 })
-                handles.append(contentsOf: h)
+                    try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+                }
             }
 
             // Calculate mid/low/high/total cloudocover
@@ -381,11 +383,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if let dewpoint = await inMemory.get(variable: .dew_point_2m, timestamp: timestamp, member: member)?.data,
                    let temperature = await inMemory.get(variable: .temperature_2m, timestamp: timestamp, member: member)?.data {
                     let rh = zip(temperature, dewpoint).map(Meteorology.relativeHumidity)
-                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.relative_humidity_2m, data: rh))
+                    try await writer.write(member: member, variable: EcmwfVariable.relative_humidity_2m, data: rh)
                 }
 
                 // Relative humidity missing in AIFS
-                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.relative_humidity_1000hPa && $0.time.range.lowerBound == timestamp && $0.member == member }) {
+                if await !writer.variables.contains(where: {$0.variable as? EcmwfVariable == EcmwfVariable.relative_humidity_1000hPa && $0.member == member }) {
                     logger.info("Calculating relative humidity")
                     try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
                     try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
@@ -401,7 +403,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
                 }
 
-                if !handles.contains(where: { $0.variable as? EcmwfVariable == EcmwfVariable.cloud_cover && $0.time.range.lowerBound == timestamp && $0.member == member }) {
+                if await !writer.variables.contains(where: {$0.variable as? EcmwfVariable == EcmwfVariable.cloud_cover && $0.member == member }) {
                     logger.info("Calculating cloud cover")
                     guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
                           let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
@@ -433,30 +435,24 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
                     
-                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow))
-                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid))
-                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh))
-                    handles.append(try await writer.write(time: timestamp, member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover))
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow)
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid)
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh)
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
                 }
             }
 
-            if domain == .ifs025_ensemble {
+            if let writerProbabilities {
                 logger.info("Calculating precipitation probability")
-                if let handle = try await inMemory.calculatePrecipitationProbability(
+                try await inMemory.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
-                    domain: domain,
-                    timestamp: timestamp,
-                    run: run,
-                    dtHoursOfCurrentStep: hour - previousHour
-                ) {
-                    handles.append(handle)
-                }
+                    dtHoursOfCurrentStep: hour - previousHour,
+                    writer: writerProbabilities
+                )
             }
             
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
-            previousHour = hour
+            let completed = i == timestamps.count - 1
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles
@@ -468,34 +464,34 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
+        
+        if variables.isEmpty {
+            return []
+        }
 
         var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
         if let maxForecastHour {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: domain == .wam025)
+        let timestamps = forecastHours.map { run.add(hours: $0) }
 
-        var handles = [GenericVariableHandle]()
-
-        for hour in forecastHours {
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
-            let timestamp = run.add(hours: hour)
-
-            if variables.isEmpty {
-                continue
-            }
+            
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil)
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
-            let h = try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
+            try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
                 })
-            }).mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+            }).foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName") else {
                     fatalError("could not get step range or type")
                 }
                 if shortName == "lsm" {
-                    return nil
+                    return
                 }
                 let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
@@ -521,12 +517,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
                 grib2d.array.flipLatitude()
-                return try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
-            }.collect().compactMap({ $0 })
-            handles.append(contentsOf: h)
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
+            let completed = i == timestamps.count - 1
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles

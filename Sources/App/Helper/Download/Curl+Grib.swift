@@ -54,6 +54,13 @@ extension Curl {
             }
         }
     }
+    
+    /// Stream GRIB messages. Does not restart stream on error
+    func getGribStream(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> AnyAsyncSequence<GribMessage> {
+        return try await self.withGribStream(url: url, bzip2Decode: bzip2Decode, nConcurrent: nConcurrent, deadLineHours: deadLineHours, headers: headers) {
+            return $0
+        }.eraseToAnyAsyncSequence()
+    }
 
     /// Stream GRIB messages. The grib stream might be restarted on error.
     func withGribStream<T>(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {

@@ -68,7 +68,6 @@ struct MeteoSwissDownload: AsyncCommand {
         let ny = grid.ny
         let collection = domain.collection
         let storeOnDisk = domain.ensembleMembers <= 1
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
         
         let directory = (domain.domainRegistryStatic ?? domain.domainRegistry).directory
         try FileManager.default.createDirectory(atPath: "\(directory)static", withIntermediateDirectories: true)
@@ -92,12 +91,18 @@ struct MeteoSwissDownload: AsyncCommand {
         let mapping: [Int] = try await OmFileReader.read(file: weightsFile)!
         //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")
         
-        return try await (0...domain.forecastLength).asyncFlatMap { hour -> [GenericVariableHandle] in
+        let timestamps = (0...domain.forecastLength).map { run.add(hours: $0) }
+        
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
-            let timestamp = run.add(hours: hour)
             
-            var handles = try await variables.mapConcurrent(nConcurrent: 4) { variable -> [GenericVariableHandle] in
+            let writerProbabilities = domain.ensembleMembers > 1 ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
+            
+            try await variables.foreachConcurrent(nConcurrent: 4) { variable in
+                let storagePrecipitation = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
                 var urls = [try await client.resolveMeteoSwissDownloadURL(
                     logger: logger,
                     collection: collection,
@@ -116,9 +121,8 @@ struct MeteoSwissDownload: AsyncCommand {
                         forecastHorizon: "P0DT\(hour.zeroPadded(len: 2))H00M00S"
                     ))
                 }
-                var handles = try await urls.asyncFlatMap({ url -> [GenericVariableHandle] in
-                    let messages = try await curl.downloadGrib(url: url, bzip2Decode: false)
-                    return try await messages.asyncCompactMap { message -> GenericVariableHandle? in
+                for url in urls {
+                    for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                         let stepRange = try message.getOrThrow(attribute: "stepRange")
                         let stepType = try message.getOrThrow(attribute: "stepType")
                         let rawData = try message.getFloats()
@@ -128,37 +132,44 @@ struct MeteoSwissDownload: AsyncCommand {
                             array2d.data.multiplyAdd(multiply: fma.scalefactor, add: fma.offset)
                         }
                         guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
-                            return nil
+                            continue
                         }
                         if [MeteoSwissSurfaceVariable.shortwave_radiation, .relative_humidity_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
-                            return nil
+                            continue
+                        }
+                        if variable == .precipitation {
+                            await storagePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
                         if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
                         logger.info("Processing \(variable) for \(timestamp.format_YYYYMMddHH) member \(member)")
-                        return try await writer.write(time: timestamp, member: member, variable: variable, data: array2d.data)
+                        try await writer.write(member: member, variable: variable, data: array2d.data)
                     }
-                })
-                if variable == .precipitation {
-                    logger.info("Calculating precipitation probability")
-                    let precipitationProbability = try await handles.calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: variable, domain: domain, run: run)
-                    handles.append(contentsOf: precipitationProbability)
                 }
-                return handles
-            }.asyncFlatMap({$0})
-            /// Calculate global shortwave radiation from diffuse and direct components
-            let sw = try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
-            /// Calculate relative humidity from temperature and dew point
-            let rh = try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
-            handles.append(contentsOf: sw)
-            handles.append(contentsOf: rh)
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
+                if variable == .precipitation, let writerProbabilities {
+                    logger.info("Calculating precipitation probability")
+                    
+                    try await storagePrecipitation.calculatePrecipitationProbability(
+                        precipitationVariable: .precipitation,
+                        dtHoursOfCurrentStep: domain.dtHours,
+                        writer: writerProbabilities
+                    )
+                }
             }
+            
+            /// Calculate global shortwave radiation from diffuse and direct components
+            try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
+            /// Calculate relative humidity from temperature and dew point
+            try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
+            
+            let completed = i == timestamps.count - 1
+            let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
             return handles
         }
+        await curl.printStatistics()
+        return handles
     }
     
     func calculateNNMapping(latitudes: [Float], longitudes: [Float], grid: Gridable) async -> [Int] {

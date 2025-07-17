@@ -360,7 +360,39 @@ enum DomainRegistry: String, CaseIterable {
     }
 }
 
+extension Process {
+    static func awsSync(src: String, dest: String, exclude: [String] = ["*~"], profile: String? = nil) throws {
+        var args = ["s3", "sync", "--no-progress"]
+        for exclude in exclude {
+            args.append(contentsOf: ["--exclude", exclude])
+        }
+        if let profile {
+            args.append(contentsOf: ["--profile", profile])
+        }
+        args.append(contentsOf: [src, dest])
+        try spawnRetriedNoFail(cmd: "aws", args: args)
+    }
+    
+    static func awsCopy(src: String, dest: String, profile: String? = nil) throws {
+        var args = ["s3", "cp", "--no-progress"]
+        if let profile {
+            args.append(contentsOf: ["--profile", profile])
+        }
+        args.append(contentsOf: [src, dest])
+        try spawnRetriedNoFail(cmd: "aws", args: args)
+    }
+}
+
 extension DomainRegistry {
+    func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
+        return buckets.split(separator: ",").map { bucket in
+            let bucketSplit = bucket.split(separator: "@")
+            let bucket = String(bucketSplit[0].replacing("MODEL", with: rawValue.replacing("_", with: "-")))
+            let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
+            return (bucket, profile)
+        }
+    }
+    
     /// Upload all data to a specified S3 bucket
     func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
         let dir = rawValue
@@ -371,57 +403,27 @@ extension DomainRegistry {
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }
-                for bucket in bucket.split(separator: ",") {
-                    let bucketSplit = bucket.split(separator: "@")
-                    let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
-                    let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+                for (bucket, profile) in parseBucket(bucket) {
                     if variable.contains("_previous_day") && bucket == "openmeteo" {
                         // do not upload data from past days yet
                         continue
                     }
-                    let dest = "s3://\(bucket)/data/\(dir)/\(variable)"
-                    try Process.spawnRetried(
-                        cmd: "aws",
-                        args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+                    try Process.awsSync(
+                        src: src,
+                        dest: "s3://\(bucket)/data/\(dir)/\(variable)",
+                        profile: profile
                     )
                 }
             }
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            for bucket in bucket.split(separator: ",") {
-                let bucketSplit = bucket.split(separator: "@")
-                let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
-                let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
-                let excludePreviousDay = bucket == "openmeteo" ? ["--exclude", "*_previous_day*"] : []
-                let dest = "s3://\(bucket)/data/\(dir)"
-                try Process.spawnRetried(
-                    cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + excludePreviousDay + profileArgs + [src, dest]
-                )
-            }
-        }
-    }
-
-    /// Upload spatial files to S3 `/data_spatial/<domain>/YYYY/MM/DD/HHMMZ/<variable>.om`
-    func syncToS3Spatial(bucket: String, timesteps: [Timestamp]) throws {
-        let dir = rawValue
-        guard let directorySpatial = OpenMeteo.dataSpatialDirectory else {
-            return
-        }
-        for timestep in timesteps {
-            let timeFormatted = timestep.format_directoriesYYYYMMddhhmm
-            for bucket in bucket.split(separator: ",") {
-                let bucketSplit = bucket.split(separator: "@")
-                let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
-                let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
-                let src = "\(directorySpatial)\(dir)/\(timeFormatted)/"
-                let dest = "s3://\(bucket)/data_spatial/\(dir)/\(timeFormatted)"
-                if !FileManager.default.fileExists(atPath: src) {
-                    continue
-                }
-                try Process.spawnRetried(
-                    cmd: "aws",
-                    args: ["s3", "sync", "--exclude", "*~", "--no-progress"] + profileArgs + [src, dest]
+            for (bucket, profile) in parseBucket(bucket) {
+                let exclude = bucket == "openmeteo" ? ["*~", "*_previous_day*"] : ["*~"]
+                try Process.awsSync(
+                    src: src,
+                    dest: "s3://\(bucket)/data/\(dir)",
+                    exclude: exclude,
+                    profile: profile
                 )
             }
         }
@@ -434,22 +436,22 @@ extension DomainRegistry {
             return
         }
         let timeFormatted = run.format_directoriesYYYYMMddhhmm
-        for bucket in bucket.split(separator: ",") {
-            let bucketSplit = bucket.split(separator: "@")
-            let bucket = (bucketSplit.first ?? bucket).replacing("MODEL", with: rawValue.replacing("_", with: "-"))
-            let profileArgs = bucketSplit.count > 1 ? ["--profile", String(bucketSplit[1])] : []
+        for (bucket, profile) in parseBucket(bucket) {
             let src = "\(directory)\(dir)/\(timeFormatted)/"
             let dest = "s3://\(bucket)/data_run/\(dir)/\(timeFormatted)"
             if !FileManager.default.fileExists(atPath: src) {
                 continue
             }
-            try Process.spawnRetried(
-                cmd: "aws",
-                args: ["s3", "sync", "--exclude", "*~", "--exclude", "meta.json", "--no-progress"] + profileArgs + [src, dest]
+            try Process.awsSync(
+                src: src,
+                dest: dest,
+                exclude: ["*~", "meta.json"],
+                profile: profile
             )
-            try Process.spawnRetried(
-                cmd: "aws",
-                args: ["s3", "sync", "--no-progress"] + profileArgs + ["\(src)meta.json", "\(dest)meta.json"]
+            try Process.awsCopy(
+                src: "\(src)meta.json",
+                dest: "\(dest)meta.json",
+                profile: profile
             )
         }
     }

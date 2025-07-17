@@ -121,20 +121,20 @@ struct GfsGraphCastDownload: AsyncCommand {
         let deadLineHours: Double = 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        let forecastHours = domain.forecastHours(run: run.hour)
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+        let timestamps = domain.forecastHours(run: run.hour).map { run.add(hours: $0) }
 
         // https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/graphcastgfs.20240401/00/forecasts_13_levels/graphcastgfs.t00z.pgrb2.0p25.f006
         let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
-        let handles = try await forecastHours.asyncFlatMap { forecastHour -> [GenericVariableHandle] in
+        let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let thhh = forecastHour.zeroPadded(len: 3)
             let url = "\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_13_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(thhh)"
-            let timestamp = run.add(hours: forecastHour)
             let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
-            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+                try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let variable = getCmaVariable(logger: logger, message: message) else {
-                        return nil
+                        return
                     }
                     guard let stepRange = message.get(attribute: "stepRange") else {
                         fatalError("could not get step range or type")
@@ -153,7 +153,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     if let variable = variable as? GfsGraphCastSurfaceVariable, variable == .precipitation {
                         // There are 2 precipitation messages inside. Actiually the second is no precip
                         if stepRange.starts(with: "0-") {
-                            return nil
+                            return
                         }
                     }
 
@@ -161,95 +161,91 @@ struct GfsGraphCastDownload: AsyncCommand {
                         await storage.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
                         if variable.variable == .specific_humdity || variable.variable == .vertical_velocity {
                             // do not store specific humidity on disk
-                            return nil
+                            return
                         }
                     }
 
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
-                }.collect().compactMap({ $0 })
-            }
-
-            /// Convert specific humidity to relative humidity
-            let handles2 = try await storage.data.mapConcurrent(nConcurrent: concurrent) { v, data -> GenericVariableHandle? in
-                guard v.variable.variable == .specific_humdity else {
-                    return nil
+                    try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
                 }
-                let level = v.variable.level
-                logger.info("Calculating relative humidity on level \(level)")
-                guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
-                    fatalError("Requires temperature_2m")
+                /// Convert specific humidity to relative humidity
+                try await storage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
+                    guard v.variable.variable == .specific_humdity else {
+                        return
+                    }
+                    let level = v.variable.level
+                    logger.info("Calculating relative humidity on level \(level)")
+                    guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
+                        fatalError("Requires temperature_2m")
+                    }
+
+                    let data = Meteorology.specificToRelativeHumidity(specificHumidity: data.data, temperature: t.data, pressure: .init(repeating: Float(level), count: t.count))
+
+                    let rhVariable = GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
+                    // Store to calculate cloud cover
+                    await storage.set(variable: rhVariable, timestamp: timestamp, member: 0, data: Array2D(data: data, nx: t.nx, ny: t.ny))
+                    try await writer.write(member: 0, variable: rhVariable, data: data)
                 }
 
-                let data = Meteorology.specificToRelativeHumidity(specificHumidity: data.data, temperature: t.data, pressure: .init(repeating: Float(level), count: t.count))
-
-                let rhVariable = GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
-                // Store to calculate cloud cover
-                await storage.set(variable: rhVariable, timestamp: timestamp, member: 0, data: Array2D(data: data, nx: t.nx, ny: t.ny))
-                return try await writer.write(time: timestamp, member: 0, variable: rhVariable, data: data)
-            }.compactMap({ $0 })
-
-            // convert pressure vertical velocity to geometric velocity
-            let handles3 = try await storage.data.mapConcurrent(nConcurrent: concurrent) { v, data -> GenericVariableHandle? in
-                guard v.variable.variable == .vertical_velocity else {
-                    return nil
+                // convert pressure vertical velocity to geometric velocity
+                try await storage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
+                    guard v.variable.variable == .vertical_velocity else {
+                        return
+                    }
+                    let level = v.variable.level
+                    logger.info("Calculating vertical velocity on level \(level)")
+                    guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
+                        fatalError("Requires temperature_2m")
+                    }
+                    let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
+                    try await writer.write(member: 0, variable: v.variable, data: data)
                 }
-                let level = v.variable.level
-                logger.info("Calculating vertical velocity on level \(level)")
-                guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
-                    fatalError("Requires temperature_2m")
-                }
-                let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
-                return try await writer.write(time: v.timestamp, member: 0, variable: v.variable, data: data)
-            }.compactMap({ $0 })
 
-            // Calculate cloud cover mid/low/high/total
-            logger.info("Calculating cloud cover mid/low/high/total")
-            var cloudcover_low = [Float](repeating: .nan, count: domain.grid.count)
-            var cloudcover_mid = [Float](repeating: .nan, count: domain.grid.count)
-            var cloudcover_high = [Float](repeating: .nan, count: domain.grid.count)
-            for (v, data) in await storage.data {
-                guard v.variable.variable == .relative_humidity else {
-                    continue
-                }
-                let level = v.variable.level
-                let clouds = data.data.map { Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level)) }
-                switch level {
-                case ...250:
-                    for i in cloudcover_high.indices {
-                        if cloudcover_high[i].isNaN || cloudcover_high[i] < clouds[i] {
-                            cloudcover_high[i] = clouds[i]
+                // Calculate cloud cover mid/low/high/total
+                logger.info("Calculating cloud cover mid/low/high/total")
+                var cloudcover_low = [Float](repeating: .nan, count: domain.grid.count)
+                var cloudcover_mid = [Float](repeating: .nan, count: domain.grid.count)
+                var cloudcover_high = [Float](repeating: .nan, count: domain.grid.count)
+                for (v, data) in await storage.data {
+                    guard v.variable.variable == .relative_humidity else {
+                        continue
+                    }
+                    let level = v.variable.level
+                    let clouds = data.data.map { Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level)) }
+                    switch level {
+                    case ...250:
+                        for i in cloudcover_high.indices {
+                            if cloudcover_high[i].isNaN || cloudcover_high[i] < clouds[i] {
+                                cloudcover_high[i] = clouds[i]
+                            }
+                        }
+                    case ...700:
+                        for i in cloudcover_mid.indices {
+                            if cloudcover_mid[i].isNaN || cloudcover_mid[i] < clouds[i] {
+                                cloudcover_mid[i] = clouds[i]
+                            }
+                        }
+                    default:
+                        for i in cloudcover_low.indices {
+                            if cloudcover_low[i].isNaN || cloudcover_low[i] < clouds[i] {
+                                cloudcover_low[i] = clouds[i]
+                            }
                         }
                     }
-                case ...700:
-                    for i in cloudcover_mid.indices {
-                        if cloudcover_mid[i].isNaN || cloudcover_mid[i] < clouds[i] {
-                            cloudcover_mid[i] = clouds[i]
-                        }
-                    }
-                default:
-                    for i in cloudcover_low.indices {
-                        if cloudcover_low[i].isNaN || cloudcover_low[i] < clouds[i] {
-                            cloudcover_low[i] = clouds[i]
-                        }
-                    }
                 }
+                let cloudcover = Meteorology.cloudCoverTotal(
+                    low: cloudcover_low,
+                    mid: cloudcover_mid,
+                    high: cloudcover_high
+                )
+                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_low, data: cloudcover_low)
+                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid)
+                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high)
+                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
+                
+                let completed = i == timestamps.count - 1
+                return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
-            let cloudcover = Meteorology.cloudCoverTotal(
-                low: cloudcover_low,
-                mid: cloudcover_mid,
-                high: cloudcover_high
-            )
-            let handlesClouds = await [
-                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_low, data: cloudcover_low),
-                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid),
-                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high),
-                try writer.write(time: timestamp, member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
-            ]
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
-            return handles + handles2 + handles3 + handlesClouds
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)

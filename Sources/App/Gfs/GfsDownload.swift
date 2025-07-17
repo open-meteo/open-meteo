@@ -203,15 +203,10 @@ struct GfsDownload: AsyncCommand {
         Process.alarm(seconds: Int(deadLineHours + 2) * 3600)
         defer { Process.alarm(seconds: 0) }
 
-        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
-        if let maxForecastHour {
-            forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
-        }
-        let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: storeOnDisk)
+        //let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
+        let isEnsemble = domain.ensembleMembers > 1
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-        var handles = [GenericVariableHandle]()
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
@@ -223,7 +218,7 @@ struct GfsDownload: AsyncCommand {
 
         // Download HRRR 15 minutes data
         if domain == .hrrr_conus_15min {
-            for forecastHour in 0...(maxForecastHour ?? 18) {
+            let handles = try await (0...(maxForecastHour ?? 18)).asyncFlatMap { forecastHour in
                 logger.info("Downloading forecastHour \(forecastHour)")
 
                 /// Keep variables in memory. Precip + Frozen percent to calculate snowfall
@@ -234,6 +229,8 @@ struct GfsDownload: AsyncCommand {
                         GfsVariableAndDomain(variable: v, domain: domain, timestep: (forecastHour - 1) * 60 + ($0 + 1) * 15)
                     }
                 }))
+                
+                let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
 
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0, useAws: downloadFromAws)
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
@@ -265,9 +262,14 @@ struct GfsDownload: AsyncCommand {
                             grib2d.array.data[i] /= factor.data[i]
                         }
                     }
-                    handles.append(try await writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data))
+                    try await writer.write(time: timestamp, member: 0, variable: variable.variable, data: grib2d.array.data)
                 }
-                handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
+                for writer in await writer.writer {
+                    try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer)
+                }
+                let completed = forecastHour == 18
+                let validTimes = TimerangeDt(start: run, nTime: (forecastHour+1)*4, dtSeconds: 900).map({$0})
+                return try await writer.finalise(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
             }
             await curl.printStatistics()
             return handles
@@ -289,12 +291,20 @@ struct GfsDownload: AsyncCommand {
         /// Keep pressure level temperature in memory to convert pressure vertical velocity (Pa/s) to geometric velocity (m/s)
         let keepVariableInMemoryPressure: [GfsPressureVariableType] = (domain == .hrrr_conus || domain == .gfs05_ens) ? [.temperature] : []
 
-        var previousHour = 0
-        for forecastHour in forecastHours {
+        var forecastHours = domain.forecastHours(run: run.hour, secondFlush: secondFlush)
+        if let maxForecastHour {
+            forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
+        }
+        let timestamps = forecastHours.map { run.add(hours: $0) }
+        
+        let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) in
+            let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading forecastHour \(forecastHour)")
-            let timestamp = run.add(hours: forecastHour)
 
             let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
+            
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
+            let writerProbabilities = isEnsemble ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
 
             for member in 0..<domain.ensembleMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
@@ -434,25 +444,21 @@ struct GfsDownload: AsyncCommand {
                         // do not write pressure to disk
                         continue
                     }
-                    handles.append(try await writer.write(time: timestamp, member: member, variable: variable.variable, data: grib2d.array.data))
+                    try await writer.write(member: member, variable: variable.variable, data: grib2d.array.data)
                 }
-                handles.append(contentsOf: try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer))
+                try await inMemory.calculateSnowfallAmount(precipitation: .precipitation, frozen_precipitation_percent: .frozen_precipitation_percent, outVariable: GfsSurfaceVariable.snowfall_water_equivalent, writer: writer)
             }
-            if domain.ensembleMembers > 1 {
-                if let handle = try await storePrecipMembers.calculatePrecipitationProbability(
+            
+            if let writerProbabilities {
+                let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+                try await storePrecipMembers.calculatePrecipitationProbability(
                     precipitationVariable: .precipitation,
-                    domain: domain,
-                    timestamp: timestamp,
-                    run: run,
-                    dtHoursOfCurrentStep: forecastHour - previousHour
-                ) {
-                    handles.append(handle)
-                }
+                    dtHoursOfCurrentStep: forecastHour - previousHour,
+                    writer: writerProbabilities
+                )
             }
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
-            previousHour = forecastHour
+            let completed = i == timestamps.count - 1
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
         }
         await curl.printStatistics()
         return handles
@@ -476,36 +482,32 @@ struct GfsVariableAndDomain: CurlIndexedVariable {
 
 extension VariablePerMemberStorage {
     /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`.
-    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
-        return try await self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
-                guard
-                    let precipitation = handles.first(where: { $0.key.variable == precipitation }),
-                    let frozen_precipitation_percent = handles.first(where: { $0.key.variable == frozen_precipitation_percent }) else {
-                    return nil
-                }
-                let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
-                    max($0 / 100 * $1 * 0.7, 0)
-                })
-                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: snowfall)
+    func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
+            guard
+                t.timestamp == writer.time,
+                let precipitation = handles.first(where: { $0.key.variable == precipitation }),
+                let frozen_precipitation_percent = handles.first(where: { $0.key.variable == frozen_precipitation_percent }) else {
+                continue
             }
-        )
+            let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
+                max($0 / 100 * $1 * 0.7, 0)
+            })
+            try await writer.write(member: t.member, variable: outVariable, data: snowfall)
+        }
     }
     
     /// Calculate relative humidity
-    func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmRunSpatialWriter) async throws -> [GenericVariableHandle] {
-        return try await self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember })
-            .asyncCompactMap({ t, handles -> GenericVariableHandle? in
-                guard
-                    let temperature = handles.first(where: { $0.key.variable == temperature }),
-                    let dewpoint = handles.first(where: { $0.key.variable == dewpoint }) else {
-                    return nil
-                }
-                let rh = zip(temperature.value.data, dewpoint.value.data).map(Meteorology.relativeHumidity)
-                return try await writer.write(time: t.timestamp, member: t.member, variable: outVariable, data: rh)
+    func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
+            guard
+                t.timestamp == writer.time,
+                let temperature = handles.first(where: { $0.key.variable == temperature }),
+                let dewpoint = handles.first(where: { $0.key.variable == dewpoint }) else {
+                continue
             }
-        )
+            let rh = zip(temperature.value.data, dewpoint.value.data).map(Meteorology.relativeHumidity)
+            try await writer.write(member: t.member, variable: outVariable, data: rh)
+        }
     }
 }

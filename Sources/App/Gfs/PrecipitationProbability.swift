@@ -122,17 +122,17 @@ extension VariablePerMemberStorage {
     /// `precipitationVariable` is used to filter only precipitation variables
     /// `domain` must be set to generate a temporary file handle afterwards
     /// `dtHoursOfCurrentStep` should be set to the correct delta time in hours for this timestep if the step width changes. E.g. 3 to 6 hours after 120h. If no dt switching takes place, just use `domain.dtHours`.
-    func calculatePrecipitationProbability(precipitationVariable: V, domain: GenericDomain, timestamp: Timestamp, run: Timestamp, dtHoursOfCurrentStep: Int) async throws -> GenericVariableHandle? {
+    func calculatePrecipitationProbability(precipitationVariable: V, dtHoursOfCurrentStep: Int, writer: OmSpatialTimestepWriter) async throws {
         // Usefull probs, precip >0.1, >1, clouds <20%, clouds 20-50, 50-80, >80, snowfall eq >0.1, >1.0, wind >20kt, temp <0, temp >25
         // However, more and more probabilities takes up more resources than analysing raw member data
         let handles = self.data.filter({ $0.key.variable == precipitationVariable })
         let nMember = handles.count
         guard nMember > 1, dtHoursOfCurrentStep > 0 else {
             print("skip nMember=\(nMember), dtHoursOfCurrentStep=\(dtHoursOfCurrentStep)")
-            return nil
+            return
         }
 
-        var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
+        var precipitationProbability01 = [Float](repeating: 0, count: handles.first!.value.data.count)
         let threshold = Float(0.1) * Float(dtHoursOfCurrentStep)
         for (v, data) in handles {
             guard v.variable == precipitationVariable else {
@@ -145,41 +145,6 @@ extension VariablePerMemberStorage {
             }
         }
         precipitationProbability01.multiplyAdd(multiply: 100 / Float(nMember), add: 0)
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-        return try await writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
-    }
-}
-
-extension Array where Element == GenericVariableHandle {
-    /// Calculate precipitation >0.1mm/h probability. BOM downloads multiple timesteps, uncompress handles and calculate probabilities
-    /// `precipitationVariable` is used to filter only precipitation variables
-    /// `domain` must be set to generate a temporary file handle afterwards
-    func calculatePrecipitationProbabilityMultipleTimestamps(precipitationVariable: GenericVariable, domain: GenericDomain, run: Timestamp) async throws -> [GenericVariableHandle] {
-        var previousTimesamp: Timestamp?
-        return try await self
-            .filter({ $0.variable.omFileName == precipitationVariable.omFileName })
-            .groupedPreservedOrder(by: { val -> Timestamp in val.time.range.lowerBound })
-            .sorted(by: { $0.key < $1.key })
-            .asyncCompactMap({ timestamp, handles -> GenericVariableHandle? in
-                let nMember = handles.count
-                guard nMember > 1 else {
-                    return nil
-                }
-                let dt = previousTimesamp.map { (timestamp.timeIntervalSince1970 - $0.timeIntervalSince1970) / 3600 } ?? domain.dtHours
-                precondition(dt > 0, "dt <= 0")
-                var precipitationProbability01 = [Float](repeating: 0, count: domain.grid.count)
-                let threshold = Float(0.1) * Float(dt)
-                for d in handles {
-                    for (i, value) in try await d.reader.read().enumerated() {
-                        if value >= threshold {
-                            precipitationProbability01[i] += 1
-                        }
-                    }
-                }
-                previousTimesamp = timestamp
-                precipitationProbability01.multiplyAdd(multiply: 100 / Float(nMember), add: 0)
-                let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-                return try await writer.write(time: timestamp, member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
-            })
+        return try await writer.write(member: 0, variable: ProbabilityVariable.precipitation_probability, data: precipitationProbability01)
     }
 }

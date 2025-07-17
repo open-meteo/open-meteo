@@ -75,7 +75,7 @@ struct JmaDownload: AsyncCommand {
         let deadLineHours: Double = domain == .gsm ? 3 : 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
+        
 
         let runDate = run.toComponents()
         let server = server.replacingOccurrences(of: "YYYY", with: runDate.year.zeroPadded(len: 4))
@@ -101,19 +101,21 @@ struct JmaDownload: AsyncCommand {
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
         let deaverager = GribDeaverager()
+        var validTimes: Set<Timestamp> = []
 
         let handles = try await filesToDownload.asyncFlatMap { filename -> [GenericVariableHandle] in
             let url = "\(server)\(filename)"
-            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                return try await stream.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
+            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+                let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+                try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let variable = message.toJmaVariable(),
                           let stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType"),
                           let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
-                        return nil
+                        return
                     }
                     if hour == 0 && variable.skipHour0 {
-                        return nil
+                        return
                     }
                     let timestamp = run.add(hours: hour)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
@@ -132,20 +134,21 @@ struct JmaDownload: AsyncCommand {
                     // Deaccumulate precipitation. MSM model falsely marks `stepType` as accumulation for precipitation, resulting in negative values
                     if domain != .msm {
                         guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                            return nil
+                            return
                         }
                     }
 
                     // try data.writeNetcdf(filename: "\(domain.downloadDirectory)\(variable.variable.omFileName.file)_\(variable.hour).nc")
                     logger.info("Compressing and writing data to \(variable.omFileName.file)_\(hour).om")
-                    return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
-                }.collect().compactMap({ $0 })
+                    
+                    try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                }
+                for writer in await writer.writer {
+                    validTimes.insert(writer.time)
+                }
+                let completed = filename == filesToDownload.last
+                return try await writer.finalise(completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
             }
-            if let uploadS3Bucket = uploadS3Bucket {
-                let timesteps = Array(handles.map { $0.time.range.lowerBound }.uniqued().sorted())
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: timesteps)
-            }
-            return handles
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)

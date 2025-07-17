@@ -71,19 +71,19 @@ struct DownloadIconWaveCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
 
-        let writer = OmRunSpatialWriter(domain: domain, run: run, storeOnDisk: true)
-
         var grib2d = GribArray2D(nx: nx, ny: ny)
+        let timestamps = (0..<(maxForecastHour ?? domain.countForecastHours)).map { run.add(hours: $0 * domain.dtHours) }
 
-        let handles = try await (0..<(maxForecastHour ?? domain.countForecastHours)).asyncFlatMap { forecastStep in
+        let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             /// E.g. 0,3,6...174 for gwam
-            let forecastHour = forecastStep * domain.dtHours
-            let timestamp = run.add(hours: forecastHour)
+            let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(forecastHour)")
             
-            let handles: [GenericVariableHandle] = try await variables.asyncCompactMap { variable in
+            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            
+            for variable in variables {
                 guard variable.availableFor(domain: domain) else {
-                    return nil
+                    continue
                 }
                 let url = "\(baseUrl)\(variable.dwdName)/\(domain.rawValue.uppercased())_\(variable.dwdName.uppercased())_\(run.format_YYYYMMddHH)_\(forecastHour.zeroPadded(len: 3)).grib2.bz2"
 
@@ -106,12 +106,10 @@ struct DownloadIconWaveCommand: AsyncCommand {
                     try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
                 }
                 
-                return try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
             }
-            if let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3Spatial(bucket: uploadS3Bucket, timesteps: [timestamp])
-            }
-            return handles
+            let completed = i == timestamps.count - 1
+            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles

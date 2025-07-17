@@ -202,6 +202,26 @@ extension AsyncSequence where Element: Sendable, Self: Sendable {
             }
         }
     }
+    
+    /// Execute a closure for each element concurrently
+    /// `nConcurrent` limits the number of concurrent tasks
+    func foreachConcurrent(
+        nConcurrent: Int,
+        body: @escaping @Sendable (Element) async throws -> Void
+    ) async rethrows {
+        assert(nConcurrent > 0)
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            var index = 0
+            for try await element in self {
+                if index >= nConcurrent {
+                    _ = try await group.next()
+                }
+                group.addTask { try await body(element) }
+                index += 1
+            }
+            try await group.waitForAll()
+        }
+    }
 }
 
 /// Thread safe dictionary
