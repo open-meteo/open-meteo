@@ -192,6 +192,9 @@ extension NetCDF {
             if error == "NetCDF: file not found" {
                 return nil
             }
+            if error == "NetCDF: I/O failure" {
+                return nil
+            }
             throw NetCDFError.ncerror(code: code, error: error)
         }
     }
