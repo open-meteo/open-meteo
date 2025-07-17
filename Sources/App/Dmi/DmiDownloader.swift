@@ -184,6 +184,12 @@ struct DmiDownload: AsyncCommand {
                             break
                         }
                         await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
+                        try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth)
+                        try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth)
                         return
                     }
 
@@ -246,15 +252,7 @@ struct DmiDownload: AsyncCommand {
                 }
 
                 previous = previousScoped
-
-                logger.info("Calculating wind speed and direction from U/V components and correcting for true north")
-                try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth)
-                try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth)
-                try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth)
-                try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth)
-                try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth)
-                try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth)
-
+                
                 if generateElevationFile {
                     try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
                 }
