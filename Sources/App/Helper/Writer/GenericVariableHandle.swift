@@ -364,8 +364,8 @@ struct GenericVariableHandle: Sendable {
 }
 
 fileprivate struct FullRunMetaJson: Encodable {
-    let forecast_reference_time: String
-    let created_at: String
+    let reference_time: Date
+    let created_at: Date
     let variables: [String]
 
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
@@ -382,8 +382,8 @@ fileprivate struct FullRunMetaJson: Encodable {
         }
         let items = try FileManager.default.contentsOfDirectory(atPath: path)
         self.variables = items.filter({$0.hasSuffix(".om")}).map({String($0.dropLast(3))})
-        self.forecast_reference_time = run.iso8601_YYYY_MM_dd_HH_mmZ
-        self.created_at = Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ
+        self.reference_time = run.toDate()
+        self.created_at = Date()
         self.temporal_resolution_seconds = domain.dtSeconds
     }
     

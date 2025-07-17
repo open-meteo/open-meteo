@@ -104,18 +104,6 @@ struct ModelUpdateMetaJson: Codable {
     }
 }
 
-extension Encodable {
-    /// Write to as an atomic operation
-    func writeTo(path: String) throws {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .sortedKeys
-        let fn = try FileHandle.createNewFile(file: "\(path)~")
-        try fn.write(contentsOf: try encoder.encode(self))
-        try fn.close()
-        try FileManager.default.moveFileOverwrite(from: "\(path)~", to: path)
-    }
-}
-
 /// Intermediate structure to keep meta files open
 struct ModelUpdateMetaJsonAndFileHandle: GenericFileManagable {
     let fn: FileHandle

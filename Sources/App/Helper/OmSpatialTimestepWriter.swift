@@ -20,7 +20,7 @@ extension OmFileWriterArrayFinalised: @retroactive @unchecked Sendable {
 
 /// Write multiple spatial oriented variables into one file per time-step
 actor OmSpatialTimestepWriter {
-    var variables: [(variable: GenericVariable, member: Int, finalised: OmFileWriterArrayFinalised)] = .init()
+    var variables: [VariableWithOffset] = .init()
     let filename: String?
     let writer: OmFileWriter<FileHandle>
     let domain: GenericDomain
@@ -28,6 +28,16 @@ actor OmSpatialTimestepWriter {
     let time: Timestamp
     let realm: String?
     let fn: FileHandle
+    
+    struct VariableWithOffset {
+        let variable: GenericVariable
+        let member: Int
+        let finalised: OmFileWriterArrayFinalised
+        
+        var omFileNameWithMember: String {
+            return member > 0 ? "\(variable.omFileName.file)_member\(member.zeroPadded(len: 2))" : variable.omFileName.file
+        }
+    }
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
@@ -73,7 +83,7 @@ actor OmSpatialTimestepWriter {
             add_offset: 0
         )
         try arrayWriter.writeData(array: data)
-        self.variables.append((variable, member, try arrayWriter.finalise()))
+        self.variables.append(VariableWithOffset(variable: variable, member: member, finalised: try arrayWriter.finalise()))
     }
     
     /// Finalise the time step, update meta JSON and return all handles
@@ -90,8 +100,7 @@ actor OmSpatialTimestepWriter {
         //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
         let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
         let variablesOffset = try self.variables.map {
-            let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
-            return try writer.write(array: $0.finalised, name: "\($0.variable.omFileName.file)\(member)", children: [])
+            return try writer.write(array: $0.finalised, name: $0.omFileNameWithMember, children: [])
         }
         let root = try writer.writeNone(name: "", children: variablesOffset + [runTime, validTime, /*coordinates,*/ createdAt])
         try writer.writeTrailer(rootVariable: root)
@@ -116,14 +125,11 @@ actor OmSpatialTimestepWriter {
         }
         
         let meta = DataSpatialJson(
-            reference_time: run.iso8601_YYYY_MM_dd_HH_mmZ,
-            last_modified_time: Timestamp.now().iso8601_YYYY_MM_dd_HH_mmZ,
+            reference_time: run.toDate(),
+            last_modified_time: Date(),
             completed: completed,
             valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
-            variables: self.variables.map {
-                let member = $0.member > 0 ? "_member\($0.member.zeroPadded(len: 2))" : ""
-                return "\($0.variable.omFileName.file)\(member)"
-            }.sorted()
+            variables: self.variables.map(\.omFileNameWithMember).sorted()
         )
         let realm = realm.map { "_\($0)" } ?? ""
         
@@ -133,7 +139,13 @@ actor OmSpatialTimestepWriter {
         let metaLatest = "\(directorySpatial)latest\(realm).json"
         
         try meta.writeTo(path: metaRunMeta)
-        try meta.writeTo(path: metaInProgress)
+        
+        /// Only update `in-progress.json` if there is no older run currently generating files. E.g. HRRR downloads 2 runs in parallel with ~20 minutes overlap
+        let canUpdateInProgress = completed || (try? DataSpatialJson.readFrom(path: metaInProgress).sameRunOrOlderThan5Minutes(run: run)) ?? true
+        
+        if canUpdateInProgress {
+            try meta.writeTo(path: metaInProgress)
+        }
         if completed {
             try meta.writeTo(path: metaLatest)
         }
@@ -145,15 +157,17 @@ actor OmSpatialTimestepWriter {
                 let destDomain = "s3://\(bucket)/data_spatial/\(domain.domainRegistry.rawValue)/"
                 let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
                 let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
-                let destMeta = "\(destRun)meta\(realm).json"
-                let destInProgress = "\(destDomain)in-progress\(realm).json"
-                let destLatest = "\(destDomain)latest\(realm).json"
                 
                 try Process.awsCopy(src: filename, dest: destFile, profile: profile)
                 if uploadMeta {
+                    let destMeta = "\(destRun)meta\(realm).json"
                     try Process.awsCopy(src: metaRunMeta, dest: destMeta, profile: profile)
-                    try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
+                    if canUpdateInProgress {
+                        let destInProgress = "\(destDomain)in-progress\(realm).json"
+                        try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
+                    }
                     if completed {
+                        let destLatest = "\(destDomain)latest\(realm).json"
                         try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)
                     }
                 }
@@ -208,10 +222,9 @@ actor OmSpatialMultistepWriter {
     }
 }
 
-
-fileprivate struct DataSpatialJson: Encodable {
-    let reference_time: String
-    let last_modified_time: String
+fileprivate struct DataSpatialJson: Codable {
+    let reference_time: Date
+    let last_modified_time: Date
     let completed: Bool
     let valid_times: [String]
     let variables: [String]
@@ -238,4 +251,14 @@ fileprivate struct DataSpatialJson: Encodable {
         case maximum
         case minimum
     }*/
+    
+    func sameRunOrOlderThan5Minutes(run: Timestamp) -> Bool {
+        /*guard let lastModified = try? Date(last_modified_time, strategy: .iso8601),
+              let lastRun = try? Date(reference_time, strategy: .iso8601) else {
+            return true
+        }*/
+        let sameRun = Int(reference_time.timeIntervalSince1970) == run.timeIntervalSince1970
+        let olderThan5Minutes = last_modified_time.addingTimeInterval(300) < Date()
+        return sameRun || olderThan5Minutes
+    }
 }
