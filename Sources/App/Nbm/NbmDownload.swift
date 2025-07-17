@@ -111,7 +111,7 @@ struct NbmDownload: AsyncCommand {
     func downloadNbm(application: Application, domain: NbmDomain, run: Timestamp, variables: [any NbmVariableDownloadable], maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
-        let deadLineHours: Double = 2
+        let deadLineHours: Double = 4
         let waitAfterLastModified: TimeInterval = 120
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: waitAfterLastModified)
         Process.alarm(seconds: Int(deadLineHours + 2) * 3600)
