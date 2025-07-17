@@ -211,6 +211,58 @@ struct KnmiDownload: AsyncCommand {
                     var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
                     await winds.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
+
+                    try await winds.calculateWindSpeed(
+                        u: .init(variable: .u, level: .heightAboveGround(10)),
+                        v: .init(variable: .v, level: .heightAboveGround(10)),
+                        outSpeedVariable: KnmiSurfaceVariable.wind_speed_10m,
+                        outDirectionVariable: KnmiSurfaceVariable.wind_direction_10m,
+                        writer: writer,
+                        trueNorth: trueNorth
+                    )
+                    try await winds.calculateWindSpeed(
+                        u: .init(variable: .u, level: .heightAboveGround(50)),
+                        v: .init(variable: .v, level: .heightAboveGround(50)),
+                        outSpeedVariable: KnmiSurfaceVariable.wind_speed_50m,
+                        outDirectionVariable: KnmiSurfaceVariable.wind_direction_50m,
+                        writer: writer,
+                        trueNorth: trueNorth
+                    )
+                    try await winds.calculateWindSpeed(
+                        u: .init(variable: .u, level: .heightAboveGround(100)),
+                        v: .init(variable: .v, level: .heightAboveGround(100)),
+                        outSpeedVariable: KnmiSurfaceVariable.wind_speed_100m,
+                        outDirectionVariable: KnmiSurfaceVariable.wind_direction_100m,
+                        writer: writer,
+                        trueNorth: trueNorth
+                    )
+                    try await winds.calculateWindSpeed(
+                        u: .init(variable: .u, level: .heightAboveGround(200)),
+                        v: .init(variable: .v, level: .heightAboveGround(200)),
+                        outSpeedVariable: KnmiSurfaceVariable.wind_speed_200m,
+                        outDirectionVariable: KnmiSurfaceVariable.wind_direction_200m,
+                        writer: writer,
+                        trueNorth: trueNorth
+                    )
+                    try await winds.calculateWindSpeed(
+                        u: .init(variable: .u, level: .heightAboveGround(300)),
+                        v: .init(variable: .v, level: .heightAboveGround(300)),
+                        outSpeedVariable: KnmiSurfaceVariable.wind_speed_300m,
+                        outDirectionVariable: KnmiSurfaceVariable.wind_direction_300m,
+                        writer: writer,
+                        trueNorth: trueNorth
+                    )
+                    let levels = await Set(winds.data.compactMap({ $0.key.variable.level.asIsobaricInhPa }))
+                    for hPa in levels {
+                        try await winds.calculateWindSpeed(
+                            u: .init(variable: .u, level: .isobaricInhPa(hPa)),
+                            v: .init(variable: .v, level: .isobaricInhPa(hPa)),
+                            outSpeedVariable: KnmiPressureVariable(variable: .wind_speed, level: hPa),
+                            outDirectionVariable: KnmiPressureVariable(variable: .wind_direction, level: hPa),
+                            writer: writer,
+                            trueNorth: trueNorth
+                        )
+                    }
                     return
                 }
 
@@ -228,6 +280,8 @@ struct KnmiDownload: AsyncCommand {
                         break
                     }
                     await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
+                    
+                    try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
                     return
                 }
 
@@ -272,63 +326,6 @@ struct KnmiDownload: AsyncCommand {
 
             if generateElevationFile {
                 try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
-            }
-
-            // loop over all timesteps
-            for writer in await writer.writer {
-                try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: KnmiSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
-
-                try await winds.calculateWindSpeed(
-                    u: .init(variable: .u, level: .heightAboveGround(10)),
-                    v: .init(variable: .v, level: .heightAboveGround(10)),
-                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_10m,
-                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_10m,
-                    writer: writer,
-                    trueNorth: trueNorth
-                )
-                try await winds.calculateWindSpeed(
-                    u: .init(variable: .u, level: .heightAboveGround(50)),
-                    v: .init(variable: .v, level: .heightAboveGround(50)),
-                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_50m,
-                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_50m,
-                    writer: writer,
-                    trueNorth: trueNorth
-                )
-                try await winds.calculateWindSpeed(
-                    u: .init(variable: .u, level: .heightAboveGround(100)),
-                    v: .init(variable: .v, level: .heightAboveGround(100)),
-                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_100m,
-                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_100m,
-                    writer: writer,
-                    trueNorth: trueNorth
-                )
-                try await winds.calculateWindSpeed(
-                    u: .init(variable: .u, level: .heightAboveGround(200)),
-                    v: .init(variable: .v, level: .heightAboveGround(200)),
-                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_200m,
-                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_200m,
-                    writer: writer,
-                    trueNorth: trueNorth
-                )
-                try await winds.calculateWindSpeed(
-                    u: .init(variable: .u, level: .heightAboveGround(300)),
-                    v: .init(variable: .v, level: .heightAboveGround(300)),
-                    outSpeedVariable: KnmiSurfaceVariable.wind_speed_300m,
-                    outDirectionVariable: KnmiSurfaceVariable.wind_direction_300m,
-                    writer: writer,
-                    trueNorth: trueNorth
-                )
-                let levels = await Set(winds.data.compactMap({ $0.key.variable.level.asIsobaricInhPa }))
-                for hPa in levels {
-                    try await winds.calculateWindSpeed(
-                        u: .init(variable: .u, level: .isobaricInhPa(hPa)),
-                        v: .init(variable: .v, level: .isobaricInhPa(hPa)),
-                        outSpeedVariable: KnmiPressureVariable(variable: .wind_speed, level: hPa),
-                        outDirectionVariable: KnmiPressureVariable(variable: .wind_direction, level: hPa),
-                        writer: writer,
-                        trueNorth: trueNorth
-                    )
-                }
             }
             return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         }

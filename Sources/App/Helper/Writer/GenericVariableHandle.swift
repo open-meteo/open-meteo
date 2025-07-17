@@ -455,32 +455,53 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
     }
 
     func getAndForget(_ variable: VariableAndMember) -> Array2D? {
-        let value = data[variable]
-        data.removeValue(forKey: variable)
-        return value
+        return data.removeValue(forKey: variable)
     }
 }
 
 extension VariablePerMemberStorage {
-    /// Calculate wind speed and direction from U/V components for all available members an timesteps.
+    /// Calculate wind speed and direction from U/V components for all available members for all timesteps
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
-        for (t, handles) in self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
-            guard
-                t.timestamp == writer.time,
-                 let u = handles.first(where: { $0.key.variable == u }), let v = handles.first(where: { $0.key.variable == v }) else {
+    /// Removes processed variables from `self.data`
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialMultistepWriter, trueNorth: [Float]? = nil) async throws {
+        
+        while let uKey = data.first(where: {$0.key.variable == u })?.key {
+            let vKey = uKey.with(variable: v)
+            guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
                 continue
             }
-            let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
-            try await writer.write(member: t.member, variable: outSpeedVariable, data: speed)
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
+            try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outSpeedVariable, data: speed)
 
             if let outDirectionVariable {
-                var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
+                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 if let trueNorth {
                     direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                 }
-                try await writer.write(member: t.member, variable: outDirectionVariable, data: direction)
+                try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outDirectionVariable, data: direction)
+            }
+        }
+    }
+    
+    /// Calculate wind speed and direction from U/V components for all available members for the timestep in writer
+    /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
+    /// Removes processed variables from `self.data`
+    func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
+        
+        while let uKey = data.first(where: {$0.key.variable == u && $0.key.timestamp == writer.time })?.key {
+            let vKey = uKey.with(variable: v)
+            guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
+                continue
+            }
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
+            try await writer.write(member: uKey.member, variable: outSpeedVariable, data: speed)
+
+            if let outDirectionVariable {
+                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+                if let trueNorth {
+                    direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
+                }
+                try await writer.write(member: uKey.member, variable: outDirectionVariable, data: direction)
             }
         }
     }
