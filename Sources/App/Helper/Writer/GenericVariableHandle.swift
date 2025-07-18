@@ -77,14 +77,11 @@ struct GenericVariableHandle: Sendable {
         }
 
         if let uploadS3Bucket = uploadS3Bucket {
-            logger.info("AWS upload to bucket \(uploadS3Bucket)")
-            let variables = handles.map { $0.variable }.uniqued(on: { $0.omFileName.file })
-            let startTimeAws = DispatchTime.now()
             try domain.domainRegistry.syncToS3(
+                logger: logger,
                 bucket: uploadS3Bucket,
-                variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : variables
+                variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : nil
             )
-            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
 
         if let run {
@@ -96,12 +93,11 @@ struct GenericVariableHandle: Sendable {
             
             /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
             if !uploadS3OnlyProbabilities, let uploadS3Bucket {
-                let startTimeAws = DispatchTime.now()
                 try domain.domainRegistry.syncToS3(
+                    logger: logger,
                     bucket: uploadS3Bucket,
                     variables: nil
                 )
-                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
             }
         }
         
@@ -112,16 +108,11 @@ struct GenericVariableHandle: Sendable {
             logger.info("Full run convert in \(startTimeFullRun.timeElapsedPretty())")
             
             if let uploadS3Bucket {
-            do {
-                let startTimeAws = DispatchTime.now()
                 try domain.domainRegistry.syncToS3PerRun(
+                    logger: logger,
                     bucket: uploadS3Bucket,
                     run:run
                 )
-                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
-                } catch {
-                    logger.error("Sync to AWS failed: \(error)")
-                }
             }
         }
     }
