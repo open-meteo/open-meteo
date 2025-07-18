@@ -1,6 +1,6 @@
 import Foundation
 import AsyncHTTPClient
-import CryptoKit
+import Vapor
 
 /// Sign AWS URLs with AWS4-HMAC-SHA256
 public struct AWSSigner {

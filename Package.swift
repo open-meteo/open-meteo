@@ -39,7 +39,6 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.0.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
-        .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0")
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.3")
@@ -55,7 +54,6 @@ let package = Package(
                 .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
                 .product(name: "SwiftEccodes", package: "SwiftEccodes"),
                 .product(name: "NIOCore", package: "swift-nio"),
-                .product(name: "SwiftCrypto", package: "swift-crypto"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 "CHelper",
                 .product(name: "OmFileFormat", package: "om-file-format"),
