@@ -73,7 +73,7 @@ struct EumetsatLsaSafReader: GenericReaderDerived, GenericReaderProtocol {
         case .diffuse_radiation:
             let swrad = try await get(raw: .shortwave_radiation, time: time)
             let dir = try await get(raw: .direct_radiation, time: time)
-            let diffuse = zip(swrad.data, dir.data).map(-)
+            let diffuse = zip(swrad.data, dir.data).map({max($0-$1,0)})
             return DataAndUnit(diffuse, swrad.unit)
         case .direct_radiation_instant:
             let direct = try await get(raw: .direct_radiation, time: time)
