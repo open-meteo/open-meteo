@@ -283,7 +283,7 @@ struct DownloadCmaCommand: AsyncCommand {
             // Split download into 16 MB parts and download concurrently
             // In case processing is too slow, incoming data will be buffered
             let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
                 // Process each grib message concurrently. Independent from download thread
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                     /*

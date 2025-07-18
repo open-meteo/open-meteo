@@ -131,7 +131,7 @@ struct GfsGraphCastDownload: AsyncCommand {
             let url = "\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_13_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(thhh)"
             let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
             return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let variable = getCmaVariable(logger: logger, message: message) else {
                         return

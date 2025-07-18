@@ -21,13 +21,14 @@ extension OmFileWriterArrayFinalised: @retroactive @unchecked Sendable {
 /// Write multiple spatial oriented variables into one file per time-step
 actor OmSpatialTimestepWriter {
     var variables: [VariableWithOffset] = .init()
-    let filename: String?
-    let writer: OmFileWriter<FileHandle>
+    var filename: String?
+    var writer: OmFileWriter<FileHandle>?
     let domain: GenericDomain
     let run: Timestamp
     let time: Timestamp
     let realm: String?
-    let fn: FileHandle
+    var fn: FileHandle?
+    let storeOnDisk: Bool
     
     struct VariableWithOffset {
         let variable: GenericVariable
@@ -41,7 +42,22 @@ actor OmSpatialTimestepWriter {
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?) throws {
+    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?) {
+        self.writer = nil
+        self.domain = domain
+        self.run = run
+        self.time = time
+        self.realm = realm
+        self.storeOnDisk = storeOnDisk
+        self.fn = nil
+    }
+    
+    /// Get existing writer or init new instance
+    func getWriter() throws -> OmFileWriter<FileHandle> {
+        if let writer = writer {
+            return writer
+        }
+        let fn: FileHandle
         if storeOnDisk, let directorySpatial = domain.domainRegistry.directorySpatial {
             let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
             try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
@@ -49,24 +65,25 @@ actor OmSpatialTimestepWriter {
             let filename = "\(path)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
             let fileTemp = "\(filename)~"
             try FileManager.default.removeItemIfExists(at: fileTemp)
-            self.fn = try FileHandle.createNewFile(file: fileTemp)
+            fn = try FileHandle.createNewFile(file: fileTemp)
             self.filename = filename
         } else {
             let file = "\(OpenMeteo.tempDirectory)\(Int.random(in: 0..<Int.max)).om"
             try FileManager.default.removeItemIfExists(at: file)
-            self.fn = try FileHandle.createNewFile(file: file)
+            fn = try FileHandle.createNewFile(file: file)
             try FileManager.default.removeItem(atPath: file)
             filename = nil
         }
-        self.writer = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
-        self.domain = domain
-        self.run = run
-        self.time = time
-        self.realm = realm
+        let writer = OmFileWriter(fn: fn, initialCapacity: 4 * 1024)
+        self.writer = writer
+        self.fn = fn
+        return writer
     }
     
     /// Write a single variable to the file
     func write(member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
+        let writer = try getWriter()
+        
         let y = min(domain.grid.ny, 32)
         let x = min(domain.grid.nx, 1024 / y)
         let dimensions = [domain.grid.ny, domain.grid.nx]
@@ -88,6 +105,10 @@ actor OmSpatialTimestepWriter {
     
     /// Finalise the time step, update meta JSON and return all handles
     func finalise(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws -> [GenericVariableHandle] {
+        guard let writer, let fn else {
+            return []
+        }
+        
         guard variables.count > 0 else {
             if let filename = filename {
                 try FileManager.default.removeItemIfExists(at: "\(filename)~")
@@ -109,7 +130,7 @@ actor OmSpatialTimestepWriter {
             try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
         }
         
-        let reader = try await OmFileReader(fn: try MmapFile(fn: self.fn))
+        let reader = try await OmFileReader(fn: try MmapFile(fn: fn))
         let time = self.time
         let dtSeconds = domain.dtSeconds
         let handles = try await self.variables.enumerated().asyncMap { (i, variable) in
@@ -203,7 +224,7 @@ actor OmSpatialMultistepWriter {
         if let writer = writer.first(where: {$0.time == time}) {
             return writer
         }
-        let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm)
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm)
         self.writer.append(writer)
         return writer
     }
