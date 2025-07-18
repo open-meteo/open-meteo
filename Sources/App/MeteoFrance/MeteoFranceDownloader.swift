@@ -219,7 +219,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
             return try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                 // process sequentialy, as precipitation need to be in order for deaveraging
-                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
                 for try await message in stream {
                     // Only select 3h precipitation probability from the grib file
                     guard let probabilityType = message.getLong(attribute: "probabilityType"),
@@ -297,7 +297,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 
-                try await curl.getGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 4) { message in
+                try await curl.getGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
 
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
@@ -514,7 +514,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let seconds = timestamp.timeIntervalSince1970 - run.timeIntervalSince1970
-            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
             
             for variable in variables {
                 guard variable.availableFor(domain: domain, forecastSecond: seconds) else {

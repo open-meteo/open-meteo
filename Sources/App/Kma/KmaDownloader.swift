@@ -114,7 +114,7 @@ struct KmaDownload: AsyncCommand {
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
             let fHHH = forecastHour.zeroPadded(len: 3)
-            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 guard let kmaName = variable.getKmaName(domain: domain) else {
                     return

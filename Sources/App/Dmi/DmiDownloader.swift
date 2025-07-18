@@ -146,7 +146,7 @@ struct DmiDownload: AsyncCommand {
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
-                let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
 
                 // process sequentialy, as precipitation need to be in order for deaveraging
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in

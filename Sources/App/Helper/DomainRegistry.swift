@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 /**
  List of all integrated domains
@@ -394,10 +395,12 @@ extension DomainRegistry {
     }
     
     /// Upload all data to a specified S3 bucket
-    func syncToS3(bucket: String, variables: [GenericVariable]?) throws {
+    func syncToS3(logger: Logger, bucket: String, variables: [GenericVariable]?) throws {
         let dir = rawValue
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
+            logger.info("AWS upload to bucket \(bucket)")
+            let startTimeAws = DispatchTime.now()
             for variable in vDirectories {
                 let src = "\(OpenMeteo.dataDirectory)\(dir)/\(variable)"
                 if !FileManager.default.fileExists(atPath: src) {
@@ -415,22 +418,26 @@ extension DomainRegistry {
                     )
                 }
             }
+            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             for (bucket, profile) in parseBucket(bucket) {
                 let exclude = bucket == "openmeteo" ? ["*~", "*_previous_day*"] : ["*~"]
+                logger.info("AWS upload to bucket \(bucket)")
+                let startTimeAws = DispatchTime.now()
                 try Process.awsSync(
                     src: src,
                     dest: "s3://\(bucket)/data/\(dir)",
                     exclude: exclude,
                     profile: profile
                 )
+                logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
             }
         }
     }
     
     /// Upload time-series optimised per RUN files to S3 `/data_run/<domain>/<run>/<variable>.om`
-    func syncToS3PerRun(bucket: String, run: Timestamp) throws {
+    func syncToS3PerRun(logger: Logger, bucket: String, run: Timestamp) throws {
         let dir = rawValue
         guard let directory = OpenMeteo.dataRunDirectory else {
             return
@@ -442,6 +449,8 @@ extension DomainRegistry {
             if !FileManager.default.fileExists(atPath: src) {
                 continue
             }
+            let startTimeAws = DispatchTime.now()
+            logger.info("AWS upload to bucket \(bucket)")
             try Process.awsSync(
                 src: src,
                 dest: dest,
@@ -453,6 +462,7 @@ extension DomainRegistry {
                 dest: "\(dest)meta.json",
                 profile: profile
             )
+            logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
     }
 }

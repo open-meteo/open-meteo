@@ -98,8 +98,8 @@ struct MeteoSwissDownload: AsyncCommand {
             logger.info("Downloading hour \(hour)")
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
             
-            let writerProbabilities = domain.ensembleMembers > 1 ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
-            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
+            let writerProbabilities = domain.ensembleMembers > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
             
             try await variables.foreachConcurrent(nConcurrent: 4) { variable in
                 let storagePrecipitation = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()

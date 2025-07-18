@@ -153,8 +153,8 @@ struct DownloadIconCommand: AsyncCommand {
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
-            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm)
-            let writerProbabilities = isEnsemble ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             let writer15Min = OmSpatialMultistepWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: true, realm: nil)
 
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in

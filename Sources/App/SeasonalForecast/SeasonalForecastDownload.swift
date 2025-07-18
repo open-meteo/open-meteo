@@ -64,7 +64,7 @@ struct SeasonalForecastDownload: AsyncCommand {
         }
 
         if let uploadS3Bucket = signature.uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(bucket: uploadS3Bucket, variables: CfsVariable.allCases)
+            try domain.domainRegistry.syncToS3(logger: context.application.logger, bucket: uploadS3Bucket, variables: CfsVariable.allCases)
         }
     }
 

@@ -303,8 +303,8 @@ struct GfsDownload: AsyncCommand {
 
             let storePrecipMembers = VariablePerMemberStorage<GfsSurfaceVariable>()
             
-            let writer = try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
-            let writerProbabilities = isEnsemble ? try OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
 
             for member in 0..<domain.ensembleMembers {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
