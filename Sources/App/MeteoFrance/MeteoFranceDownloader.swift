@@ -297,7 +297,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 
-                try await curl.getGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
+                try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
 
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
