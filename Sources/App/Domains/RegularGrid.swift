@@ -9,6 +9,8 @@ struct RegularGrid: Gridable {
     let dy: Float
     let searchRadius: Int
 
+    let cfProjectionParameters = CfProjectionParameters.latitudeLongitude()
+
     public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
         self.nx = nx
         self.ny = ny
@@ -130,7 +132,7 @@ struct GridSliceXyIterator: IteratorProtocol {
     let nxSlice: Int
     /// Number of x steps in the grid
     let nx: Int
-    
+
     let yLowerBound: Int
     let xLowerBound: Int
 
