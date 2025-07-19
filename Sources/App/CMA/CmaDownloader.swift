@@ -273,7 +273,7 @@ struct DownloadCmaCommand: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let nForecastHours = domain.forecastHours(run: run.hour)
-        let timestamps = TimerangeDt(start: run, nTime: nForecastHours, dtSeconds: 3*3600).map{$0}
+        let timestamps = TimerangeDt(start: run, nTime: nForecastHours/3, dtSeconds: 3*3600).map{$0}
         let previous = GribDeaverager()
 
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
