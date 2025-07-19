@@ -29,6 +29,9 @@ struct MeteoFranceDownload: AsyncCommand {
 
         @Flag(name: "use-grib-packages", help: "If true, download GRIB packages (SP1, SP2, ...) instead of individual records")
         var useGribPackages: Bool
+        
+        @Option(name: "grib-packages")
+        var gribPackages: String?
 
         @Flag(name: "use-gov-server", help: "Use france gov server instead of meteofrance API")
         var useGovServer: Bool
@@ -83,10 +86,11 @@ struct MeteoFranceDownload: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let useGribPackagesDownload = signature.useGribPackages && !domain.mfApiPackagesSurface.isEmpty
+        let gribPackages: [String]? = signature.gribPackages.map{$0.split(separator: ",").map(String.init)}
 
         try await downloadElevation2(application: context.application, domain: domain, run: run)
         let handles = await domain == .arpege_world_probabilities || domain == .arpege_europe_probabilities ? try downloadProbabilities(application: context.application, domain: domain, run: run, uploadS3Bucket: signature.uploadS3Bucket) : useGribPackagesDownload ?
-        try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket) :
+        try await download3(application: context.application, domain: domain, run: run, /*upperLevel: signature.upperLevel,*/ useGovServer: signature.useGovServer, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, packages: gribPackages) :
         try await download2(application: context.application, domain: domain, run: run, variables: variables, uploadS3Bucket: signature.uploadS3Bucket)
 
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
@@ -256,7 +260,7 @@ struct MeteoFranceDownload: AsyncCommand {
      - MF does not publish 15minutely data via GRIB packages
      - There is no GRIB inventory, so we have to download the entire GRIB file
      */
-    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, /*upperLevel: Bool,*/ useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, /*upperLevel: Bool,*/ useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?, packages: [String]?) async throws -> [GenericVariableHandle] {
         guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
             fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
         }
@@ -269,7 +273,7 @@ struct MeteoFranceDownload: AsyncCommand {
         let nx = grid.nx
         let ny = grid.ny
         let previous = GribDeaverager()
-        let packages =  domain.mfApiPackagesPressure + domain.mfApiPackagesSurface
+        let packages = packages ?? (domain.mfApiPackagesPressure + domain.mfApiPackagesSurface)
         //upperLevel ? domain.mfApiPackagesPressure : domain.mfApiPackagesSurface
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
 
