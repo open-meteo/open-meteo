@@ -137,7 +137,7 @@ struct WeatherApiController {
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(1940, 1, 1)
             case .historicalForecast:
-                forecastDaysMax = 1
+                forecastDaysMax = 16
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(2016, 1, 1)
             case .previousRuns:
