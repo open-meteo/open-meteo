@@ -11,6 +11,7 @@ enum EumetsatSarahVariableDerived: String, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
+    case sunshine_duration
 
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -93,6 +94,10 @@ struct EumetsatSarahReader: GenericReaderDerived, GenericReaderProtocol {
             let diffuseRadiation = try await get(derived: .diffuse_radiation, time: time).data
             let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
             return DataAndUnit(gti, .wattPerSquareMetre)
+        case .sunshine_duration:
+            let directRadiation = try await get(raw: .direct_radiation, time: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(duration, .seconds)
         }
     }
 
@@ -102,7 +107,7 @@ struct EumetsatSarahReader: GenericReaderDerived, GenericReaderProtocol {
             break
         case .shortwave_radiation_instant:
             try await prefetchData(raw: .shortwave_radiation, time: time)
-        case .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant:
+        case .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant, .sunshine_duration:
             try await prefetchData(raw: .direct_radiation, time: time)
         case .diffuse_radiation, .diffuse_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant:
             try await prefetchData(raw: .shortwave_radiation, time: time)
