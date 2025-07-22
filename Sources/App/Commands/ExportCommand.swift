@@ -734,7 +734,9 @@ enum ExportDomain: String, CaseIterable {
     case glofas_v3_seasonal
     case era5_land
     case era5
+    case era5_seamless
     case ecmwf_ifs
+    case ecmwf_ifs025
 
     var genericDomain: GenericDomain {
         switch self {
@@ -766,6 +768,10 @@ enum ExportDomain: String, CaseIterable {
             return CdsDomain.era5
         case .ecmwf_ifs:
             return CdsDomain.ecmwf_ifs
+        case .era5_seamless:
+            return CdsDomain.era5_land
+        case .ecmwf_ifs025:
+            return EcmwfDomain.ifs025
         }
     }
 
@@ -798,6 +804,10 @@ enum ExportDomain: String, CaseIterable {
         case .era5:
             return nil
         case .ecmwf_ifs:
+            return nil
+        case .era5_seamless:
+            return nil
+        case .ecmwf_ifs025:
             return nil
         }
     }
@@ -836,6 +846,17 @@ enum ExportDomain: String, CaseIterable {
             return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .era5, position: position, options: options)), options: options)
         case .ecmwf_ifs:
             return await Era5Reader(reader: GenericReaderCached<CdsDomain, Era5Variable>(reader: try GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, position: position, options: options)), options: options)
+        case .ecmwf_ifs025:
+            return try await EcmwfReader(domain: .ifs025, gridpoint: position, options: options)
+        case .era5_seamless:
+            let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: position, options: options)
+            guard
+                let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
+            else {
+                // Not possible
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         }
     }
 
