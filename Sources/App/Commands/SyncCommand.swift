@@ -49,10 +49,10 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "concurrent", short: "c", help: "Number of concurrent file download. Default 4")
         var concurrent: Int?
 
-        @Option(name: "data-directory-max-size-gb", help: "Trim data directory to the speicfied target size in gigabyte GB")
+        @Option(name: "data-directory-max-size-gb", help: "Trim data directory to the specified target size in gigabyte GB")
         var dataDirectoryMaxSize: Int?
 
-        @Option(name: "cache-directory-max-size-gb", help: "Trim cache directory to the speicfied target size in gigabyte GB")
+        @Option(name: "cache-directory-max-size-gb", help: "Trim cache directory to the specified target size in gigabyte GB")
         var cacheDirectoryMaxSize: Int?
 
         @Flag(name: "execute", help: "Actually perfom file delete on cleanup")
@@ -70,12 +70,12 @@ struct SyncCommand: AsyncCommand {
 
         disableIdleSleep()
 
-        let serverSet = (signature.server ?? "https://openmeteo.s3.amazonaws.com/").split(separator: ";").map(String.init)
-        for server in serverSet {
-            guard server.last == "/" else {
-                fatalError("Server name must include http and end with a trailing slash.")
+        let serverSet = (signature.server ?? "https://openmeteo.s3.amazonaws.com/").split(separator: ";").map({
+            guard let url = URL(string: String($0)) else {
+                fatalError("Could not parse URL: \($0)")
             }
-        }
+            return url
+        })
         let modelsSet = try signature.models.split(separator: ";").map({
             try DomainRegistry.load(commaSeparated: String($0))
         })
@@ -143,7 +143,7 @@ struct SyncCommand: AsyncCommand {
 
                     /// Get a list of all variables from all models
                     let remotes: [(DomainRegistry, String)] = try await models.mapConcurrent(nConcurrent: concurrent) { model -> [(DomainRegistry, String)] in
-                        let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: signature.apikey, deadLineHours: 0.1).directories
+                        let remoteDirectories = try await curl.s3list(server: server, http1Client: context.application.http1Client, prefix: "data/\(model.rawValue)/", apikey: signature.apikey, deadLineHours: 0.1).directories
                         return remoteDirectories.map {
                             return (model, $0)
                         }
@@ -166,7 +166,7 @@ struct SyncCommand: AsyncCommand {
                                 variables.contains(where: { $0 == variable }) else {
                             return []
                         }
-                        let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
+                        let remote = try await curl.s3list(server: server, http1Client: context.application.http1Client, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
                         let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
                         return Array(filtered)
                     }.flatMap({ $0 })
@@ -398,14 +398,29 @@ extension StringProtocol {
     }
 }
 
+
+
 fileprivate extension Curl {
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
-    func s3list(server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3DataController.S3ListV2File], directories: [String]) {
-        var request = ClientRequest(method: .GET, url: URI("\(server)"))
-        let params = S3DataController.S3ListV2(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey)
-        try request.query.encode(params)
-        var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours)
-        guard let body = response.readString(length: response.readableBytes) else {
+    func s3list(server: URL, http1Client: HTTPClient, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3DataController.S3ListV2File], directories: [String]) {
+        
+        var url = server.appending(queryItems: [
+            URLQueryItem(name: "prefix", value: prefix),
+            URLQueryItem(name: "list_type", value: "2"),
+            URLQueryItem(name: "delimiter", value: "/"),
+        ] + (apikey.map {[
+            URLQueryItem(name: "apikey", value: $0)
+        ]} ?? []))
+        let httpRequest = try url.toHttpClientRequest(signAws: true)
+        
+        // Note: Ceph S3 has issues with HTTP2 and API actions with empty body payloads. Fallback to HTTP1.1
+        // See: https://github.com/swift-server/async-http-client/issues/602
+        let useHttp1 = server.host()?.contains("your-objectstorage.com") == true
+        let client = useHttp1 ? http1Client : self.client
+        let response = try await client.executeRetry(httpRequest, logger: logger, deadline: Date().addingTimeInterval(deadLineHours * 3600))
+        try await response.checkCode200()
+        
+        guard let body = try await response.readStringImmutable() else {
             return ([], [])
         }
         let files = body.xmlSection("Contents").map {

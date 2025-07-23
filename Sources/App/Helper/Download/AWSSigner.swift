@@ -2,6 +2,33 @@ import Foundation
 import AsyncHTTPClient
 import Vapor
 
+extension CharacterSet {
+    static let awsUriAllowed: CharacterSet = {
+        var allowed = CharacterSet()
+
+        // Add unreserved characters: A-Z a-z 0-9
+        allowed.formUnion(.alphanumerics)
+
+        // Add '-', '_', '.', '~'
+        allowed.insert(charactersIn: "-_.~")
+
+        return allowed
+    }()
+}
+
+extension URL {
+    /// Convert URL to request and sign with AWS signature. AWS credentials are used from username:password from the URL path
+    mutating func toHttpClientRequest(signAws: Bool) throws -> HTTPClientRequest {
+        let url = self.formatted(FormatStyle(query: .always))
+        var request = HTTPClientRequest(url: url)
+        if signAws, let user = self.user(), let password = password() {
+            let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+            try signer.sign(request: &request, body: nil)
+        }
+        return request
+    }
+}
+
 /// Sign AWS URLs with AWS4-HMAC-SHA256
 public struct AWSSigner {
     public let accessKey: String
@@ -17,17 +44,18 @@ public struct AWSSigner {
     }
 
     public func sign(request: inout HTTPClientRequest, body: Data?, now: Date = Date()) throws {
-        guard let url = URL(string: request.url),
-              let host = url.host else {
+        guard let components = URLComponents(string: request.url),
+              let host = components.encodedHost else {
             throw SigningError.invalidURL
         }
 
         let method = request.method.rawValue
-        let path = url.path(percentEncoded: true).isEmpty ? "/" : url.path(percentEncoded: true)
-        let query = url.query(percentEncoded: true) ?? ""
-        let canonicalQueryString = query.split(separator: "&")
+        let path = components.percentEncodedPath.isEmpty ? "/" : components.percentEncodedPath
+        
+        let canonicalQueryString = components.queryItems?
+            .map({ "\($0.name)\($0.value.map{"=\($0.addingPercentEncoding(withAllowedCharacters: .awsUriAllowed)!)"} ?? "")" })
             .sorted()
-            .joined(separator: "&")
+            .joined(separator: "&") ?? ""
 
         let amzDate = now.iso8601DateTime
         let dateStamp = now.shortDate

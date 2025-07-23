@@ -17,6 +17,10 @@ enum CurlErrorRetry: Error {
     case gatewayTimeout
 }
 
+enum HTTPClientResponseError: Error {
+    case non200StatusCode(code: UInt, message: String?)
+}
+
 extension HTTPClientResponse {
     /// Throw if a transient error occurred. A retry could be successful. E.g. Gateway timeout or too many requests
     /// `CurlErrorNonRetry` is thrown for error that should not be retried
@@ -147,5 +151,14 @@ extension Date {
     }
     static func seconds(_ seconds: Double) -> Date {
         return Date(timeIntervalSinceNow: seconds)
+    }
+}
+
+extension HTTPClientResponse {
+    public func checkCode200() async throws {
+        guard (200..<300).contains(status.code) else {
+            let error = try await readStringImmutable()
+            throw HTTPClientResponseError.non200StatusCode(code: status.code, message: error)
+        }
     }
 }
