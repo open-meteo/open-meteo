@@ -1,18 +1,18 @@
 import Foundation
 @testable import App
-import XCTest
+import Testing
 import Vapor
 // import NIOFileSystem
 
-final class DataTests: XCTestCase {
-    override func setUp() {
+@Suite struct DataTests {
+    init() {
         #if Xcode
         let projectHome = String(#filePath[...#filePath.range(of: "/Tests/")!.lowerBound])
         FileManager.default.changeCurrentDirectoryPath(projectHome)
         #endif
     }
-    
-    func testAggregation() {
+
+    @Test func aggregation() {
         let values: [Float] = [1,2,3,4,5,6]
         XCTAssertEqualArray(values.mean(by: 2), [1.5, 3.5, 5.5], accuracy: 0.01)
         XCTAssertEqualArray(values.mean(by: 3), [2.0, 5.0], accuracy: 0.01)
@@ -46,7 +46,7 @@ final class DataTests: XCTestCase {
     /*func testGribStream() async throws {
         let url = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-009-d4755d5b313f7cded016e66ba0cd989b-hyELHH.grib"
         let fileSystem = FileSystem.shared
-        
+
         try await fileSystem.withFileHandle(forReadingAt: FilePath(url)) { fn in
             for try await message in fn.readChunks().decodeGrib() {
                 print(message.get(attribute: "shortName")!)
@@ -54,125 +54,135 @@ final class DataTests: XCTestCase {
         }
     }*/
 
-    func testDem90() async throws {
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
+    @Test(
+        .enabled(if: FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory)),
+        .disabled("Elevation information unavailable")
+    )
+    func dem90() async throws {
         let logger = Logger(label: "test")
         let httpClient = HTTPClient.shared
-        
+
         let value1 = try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value1, 25) // beach, SE south africa
-        
+        #expect(value1 == 25) // beach, SE south africa // beach, SE south africa
+
         let value2 = try await Dem90.read(lat: -32.878000, lon: 28.101000, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value2, 0) // water, SE south africa
+        #expect(value2 == 0) // water, SE south africa // water, SE south africa
 
         let value3 = try await Dem90.read(lat: 46.885748, lon: 8.670080, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value3, 991)
+        #expect(value3 == 991)
         let value4 = try await Dem90.read(lat: 46.885748, lon: 8.669093, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value4, 1028)
+        #expect(value4 == 1028)
         let value5 = try await Dem90.read(lat: 46.885748, lon: 8.668106, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value5, 1001)
-        
+        #expect(value5 == 1001)
+
         // island
         let value6 = try await Dem90.read(lat: 65.03738, lon: -17.75940, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value6, 715)
-        
+        #expect(value6 == 715)
+
         // greenland
         let value7 = try await Dem90.read(lat: 72.71190, lon: -31.81641, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value7, 2878.0)
+        #expect(value7 == 2878.0)
         // bolivia
         let value8 = try await Dem90.read(lat: -15.11455, lon: -65.74219, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value8, 162.0)
+        #expect(value8 == 162.0)
         // antarctica
         let value9 = try await Dem90.read(lat: -70.52490, lon: -65.30273, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value9, 1749.0)
+        #expect(value9 == 1749.0)
         let value10 = try await Dem90.read(lat: -80.95610, lon: -70.66406, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value10, 124.0)
+        #expect(value10 == 124.0)
         let value11 = try await Dem90.read(lat: -81.20142, lon: 2.10938, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value11, 2342.0)
+        #expect(value11 == 2342.0)
         let value12 = try await Dem90.read(lat: -80.58973, lon: 108.28125, logger: logger, httpClient: httpClient)
-        XCTAssertEqual(value12, 3348.0)
+        #expect(value12 == 3348.0)
     }
 
-    func testRegularGrid() {
+    @Test func regularGrid() {
         let grid = RegularGrid(nx: 768, ny: 384, latMin: -90, lonMin: -180, dx: 360 / 768, dy: 180 / 384)
 
         // Exactly on the border
         let pos = grid.findPoint(lat: 89.90001, lon: 179.80002)!
         let (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 0)
-        XCTAssertEqual(lat, -90.0, accuracy: 0.001)
-        XCTAssertEqual(lon, -180.0, accuracy: 0.001)
+        #expect(pos == 0)
+        #expect(lat.isApproximatelyEqual(to: -90.0, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: -180.0, absoluteTolerance: 0.001))
 
         let pos2 = IconDomains.icon.grid.findPoint(lat: -16.805414, lon: 179.990623)!
         let (lat2, lon2) = IconDomains.icon.grid.getCoordinates(gridpoint: pos2)
-        XCTAssertEqual(pos2, 1687095)
-        XCTAssertEqual(lat2, -16.75, accuracy: 0.001)
-        XCTAssertEqual(lon2, -179.875, accuracy: 0.001)
+        #expect(pos2 == 1687095)
+        #expect(lat2.isApproximatelyEqual(to: -16.75, absoluteTolerance: 0.001))
+        #expect(lon2.isApproximatelyEqual(to: -179.875, absoluteTolerance: 0.001))
     }
 
-    func testElevationMatching() async throws {
-        try XCTSkipUnless(FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory), "Elevation information unavailable")
-
+    @Test(
+        .enabled(if: FileManager.default.fileExists(atPath: DomainRegistry.copernicus_dem90.directory)),
+        .disabled("Elevation information unavailable")
+    )
+    func elevationMatching() async throws {
         let logger = Logger(label: "testElevationMatching")
         let client = HTTPClient.shared
         let optimised = try await IconDomains.iconD2.grid.findPointTerrainOptimised(lat: 46.88, lon: 8.67, elevation: 650, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
-        XCTAssertEqual(optimised.gridpoint, 225405)
-        XCTAssertEqual(optimised.gridElevation.numeric, 600)
+        #expect(optimised.gridpoint == 225405)
+        #expect(optimised.gridElevation.numeric == 600)
 
         let nearest = try await IconDomains.iconD2.grid.findPointNearest(lat: 46.88, lon: 8.67, elevationFile: IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: client, logger: logger)!)!
-        XCTAssertEqual(nearest.gridpoint, 225406)
-        XCTAssertEqual(nearest.gridElevation.numeric, 1006.0)
+        #expect(nearest.gridpoint == 225406)
+        #expect(nearest.gridElevation.numeric == 1006.0)
     }
 
-    func testNbmGrid() {
+    @Test func nbmGrid() {
         // https://vlab.noaa.gov/web/mdl/nbm-grib2-v4.0
         let proj = LambertConformalConicProjection(λ0: 265 - 360, ϕ0: 0, ϕ1: 25, ϕ2: 25, radius: 6371200)
         let grid = ProjectionGrid(nx: 2345, ny: 1597, latitude: 19.229, longitude: 233.723 - 360, dx: 2539.7, dy: 2539.7, projection: proj)
         let pos = proj.forward(latitude: 19.229, longitude: 233.723 - 360)
-        XCTAssertEqual(pos.x, -3271192.0)
-        XCTAssertEqual(pos.y, 2604267.8)
+        #expect(pos.x == -3271192.0)
+        #expect(pos.y == 2604267.8)
 
         let pos2 = grid.findPointXy(lat: 19.229, lon: 233.723 - 360)
-        XCTAssertEqual(pos2?.x, 0)
-        XCTAssertEqual(pos2?.y, 0)
+        #expect(pos2?.x == 0)
+        #expect(pos2?.y == 0)
 
-        XCTAssertEqual(grid.findPoint(lat: 21.137999999999987, lon: 237.28 - 360), 117411)
-        XCTAssertEqual(grid.findPoint(lat: 24.449714395051082, lon: 265.54789437771944 - 360), 188910)
-        XCTAssertEqual(grid.findPoint(lat: 22.73382904757237, lon: 242.93190409785294 - 360), 180965)
-        XCTAssertEqual(grid.findPoint(lat: 24.37172305316154, lon: 271.6307003393202 - 360), 196187)
-        XCTAssertEqual(grid.findPoint(lat: 24.007414634071907, lon: 248.77817290935954 - 360), 232796)
+        #expect(grid.findPoint(lat: 21.137999999999987, lon: 237.28 - 360) == 117411)
+        #expect(grid.findPoint(lat: 24.449714395051082, lon: 265.54789437771944 - 360) == 188910)
+        #expect(grid.findPoint(lat: 22.73382904757237, lon: 242.93190409785294 - 360) == 180965)
+        #expect(grid.findPoint(lat: 24.37172305316154, lon: 271.6307003393202 - 360) == 196187)
+        #expect(grid.findPoint(lat: 24.007414634071907, lon: 248.77817290935954 - 360) == 232796)
 
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 0).latitude, 19.228992, accuracy: 0.001)
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 0).longitude, -126.27699, accuracy: 0.001)
+        let coord0 = grid.getCoordinates(gridpoint: 0)
+        #expect(coord0.latitude.isApproximatelyEqual(to: 19.228992, absoluteTolerance: 0.001))
+        #expect(coord0.longitude.isApproximatelyEqual(to: -126.27699, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 10000).latitude, 21.794254, accuracy: 0.001)
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 10000).longitude, -111.44652, accuracy: 0.001)
+        let coord10000 = grid.getCoordinates(gridpoint: 10000)
+        #expect(coord10000.latitude.isApproximatelyEqual(to: 21.794254, absoluteTolerance: 0.001))
+        #expect(coord10000.longitude.isApproximatelyEqual(to: -111.44652, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 20000).latitude, 22.806227, accuracy: 0.001)
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 20000).longitude, -96.18898, accuracy: 0.001)
+        let coord20000 = grid.getCoordinates(gridpoint: 20000)
+        #expect(coord20000.latitude.isApproximatelyEqual(to: 22.806227, absoluteTolerance: 0.001))
+        #expect(coord20000.longitude.isApproximatelyEqual(to: -96.18898, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 30000).latitude, 22.222015, accuracy: 0.001)
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 30000).longitude, -80.87921, accuracy: 0.001)
+        let coord30000 = grid.getCoordinates(gridpoint: 30000)
+        #expect(coord30000.latitude.isApproximatelyEqual(to: 22.222015, absoluteTolerance: 0.001))
+        #expect(coord30000.longitude.isApproximatelyEqual(to: -80.87921, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 40000).latitude, 20.274399, accuracy: 0.001)
-        XCTAssertEqual(grid.getCoordinates(gridpoint: 40000).longitude, -123.18192, accuracy: 0.001)
+        let coord40000 = grid.getCoordinates(gridpoint: 40000)
+        #expect(coord40000.latitude.isApproximatelyEqual(to: 20.274399, absoluteTolerance: 0.001))
+        #expect(coord40000.longitude.isApproximatelyEqual(to: -123.18192, absoluteTolerance: 0.001))
     }
 
-    func testLambertConformal() {
+    @Test func lambertConformal() {
         let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
         let pos = proj.forward(latitude: 47, longitude: -8)
-        XCTAssertEqual(pos.x, 5833.8677)
-        XCTAssertEqual(pos.y, 8632.733)
+        #expect(pos.x == 5833.8677)
+        #expect(pos.y == 8632.733)
         let coords = proj.inverse(x: pos.x, y: pos.y)
-        XCTAssertEqual(coords.latitude, 47, accuracy: 0.0001)
-        XCTAssertEqual(coords.longitude, -8, accuracy: 0.0001)
+        #expect(coords.latitude.isApproximatelyEqual(to: 47, absoluteTolerance: 0.0001))
+        #expect(coords.longitude.isApproximatelyEqual(to: -8, absoluteTolerance: 0.0001))
 
         let nam = ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         let pos2 = nam.findPoint(lat: 34, lon: -118)
-        XCTAssertEqual(pos2, 777441)
+        #expect(pos2 == 777441)
         let coords2 = nam.getCoordinates(gridpoint: pos2!)
-        XCTAssertEqual(coords2.latitude, 34, accuracy: 0.01)
-        XCTAssertEqual(coords2.longitude, -118, accuracy: 0.1)
+        #expect(coords2.latitude.isApproximatelyEqual(to: 34, absoluteTolerance: 0.01))
+        #expect(coords2.longitude.isApproximatelyEqual(to: -118, absoluteTolerance: 0.1))
 
         /**
          Reference coordinates directly from grib files
@@ -197,50 +207,50 @@ final class DataTests: XCTestCase {
          grid 180000 lat 24.32811370921869 lon 239.2705262869787
          */
 
-        XCTAssertEqual(nam.findPoint(lat: 21.137999999999987, lon: 237.28 - 360), 0)
-        XCTAssertEqual(nam.findPoint(lat: 24.449714395051082, lon: 265.54789437771944 - 360), 10000)
-        XCTAssertEqual(nam.findPoint(lat: 22.73382904757237, lon: 242.93190409785294 - 360), 20000)
-        XCTAssertEqual(nam.findPoint(lat: 24.37172305316154, lon: 271.6307003393202 - 360), 30000)
-        XCTAssertEqual(nam.findPoint(lat: 24.007414634071907, lon: 248.77817290935954 - 360), 40000)
+        #expect(nam.findPoint(lat: 21.137999999999987, lon: 237.28 - 360) == 0)
+        #expect(nam.findPoint(lat: 24.449714395051082, lon: 265.54789437771944 - 360) == 10000)
+        #expect(nam.findPoint(lat: 22.73382904757237, lon: 242.93190409785294 - 360) == 20000)
+        #expect(nam.findPoint(lat: 24.37172305316154, lon: 271.6307003393202 - 360) == 30000)
+        #expect(nam.findPoint(lat: 24.007414634071907, lon: 248.77817290935954 - 360) == 40000)
 
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 0).latitude, 21.137999999999987, accuracy: 0.001)
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 0).longitude, 237.28 - 360, accuracy: 0.001)
+        #expect(nam.getCoordinates(gridpoint: 0).latitude.isApproximatelyEqual(to: 21.137999999999987, absoluteTolerance: 0.001))
+        #expect(nam.getCoordinates(gridpoint: 0).longitude.isApproximatelyEqual(to: 237.28 - 360, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 10000).latitude, 24.449714395051082, accuracy: 0.001)
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 10000).longitude, 265.54789437771944 - 360, accuracy: 0.001)
+        #expect(nam.getCoordinates(gridpoint: 10000).latitude.isApproximatelyEqual(to: 24.449714395051082, absoluteTolerance: 0.001))
+        #expect(nam.getCoordinates(gridpoint: 10000).longitude.isApproximatelyEqual(to: 265.54789437771944 - 360, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 20000).latitude, 22.73382904757237, accuracy: 0.001)
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 20000).longitude, 242.93190409785294 - 360, accuracy: 0.001)
+        #expect(nam.getCoordinates(gridpoint: 20000).latitude.isApproximatelyEqual(to: 22.73382904757237, absoluteTolerance: 0.001))
+        #expect(nam.getCoordinates(gridpoint: 20000).longitude.isApproximatelyEqual(to: 242.93190409785294 - 360, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 30000).latitude, 24.37172305316154, accuracy: 0.001)
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 30000).longitude, 271.6307003393202 - 360, accuracy: 0.001)
+        #expect(nam.getCoordinates(gridpoint: 30000).latitude.isApproximatelyEqual(to: 24.37172305316154, absoluteTolerance: 0.001))
+        #expect(nam.getCoordinates(gridpoint: 30000).longitude.isApproximatelyEqual(to: 271.6307003393202 - 360, absoluteTolerance: 0.001))
 
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).latitude, 24.007414634071907, accuracy: 0.001)
-        XCTAssertEqual(nam.getCoordinates(gridpoint: 40000).longitude, 248.77817290935954 - 360, accuracy: 0.001)
+        #expect(nam.getCoordinates(gridpoint: 40000).latitude.isApproximatelyEqual(to: 24.007414634071907, absoluteTolerance: 0.001))
+        #expect(nam.getCoordinates(gridpoint: 40000).longitude.isApproximatelyEqual(to: 248.77817290935954 - 360, absoluteTolerance: 0.001))
     }
 
-    func testLambertAzimuthalEqualAreaProjection() {
+    @Test func lambertAzimuthalEqualAreaProjection() {
         let proj = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
         let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigion: -1036000, longitudeProjectionOrigion: -1158000, dx: 2000, dy: 2000, projection: proj)
         // peak north denmark 57.745566, 10.620785
         let coords = proj.forward(latitude: 57.745566, longitude: 10.620785)
-        XCTAssertEqual(coords.x, 773650.5, accuracy: 0.0001) // around 774000.0
-        XCTAssertEqual(coords.y, 389820.06, accuracy: 0.0001) // around 378000
+        #expect(coords.x.isApproximatelyEqual(to: 773650.5, absoluteTolerance: 0.0001)) // around 774000.0 // around 774000.0
+        #expect(coords.y.isApproximatelyEqual(to: 389820.06, absoluteTolerance: 0.0001)) // around 378000 // around 378000
 
         let r = proj.inverse(x: 773650.5, y: 389820.06)
-        XCTAssertEqual(r.longitude, 10.620785, accuracy: 0.0001)
-        XCTAssertEqual(r.latitude, 57.745566, accuracy: 0.0001)
+        #expect(r.longitude.isApproximatelyEqual(to: 10.620785, absoluteTolerance: 0.0001))
+        #expect(r.latitude.isApproximatelyEqual(to: 57.745566, absoluteTolerance: 0.0001))
 
         let coords2 = grid.findPointXy(lat: 57.745566, lon: 10.620785)!
-        XCTAssertEqual(coords2.x, 966)
-        XCTAssertEqual(coords2.y, 713)
+        #expect(coords2.x == 966)
+        #expect(coords2.y == 713)
 
         let r2 = grid.getCoordinates(gridpoint: 966 + 713 * grid.nx)
-        XCTAssertEqual(r2.longitude, 10.6271515, accuracy: 0.0001)
-        XCTAssertEqual(r2.latitude, 57.746563, accuracy: 0.0001)
+        #expect(r2.longitude.isApproximatelyEqual(to: 10.6271515, absoluteTolerance: 0.0001))
+        #expect(r2.latitude.isApproximatelyEqual(to: 57.746563, absoluteTolerance: 0.0001))
     }
 
-    func testLambertCC() {
+    @Test func lambertCC() {
         let proj = LambertConformalConicProjection(λ0: 352, ϕ0: 55.5, ϕ1: 55.5, ϕ2: 55.5, radius: 6371229)
         let grid = ProjectionGrid(
             nx: 1906,
@@ -253,103 +263,103 @@ final class DataTests: XCTestCase {
         )
 
         let origin = proj.forward(latitude: 39.671, longitude: -25.421997)
-        XCTAssertEqual(origin.x, -1527524.9, accuracy: 0.001)
-        XCTAssertEqual(origin.y, -1588682.0, accuracy: 0.001)
+        #expect(origin.x.isApproximatelyEqual(to: -1527524.9, absoluteTolerance: 0.001))
+        #expect(origin.y.isApproximatelyEqual(to: -1588682.0, absoluteTolerance: 0.001))
 
         let x1 = proj.forward(latitude: 39.675304, longitude: -25.400146)
-        XCTAssertEqual(origin.x - x1.x, -1998.125, accuracy: 0.001)
-        XCTAssertEqual(origin.y - x1.y, -0.375, accuracy: 0.001)
+        #expect((origin.x - x1.x).isApproximatelyEqual(to: -1998.125, absoluteTolerance: 0.001))
+        #expect((origin.y - x1.y).isApproximatelyEqual(to: -0.375, absoluteTolerance: 0.001))
 
         var c = grid.getCoordinates(gridpoint: 1)
-        XCTAssertEqual(c.latitude, 39.675304, accuracy: 0.001)
-        XCTAssertEqual(c.longitude, -25.400146, accuracy: 0.001)
-        XCTAssertEqual(grid.findPoint(lat: 39.675304, lon: -25.400146), 1)
+        #expect(c.latitude.isApproximatelyEqual(to: 39.675304, absoluteTolerance: 0.001))
+        #expect(c.longitude.isApproximatelyEqual(to: -25.400146, absoluteTolerance: 0.001))
+        #expect(grid.findPoint(lat: 39.675304, lon: -25.400146) == 1)
 
         // Coords(i: 122440, x: 456, y: 64, latitude: 42.18604, longitude: -15.30127)
         c = grid.getCoordinates(gridpoint: 122440)
-        XCTAssertEqual(c.latitude, 42.18604, accuracy: 0.001)
-        XCTAssertEqual(c.longitude, -15.30127, accuracy: 0.001)
-        XCTAssertEqual(grid.findPoint(lat: 42.18604, lon: -15.30127), 122440)
+        #expect(c.latitude.isApproximatelyEqual(to: 42.18604, absoluteTolerance: 0.001))
+        #expect(c.longitude.isApproximatelyEqual(to: -15.30127, absoluteTolerance: 0.001))
+        #expect(grid.findPoint(lat: 42.18604, lon: -15.30127) == 122440)
 
         // Coords(i: 2999780, x: 1642, y: 1573, latitude: 64.943695, longitude: 30.711975)
         c = grid.getCoordinates(gridpoint: 2999780)
-        XCTAssertEqual(c.latitude, 64.943695, accuracy: 0.001)
-        XCTAssertEqual(c.longitude, 30.711975, accuracy: 0.001)
-        XCTAssertEqual(grid.findPoint(lat: 64.943695, lon: 30.711975), 2999780)
+        #expect(c.latitude.isApproximatelyEqual(to: 64.943695, absoluteTolerance: 0.001))
+        #expect(c.longitude.isApproximatelyEqual(to: 30.711975, absoluteTolerance: 0.001))
+        #expect(grid.findPoint(lat: 64.943695, lon: 30.711975) == 2999780)
     }
 
-    func testStereographic() {
+    @Test func stereographic() {
         let nx = 935
         let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
 
         let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
-        XCTAssertEqual(pos % nx, 420)
-        XCTAssertEqual(pos / nx, 468)
+        #expect(pos % nx == 420)
+        #expect(pos / nx == 468)
     }
 
-    func testHrdpsGrid() {
+    @Test func hrdpsGrid() {
         let grid = ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
 
         var pos = grid.findPoint(lat: 39.626034, lon: -133.62952)!
         var (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 0)
-        XCTAssertEqual(lat, 39.626034, accuracy: 0.001)
-        XCTAssertEqual(lon, -133.62952, accuracy: 0.001)
+        #expect(pos == 0)
+        #expect(lat.isApproximatelyEqual(to: 39.626034, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: -133.62952, absoluteTolerance: 0.001))
 
         pos = grid.findPoint(lat: 27.284597, lon: -66.96642)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 2539) //  x: 2539, y: 0,
-        XCTAssertEqual(lat, 27.284597, accuracy: 0.001)
-        XCTAssertEqual(lon, -66.96642, accuracy: 0.001)
+        #expect(pos == 2539) //  x: 2539, y: 0, //  x: 2539, y: 0,
+        #expect(lat.isApproximatelyEqual(to: 27.284597, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: -66.96642, absoluteTolerance: 0.001))
 
         // Coords(i: 720852, x: 2032, y: 283, latitude: 38.96126, longitude: -73.63256)
         pos = grid.findPoint(lat: 38.96126, lon: -73.63256)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 720852)
-        XCTAssertEqual(lat, 38.96126, accuracy: 0.001)
-        XCTAssertEqual(lon, -73.63256, accuracy: 0.001)
+        #expect(pos == 720852)
+        #expect(lat.isApproximatelyEqual(to: 38.96126, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: -73.63256, absoluteTolerance: 0.001))
 
         // Coords(i: 3276599, x: 2539, y: 1289, latitude: 47.876457, longitude: -40.708557)
         pos = grid.findPoint(lat: 47.876457, lon: -40.708557)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 3276599)
-        XCTAssertEqual(lat, 47.876457, accuracy: 0.001)
-        XCTAssertEqual(lon, -40.708557, accuracy: 0.001)
+        #expect(pos == 3276599)
+        #expect(lat.isApproximatelyEqual(to: 47.876457, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: -40.708557, absoluteTolerance: 0.001))
     }
 
-    func testCerraGrid() {
-        // 
+    @Test func cerraGrid() {
+        //
         let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
 
         var pos = grid.findPoint(lat: 20.29228, lon: -17.485962)!
         var (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 0)
-        XCTAssertEqual(lat, 20.29228, accuracy: 0.001)
-        XCTAssertEqual(lon, -17.485962, accuracy: 0.001)
+        #expect(pos == 0)
+        #expect(lat.isApproximatelyEqual(to: 20.29228, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: -17.485962, absoluteTolerance: 0.001))
 
         pos = grid.findPoint(lat: 20.292282, lon: 33.485947)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 1068) // x: 1068, y: 0
-        XCTAssertEqual(lat, 20.292282, accuracy: 0.001)
-        XCTAssertEqual(lon, 33.485947, accuracy: 0.001)
+        #expect(pos == 1068) // x: 1068, y: 0 // x: 1068, y: 0
+        #expect(lat.isApproximatelyEqual(to: 20.292282, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: 33.485947, absoluteTolerance: 0.001))
 
         pos = grid.findPoint(lat: 24.21984, lon: 18.087494)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 11427) // x: 737, y: 10,
-        XCTAssertEqual(lat, 24.21984, accuracy: 0.001)
-        XCTAssertEqual(lon, 18.087494, accuracy: 0.001)
+        #expect(pos == 11427) // x: 737, y: 10, // x: 737, y: 10,
+        #expect(lat.isApproximatelyEqual(to: 24.21984, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: 18.087494, absoluteTolerance: 0.001))
 
         pos = grid.findPoint(lat: 54.086716, lon: 50.74211)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 811317) // x: 1015, y: 758)
-        XCTAssertEqual(lat, 54.086716, accuracy: 0.001)
-        XCTAssertEqual(lon, 50.74211, accuracy: 0.001)
+        #expect(pos == 811317) // x: 1015, y: 758) // x: 1015, y: 758)
+        #expect(lat.isApproximatelyEqual(to: 54.086716, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: 50.74211, absoluteTolerance: 0.001))
 
         pos = grid.findPoint(lat: 63.769516, lon: 74.10509)!
         (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        XCTAssertEqual(pos, 1142760) // x: 1068, y: 1068,
-        XCTAssertEqual(lat, 63.769516, accuracy: 0.001)
-        XCTAssertEqual(lon, 74.10509, accuracy: 0.001)
+        #expect(pos == 1142760) // x: 1068, y: 1068, // x: 1068, y: 1068,
+        #expect(lat.isApproximatelyEqual(to: 63.769516, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: 74.10509, absoluteTolerance: 0.001))
 
         /**
          Coords(i: 0, x: 0, y: 0, latitude: 20.29228, longitude: -17.485962)
@@ -460,15 +470,15 @@ final class DataTests: XCTestCase {
          */
     }
 
-    func testCamsEurope() {
+    @Test func camsEurope() {
         let grid = CamsDomain.cams_europe.grid
         let pos = grid.getCoordinates(gridpoint: 0)
-        XCTAssertEqual(pos.latitude, 71.95)
-        XCTAssertEqual(pos.longitude, -24.95)
+        #expect(pos.latitude == 71.95)
+        #expect(pos.longitude == -24.95)
 
         let bologna = grid.findPoint(lat: 45.45, lon: 11.35)!
-        XCTAssertEqual(bologna % grid.nx, 363) // x
-        XCTAssertEqual(bologna / grid.nx, 265) // y        
+        #expect(bologna % grid.nx == 363) // x // x
+        #expect(bologna / grid.nx == 265) // y         // y
     }
 
     /**
@@ -502,143 +512,143 @@ final class DataTests: XCTestCase {
      Coords(i: 6599679, x: 6599679, y: 0, latitude: -89.94619, longitude: -18.0)
      Coords(i: 6599679, x: 6599679, y: 0, latitude: -89.94619, longitude: -18.0)
      */
-    func testEcmwfIfsGrid() {
+    @Test func ecmwfIfsGrid() {
         let grid = GaussianGrid(type: .o1280)
-        XCTAssertEqual(grid.nxOf(y: 0), 20)
-        XCTAssertEqual(grid.nxOf(y: 1), 24)
-        XCTAssertEqual(grid.nxOf(y: 1280 - 1), 5136)
-        XCTAssertEqual(grid.nxOf(y: 1281 - 1), 5136)
-        XCTAssertEqual(grid.nxOf(y: 2559 - 1), 24)
-        XCTAssertEqual(grid.nxOf(y: 2560 - 1), 20)
+        #expect(grid.nxOf(y: 0) == 20)
+        #expect(grid.nxOf(y: 1) == 24)
+        #expect(grid.nxOf(y: 1280 - 1) == 5136)
+        #expect(grid.nxOf(y: 1281 - 1) == 5136)
+        #expect(grid.nxOf(y: 2559 - 1) == 24)
+        #expect(grid.nxOf(y: 2560 - 1) == 20)
 
-        XCTAssertEqual(grid.integral(y: 0), 0)
-        XCTAssertEqual(grid.integral(y: 1), 20)
-        XCTAssertEqual(grid.integral(y: 2), 44)
-        XCTAssertEqual(grid.integral(y: 3), 72)
-        XCTAssertEqual(grid.integral(y: 4), 104)
-        XCTAssertEqual(grid.integral(y: 1280 - 1), 3294704)
-        XCTAssertEqual(grid.integral(y: 1281 - 1), 3299840)
-        XCTAssertEqual(grid.integral(y: 2559 - 1), 6599636)
-        XCTAssertEqual(grid.integral(y: 2560 - 1), 6599660)
+        #expect(grid.integral(y: 0) == 0)
+        #expect(grid.integral(y: 1) == 20)
+        #expect(grid.integral(y: 2) == 44)
+        #expect(grid.integral(y: 3) == 72)
+        #expect(grid.integral(y: 4) == 104)
+        #expect(grid.integral(y: 1280 - 1) == 3294704)
+        #expect(grid.integral(y: 1281 - 1) == 3299840)
+        #expect(grid.integral(y: 2559 - 1) == 6599636)
+        #expect(grid.integral(y: 2560 - 1) == 6599660)
 
         // All reference points from grib file directly
         var coord = grid.findPoint(lat: 89.94619, lon: 0)!
         var pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 0) // y=0
+        #expect(coord == 0) // y=0 // y=0
         // slightly inaccurate at the last 2 lines at the pole
-        XCTAssertEqual(pos.latitude, 89.94619, accuracy: 0.005)
-        XCTAssertEqual(pos.longitude, 0)
+        #expect(pos.latitude.isApproximatelyEqual(to: 89.94619, absoluteTolerance: 0.005))
+        #expect(pos.longitude == 0)
         coord = grid.findPoint(lat: 64.78031, lon: -59.50412)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 263984) // y=358
-        XCTAssertEqual(pos.latitude, 64.78031)
-        XCTAssertEqual(pos.longitude, -59.50412, accuracy: 0.0001)
+        #expect(coord == 263984) // y=358 // y=358
+        #expect(pos.latitude == 64.78031)
+        #expect(pos.longitude.isApproximatelyEqual(to: -59.50412, absoluteTolerance: 0.0001))
         coord = grid.findPoint(lat: -42.495605, lon: -82.58823)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 5675656) // y=1884
-        XCTAssertEqual(pos.latitude, -42.495605)
-        XCTAssertEqual(pos.longitude, -82.58823)
+        #expect(coord == 5675656) // y=1884 // y=1884
+        #expect(pos.latitude == -42.495605)
+        #expect(pos.longitude == -82.58823)
         coord = grid.findPoint(lat: -51.98594, lon: 174.38531)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 6005636) // y=2019
-        XCTAssertEqual(pos.latitude, -51.98594)
-        XCTAssertEqual(pos.longitude, 174.38531, accuracy: 0.0001)
+        #expect(coord == 6005636) // y=2019 // y=2019
+        #expect(pos.latitude == -51.98594)
+        #expect(pos.longitude.isApproximatelyEqual(to: 174.38531, absoluteTolerance: 0.0001))
         coord = grid.findPoint(lat: -0.035149384, lon: 0)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 3299840) // y=1280
-        XCTAssertEqual(pos.latitude, -0.035149384)
-        XCTAssertEqual(pos.longitude, 0, accuracy: 0.0001)
+        #expect(coord == 3299840) // y=1280 // y=1280
+        #expect(pos.latitude == -0.035149384)
+        #expect(pos.longitude.isApproximatelyEqual(to: 0, absoluteTolerance: 0.0001))
         coord = grid.findPoint(lat: -0.52724075, lon: 0)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 3335708)
-        XCTAssertEqual(pos.latitude, -0.52724075)
-        XCTAssertEqual(pos.longitude, 0, accuracy: 0.0001)
+        #expect(coord == 3335708)
+        #expect(pos.latitude == -0.52724075)
+        #expect(pos.longitude.isApproximatelyEqual(to: 0, absoluteTolerance: 0.0001))
     }
 
-    func testMfWaveGrid() {
+    @Test func mfWaveGrid() {
         // Note: Grid is moved by dx/2 dy/2
         let grid = MfWaveDomain.mfwave.grid
         var coord = grid.findPoint(lat: 36.16667, lon: -0.83333333)!
         var pos = grid.getCoordinates(gridpoint: coord)
         // i=x (i=2150, j=1394) 0.0292969 (x=-0.8333333, y=36.16667)
-        XCTAssertEqual(coord, 1394 * grid.nx + 2150)
-        XCTAssertEqual(pos.latitude, 36.208336, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, -0.7916565, accuracy: 0.0005)
+        #expect(coord == 1394 * grid.nx + 2150)
+        #expect(pos.latitude.isApproximatelyEqual(to: 36.208336, absoluteTolerance: 0.0005))
+        #expect(pos.longitude.isApproximatelyEqual(to: -0.7916565, absoluteTolerance: 0.0005))
 
         // (i-3486, j-778) -0.0556641 (x=110.5, y=-15.16667)
         coord = grid.findPoint(lat: -15.16667, lon: 110.5)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 777 * grid.nx + 3485)
-        XCTAssertEqual(pos.latitude, -15.208336, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, 110.45836)
+        #expect(coord == 777 * grid.nx + 3485)
+        #expect(pos.latitude.isApproximatelyEqual(to: -15.208336, absoluteTolerance: 0.0005))
+        #expect(pos.longitude == 110.45836)
 
         // (i-714, j-1230) 0.0146484 (x=-120.5, y=22.5)
         coord = grid.findPoint(lat: 22.5, lon: -120.5)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 1230 * grid.nx + 713)
-        XCTAssertEqual(pos.latitude, 22.541664, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, -120.54166)
+        #expect(coord == 1230 * grid.nx + 713)
+        #expect(pos.latitude.isApproximatelyEqual(to: 22.541664, absoluteTolerance: 0.0005))
+        #expect(pos.longitude == -120.54166)
 
         // (i=4278, j=1170) -0.321289 (x=176.5, y=17.5)
         coord = grid.findPoint(lat: 17.5, lon: 176.5)!
         pos = grid.getCoordinates(gridpoint: coord)
-        XCTAssertEqual(coord, 1170 * grid.nx + 4277)
-        XCTAssertEqual(pos.latitude, 17.541664, accuracy: 0.0005)
-        XCTAssertEqual(pos.longitude, 176.45836)
+        #expect(coord == 1170 * grid.nx + 4277)
+        #expect(pos.latitude.isApproximatelyEqual(to: 17.541664, absoluteTolerance: 0.0005))
+        #expect(pos.longitude == 176.45836)
     }
-    
-    func testStereographicIconMCH1() {
+
+    @Test func stereographicIconMCH1() {
         let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
         let grid = ProjectionGrid(nx: Int((6.86+4.83)/0.01+1), ny: Int((4.46+3.39)/0.01+1), latitudeProjectionOrigion: -4.46, longitudeProjectionOrigion: -6.86, dx: 0.01, dy: 0.01, projection: projection)
-        
-        XCTAssertEqual(grid.nx, 1170)
-        XCTAssertEqual(grid.ny, 786)
-        XCTAssertEqual(grid.count, 919620)
+
+        #expect(grid.nx == 1170)
+        #expect(grid.ny == 786)
+        #expect(grid.count == 919620)
 
         //let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
         //XCTAssertEqual(pos % nx, 420)
         //XCTAssertEqual(pos / nx, 468)
-        
+
         let pos = grid.getCoordinates(gridpoint: 0)
-        XCTAssertEqual(pos.latitude, 42.135387)
-        XCTAssertEqual(pos.longitude, 0.75927734)
-        
+        #expect(pos.latitude == 42.135387)
+        #expect(pos.longitude == 0.75927734)
+
         let pos2 = grid.getCoordinates(gridpoint: 919620-1)
-        XCTAssertEqual(pos2.latitude, 50.15759, accuracy: 0.0001)
-        XCTAssertEqual(pos2.longitude, 17.538513)
-        
+        #expect(pos2.latitude.isApproximatelyEqual(to: 50.15759, absoluteTolerance: 0.0001))
+        #expect(pos2.longitude == 17.538513)
+
         let pos3 = grid.getCoordinates(gridpoint: 1)
-        XCTAssertEqual(pos3.latitude, 42.13657, accuracy: 0.0001)
-        XCTAssertEqual(pos3.longitude, 0.77264404)
-        
+        #expect(pos3.latitude.isApproximatelyEqual(to: 42.13657, absoluteTolerance: 0.0001))
+        #expect(pos3.longitude == 0.77264404)
+
         let pos4 = grid.getCoordinates(gridpoint: 1919620/2)
-        XCTAssertEqual(pos4.latitude, 50.663414)
-        XCTAssertEqual(pos4.longitude, 5.652588)
-        
+        #expect(pos4.latitude == 50.663414)
+        #expect(pos4.longitude == 5.652588)
+
         let pos5 = grid.getCoordinates(gridpoint: grid.nx-1)
-        XCTAssertEqual(pos5.latitude, 42.338978)
-        XCTAssertEqual(pos5.longitude, 16.52089)
-        
+        #expect(pos5.latitude == 42.338978)
+        #expect(pos5.longitude == 16.52089)
+
         let coords = grid.findPointXy(lat: 47.215658, lon: 3.698824)!
-        XCTAssertEqual(coords.x, 258)
-        XCTAssertEqual(coords.y, 485)
-        
+        #expect(coords.x == 258)
+        #expect(coords.y == 485)
+
         let coords2 = grid.findPointXy(lat: 49.159088, lon:14.926517)!
-        XCTAssertEqual(coords2.x, 1008)
-        XCTAssertEqual(coords2.y, 672)
+        #expect(coords2.x == 1008)
+        #expect(coords2.y == 672)
     }
-    
-    
-    func testRotatedLatLon() {
+
+
+    @Test func rotatedLatLon() {
         /*
          xmin, xmax = -6.86, 4.83
          ymin, ymax = -4.46, 3.39
-         
+
          print(geodetic.transform_point(xmin, ymin, rotated_crs))
          print(geodetic.transform_point(xmin, ymax, rotated_crs))
          print(geodetic.transform_point(xmax, ymin, rotated_crs))
          print(geodetic.transform_point(xmax, ymax, rotated_crs))
-         
+
          (np.float64(0.7592734782323791), np.float64(42.135393352769036))
          (np.float64(-0.6726940671609235), np.float64(49.92259526903297))
          (np.float64(16.520897355538942), np.float64(42.33897767617745))
@@ -646,42 +656,35 @@ final class DataTests: XCTestCase {
          */
         let prj = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
         let pos = prj.inverse(x: -6.86, y: -4.46)
-        XCTAssertEqual(pos.latitude, 42.135387) // 42.135393352769036
-        XCTAssertEqual(pos.longitude, 0.75927734) // 0.7592734782323791
-        
-        let pos2 = prj.inverse(x: -6.86, y: 3.39)
-        XCTAssertEqual(pos2.latitude, 49.92259526903297)
-        XCTAssertEqual(pos2.longitude, -0.6727295) // -0.6726940671609235
-        
-        let pos3 = prj.inverse(x: 4.83, y: -4.46)
-        XCTAssertEqual(pos3.latitude, 42.33897767617745)
-        XCTAssertEqual(pos3.longitude, 16.52089) // 16.520897355538942)
-        
-        let pos4 = prj.inverse(x: 4.83, y: 3.39)
-        XCTAssertEqual(pos4.latitude, 50.15759, accuracy: 0.0001) // 50.15758220431567
-        XCTAssertEqual(pos4.longitude, 17.538514061258)
-        
-        let pos5 = prj.forward(latitude: 42.135393352769036, longitude: 0.7592734782323791)
-        XCTAssertEqual(pos5.x,-6.8599935, accuracy: 0.0001)
-        XCTAssertEqual(pos5.y, -4.4600043)
-        
-        let pos6 = prj.forward(latitude: 49.92259526903297, longitude: -0.6726940671609235)
-        XCTAssertEqual(pos6.x, -6.859994)
-        XCTAssertEqual(pos6.y, 3.3899972)
-        
-        let pos7 = prj.forward(latitude: 42.33897767617745, longitude: 16.520897355538942)
-        XCTAssertEqual(pos7.x, 4.8300076)
-        XCTAssertEqual(pos7.y, -4.4600024)
-        
-        let pos8 = prj.forward(latitude: 50.15758220431567, longitude: 17.538514061258)
-        XCTAssertEqual(pos8.x, 4.8300066)
-        XCTAssertEqual(pos8.y, 3.3899925)
-    }
-}
+        #expect(pos.latitude == 42.135387) // 42.135393352769036 // 42.135393352769036
+        #expect(pos.longitude == 0.75927734) // 0.7592734782323791 // 0.7592734782323791
 
-public func XCTAssertEqual(_ expression1: Float, _ expression2: Float, _ message: @autoclosure () -> String = "", file: StaticString = #filePath, line: UInt = #line, accuracy: Float) {
-    let difference = abs(expression1 - expression2)
-    if difference > accuracy {
-        XCTFail("XCTAssertEqual failed: \"\(expression1)\" is not equal to \"\(expression2)\" ±\(accuracy). " + message(), file: file, line: line)
+        let pos2 = prj.inverse(x: -6.86, y: 3.39)
+        #expect(pos2.latitude == 49.92259526903297)
+        #expect(pos2.longitude == -0.6727295) // -0.6726940671609235 // -0.6726940671609235
+
+        let pos3 = prj.inverse(x: 4.83, y: -4.46)
+        #expect(pos3.latitude == 42.33897767617745)
+        #expect(pos3.longitude == 16.52089) // 16.520897355538942) // 16.520897355538942)
+
+        let pos4 = prj.inverse(x: 4.83, y: 3.39)
+        #expect(pos4.latitude.isApproximatelyEqual(to: 50.15759)) // 50.15758220431567 // 50.15758220431567
+        #expect(pos4.longitude == 17.538514061258)
+
+        let pos5 = prj.forward(latitude: 42.135393352769036, longitude: 0.7592734782323791)
+        #expect(pos5.x.isApproximatelyEqual(to: -6.8599935))
+        #expect(pos5.y == -4.4600043)
+
+        let pos6 = prj.forward(latitude: 49.92259526903297, longitude: -0.6726940671609235)
+        #expect(pos6.x == -6.859994)
+        #expect(pos6.y == 3.3899972)
+
+        let pos7 = prj.forward(latitude: 42.33897767617745, longitude: 16.520897355538942)
+        #expect(pos7.x == 4.8300076)
+        #expect(pos7.y == -4.4600024)
+
+        let pos8 = prj.forward(latitude: 50.15758220431567, longitude: 17.538514061258)
+        #expect(pos8.x == 4.8300066)
+        #expect(pos8.y == 3.3899925)
     }
 }

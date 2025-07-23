@@ -1,20 +1,20 @@
 import Foundation
 @testable import App
-import XCTest
+import Testing
 
-final class ArrayTests: XCTestCase {
-    func testTranspose() {
+@Suite struct ArrayTests {
+    @Test func transpose() {
         let spatial = Array2DFastSpace(data: [1, 2, 3, 4, 5, 6], nLocations: 2, nTime: 3)
         let temporal = spatial.transpose()
-        XCTAssertEqual(temporal.data, [1, 3, 5, 2, 4, 6])
+        #expect(temporal.data == [1, 3, 5, 2, 4, 6])
         let spatial2 = temporal.transpose()
-        XCTAssertEqual(spatial2.data, spatial.data)
+        #expect(spatial2.data == spatial.data)
     }
 
-    func testBackwardInterpolateInplace() {
+    @Test func backwardInterpolateInplace() {
         var a: [Float] = [0, 1, .nan, .nan, .nan, 5]
         a.interpolateInplaceBackwards(nTime: 6, isSummation: false)
-        XCTAssertEqual(a, [0, 1, 5, 5, 5, 5])
+        #expect(a == [0, 1, 5, 5, 5, 5])
 
         // Make sure nTime is honored correctly
         a = [0, .nan, 1, .nan, .nan, .nan, 0, .nan, 1, .nan, .nan, .nan]
@@ -37,15 +37,15 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqualArray(a, [.nan, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, .nan, 1, 1, 1, 1, 1, 1], accuracy: 0.0001)
     }
 
-    func testInterpolateDegrees() {
+    @Test func interpolateDegrees() {
         let time = TimerangeDt(start: Timestamp(0), nTime: 4, dtSeconds: 3600)
-        XCTAssertEqual([Float(10), 350, 20, 300].interpolateLinearDegrees(timeOld: time, timeNew: time.with(dtSeconds: 900), scalefactor: 1), [10.0, 5.0, 0.0, 355.0, 350.0, 358.0, 5.0, 13.0, 20.0, 0.0, 340.0, 320.0, 300.0, 300.0, 300.0, 300.0])
+        #expect([Float(10), 350, 20, 300].interpolateLinearDegrees(timeOld: time, timeNew: time.with(dtSeconds: 900), scalefactor: 1) == [10.0, 5.0, 0.0, 355.0, 350.0, 358.0, 5.0, 13.0, 20.0, 0.0, 340.0, 320.0, 300.0, 300.0, 300.0, 300.0])
     }
 
-    func testLinearInterpolateInplace() {
+    @Test func linearInterpolateInplace() {
         var a: [Float] = [0, 1, .nan, .nan, .nan, 5]
         a.interpolateInplaceLinear(nTime: 6)
-        XCTAssertEqual(a, [0, 1, 2, 3, 4, 5])
+        #expect(a == [0, 1, 2, 3, 4, 5])
 
         // Make sure nTime is honored correctly
         a = [0, .nan, 1, .nan, .nan, .nan, 0, .nan, 1, .nan, .nan, .nan]
@@ -57,10 +57,10 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqualArray(a, [355.0, 7.5, 20.0, .nan, .nan, .nan, 340.0, 0.0, 20.0, .nan, .nan, .nan], accuracy: 0.0001)
     }
 
-    func testHermiteInterpolateInplace() {
+    @Test func hermiteInterpolateInplace() {
         var a: [Float] = [0, 1, .nan, 3, .nan, 5, .nan, 0]
         a.interpolateInplaceHermite(nTime: 8, bounds: nil)
-        XCTAssertEqual(a, [0.0, 1.0, 1.875, 3.0, 4.4375, 5.0, 2.625, 0.0])
+        #expect(a == [0.0, 1.0, 1.875, 3.0, 4.4375, 5.0, 2.625, 0.0])
 
         a = [0, 1, .nan, .nan, 3, .nan, .nan, 5, .nan, .nan, 0]
         a.interpolateInplaceHermite(nTime: 11, bounds: nil)
@@ -81,7 +81,7 @@ final class ArrayTests: XCTestCase {
         a.interpolateInplaceHermite(nTime: a.count, bounds: nil)
         XCTAssertEqualArray(a, [.nan, 1.0, 1.875, 3.0, 4.4375, 5.0, 0.7013891, 0.0, 2.8194444, 7.2430553, 10.0, 9.259259, 6.8518515, 5.0], accuracy: 0.0001)
     }
-    func testSolarBackwardsInterpolateInplace() {
+    @Test func solarBackwardsInterpolateInplace() {
         var data: [Float] = [.nan, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.3125, 11.9375, 57.484375, 75.203125, 81.625, 56.3125, 69.359375, 100.671875, 320.9375, 400.78125, 373.76562, 246.95312, 53.632812, 29.242188, 2.578125, -0.109375, 0.0, 0.0625, 0.0859375, -0.0859375, 0.0234375, -0.0859375, 0.140625, -0.03125, 0.2421875, 4.2109375, 3.515625, 8.65625, 14.0, 4.015625, 18.257812, 0.3359375, 4.0, 1.90625, 0.796875, 1.09375, 3.59375, 0.578125, -0.046875, 0.140625, 0.1015625, -0.1953125, -0.015625, -0.109375, 0.2890625, -0.0078125, -0.234375, 0.03125, 2.96875, 27.578125, 98.99219, 126.14844, 183.63281, 261.22656, 319.10156, 409.4922, 386.6797, 374.72656, 353.08594, 311.9453, 132.4375, 70.46875, 8.3828125, -0.0703125, 0.0703125, -0.2578125, 0.0546875, -0.1171875, 0.3671875, -0.2421875, -0.203125, 0.515625, .nan, .nan, 15.9765625, .nan, .nan, 175.58594, .nan, .nan, 411.35938, .nan, .nan, 272.71875, .nan, .nan, 40.820312, .nan, .nan, -0.0234375, .nan, .nan, -0.0859375, .nan, .nan, 0.0546875, .nan, .nan, 0.640625, .nan, .nan, 3.078125, .nan, .nan, 0.875, .nan, .nan, 1.484375, .nan, .nan, 0.0078125, .nan, .nan, -0.0546875, .nan, .nan, 0.140625, .nan, .nan, -0.0625, .nan, .nan, 1.9609375, .nan, .nan, 181.02344, .nan, .nan, 152.05469, .nan, .nan, 40.648438, .nan, .nan, 6.5390625, .nan, .nan, -0.0546875, .nan, .nan, -0.015625, .nan, .nan, 0.1875, .nan, .nan, 20.078125, .nan, .nan, 317.53125, .nan, .nan, 381.72656, .nan, .nan, 250.71094, .nan, .nan, 53.742188, .nan, .nan, -0.3359375, .nan, .nan, 0.171875, .nan, .nan, -0.0625, .nan, .nan, 43.609375, .nan, .nan, 191.8125]
 
         // this location is exactly at a point where sofac is diverging to 0 on the first step to interpolate
@@ -121,24 +121,24 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqualArray(data, [321.95593, .nan], accuracy: 0.001)
     }
 
-    func testRangeFraction() {
-        XCTAssertEqual((100..<1000).interpolated(atFraction: 0.5), 550)
-        XCTAssertEqual((100..<1000).interpolated(atFraction: 0), 100)
-        XCTAssertEqual((100..<1000).interpolated(atFraction: 1), 1000)
-        XCTAssertEqual((100..<1000).interpolated(atFraction: -0.1), 100)
-        XCTAssertEqual((100..<1000).interpolated(atFraction: 1.1), 1000)
+    @Test func rangeFraction() {
+        #expect((100..<1000).interpolated(atFraction: 0.5) == 550)
+        #expect((100..<1000).interpolated(atFraction: 0) == 100)
+        #expect((100..<1000).interpolated(atFraction: 1) == 1000)
+        #expect((100..<1000).interpolated(atFraction: -0.1) == 100)
+        #expect((100..<1000).interpolated(atFraction: 1.1) == 1000)
 
-        XCTAssertEqual((100..<1000).fraction(of: 550), 0.5)
-        XCTAssertEqual((100..<1000).fraction(of: 100), 0)
-        XCTAssertEqual((100..<1000).fraction(of: 1000), 1)
-        XCTAssertEqual((100..<1000).fraction(of: 90), 0)
-        XCTAssertEqual((100..<1000).fraction(of: 1010), 1)
+        #expect((100..<1000).fraction(of: 550) == 0.5)
+        #expect((100..<1000).fraction(of: 100) == 0)
+        #expect((100..<1000).fraction(of: 1000) == 1)
+        #expect((100..<1000).fraction(of: 90) == 0)
+        #expect((100..<1000).fraction(of: 1010) == 1)
     }
 
-    func testDeaverage() {
+    @Test func deaverage() {
         var data = Array2DFastTime(data: [1, 2, 3, 1, 2, 3], nLocations: 2, nTime: 3)
         data.deavergeOverTime()
-        XCTAssertEqual(data.data, [1.0, 3.0, 5.0, 1.0, 3.0, 5.0])
+        #expect(data.data == [1.0, 3.0, 5.0, 1.0, 3.0, 5.0])
 
         data = Array2DFastTime(data: [.nan, 2, 3, .nan, 2, 3], nLocations: 2, nTime: 3)
         data.deavergeOverTime()
@@ -161,19 +161,19 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqualArray(data.data, [10.0, 10.0, .nan, 10.0, 10.0, 10.0, .nan, 10.0], accuracy: 0.001)
     }
 
-    func testDeaccumulate() {
+    @Test func deaccumulate() {
         var data = Array2DFastTime(data: [1, 2, 3, 1, 2, 3], nLocations: 2, nTime: 3)
         data.deaccumulateOverTime()
-        XCTAssertEqual(data.data, [1, 1, 1, 1, 1, 1])
+        #expect(data.data == [1, 1, 1, 1, 1, 1])
 
         var data2 = Array2DFastTime(data: [.nan, 1, 2, 1, 2, 3], nLocations: 2, nTime: 3)
         data2.deaccumulateOverTime()
-        XCTAssertTrue(data2.data[0].isNaN)
-        XCTAssertEqual(data2.data[1..<6], [1, 1, 1, 1, 1])
+        #expect(data2.data[0].isNaN)
+        #expect(data2.data[1..<6] == [1, 1, 1, 1, 1])
 
         var data4 = Array2DFastTime(data: [.nan, 1, 2, 3, 3.1, 3.3, 3.9], nLocations: 1, nTime: 7)
         data4.deaccumulateOverTime()
-        XCTAssertTrue(data4.data[0].isNaN)
+        #expect(data4.data[0].isNaN)
         XCTAssertEqualArray(data4.data[1..<7], [1.0, 1.0, 1.0, 0.1, 0.2, 0.6], accuracy: 0.001)
 
         // Allow one missing value to be ignored
@@ -182,7 +182,7 @@ final class ArrayTests: XCTestCase {
         XCTAssertEqualArray(data5.data, [5, .nan, 2, 5, .nan, 2], accuracy: 0.001)
     }
 
-    func testSolfactorBackwards() {
+    @Test func solfactorBackwards() {
         let time = TimerangeDt(start: Timestamp(2022, 08, 17), nTime: 48, dtSeconds: 3600)
         let grid = RegularGrid(nx: 1, ny: 1, latMin: 47, lonMin: 4.5, dx: 1, dy: 1)
         /*let solfac = Zensun.calculateRadiationBackwardsSubsampled(grid: grid, timerange: time, steps: 120).data
@@ -197,7 +197,7 @@ final class ArrayTests: XCTestCase {
 
 func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T.Element == Float, T: Equatable {
     guard a.count == b.count else {
-        XCTFail("Array length different")
+        Issue.record("Array length different")
         return
     }
     var failed = false
@@ -219,6 +219,6 @@ func XCTAssertEqualArray<T: Collection>(_ a: T, _ b: T, accuracy: Float) where T
                 print("\(a1)\t\(b1)\t\(a1 - b1)")
             }
         }
-        XCTAssertEqual(a, b)
+        #expect(a == b)
     }
 }

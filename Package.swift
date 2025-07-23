@@ -29,6 +29,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/google/flatbuffers.git", from: "25.2.10"),
+        .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.20.0"),
         .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "01b48bf682c50e736749569cc2320298a08e80a9"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
@@ -88,7 +89,11 @@ let package = Package(
         ),
         .testTarget(
             name: "AppTests",
-            dependencies: [.target(name: "App")]
+            dependencies: [
+                .target(name: "App"),
+                .product(name: "Numerics", package: "swift-numerics"),
+                .product(name: "VaporTesting", package: "vapor")
+            ]
         ),
     ]
 )
