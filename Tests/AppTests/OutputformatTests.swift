@@ -78,7 +78,7 @@ import VaporTesting
     }
 
     private func drainString(_ response: Response) async -> String {
-        try! await withApp(configure: configure) { app in
+        try! await withApp(configure: configure, { app in
             guard var buffer = try? await response.body.collect(on: app.eventLoopGroup.next()).get() else {
                 fatalError("could not get buffer")
             }
@@ -86,11 +86,11 @@ import VaporTesting
                 fatalError("could not convert to string")
             }
             return string
-        }
+        })
     }
 
     private func drainData(_ response: Response) async -> Data {
-        try! await withApp(configure: configure)  { app in
+        try! await withApp(configure: configure,  { app in
             guard var buffer = try? await response.body.collect(on: app.eventLoopGroup.next()).get() else {
                 fatalError("could not get buffer")
             }
@@ -98,7 +98,7 @@ import VaporTesting
                 fatalError("could not convert to data")
             }
             return data
-        }
+        })
     }
 
     @Test func formats() async throws {
