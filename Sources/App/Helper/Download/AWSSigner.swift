@@ -16,19 +16,6 @@ extension CharacterSet {
     }()
 }
 
-extension URL {
-    /// Convert URL to request and sign with AWS signature. AWS credentials are used from username:password from the URL path
-    mutating func toHttpClientRequest(signAws: Bool) throws -> HTTPClientRequest {
-        let url = self.formatted(FormatStyle(query: .always))
-        var request = HTTPClientRequest(url: url)
-        if signAws, let user = self.user(), let password = password() {
-            let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
-            try signer.sign(request: &request, body: nil)
-        }
-        return request
-    }
-}
-
 /// Sign AWS URLs with AWS4-HMAC-SHA256
 public struct AWSSigner {
     public let accessKey: String

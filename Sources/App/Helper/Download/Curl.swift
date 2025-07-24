@@ -86,8 +86,9 @@ final class Curl: Sendable {
         guard let url = URL(string: _url) else {
             throw CurlError.invalidURL(_url)
         }
+        let urlStyle = URL.FormatStyle(query: .always)
         /// URL with query, but without any credentials
-        let urlFormated = url.formatted(URL.FormatStyle(query: .always))
+        let urlFormated = urlStyle.format(url)
         
         if url.isFileURL {
             guard let data = try FileHandle(forReadingFrom: url).readToEnd() else {
@@ -122,7 +123,7 @@ final class Curl: Sendable {
         }
 
         let request = try {
-            var request = HTTPClientRequest(url: url.formatted(URL.FormatStyle(query: .always)))
+            var request = HTTPClientRequest(url: urlFormated)
             request.method = method
             if let user = url.user(), let password = url.password() {
                 if url.host()?.hasSuffix(".your-objectstorage.com") == true {
