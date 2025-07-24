@@ -102,6 +102,32 @@ extension Application {
         }
         return new
     }
+    
+    fileprivate struct Http1ClientKey: StorageKey, LockKey {
+        typealias Value = HTTPClient
+    }
+    /// Get dedicated HTTPClient instance with a dedicated threadpool
+    var http1Client: HTTPClient {
+        let lock = self.locks.lock(for: Http1ClientKey.self)
+        lock.lock()
+        defer { lock.unlock() }
+        if let existing = self.storage[Http1ClientKey.self] {
+            return existing
+        }
+        var configuration = HTTPClient.Configuration(
+            redirectConfiguration: .disallow,
+            timeout: .init(connect: .seconds(30), read: .minutes(5)),
+            connectionPool: .init(idleTimeout: .minutes(10)))
+        configuration.httpVersion = .http1Only
+        let new = HTTPClient(
+            eventLoopGroupProvider: .shared(eventLoopGroup),
+            configuration: configuration,
+            backgroundActivityLogger: logger)
+        self.storage.set(Http1ClientKey.self, to: new) {
+            try $0.syncShutdown()
+        }
+        return new
+    }
 
     /// Create a new HTTP client instance. `shutdown` must be called after using it
     func makeNewHttpClient(httpVersion: HTTPClient.Configuration.HTTPVersion = .automatic, redirectConfiguration: HTTPClient.Configuration.RedirectConfiguration? = nil) -> HTTPClient {
