@@ -31,10 +31,10 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     case wet_bulb_temperature_2m
-    case wind_speed_10m
-    case wind_direction_10m
-    case wind_speed_100m
-    case wind_direction_100m
+    case windspeed_10m
+    case winddirection_10m
+    case windspeed_100m
+    case winddirection_100m
     case wind_gusts_10m
     case relative_humidity_2m
     case cloud_cover_low
@@ -140,9 +140,9 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         case .wet_bulb_temperature_2m:
             try await prefetchData(raw: .temperature_2m, time: time)
             try await prefetchData(raw: .relative_humidity_2m, time: time)
-        case .wind_speed_10m:
+        case .windspeed_10m:
             try await prefetchData(raw: .wind_speed_10m, time: time)
-        case .wind_direction_10m:
+        case .winddirection_10m:
             try await prefetchData(raw: .wind_direction_10m, time: time)
         case .wind_gusts_10m:
             try await prefetchData(raw: .wind_gusts_10m, time: time)
@@ -154,9 +154,9 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try await prefetchData(raw: .cloud_cover_mid, time: time)
         case .cloud_cover_high:
             try await prefetchData(raw: .cloud_cover_high, time: time)
-        case .wind_speed_100m:
+        case .windspeed_100m:
             try await prefetchData(raw: .wind_speed_100m, time: time)
-        case .wind_direction_100m:
+        case .winddirection_100m:
             try await prefetchData(raw: .wind_speed_100m, time: time)
         case .sunshine_duration:
             try await prefetchData(raw: .direct_radiation, time: time)
@@ -272,13 +272,13 @@ struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             let relhum = try await get(raw: .relative_humidity_2m, time: time)
             let temperature = try await get(raw: .temperature_2m, time: time)
             return DataAndUnit(zip(temperature.data, relhum.data).map(Meteorology.wetBulbTemperature), temperature.unit)
-        case .wind_speed_10m:
+        case .windspeed_10m:
             return try await get(raw: .wind_speed_10m, time: time)
-        case .wind_direction_10m:
+        case .winddirection_10m:
             return try await get(raw: .wind_direction_10m, time: time)
-        case .wind_speed_100m:
-            return try await get(raw: .wind_speed_10m, time: time)
-        case .wind_direction_100m:
+        case .windspeed_100m:
+            return try await get(raw: .wind_speed_100m, time: time)
+        case .winddirection_100m:
             return try await get(raw: .wind_direction_100m, time: time)
         case .wind_gusts_10m:
             return try await get(raw: .wind_gusts_10m, time: time)
