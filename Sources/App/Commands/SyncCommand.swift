@@ -147,6 +147,7 @@ struct SyncCommand: AsyncCommand {
 
                     /// Get a list of all variables from all models
                     let remotes: [(DomainRegistry, String)] = try await models.mapConcurrent(nConcurrent: concurrent) { model -> [(DomainRegistry, String)] in
+                        let server = server.replacing("MODEL", with: model.rawValue.replacing("_", with: "-"))
                         let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: signature.apikey, deadLineHours: 0.1).directories
                         return remoteDirectories.map {
                             return (model, $0)
@@ -155,6 +156,7 @@ struct SyncCommand: AsyncCommand {
 
                     /// Filter variables to download
                     let toDownload: [S3DataController.S3ListV2File] = try await remotes.mapConcurrent(nConcurrent: concurrent) { model, remoteDirectory -> [S3DataController.S3ListV2File] in
+                        let server = server.replacing("MODEL", with: model.rawValue.replacing("_", with: "-"))
                         guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
                             fatalError("could not get variable from string")
                         }
