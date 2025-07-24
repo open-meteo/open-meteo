@@ -82,17 +82,10 @@ final class Curl: Sendable {
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?, headers: [(String, String)] = []) async throws -> HTTPClientResponse {
         let deadline = deadline ?? self.deadline
-
-        guard let url = URL(string: _url) else {
-            throw CurlError.invalidURL(_url)
-        }
-        let urlStyle = URL.FormatStyle(query: .always)
-        /// URL with query, but without any credentials
-        let urlFormated = urlStyle.format(url)
         
-        if url.isFileURL {
-            guard let data = try FileHandle(forReadingFrom: url).readToEnd() else {
-                fatalError("Could not read file \(url)")
+        if _url.starts(with: "file://") {
+            guard let data = try FileHandle(forReadingAtPath: String(_url.dropFirst(7)))?.readToEnd() else {
+                fatalError("Could not read file \(_url.dropFirst(7))")
             }
             var headers = HTTPHeaders()
             headers.add(name: "content-length", value: "\(data.count)")
@@ -113,20 +106,35 @@ final class Curl: Sendable {
         if nConcurrent > 1 {
             return try await initiateDownloadConcurrent(url: _url, range: range, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
+        
+        // URL might contain password, strip them from logging
+        let url: String
+        let user: String?
+        let password: String?
+        if _url.contains("@") && _url.contains(":") {
+            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0].split(separator: ":")
+            user = String(usernamePassword.first!)
+            password = usernamePassword.count > 1 ? String(usernamePassword[1]) : nil
+            url = _url.stripHttpPassword()
+        } else {
+            url = _url
+            user = nil
+            password = nil
+        }
 
         if !quiet && waitAfterLastModifiedBeforeDownload == nil {
             if let range {
-                logger.info("Downloading file \(urlFormated) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
+                logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
             } else {
-                logger.info("Downloading file \(urlFormated)")
+                logger.info("Downloading file \(url)")
             }
         }
 
         let request = try {
-            var request = HTTPClientRequest(url: urlFormated)
+            var request = HTTPClientRequest(url: url)
             request.method = method
-            if let user = url.user(), let password = url.password() {
-                if url.host()?.hasSuffix(".your-objectstorage.com") == true {
+            if let user = user, let password = password {
+                if url.contains(".your-objectstorage.com") {
                     let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                     try signer.sign(request: &request, body: nil)
                 } else {
