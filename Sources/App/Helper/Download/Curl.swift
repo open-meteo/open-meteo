@@ -18,6 +18,7 @@ enum CurlError: Error {
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
     case couldNotGetContentLengthForConcurrentDownload
+    case invalidURL(String)
 }
 
 
@@ -82,9 +83,15 @@ final class Curl: Sendable {
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?, headers: [(String, String)] = []) async throws -> HTTPClientResponse {
         let deadline = deadline ?? self.deadline
 
-        if _url.starts(with: "file://") {
-            guard let data = try FileHandle(forReadingAtPath: String(_url.dropFirst(7)))?.readToEnd() else {
-                fatalError("Could not read file \(_url.dropFirst(7))")
+        guard let url = URL(string: _url) else {
+            throw CurlError.invalidURL(_url)
+        }
+        /// URL with query, but without any credentials
+        let urlFormated = url.formatted(URL.FormatStyle(query: .always))
+        
+        if url.isFileURL {
+            guard let data = try FileHandle(forReadingFrom: url).readToEnd() else {
+                fatalError("Could not read file \(url)")
             }
             var headers = HTTPHeaders()
             headers.add(name: "content-length", value: "\(data.count)")
@@ -106,33 +113,27 @@ final class Curl: Sendable {
             return try await initiateDownloadConcurrent(url: _url, range: range, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
 
-        // URL might contain password, strip them from logging
-        let url: String
-        let auth: String?
-        if _url.contains("@") && _url.contains(":") {
-            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
-            auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
-            url = _url.stripHttpPassword()
-        } else {
-            url = _url
-            auth = nil
-        }
         if !quiet && waitAfterLastModifiedBeforeDownload == nil {
             if let range {
-                logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
+                logger.info("Downloading file \(urlFormated) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
             } else {
-                logger.info("Downloading file \(url)")
+                logger.info("Downloading file \(urlFormated)")
             }
         }
 
-        let request = {
-            var request = HTTPClientRequest(url: url)
+        let request = try {
+            var request = HTTPClientRequest(url: url.formatted(URL.FormatStyle(query: .always)))
             request.method = method
+            if let user = url.user(), let password = url.password() {
+                if url.host()?.hasSuffix(".your-objectstorage.com") == true {
+                    let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+                    try signer.sign(request: &request, body: nil)
+                } else {
+                    request.setBasicAuth(username: user, password: password)
+                }
+            }
             if let range = range {
                 request.headers.add(name: "range", value: "bytes=\(range)")
-            }
-            if let auth = auth {
-                request.headers.add(name: "Authorization", value: "Basic \(auth)")
             }
             request.headers.add(contentsOf: self.headers)
             request.headers.add(contentsOf: headers)
