@@ -114,10 +114,58 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return timeformat ?? .iso8601
     }
 
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        latitude = try c.decode([String].self, forKey: .latitude)
+        longitude = try c.decode([String].self, forKey: .longitude)
+        minutely_15 = try c.decodeIfPresent([String].self, forKey: .minutely_15)
+        current = try c.decodeIfPresent([String].self, forKey: .current)
+        hourly = try c.decodeIfPresent([String].self, forKey: .hourly)
+        daily = try c.decodeIfPresent([String].self, forKey: .daily)
+        six_hourly = try c.decodeIfPresent([String].self, forKey: .six_hourly)
+        current_weather = try c.decodeIfPresent(Bool.self, forKey: .current_weather)
+        elevation = try c.decodeIfPresent([String].self, forKey: .elevation)
+        location_id = try c.decodeIfPresent([String].self, forKey: .location_id)
+        timezone = try c.decodeIfPresent([String].self, forKey: .timezone)
+        temperature_unit = try c.decodeIfPresent(TemperatureUnit.self, forKey: .temperature_unit)
+        windspeed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .windspeed_unit)
+        wind_speed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .wind_speed_unit)
+        precipitation_unit = try c.decodeIfPresent(PrecipitationUnit.self, forKey: .precipitation_unit)
+        length_unit = try c.decodeIfPresent(LengthUnit.self, forKey: .length_unit)
+        timeformat = try c.decodeIfPresent(Timeformat.self, forKey: .timeformat)
+        temporal_resolution = try c.decodeIfPresent(ApiTemporalResolution.self, forKey: .temporal_resolution)
+        past_days = try c.decodeIfPresent(Int.self, forKey: .past_days)
+        past_hours = try c.decodeIfPresent(Int.self, forKey: .past_hours)
+        past_minutely_15 = try c.decodeIfPresent(Int.self, forKey: .past_minutely_15)
+        forecast_days = try c.decodeIfPresent(Int.self, forKey: .forecast_days)
+        forecast_hours = try c.decodeIfPresent(Int.self, forKey: .forecast_hours)
+        forecast_minutely_15 = try c.decodeIfPresent(Int.self, forKey: .forecast_minutely_15)
+        initial_hours = try c.decodeIfPresent(Int.self, forKey: .initial_hours)
+        initial_minutely_15 = try c.decodeIfPresent(Int.self, forKey: .initial_minutely_15)
+        format = try c.decodeIfPresent(ForecastResultFormat.self, forKey: .format)
+        models = try c.decodeIfPresent([String].self, forKey: .models)
+        cell_selection = try c.decodeIfPresent(GridSelectionMode.self, forKey: .cell_selection)
+        apikey = try c.decodeIfPresent(String.self, forKey: .apikey)
+        tilt = try c.decodeIfPresent(Float.self, forKey: .tilt)
+        azimuth = try c.decodeIfPresent(Float.self, forKey: .azimuth)
+        disable_bias_correction = try c.decodeIfPresent(Bool.self, forKey: .disable_bias_correction)
+        domains = try c.decodeIfPresent(CamsQuery.Domain.self, forKey: .domains)
+
+        // Provide a default value if missing:
+        bounding_box = try c.decodeIfPresent([String].self, forKey: .bounding_box) ?? []
+        ensemble = try c.decodeIfPresent(Bool.self, forKey: .ensemble) ?? false
+        start_date = try c.decodeIfPresent([String].self, forKey: .start_date) ?? []
+        end_date = try c.decodeIfPresent([String].self, forKey: .end_date) ?? []
+        start_hour = try c.decodeIfPresent([String].self, forKey: .start_hour) ?? []
+        end_hour = try c.decodeIfPresent([String].self, forKey: .end_hour) ?? []
+        start_minutely_15 = try c.decodeIfPresent([String].self, forKey: .start_minutely_15) ?? []
+        end_minutely_15 = try c.decodeIfPresent([String].self, forKey: .end_minutely_15) ?? []
+    }
+
     func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
         return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
     }
-    
+
     func readerOptions(for request: Request) throws -> GenericReaderOptions {
         return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: request.application.http.client.shared)
     }
