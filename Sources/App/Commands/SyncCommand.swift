@@ -155,7 +155,7 @@ struct SyncCommand: AsyncCommand {
                     }.flatMap({ $0 })
 
                     /// Filter variables to download
-                    let toDownload: [S3DataController.S3ListV2File] = try await remotes.mapConcurrent(nConcurrent: concurrent) { model, remoteDirectory -> [S3DataController.S3ListV2File] in
+                    let toDownload: [(server: String, files: [S3DataController.S3ListV2File])] = try await remotes.mapConcurrent(nConcurrent: concurrent) { model, remoteDirectory -> (server: String, files: [S3DataController.S3ListV2File]) in
                         let server = server.replacing("MODEL", with: model.rawValue.replacing("_", with: "-"))
                         guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
                             fatalError("could not get variable from string")
@@ -170,45 +170,47 @@ struct SyncCommand: AsyncCommand {
                                 (downloadAllSurface && isSurface) ||
                                 (downloadAllPreviousDay && isPreviousDay) ||
                                 variables.contains(where: { $0 == variable }) else {
-                            return []
+                            return (server, [])
                         }
                         let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
                         let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        return Array(filtered)
-                    }.flatMap({ $0 })
+                        return (server, Array(filtered))
+                    }
 
                     /// Download all files
-                    let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
+                    let totalBytes = toDownload.reduce(0, { $0 + $1.files.reduce(0, { $0 + $1.fileSize }) })
                     logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
                     let progress = TransferAmountTrackerActor(logger: logger, totalSize: totalBytes)
                     let curlStartBytes = await curl.totalBytesTransfered.bytes
-                    try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
-                        var client = ClientRequest(url: URI("\(server)\(download.name)"))
-                        if signature.apikey != nil || signature.rate != nil {
-                            try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
+                    for (server, files) in toDownload {
+                        try await files.foreachConcurrent(nConcurrent: concurrent) { download in
+                            var client = ClientRequest(url: URI("\(server)\(download.name)"))
+                            if signature.apikey != nil || signature.rate != nil {
+                                try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
+                            }
+                            let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
+                            let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
+                            let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
+                            try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
+                            // Another process might be updating this file right now. E.g. Second sync operation
+                            FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
+                            if localFile.hasSuffix("/meta.json") {
+                                /// Update the `last_run_availability_time` within meta.json
+                                try await curl
+                                    .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
+                                    .readJSONDecodable(ModelUpdateMetaJson.self)?
+                                    .with(last_run_availability_time: .now())
+                                    .writeTo(path: localFile)
+                            } else {
+                                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                            }
+                            /*if let cacheDirectory = OpenMeteo.cacheDirectory {
+                             // Delete cached file, in case cache is active
+                             let cacheFile = "\(cacheDirectory)/\(pathNoData)"
+                             try FileManager.default.removeItemIfExists(at: cacheFile)
+                             }*/
+                            await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
                         }
-                        let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
-                        let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
-                        let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
-                        try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-                        // Another process might be updating this file right now. E.g. Second sync operation
-                        FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
-                        if localFile.hasSuffix("/meta.json") {
-                            /// Update the `last_run_availability_time` within meta.json
-                            try await curl
-                                .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
-                                .readJSONDecodable(ModelUpdateMetaJson.self)?
-                                .with(last_run_availability_time: .now())
-                                .writeTo(path: localFile)
-                        } else {
-                            try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
-                        }
-                        /*if let cacheDirectory = OpenMeteo.cacheDirectory {
-                            // Delete cached file, in case cache is active
-                            let cacheFile = "\(cacheDirectory)/\(pathNoData)"
-                            try FileManager.default.removeItemIfExists(at: cacheFile)
-                        }*/
-                        await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
                     }
                     await progress.finish()
 
