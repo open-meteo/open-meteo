@@ -14,15 +14,15 @@ import Vapor
 
     @Test func aggregation() {
         let values: [Float] = [1,2,3,4,5,6]
-        XCTAssertEqualArray(values.mean(by: 2), [1.5, 3.5, 5.5], accuracy: 0.01)
-        XCTAssertEqualArray(values.mean(by: 3), [2.0, 5.0], accuracy: 0.01)
+        #expect(arraysEqual(values.mean(by: 2), [1.5, 3.5, 5.5], accuracy: 0.01))
+        #expect(arraysEqual(values.mean(by: 3), [2.0, 5.0], accuracy: 0.01))
         let values2: [Float] = [1,2,3,4,.nan,.nan]
-        XCTAssertEqualArray(values2.mean(by: 2), [1.5, 3.5, .nan], accuracy: 0.01)
-        XCTAssertEqualArray(values2.mean(by: 3), [2.0, .nan], accuracy: 0.01)
-        XCTAssertEqualArray(values2.min(by: 2), [1.0, 3.0, .nan], accuracy: 0.01)
-        XCTAssertEqualArray(values2.min(by: 3), [1.0, .nan], accuracy: 0.01)
-        XCTAssertEqualArray(values2.max(by: 2), [2.0, 4.0, .nan], accuracy: 0.01)
-        XCTAssertEqualArray(values2.max(by: 3), [3.0, .nan], accuracy: 0.01)
+        #expect(arraysEqual(values2.mean(by: 2), [1.5, 3.5, .nan], accuracy: 0.01))
+        #expect(arraysEqual(values2.mean(by: 3), [2.0, .nan], accuracy: 0.01))
+        #expect(arraysEqual(values2.min(by: 2), [1.0, 3.0, .nan], accuracy: 0.01))
+        #expect(arraysEqual(values2.min(by: 3), [1.0, .nan], accuracy: 0.01))
+        #expect(arraysEqual(values2.max(by: 2), [2.0, 4.0, .nan], accuracy: 0.01))
+        #expect(arraysEqual(values2.max(by: 3), [3.0, .nan], accuracy: 0.01))
     }
 
     /*func testGribDecode() throws {
@@ -234,8 +234,8 @@ import Vapor
         let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigion: -1036000, longitudeProjectionOrigion: -1158000, dx: 2000, dy: 2000, projection: proj)
         // peak north denmark 57.745566, 10.620785
         let coords = proj.forward(latitude: 57.745566, longitude: 10.620785)
-        #expect(coords.x.isApproximatelyEqual(to: 773650.5, absoluteTolerance: 0.0001)) // around 774000.0 // around 774000.0
-        #expect(coords.y.isApproximatelyEqual(to: 389820.06, absoluteTolerance: 0.0001)) // around 378000 // around 378000
+        #expect(coords.x.isApproximatelyEqual(to: 773650.5, absoluteTolerance: 0.0001)) // around 774000.0
+        #expect(coords.y.isApproximatelyEqual(to: 389820.06, absoluteTolerance: 0.0001)) // around 378000
 
         let r = proj.inverse(x: 773650.5, y: 389820.06)
         #expect(r.longitude.isApproximatelyEqual(to: 10.620785, absoluteTolerance: 0.0001))
@@ -477,8 +477,8 @@ import Vapor
         #expect(pos.longitude == -24.95)
 
         let bologna = grid.findPoint(lat: 45.45, lon: 11.35)!
-        #expect(bologna % grid.nx == 363) // x // x
-        #expect(bologna / grid.nx == 265) // y         // y
+        #expect(bologna % grid.nx == 363) // x
+        #expect(bologna / grid.nx == 265) // y
     }
 
     /**
@@ -656,19 +656,19 @@ import Vapor
          */
         let prj = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
         let pos = prj.inverse(x: -6.86, y: -4.46)
-        #expect(pos.latitude == 42.135387) // 42.135393352769036 // 42.135393352769036
-        #expect(pos.longitude == 0.75927734) // 0.7592734782323791 // 0.7592734782323791
+        #expect(pos.latitude == 42.135387) // 42.135393352769036
+        #expect(pos.longitude == 0.75927734) // 0.7592734782323791
 
         let pos2 = prj.inverse(x: -6.86, y: 3.39)
         #expect(pos2.latitude == 49.92259526903297)
-        #expect(pos2.longitude == -0.6727295) // -0.6726940671609235 // -0.6726940671609235
+        #expect(pos2.longitude == -0.6727295) // -0.6726940671609235
 
         let pos3 = prj.inverse(x: 4.83, y: -4.46)
         #expect(pos3.latitude == 42.33897767617745)
-        #expect(pos3.longitude == 16.52089) // 16.520897355538942) // 16.520897355538942)
+        #expect(pos3.longitude == 16.52089) // 16.520897355538942)
 
         let pos4 = prj.inverse(x: 4.83, y: 3.39)
-        #expect(pos4.latitude.isApproximatelyEqual(to: 50.15759)) // 50.15758220431567 // 50.15758220431567
+        #expect(pos4.latitude.isApproximatelyEqual(to: 50.15759)) // 50.15758220431567
         #expect(pos4.longitude == 17.538514061258)
 
         let pos5 = prj.forward(latitude: 42.135393352769036, longitude: 0.7592734782323791)
