@@ -620,11 +620,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         switch self {
         case .best_match:
             return .bestMatch
-        case .gfs_seamless:
+        case .gfs_seamless, .ncep_seamless:
             return .gfsSeamless
-        case .gfs_mix, .gfs_global:
+        case .gfs_mix, .gfs_global, .ncep_gfs_global:
             return .gfsGlobal
-        case .gfs_hrrr:
+        case .gfs_hrrr, .ncep_hrrr_conus, .ncep_hrrr_conus_15min:
             return .gfsHrrr
         case .meteofrance_seamless:
             return .meteofranceSeamless
@@ -652,25 +652,25 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .gemRegional
         case .gem_hrdps_continental:
             return .gemHrdpsContinental
-        case .icon_mix, .icon_seamless:
+        case .icon_mix, .icon_seamless, .dwd_icon_seamless:
             return .iconSeamless
-        case .icon_global:
+        case .icon_global, .dwd_icon_global:
             return .iconGlobal
-        case .icon_eu:
+        case .icon_eu, .dwd_icon_eu:
             return .iconEu
-        case .icon_d2:
+        case .icon_d2, .dwd_icon_d2, .dwd_icon_d2_15min:
             return .iconD2
         case .ecmwf_ifs04:
             return .ecmwfIfs04
         case .metno_nordic:
             return .metnoNordic
-        case .era5_seamless:
+        case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
-        case .era5:
+        case .era5, .copernicus_era5:
             return .era5
-        case .cerra:
+        case .cerra, .copernicus_cerra:
             return .cerra
-        case .era5_land:
+        case .era5_land, .copernicus_era5_land:
             return .era5Land
         case .ecmwf_ifs:
             return .ecmwfIfs
@@ -708,11 +708,11 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ecmwfIfs025
         case .ecmwf_aifs025:
             return .ecmwfAifs025
-        case .gfs_graphcast025:
+        case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return .gfsGraphcast025
-        case .gfs025:
+        case .gfs025, .ncep_gfs025:
             return .gfs025
-        case .gfs013:
+        case .gfs013, .ncep_gfs013:
             return .gfs013
         case .knmi_harmonie_arome_europe:
             return .knmiHarmonieAromeEurope
@@ -732,7 +732,7 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .ecmwfIfsAnalysis
         case .ecmwf_ifs_long_window:
             return .ecmwfIfsLongWindow
-        case .era5_ensemble:
+        case .era5_ensemble, .copernicus_era5_ensemble:
             return .era5Ensemble
         case .ukmo_seamless:
             return .ukmoSeamless

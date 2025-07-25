@@ -94,6 +94,12 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
+    
+    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
+        let reader = try await GenericReader<Domain, Variable>(domain: domain, position: gridpoint, options: options)
+        self.reader = GenericReaderCached(reader: reader)
+        self.options = options
+    }
 
     func get(raw: SurfaceAndPressureVariable<JmaSurfaceVariable, JmaPressureVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch raw {
