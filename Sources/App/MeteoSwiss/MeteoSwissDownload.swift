@@ -93,6 +93,14 @@ struct MeteoSwissDownload: AsyncCommand {
         
         let timestamps = (0...domain.forecastLength).map { run.add(hours: $0) }
         
+        /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read(range: nil) else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
+        
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
@@ -140,6 +148,23 @@ struct MeteoSwissDownload: AsyncCommand {
                         }
                         if variable == .precipitation {
                             await storagePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
+                        }
+                        /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
+                        /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
+                        /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
+                        /// Note: snowfall height is NaN if snowfall height is at ground level
+                        if variable == .freezing_level_height || variable == .snowfall_height {
+                            guard let t2m = await storage.get(variable: .temperature_2m, timestamp: timestamp, member: member) else {
+                                fatalError("temperature 2m is required for adjusting freezing level height")
+                            }
+                            for i in array2d.data.indices {
+                                let freezingLevelHeight = array2d.data[i].isNaN ? max(0, domainElevation[i]) : array2d.data[i]
+                                let temperature_2m = t2m.data[i]
+                                let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
+                                if newHeight <= domainElevation[i] {
+                                    array2d.data[i] = newHeight
+                                }
+                            }
                         }
                         if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
