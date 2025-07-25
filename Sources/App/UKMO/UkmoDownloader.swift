@@ -242,6 +242,7 @@ struct UkmoDownload: AsyncCommand {
         }
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
+        let isEnsemble = domain.ensembleMembers > 1
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
@@ -256,7 +257,7 @@ struct UkmoDownload: AsyncCommand {
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 if variable.skipHour0, timestamp == run {
                     return
