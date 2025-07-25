@@ -348,15 +348,15 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     var updateIntervalSeconds: Int {
         switch self {
         case .forecast:
-            return 12 * 3600
+            return 24 * 3600
         case .consolidated:
             return 0
         case .seasonal:
-            return 12 * 3600
+            return 31 * 24 * 3600
         case .intermediate:
             return 0
         case .forecastv3:
-            return 12 * 3600
+            return 24 * 3600
         case .consolidatedv3:
             return 0
         case .seasonalv3:
