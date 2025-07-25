@@ -74,7 +74,7 @@ import Testing
         let z2 = SolarPositionAlgorithm.zenith(lat: 23.5, lon: 2, time: Timestamp(1636211364))
         let z = Zensun.calculateZenithInstant(lat: 23.5, lon: 2, time: Timestamp(1636211364))
 
-        XCTAssertEqual(z, z2)
+        #expect(z == z2)
         // 65.556435 vs 65.53193
     }*/
 

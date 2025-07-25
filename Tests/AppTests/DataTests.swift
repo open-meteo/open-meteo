@@ -606,8 +606,8 @@ import Vapor
         #expect(grid.count == 919620)
 
         //let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
-        //XCTAssertEqual(pos % nx, 420)
-        //XCTAssertEqual(pos / nx, 468)
+        //#expect((pos % nx == 420)
+        //#expect((pos / nx == 468)
 
         let pos = grid.getCoordinates(gridpoint: 0)
         #expect(pos.latitude == 42.135387)

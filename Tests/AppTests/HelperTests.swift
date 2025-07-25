@@ -12,7 +12,7 @@ import NIO
             return $0
         }.collect()
         #expect(res == a)
-        
+
         let a2 = (0..<5).map { $0 }
         let res2 = try! await a2.mapStream(nConcurrent: 10) {
             try await Task.sleep(nanoseconds: UInt64.random(in: 1000..<10000))
@@ -20,7 +20,7 @@ import NIO
         }.collect()
         #expect(res2 == a2)
     }
-    
+
     @Test func indexedCurl() {
         let index = """
             1:0:d=2022080800:UFLX:surface:anl:
@@ -43,18 +43,18 @@ import NIO
         }
         #expect(range?.range == "104746-276986,344851-430542,564311-")
         #expect(range?.minSize == 257933)
-        
+
         let range2 = index.split(separator: "\n").indexToRange { _ in
             return true
         }
         #expect(range2?.range == "0-")
         #expect(range2?.minSize == 564311)
-        
+
         let range3 = index.split(separator: "\n").indexToRange { _ in
             return false
         }
         #expect(range3 == nil)
-        
+
         let range4 = index.split(separator: "\n").indexToRange { line in
             line.contains("TMP") || line.contains("UFLX")
         }
@@ -65,7 +65,7 @@ import NIO
          line.contains(":")
          })*/
     }
-    
+
     @Test func decodeEcmwfIndex() throws {
         var buffer = ByteBuffer()
         buffer.writeString("""
@@ -81,7 +81,7 @@ import NIO
         let range = index.indexToRange()[0]
         #expect(range.range == "0-3857388")
         #expect(range.minSize == 3857388)
-        
+
         var buffer2 = ByteBuffer()
         buffer2.writeString("""
         {"domain": "g", "date": "20230501", "time": "0000", "expver": "0001", "class": "od", "type": "pf", "stream": "enfo", "levtype": "sfc", "number": "21", "step": "102", "param": "tp", "_offset": 0, "_length": 812043}
@@ -97,7 +97,7 @@ import NIO
         #expect(range2.range == "0-812043,812044-2639250,2639249-3248317,3248319-3857388")
         #expect(range2.minSize == 3857386)
     }
-    
+
     /*func testSpawn() async throws {
      let time = DispatchTime.now()
      async let a: () = try Process.spawn(cmd: "sleep", args: ["1"])
@@ -105,18 +105,18 @@ import NIO
      try await a
      try await b
      let elapsedMs = Double((DispatchTime.now().uptimeNanoseconds - time.uptimeNanoseconds) / 1_000_000)
-     XCTAssertLessThan(elapsedMs, 1200)
+     #expect(elapsedMs < 1200)
      }*/
-    
+
     @Test func nativeSpawn() throws {
         #expect(try Process.spawnWithExitCode(cmd: "echo", args: ["Hello"]) == 0)
         #expect(try Process.spawnWithExitCode(cmd: "echo", args: ["World"]) == 0)
-        
+
         try "exit 70".write(toFile: "temp.sh", atomically: true, encoding: .utf8)
         #expect(try Process.spawnWithExitCode(cmd: "bash", args: ["temp.sh"]) == 70)
         try FileManager.default.removeItem(atPath: "temp.sh")
     }
-    
+
     @Test func byteSizeParser() throws {
         let bytes = try ByteSizeParser.parseSizeStringToBytes("2KB")
         #expect(bytes == 2 * 1024)

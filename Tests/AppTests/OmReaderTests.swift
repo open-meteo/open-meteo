@@ -52,7 +52,7 @@ import OmFileFormat
         let value = try await RemoteOmFileManager.instance.with(file: .staticFile(domain: .dwd_icon_d2_eps, variable: "HSURF", chunk: nil), client: .shared, logger: .init(label: "")) { reader in
             try await reader.asArray(of: Float.self)!.read(range: [250..<251, 420..<421])
         }
-        XCTAssertEqual(value?.first, 214)
+        #expect(value?.first == 214)
     }*/
 
     @Test func keyValueCache() async throws {
