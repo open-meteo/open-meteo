@@ -228,11 +228,11 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
         case .direct_radiation:
             return "ASWDIR_S"
         case .cape:
-            return "CAPE_MU"
+            return "CAPE_ML"
         case .cloud_base:
             return "CEILING"
         case .convective_inhibition:
-            return "CIN_MU"
+            return "CIN_ML"
         case .cloud_cover:
             return "CLCT"
         case .cloud_cover_low:
