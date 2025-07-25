@@ -18,6 +18,7 @@ enum CurlError: Error {
     case futimes(error: String)
     case contentLengthHeaderTooLarge(got: Int)
     case couldNotGetContentLengthForConcurrentDownload
+    case invalidURL(String)
 }
 
 
@@ -81,7 +82,7 @@ final class Curl: Sendable {
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
     func initiateDownload(url _url: String, range: String?, minSize: Int?, method: HTTPMethod = .GET, cacheDirectory: String? = Curl.cacheDirectory, deadline: Date?, nConcurrent: Int, quiet: Bool = false, waitAfterLastModifiedBeforeDownload: TimeInterval?, headers: [(String, String)] = []) async throws -> HTTPClientResponse {
         let deadline = deadline ?? self.deadline
-
+        
         if _url.starts(with: "file://") {
             guard let data = try FileHandle(forReadingAtPath: String(_url.dropFirst(7)))?.readToEnd() else {
                 fatalError("Could not read file \(_url.dropFirst(7))")
@@ -105,18 +106,22 @@ final class Curl: Sendable {
         if nConcurrent > 1 {
             return try await initiateDownloadConcurrent(url: _url, range: range, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
         }
-
+        
         // URL might contain password, strip them from logging
         let url: String
-        let auth: String?
+        let user: String?
+        let password: String?
         if _url.contains("@") && _url.contains(":") {
-            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0]
-            auth = (usernamePassword).data(using: .utf8)!.base64EncodedString()
+            let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0].split(separator: ":")
+            user = String(usernamePassword.first!)
+            password = usernamePassword.count > 1 ? String(usernamePassword[1]) : nil
             url = _url.stripHttpPassword()
         } else {
             url = _url
-            auth = nil
+            user = nil
+            password = nil
         }
+
         if !quiet && waitAfterLastModifiedBeforeDownload == nil {
             if let range {
                 logger.info("Downloading file \(url) [range \(range.padding(toLength: 20, withPad: ".", startingAt: 0))...]")
@@ -125,14 +130,19 @@ final class Curl: Sendable {
             }
         }
 
-        let request = {
+        let request = try {
             var request = HTTPClientRequest(url: url)
             request.method = method
+            if let user = user, let password = password {
+                if url.contains(".your-objectstorage.com") {
+                    let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+                    try signer.sign(request: &request, body: nil)
+                } else {
+                    request.setBasicAuth(username: user, password: password)
+                }
+            }
             if let range = range {
                 request.headers.add(name: "range", value: "bytes=\(range)")
-            }
-            if let auth = auth {
-                request.headers.add(name: "Authorization", value: "Basic \(auth)")
             }
             request.headers.add(contentsOf: self.headers)
             request.headers.add(contentsOf: headers)

@@ -38,6 +38,7 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 
 ## Who is using Open-Meteo?
 Apps:
+- [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android

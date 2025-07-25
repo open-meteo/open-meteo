@@ -445,7 +445,7 @@ extension DomainRegistry {
         let timeFormatted = run.format_directoriesYYYYMMddhhmm
         for (bucket, profile) in parseBucket(bucket) {
             let src = "\(directory)\(dir)/\(timeFormatted)/"
-            let dest = "s3://\(bucket)/data_run/\(dir)/\(timeFormatted)"
+            let dest = "s3://\(bucket)/data_run/\(dir)/\(timeFormatted)/"
             if !FileManager.default.fileExists(atPath: src) {
                 continue
             }
