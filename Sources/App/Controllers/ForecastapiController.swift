@@ -321,8 +321,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gfs013
     case gfs_hrrr
     case gfs_graphcast025
+    
+    case ncep_seamless
+    case ncep_gfs_global
     case ncep_nbm_conus
-
+    case ncep_gfs025
+    case ncep_gfs013
+    case ncep_hrrr_conus
+    case ncep_hrrr_conus_15min
+    case ncep_gfs_graphcast025
+    
     case meteofrance_seamless
     case meteofrance_mix
     case meteofrance_arpege_seamless
@@ -356,6 +364,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case icon_global
     case icon_eu
     case icon_d2
+    case dwd_icon_seamless
+    case dwd_icon_global
+    case dwd_icon_eu
+    case dwd_icon_d2
+    case dwd_icon_d2_15min
 
     case ecmwf_ifs04
     case ecmwf_ifs025
@@ -374,6 +387,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case cerra
     case era5_land
     case era5_ensemble
+    case copernicus_era5_seamless
+    case copernicus_era5
+    case copernicus_cerra
+    case copernicus_era5_land
+    case copernicus_era5_ensemble
     case ecmwf_ifs
     case ecmwf_ifs_analysis
     case ecmwf_ifs_analysis_long_window
@@ -488,25 +506,27 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
 
             // Remaining parts of the world
             return [gfsProbabilites, iconProbabilities, gfs, icon]
-        case .gfs_mix, .gfs_seamless:
+        case .gfs_mix, .gfs_seamless, .ncep_seamless:
             return [
                 try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as any GenericReaderProtocol,
                 try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
                 try await GfsReader(domains: [.gfs025, .gfs013, .hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             ].compactMap({ $0 })
-        case .gfs_global:
+        case .gfs_global, .ncep_gfs_global:
             let gfsProbabilites = try await ProbabilityReader.makeGfsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [gfsProbabilites] + (try await GfsReader(domains: [.gfs025, .gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
-        case .gfs025:
+        case .gfs025, .ncep_gfs025:
             return try await GfsReader(domains: [.gfs025], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs013:
+        case .gfs013, .ncep_gfs013:
             return try await GfsReader(domains: [.gfs013], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gfs_hrrr:
+        case .gfs_hrrr, .ncep_hrrr_conus:
             return [
                 try await ProbabilityReader.makeNbmReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
                 try await GfsReader(domains: [.hrrr_conus, .hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             ].compactMap({ $0 })
-        case .gfs_graphcast025:
+        case .ncep_hrrr_conus_15min:
+            return try await GfsReader(domains: [.hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -537,18 +557,20 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await JmaReader(domain: .msm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .jms_gsm, .jma_gsm:
             return try await JmaReader(domain: .gsm, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .icon_seamless, .icon_mix:
+        case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [iconProbabilities] + (try await IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
-        case .icon_global:
+        case .icon_global, .dwd_icon_global:
             let iconProbabilities = try await ProbabilityReader.makeIconGlobalReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [iconProbabilities] + (try await IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
-        case .icon_eu:
+        case .icon_eu, .dwd_icon_eu:
             let iconProbabilities = try await ProbabilityReader.makeIconEuReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return (iconProbabilities.flatMap({ [$0] }) ?? []) + (try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
-        case .icon_d2:
+        case .icon_d2, .dwd_icon_d2:
             let iconProbabilities = try await ProbabilityReader.makeIconD2Reader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return (iconProbabilities.flatMap({ [$0] }) ?? []) + (try await IconMixer(domains: [.iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
+        case .dwd_icon_d2_15min:
+            return (try await IconMixer(domains: [.iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs025:
@@ -572,14 +594,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .archive_best_match:
             return [try await Era5Factory.makeArchiveBestMatch(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
-        case .era5_seamless:
+        case .era5_seamless, .copernicus_era5_seamless:
             return [try await Era5Factory.makeEra5CombinedLand(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
-        case .era5:
+        case .era5, .copernicus_era5:
             // If explicitly selected ERA5, combine with ensemble to read spread variables
             return [try await Era5Factory.makeEra5WithEnsemble(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
-        case .era5_land:
+        case .era5_land, .copernicus_era5_land:
             return [try await Era5Factory.makeReader(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
-        case .cerra:
+        case .cerra, .copernicus_cerra:
             return try await CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs:
             return [try await Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
@@ -618,7 +640,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [try await Era5Factory.makeReader(domain: .ecmwf_ifs_analysis, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ecmwf_ifs_long_window:
             return [try await Era5Factory.makeReader(domain: .ecmwf_ifs_long_window, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
-        case .era5_ensemble:
+        case .era5_ensemble, .copernicus_era5_ensemble:
             return [try await Era5Factory.makeReader(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .ukmo_seamless:
             let ukmoGlobal: (any GenericReaderProtocol)? = try await UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -688,13 +710,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
 
     var genericDomain: (any GenericDomain)? {
         switch self {
-        case .gfs025:
+        case .gfs025, .ncep_gfs025:
             return GfsDomain.gfs025
-        case .gfs013:
+        case .gfs013, .ncep_gfs013:
             return GfsDomain.gfs013
-        case .gfs_hrrr:
+        case .gfs_hrrr, .ncep_hrrr_conus:
             return GfsDomain.hrrr_conus
-        case .gfs_graphcast025:
+        case .ncep_hrrr_conus_15min:
+            return GfsDomain.hrrr_conus_15min
+        case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return GfsGraphCastDomain.graphcast025
         case .meteofrance_arpege_world, .arpege_world:
             return MeteoFranceDomain.arpege_world
@@ -704,12 +728,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return MeteoFranceDomain.arome_france
         case .meteofrance_arome_france_hd, .arome_france_hd:
             return MeteoFranceDomain.arome_france_hd
-        case .icon_global:
+        case .icon_global, .dwd_icon_global:
             return IconDomains.icon
-        case .icon_eu:
+        case .icon_eu, .dwd_icon_eu:
             return IconDomains.iconEu
-        case .icon_d2:
+        case .icon_d2, .dwd_icon_d2:
             return IconDomains.iconD2
+        case .dwd_icon_d2_15min:
+            return IconDomains.iconD2_15min
         case .ecmwf_ifs04:
             return EcmwfDomain.ifs04
         case .ecmwf_ifs025:
@@ -724,11 +750,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return GemDomain.gem_regional
         case .gem_hrdps_continental:
             return GemDomain.gem_hrdps_continental
-        case .era5:
+        case .era5, .copernicus_era5:
             return CdsDomain.era5
-        case .era5_land:
+        case .era5_land, .copernicus_era5_land:
             return CdsDomain.era5_land
-        case .cerra:
+        case .cerra, .copernicus_cerra:
             return CdsDomain.cerra
         case .ecmwf_ifs:
             return CdsDomain.ecmwf_ifs
@@ -738,11 +764,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return BomDomain.access_global
         case .best_match:
             return nil
-        case .gfs_seamless:
+        case .gfs_seamless, .gfs_mix, .ncep_seamless:
             return nil
-        case .gfs_mix:
-            return nil
-        case .gfs_global:
+        case .gfs_global, .ncep_gfs_global:
             return nil
         case .ncep_nbm_conus:
             return NbmDomain.nbm_conus
@@ -772,17 +796,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return JmaDomain.gsm
         case .gem_seamless:
             return nil
-        case .icon_seamless:
-            return nil
-        case .icon_mix:
+        case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return nil
         case .ecmwf_aifs025_single:
             return EcmwfDomain.aifs025_single
         case .archive_best_match:
             return nil
-        case .era5_seamless:
+        case .era5_seamless, .copernicus_era5_seamless:
             return nil
-        case .era5_ensemble:
+        case .era5_ensemble, .copernicus_era5_ensemble:
             return CdsDomain.era5_ensemble
         case .ecmwf_ifs_analysis:
             return CdsDomain.ecmwf_ifs_analysis
@@ -845,13 +867,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
 
     func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
         switch self {
-        case .gfs025:
+        case .gfs025, .ncep_gfs025:
             return try await GfsReader(domain: .gfs025, gridpoint: gridpoint, options: options)
-        case .gfs013:
+        case .gfs013, .ncep_gfs013:
             return try await GfsReader(domain: .gfs013, gridpoint: gridpoint, options: options)
-        case .gfs_hrrr:
+        case .gfs_hrrr, .ncep_hrrr_conus:
             return try await GfsReader(domain: .hrrr_conus, gridpoint: gridpoint, options: options)
-        case .gfs_graphcast025:
+        case .ncep_hrrr_conus_15min:
+            return try await GfsReader(domain: .hrrr_conus_15min, gridpoint: gridpoint, options: options)
+        case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_world, .arpege_world:
             return try await MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
@@ -877,12 +901,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .arome_seamless:
             return nil
-        case .icon_global:
+        case .icon_global, .dwd_icon_global:
             return try await IconReader(domain: .icon, gridpoint: gridpoint, options: options)
-        case .icon_eu:
+        case .icon_eu, .dwd_icon_eu:
             return try await IconReader(domain: .iconEu, gridpoint: gridpoint, options: options)
-        case .icon_d2:
+        case .icon_d2, .dwd_icon_d2:
             return try await IconReader(domain: .iconD2, gridpoint: gridpoint, options: options)
+        case .dwd_icon_d2_15min:
+            return try await IconReader(domain: .iconD2_15min, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs04:
             return try await EcmwfReader(domain: .ifs04, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs025:
@@ -897,11 +923,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GemReader(domain: .gem_regional, gridpoint: gridpoint, options: options)
         case .gem_hrdps_continental:
             return try await GemReader(domain: .gem_hrdps_continental, gridpoint: gridpoint, options: options)
-        case .era5:
+        case .era5, .copernicus_era5:
             return try await Era5Factory.makeReader(domain: .era5, gridpoint: gridpoint, options: options)
-        case .era5_land:
+        case .era5_land, .copernicus_era5_land:
             return try await Era5Factory.makeReader(domain: .era5_land, gridpoint: gridpoint, options: options)
-        case .cerra:
+        case .cerra, .copernicus_cerra:
             return try await CerraReader(domain: .cerra, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs:
             return try await Era5Factory.makeReader(domain: .ecmwf_ifs, gridpoint: gridpoint, options: options)
@@ -913,11 +939,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
             return nil
-        case .gfs_seamless:
+        case .gfs_seamless, .ncep_seamless, .gfs_mix:
             return nil
-        case .gfs_mix:
-            return nil
-        case .gfs_global:
+        case .gfs_global, .ncep_gfs_global:
             return nil
         case .ncep_nbm_conus:
             return try await NbmReader(domain: .nbm_conus, gridpoint: gridpoint, options: options)
@@ -929,16 +953,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await JmaReader(domain: .gsm, gridpoint: gridpoint, options: options)
         case .gem_seamless:
             return nil
-        case .icon_seamless, .icon_mix:
+        case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             return nil
         case .ecmwf_aifs025_single:
             return try await EcmwfReader(domain: .aifs025_single, gridpoint: gridpoint, options: options)
         case .archive_best_match:
             return nil
-        case .era5_seamless:
+        case .era5_seamless, .copernicus_era5_seamless:
             return nil
-        case .era5_ensemble:
-            return nil
+        case .era5_ensemble, .copernicus_era5_ensemble:
+            return try await Era5Factory.makeReader(domain: .era5_ensemble, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs_analysis:
             return try await Era5Factory.makeReader(domain: .ecmwf_ifs_analysis, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs_analysis_long_window:
