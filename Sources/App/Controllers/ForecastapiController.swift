@@ -736,7 +736,109 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return CmaDomain.grapes_global
         case .bom_access_global:
             return BomDomain.access_global
-        default:
+        case .best_match:
+            return nil
+        case .gfs_seamless:
+            return nil
+        case .gfs_mix:
+            return nil
+        case .gfs_global:
+            return nil
+        case .ncep_nbm_conus:
+            return NbmDomain.nbm_conus
+        case .meteofrance_seamless:
+            return nil
+        case .meteofrance_mix:
+            return nil
+        case .meteofrance_arpege_seamless:
+            return nil
+        case .meteofrance_arome_seamless:
+            return nil
+        case .meteofrance_arome_france_hd_15min:
+            return MeteoFranceDomain.arome_france_hd_15min
+        case .meteofrance_arome_france_15min:
+            return MeteoFranceDomain.arome_france_15min
+        case .arpege_seamless:
+            return nil
+        case .arome_seamless:
+            return nil
+        case .jma_seamless:
+            return nil
+        case .jma_mix:
+            return nil
+        case .jma_msm:
+            return JmaDomain.msm
+        case .jms_gsm, .jma_gsm:
+            return JmaDomain.gsm
+        case .gem_seamless:
+            return nil
+        case .icon_seamless:
+            return nil
+        case .icon_mix:
+            return nil
+        case .ecmwf_aifs025_single:
+            return EcmwfDomain.aifs025_single
+        case .archive_best_match:
+            return nil
+        case .era5_seamless:
+            return nil
+        case .era5_ensemble:
+            return CdsDomain.era5_ensemble
+        case .ecmwf_ifs_analysis:
+            return CdsDomain.ecmwf_ifs_analysis
+        case .ecmwf_ifs_analysis_long_window:
+            return CdsDomain.ecmwf_ifs_analysis_long_window
+        case .ecmwf_ifs_long_window:
+            return CdsDomain.ecmwf_ifs_long_window
+        case .arpae_cosmo_seamless:
+            return nil
+        case .arpae_cosmo_2i:
+            return nil
+        case .arpae_cosmo_2i_ruc:
+            return nil
+        case .arpae_cosmo_5m:
+            return nil
+        case .knmi_harmonie_arome_europe:
+            return KnmiDomain.harmonie_arome_europe
+        case .knmi_harmonie_arome_netherlands:
+            return KnmiDomain.harmonie_arome_netherlands
+        case .dmi_harmonie_arome_europe:
+            return DmiDomain.harmonie_arome_europe
+        case .knmi_seamless:
+            return nil
+        case .dmi_seamless:
+            return nil
+        case .metno_seamless:
+            return nil
+        case .ukmo_seamless:
+            return nil
+        case .ukmo_global_deterministic_10km:
+            return UkmoDomain.global_deterministic_10km
+        case .ukmo_uk_deterministic_2km:
+            return UkmoDomain.uk_deterministic_2km
+        case .satellite_radiation_seamless:
+            return nil
+        case .eumetsat_sarah3:
+            return nil
+        case .eumetsat_lsa_saf_msg:
+            return nil
+        case .eumetsat_lsa_saf_iodc:
+            return nil
+        case .jma_jaxa_himawari:
+            return nil
+        case .kma_seamless:
+            return nil
+        case .kma_gdps:
+            return KmaDomain.gdps
+        case .kma_ldps:
+            return KmaDomain.ldps
+        case .italia_meteo_arpae_icon_2i:
+            return ItaliaMeteoArpaeDomain.icon_2i
+        case .meteoswiss_icon_ch1:
+            return MeteoSwissDomain.icon_ch1
+        case .meteoswiss_icon_ch2:
+            return MeteoSwissDomain.icon_ch2
+        case .meteoswiss_icon_seamless:
             return nil
         }
     }
@@ -759,6 +861,22 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await MeteoFranceReader(domain: .arome_france, gridpoint: gridpoint, options: options)
         case .meteofrance_arome_france_hd, .arome_france_hd:
             return try await MeteoFranceReader(domain: .arome_france_hd, gridpoint: gridpoint, options: options)
+        case .meteofrance_seamless:
+            return nil
+        case .meteofrance_mix:
+            return nil
+        case .meteofrance_arpege_seamless:
+            return nil
+        case .meteofrance_arome_seamless:
+            return nil
+        case .meteofrance_arome_france_hd_15min:
+            return try await MeteoFranceReader(domain: .arome_france_hd_15min, gridpoint: gridpoint, options: options)
+        case .meteofrance_arome_france_15min:
+            return try await MeteoFranceReader(domain: .arome_france_15min, gridpoint: gridpoint, options: options)
+        case .arpege_seamless:
+            return nil
+        case .arome_seamless:
+            return nil
         case .icon_global:
             return try await IconReader(domain: .icon, gridpoint: gridpoint, options: options)
         case .icon_eu:
@@ -791,9 +909,83 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await CmaReader(domain: .grapes_global, gridpoint: gridpoint, options: options)
         case .bom_access_global:
             return try await BomReader(domain: .access_global, gridpoint: gridpoint, options: options)
-        case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
+        case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m, .arpae_cosmo_seamless:
             throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
-        default:
+        case .best_match:
+            return nil
+        case .gfs_seamless:
+            return nil
+        case .gfs_mix:
+            return nil
+        case .gfs_global:
+            return nil
+        case .ncep_nbm_conus:
+            return try await NbmReader(domain: .nbm_conus, gridpoint: gridpoint, options: options)
+        case .jma_seamless, .jma_mix:
+            return nil
+        case .jma_msm:
+            return try await JmaReader(domain: .msm, gridpoint: gridpoint, options: options)
+        case .jms_gsm, .jma_gsm:
+            return try await JmaReader(domain: .gsm, gridpoint: gridpoint, options: options)
+        case .gem_seamless:
+            return nil
+        case .icon_seamless, .icon_mix:
+            return nil
+        case .ecmwf_aifs025_single:
+            return try await EcmwfReader(domain: .aifs025_single, gridpoint: gridpoint, options: options)
+        case .archive_best_match:
+            return nil
+        case .era5_seamless:
+            return nil
+        case .era5_ensemble:
+            return nil
+        case .ecmwf_ifs_analysis:
+            return try await Era5Factory.makeReader(domain: .ecmwf_ifs_analysis, gridpoint: gridpoint, options: options)
+        case .ecmwf_ifs_analysis_long_window:
+            return try await Era5Factory.makeReader(domain: .ecmwf_ifs_analysis_long_window, gridpoint: gridpoint, options: options)
+        case .ecmwf_ifs_long_window:
+            return try await Era5Factory.makeReader(domain: .ecmwf_ifs_long_window, gridpoint: gridpoint, options: options)
+        case .knmi_harmonie_arome_europe:
+            return try await KnmiReader(domain: .harmonie_arome_europe, gridpoint: gridpoint, options: options)
+        case .knmi_harmonie_arome_netherlands:
+            return try await KnmiReader(domain: .harmonie_arome_netherlands, gridpoint: gridpoint, options: options)
+        case .dmi_harmonie_arome_europe:
+            return try await DmiReader(domain: .harmonie_arome_europe, gridpoint: gridpoint, options: options)
+        case .knmi_seamless:
+            return nil
+        case .dmi_seamless:
+            return nil
+        case .metno_seamless:
+            return nil
+        case .ukmo_seamless:
+            return nil
+        case .ukmo_global_deterministic_10km:
+            return try await UkmoReader(domain: .global_deterministic_10km, gridpoint: gridpoint, options: options)
+        case .ukmo_uk_deterministic_2km:
+            return try await UkmoReader(domain: .uk_deterministic_2km, gridpoint: gridpoint, options: options)
+        case .satellite_radiation_seamless:
+            return nil
+        case .eumetsat_sarah3:
+            return nil
+        case .eumetsat_lsa_saf_msg:
+            return nil
+        case .eumetsat_lsa_saf_iodc:
+            return nil
+        case .jma_jaxa_himawari:
+            return nil
+        case .kma_seamless:
+            return nil
+        case .kma_gdps:
+            return try await KmaReader(domain: .gdps, gridpoint: gridpoint, options: options)
+        case .kma_ldps:
+            return try await KmaReader(domain: .ldps, gridpoint: gridpoint, options: options)
+        case .italia_meteo_arpae_icon_2i:
+            return try await ItaliaMeteoArpaeReader(domain: .icon_2i, gridpoint: gridpoint, options: options)
+        case .meteoswiss_icon_ch1:
+            return try await MeteoSwissReader(domain: .icon_ch1, gridpoint: gridpoint, options: options)
+        case .meteoswiss_icon_ch2:
+            return try await MeteoSwissReader(domain: .icon_ch2, gridpoint: gridpoint, options: options)
+        case .meteoswiss_icon_seamless:
             return nil
         }
     }
