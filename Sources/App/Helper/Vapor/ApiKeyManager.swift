@@ -86,10 +86,10 @@ extension SocketAddress {
 }
 
 extension Request {
-    private func parseApiParams() throws -> ApiQueryParameter {
+    func parseApiParams() throws -> ApiQueryParameter {
         self.method == .POST ? try self.content.decode(ApiQueryParameter.self) : try self.query.decode(ApiQueryParameter.self)
     }
-    
+
     /// http or https
     fileprivate var scheme: String {
         return headers.first(name: "X-Forwarded-Proto") ?? url.scheme ?? "http"
