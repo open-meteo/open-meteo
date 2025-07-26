@@ -166,6 +166,14 @@ struct MeteoSwissDownload: AsyncCommand {
                                 }
                             }
                         }
+                        /// CIN is set to -1000 for missing data. This is really bad for compression. Typical ranges 0...250. Set it to -1 to mark missing data.
+                        if variable == .convective_inhibition {
+                            for i in array2d.data.indices {
+                                if array2d.data[i] == -1000 {
+                                    array2d.data[i] = -1
+                                }
+                            }
+                        }
                         if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
