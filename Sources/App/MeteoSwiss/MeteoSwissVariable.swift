@@ -5,7 +5,7 @@ import Foundation
  */
 enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownloadable, GenericVariableMixable {
     
-    
+    case temperature_2m
     //case albedo
     //case latent_heat_flux
     //case sensible_heat_flux
@@ -34,7 +34,6 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
     case snowfall_height
     case relative_humidity_2m
     
-    case temperature_2m
     //case temperature_2m_max
     //case temperature_2m_min
     case precipitation
