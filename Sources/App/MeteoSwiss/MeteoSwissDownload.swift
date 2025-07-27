@@ -142,29 +142,8 @@ struct MeteoSwissDownload: AsyncCommand {
                         guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
                             continue
                         }
-                        if [MeteoSwissSurfaceVariable.shortwave_radiation, .relative_humidity_2m].contains(variable) {
-                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
-                            continue
-                        }
                         if variable == .precipitation {
                             await storagePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
-                        }
-                        /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
-                        /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
-                        /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
-                        /// Note: snowfall height is NaN if snowfall height is at ground level
-                        if variable == .freezing_level_height || variable == .snowfall_height {
-                            guard let t2m = await storage.get(variable: .temperature_2m, timestamp: timestamp, member: member) else {
-                                fatalError("temperature 2m is required for adjusting freezing level height")
-                            }
-                            for i in array2d.data.indices {
-                                let freezingLevelHeight = array2d.data[i].isNaN ? max(0, domainElevation[i]) : array2d.data[i]
-                                let temperature_2m = t2m.data[i]
-                                let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
-                                if newHeight <= domainElevation[i] {
-                                    array2d.data[i] = newHeight
-                                }
-                            }
                         }
                         /// CIN is set to -1000 for missing data. This is really bad for compression. Typical ranges 0...250. Set it to -1 to mark missing data.
                         if variable == .convective_inhibition {
@@ -174,9 +153,24 @@ struct MeteoSwissDownload: AsyncCommand {
                                 }
                             }
                         }
-                        if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m].contains(variable) {
+                        
+                        if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m, .freezing_level_height, .snowfall_height, .shortwave_radiation, .relative_humidity_2m].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
+                            
+                            try await storage.correctIconSnowfallHeight(snowfallHeight: .snowfall_height, temperature2m: .temperature_2m, domainElevation: domainElevation, writer: writer)
+                            try await storage.correctIconSnowfallHeight(snowfallHeight: .freezing_level_height, temperature2m: .temperature_2m, domainElevation: domainElevation, writer: writer)
+                            
+                            /// Calculate global shortwave radiation from diffuse and direct components
+                            try await storage.sumUpRemovingBoth(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
+                            
+                            /// Calculate relative humidity from temperature and dew point
+                            try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
                         }
+                        
+                        if [MeteoSwissSurfaceVariable.freezing_level_height, .snowfall_height, .shortwave_radiation, .relative_humidity_2m].contains(variable) {
+                            continue
+                        }
+                        
                         logger.info("Processing \(variable) for \(timestamp.format_YYYYMMddHH) member \(member)")
                         try await writer.write(member: member, variable: variable, data: array2d.data)
                     }
@@ -191,11 +185,6 @@ struct MeteoSwissDownload: AsyncCommand {
                     )
                 }
             }
-            
-            /// Calculate global shortwave radiation from diffuse and direct components
-            try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
-            /// Calculate relative humidity from temperature and dew point
-            try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
             
             let completed = i == timestamps.count - 1
             let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
