@@ -54,24 +54,22 @@ extension VariablePerMemberStorage {
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
     /// Removes processed variables from `self.data`
     func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialMultistepWriter, trueNorth: [Float]? = nil) async throws {
-        
-        for uKey in data.keys {
-            guard uKey.variable == u else {
-                continue
-            }
-            let vKey = uKey.with(variable: v)
-            guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
-                continue
-            }
-            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-            try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outSpeedVariable, data: speed)
+        // Note: A for loop + remove is not thread safe due to reentrance issues
+        while
+            let uIndex = data.firstIndex(where: { $0.key.variable == u }),
+            let vIndex = data.firstIndex(where: { $0.key.variable == v && $0.key.timestamp == data[uIndex].key.timestamp && $0.key.member == data[uIndex].key.member}) {
+            let u = data.remove(at: uIndex)
+            let v = data.remove(at: vIndex)
+            
+            let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
+            try await writer.write(time: u.key.timestamp, member: u.key.member, variable: outSpeedVariable, data: speed)
 
             if let outDirectionVariable {
-                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+                var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
                 if let trueNorth {
                     direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                 }
-                try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outDirectionVariable, data: direction)
+                try await writer.write(time: u.key.timestamp, member: u.key.member, variable: outDirectionVariable, data: direction)
             }
         }
     }
@@ -80,24 +78,22 @@ extension VariablePerMemberStorage {
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
     /// Removes processed variables from `self.data`
     func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
-        
-        for uKey in data.keys {
-            guard uKey.variable == u && uKey.timestamp == writer.time else {
-                continue
-            }
-            let vKey = uKey.with(variable: v)
-            guard let v = data.removeValue(forKey: vKey), let u = data.removeValue(forKey: uKey) else {
-                continue
-            }
-            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-            try await writer.write(member: uKey.member, variable: outSpeedVariable, data: speed)
+        // Note: A for loop + remove is not thread safe due to reentrance issues
+        while
+            let uIndex = data.firstIndex(where: { $0.key.variable == u && $0.key.timestamp == writer.time}),
+            let vIndex = data.firstIndex(where: { $0.key.variable == v && $0.key.timestamp == writer.time && $0.key.member == data[uIndex].key.member}) {
+            let u = data.remove(at: uIndex)
+            let v = data.remove(at: vIndex)
+            
+            let speed = zip(u.value.data, v.value.data).map(Meteorology.windspeed)
+            try await writer.write(member: u.key.member, variable: outSpeedVariable, data: speed)
 
             if let outDirectionVariable {
-                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
+                var direction = Meteorology.windirectionFast(u: u.value.data, v: v.value.data)
                 if let trueNorth {
                     direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                 }
-                try await writer.write(member: uKey.member, variable: outDirectionVariable, data: direction)
+                try await writer.write(member: u.key.member, variable: outDirectionVariable, data: direction)
             }
         }
     }
@@ -137,25 +133,20 @@ extension VariablePerMemberStorage {
     /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
     /// Note: snowfall height is NaN if snowfall height is at ground level
     func correctIconSnowfallHeight(snowfallHeight: V, temperature2m: V, domainElevation: [Float], writer: OmSpatialTimestepWriter) async throws where V: GenericVariable {
-        for (key, t2m) in data {
-            guard
-                key.variable == temperature2m,
-                key.timestamp == writer.time,
-                let snowfallHeightIndex = data.firstIndex(where: { $0.key.variable == snowfallHeight && $0.key.timestamp == writer.time && $0.key.member == key.member })
-            else {
-                continue
-            }
-            var height = data.remove(at: snowfallHeightIndex).value
-            
+        // Note: A for loop + remove is not thread safe due to reentrance issues
+        while
+            let t2m = data.first(where: {$0.key.variable == temperature2m && $0.key.timestamp == writer.time}),
+            var height = data.removeValue(forKey: .init(variable: snowfallHeight, timestamp: writer.time, member: t2m.key.member))
+        {
             for i in height.data.indices {
                 let freezingLevelHeight = height.data[i].isNaN ? max(0, domainElevation[i]) : height.data[i]
-                let t = t2m.data[i]
+                let t = t2m.value.data[i]
                 let newHeight = freezingLevelHeight - abs(-1 * t) * 0.7 * 100
                 if newHeight <= domainElevation[i] {
                     height.data[i] = newHeight
                 }
             }
-            try await writer.write(member: key.member, variable: snowfallHeight, data: height.data)
+            try await writer.write(member: t2m.key.member, variable: snowfallHeight, data: height.data)
         }
     }
 
@@ -176,18 +167,15 @@ extension VariablePerMemberStorage {
     
     /// Sum up 2 variables, and remove them from storage
     func sumUpRemovingBoth(var1: V, var2: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        for (key, _) in data {
-            guard
-                key.variable == var1,
-                key.timestamp == writer.time,
-                let var2Index = data.firstIndex(where: { $0.key.variable == var2 && $0.key.timestamp == writer.time && $0.key.member == key.member }),
-                let var1 = data.removeValue(forKey: key)
-            else {
-                continue
-            }
-            let var2 = data.remove(at: var2Index).value
-            let sum = zip(var1.data, var2.data).map(+)
-            try await writer.write(member: key.member, variable: outVariable, data: sum)
+        // Note: A for loop + remove is not thread safe due to reentrance issues
+        while
+            let var1Index = data.firstIndex(where: {$0.key.variable == var1 && $0.key.timestamp == writer.time}),
+            let var2Index = data.firstIndex(where: {$0.key.variable == var2 && $0.key.timestamp == writer.time && $0.key.member == data[var1Index].key.member})
+        {
+            let var1 = data.remove(at: var1Index)
+            let var2 = data.remove(at: var2Index)
+            let sum = zip(var1.value.data, var2.value.data).map(+)
+            try await writer.write(member: var1.key.member, variable: outVariable, data: sum)
         }
     }
     
@@ -222,19 +210,15 @@ extension VariablePerMemberStorage {
         }
     }
     
-    /// Calculate relative humidity. Removed dewpoint from storage afterwards
+    /// Calculate relative humidity. Removed dew-point from storage afterwards
     func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        for (key, t2m) in data {
-            guard
-                key.variable == temperature,
-                key.timestamp == writer.time,
-                let dewpointIndex = data.firstIndex(where: { $0.key.variable == dewpoint && $0.key.timestamp == writer.time && $0.key.member == key.member })
-            else {
-                continue
-            }
-            let dewpoint = data.remove(at: dewpointIndex).value
-            let rh = zip(t2m.data, dewpoint.data).map(Meteorology.relativeHumidity)
-            try await writer.write(member: key.member, variable: outVariable, data: rh)
+        // Note: A for loop + remove is not thread safe due to reentrance issues
+        while
+            let t2m = data.first(where: {$0.key.variable == temperature && $0.key.timestamp == writer.time}),
+            var dewpoint = data.removeValue(forKey: .init(variable: dewpoint, timestamp: writer.time, member: t2m.key.member))
+        {
+            let rh = zip(t2m.value.data, dewpoint.data).map(Meteorology.relativeHumidity)
+            try await writer.write(member: t2m.key.member, variable: outVariable, data: rh)
         }
     }
 }
