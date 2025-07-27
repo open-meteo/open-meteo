@@ -138,8 +138,10 @@ extension VariablePerMemberStorage {
     /// Note: snowfall height is NaN if snowfall height is at ground level
     func correctIconSnowfallHeight(snowfallHeight: V, temperature2m: V, domainElevation: [Float], writer: OmSpatialTimestepWriter) async throws where V: GenericVariable {
         for (key, t2m) in data {
-            guard key.variable == temperature2m, key.timestamp == writer.time,
-                  let snowfallHeightIndex = data.firstIndex(where: { $0.key.variable == snowfallHeight && $0.key.timestamp == writer.time && $0.key.member == key.member })
+            guard
+                key.variable == temperature2m,
+                key.timestamp == writer.time,
+                let snowfallHeightIndex = data.firstIndex(where: { $0.key.variable == snowfallHeight && $0.key.timestamp == writer.time && $0.key.member == key.member })
             else {
                 continue
             }
@@ -152,8 +154,8 @@ extension VariablePerMemberStorage {
                 if newHeight <= domainElevation[i] {
                     height.data[i] = newHeight
                 }
-                try await writer.write(member: key.member, variable: snowfallHeight, data: height.data)
             }
+            try await writer.write(member: key.member, variable: snowfallHeight, data: height.data)
         }
     }
 
@@ -174,16 +176,17 @@ extension VariablePerMemberStorage {
     
     /// Sum up 2 variables, and remove them from storage
     func sumUpRemovingBoth(var1: V, var2: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        for (key, var1data) in data {
+        for (key, _) in data {
             guard
                 key.variable == var1,
                 key.timestamp == writer.time,
-                let var2Index = data.firstIndex(where: { $0.key.variable == var2 && $0.key.timestamp == writer.time && $0.key.member == key.member })
+                let var2Index = data.firstIndex(where: { $0.key.variable == var2 && $0.key.timestamp == writer.time && $0.key.member == key.member }),
+                let var1 = data.removeValue(forKey: key)
             else {
                 continue
             }
             let var2 = data.remove(at: var2Index).value
-            let sum = zip(var1data.data, var2.data).map(+)
+            let sum = zip(var1.data, var2.data).map(+)
             try await writer.write(member: key.member, variable: outVariable, data: sum)
         }
     }
