@@ -137,7 +137,8 @@ struct SyncCommand: AsyncCommand {
             // See: https://github.com/swift-server/async-http-client/issues/602
             let client = server.contains(".your-objectstorage.com") ? context.application.http1Client : context.application.dedicatedHttpClient
 
-            let curl = Curl(logger: logger, client: client, retryError4xx: false)
+            /// 2025-07-28 For whatever reason, the hetzner s3 storage returns 404 from time to time. Maybe updates are not perfectly atomic
+            let curl = Curl(logger: logger, client: client, retryError4xx: true)
             var lastPressureDownloadDate = Timestamp.now().with(hour: 0).add(days: -1)
 
             while true {
