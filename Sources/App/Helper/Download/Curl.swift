@@ -326,7 +326,7 @@ final class Curl: Sendable {
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
             // Start the download and wait for the header
-            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers, quiet: quiet)
+            let response = try await initiateDownload(url: url, range: range, minSize: minSize, deadline: deadline, nConcurrent: nConcurrent, quiet: quiet, waitAfterLastModifiedBeforeDownload: waitAfterLastModifiedBeforeDownload, headers: headers)
 
             // Retry failed file transfers after this point
             do {
