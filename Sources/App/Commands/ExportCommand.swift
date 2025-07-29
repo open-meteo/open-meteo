@@ -223,7 +223,7 @@ struct ExportCommand: AsyncCommand {
                 application: context.application,
                 file: "\(filePath)~",
                 domain: domain,
-                variable: signature.variable,
+                variables: signature.variable.split(separator: ",").map(String.init),
                 time: time,
                 compressionLevel: signature.compressionLevel,
                 //targetGridDomain: regriddingDomain,
@@ -428,7 +428,7 @@ struct ExportCommand: AsyncCommand {
         #endif
     }
 
-    func generateNetCdf(application: Application, file: String, domain: MultiDomains, variable: String, time: TimerangeDt, compressionLevel: Int?, /*targetGridDomain: TargetGridDomain?,*/ outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
+    func generateNetCdf(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, compressionLevel: Int?, /*targetGridDomain: TargetGridDomain?,*/ outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
         guard let genericDomain = domain.genericDomain else {
             fatalError("Export not supported for domain \(domain)")
         }
@@ -439,7 +439,7 @@ struct ExportCommand: AsyncCommand {
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) (\(time.prettyString()))")
         let ncFile = try NetCDF.create(path: file, overwriteExisting: true)
-        try ncFile.setAttribute("TITLE", "\(domain) \(variable)")
+        try ncFile.setAttribute("TITLE", "\(domain) \(variables.joined(separator: ", "))")
         let latDimension = try ncFile.createDimension(name: "LAT", length: grid.ny)
         let lonDimension = try ncFile.createDimension(name: "LON", length: grid.nx)
 
@@ -467,19 +467,73 @@ struct ExportCommand: AsyncCommand {
             let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
             let nTimeNormals = normalsCalculator.timeBins.count * 365
             let timeDimension = try ncFile.createDimension(name: "time", length: nTimeNormals)
-            var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
+            for variable in variables {
+                var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
+                if let compressionLevel, compressionLevel > 0 {
+                    try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
+                    try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, nTimeNormals])
+                }
+
+                logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
+
+                /*if let targetGridDomain {
+                    let targetDomain = targetGridDomain.genericDomain
+                    guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+                        fatalError("Could not read elevation file for domain \(targetDomain)")
+                    }
+                    for l in 0..<grid.count {
+                        let coords = grid.getCoordinates(gridpoint: l)
+                        let elevation = try await grid.readElevation(gridpoint: l, elevationFile: elevationFile)
+
+                        // Read data
+                        let reader = try await domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land, options: options)
+                        guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                            fatalError("Invalid variable \(variable)")
+                        }
+                        let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
+                        try ncVariable.write(normals, offset: [l / grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
+                        progress.add(time.count * 4)
+                    }
+                    progress.finish()
+                    return
+                }*/
+                // Loop over locations, read and write
+                for gridpoint in 0..<grid.count {
+                    // Read data
+                    guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                        fatalError("Could not create reader for domain \(domain)")
+                    }
+                    guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
+                        fatalError("Invalid variable \(variable)")
+                    }
+                    let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
+                    try ncVariable.write(normals, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
+                    progress.add(time.count * 4)
+                }
+                progress.finish()
+            }
+            return
+        }
+
+        let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
+        for variable in variables {
+            var ncVariable = try ncFile.createVariable(name: variable, type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
+
             if let compressionLevel, compressionLevel > 0 {
                 try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
-                try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, nTimeNormals])
+                try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, time.count])
             }
 
-            logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
+            logger.info("Writing data. Total raw size \((grid.count * time.count * 4).bytesHumanReadable)")
+            let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
 
+            /// Interpolate data from one grid to another and perform bias correction
             /*if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
                 guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
                 }
+
                 for l in 0..<grid.count {
                     let coords = grid.getCoordinates(gridpoint: l)
                     let elevation = try await grid.readElevation(gridpoint: l, elevationFile: elevationFile)
@@ -489,78 +543,28 @@ struct ExportCommand: AsyncCommand {
                     guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                         fatalError("Invalid variable \(variable)")
                     }
-                    let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
-                    try ncVariable.write(normals, offset: [l / grid.nx, l % grid.nx, 0], count: [1, 1, normals.count])
+                    try ncVariable.write(data.data, offset: [l / grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
                     progress.add(time.count * 4)
                 }
                 progress.finish()
                 return
             }*/
+
             // Loop over locations, read and write
             for gridpoint in 0..<grid.count {
                 // Read data
                 guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
                     fatalError("Could not create reader for domain \(domain)")
                 }
-                guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
-                    fatalError("Invalid variable \(variable)")
-                }
-                let normals = normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data), time: time, rainDayDistribution: rainDayDistribution ?? .end)
-                try ncVariable.write(normals, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, normals.count])
-                progress.add(time.count * 4)
-            }
-            progress.finish()
-            return
-        }
-
-        let timeDimension = try ncFile.createDimension(name: "time", length: time.count)
-        var ncVariable = try ncFile.createVariable(name: "data", type: Float.self, dimensions: [latDimension, lonDimension, timeDimension])
-
-        if let compressionLevel, compressionLevel > 0 {
-            try ncVariable.defineDeflate(enable: true, level: compressionLevel, shuffle: true)
-            try ncVariable.defineChunking(chunking: .chunked, chunks: [1, 1, time.count])
-        }
-
-        logger.info("Writing data. Total raw size \((grid.count * time.count * 4).bytesHumanReadable)")
-        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
-
-        /// Interpolate data from one grid to another and perform bias correction
-        /*if let targetGridDomain {
-            let targetDomain = targetGridDomain.genericDomain
-            guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
-                fatalError("Could not read elevation file for domain \(targetDomain)")
-            }
-
-            for l in 0..<grid.count {
-                let coords = grid.getCoordinates(gridpoint: l)
-                let elevation = try await grid.readElevation(gridpoint: l, elevationFile: elevationFile)
-
-                // Read data
-                let reader = try await domain.getReader(targetGridDomain: targetGridDomain, lat: coords.latitude, lon: coords.longitude, elevation: elevation.numeric, mode: .land, options: options)
                 guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                     fatalError("Invalid variable \(variable)")
                 }
-                try ncVariable.write(data.data, offset: [l / grid.nx, l % grid.nx, 0], count: [1, 1, time.count])
+                try ncVariable.write(data.data, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
                 progress.add(time.count * 4)
             }
+
             progress.finish()
-            return
-        }*/
-
-        // Loop over locations, read and write
-        for gridpoint in 0..<grid.count {
-            // Read data
-            guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
-                fatalError("Could not create reader for domain \(domain)")
-            }
-            guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
-                fatalError("Invalid variable \(variable)")
-            }
-            try ncVariable.write(data.data, offset: [gridpoint / grid.nx, gridpoint % grid.nx, 0], count: [1, 1, time.count])
-            progress.add(time.count * 4)
         }
-
-        progress.finish()
     }
 }
 
