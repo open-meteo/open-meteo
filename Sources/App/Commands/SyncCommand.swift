@@ -46,8 +46,11 @@ struct SyncCommand: AsyncCommand {
         @Option(name: "repeat-interval", help: "If set, check for new files every specified amount of minutes.")
         var repeatInterval: Int?
 
-        @Option(name: "concurrent", short: "c", help: "Number of concurrent file download. Default 4")
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent files per model download. Default 2")
         var concurrent: Int?
+        
+        @Option(name: "concurrent-models", short: "c", help: "Number of concurrent models to download. Default 2")
+        var concurrentModels: Int?
 
         @Option(name: "data-directory-max-size-gb", help: "Trim data directory to the specified target size in gigabyte GB")
         var dataDirectoryMaxSize: Int?
@@ -96,7 +99,8 @@ struct SyncCommand: AsyncCommand {
         let variablesSet = variablesSetA.count != serverSet.count ? [[String]](repeating: variablesSetA[0], count: serverSet.count) : variablesSetA
 
         let pastDays = signature.pastDays ?? 7
-        let concurrent = signature.concurrent ?? 4
+        let concurrent = signature.concurrent ?? 2
+        let concurrentModels = signature.concurrentModels ?? 2
 
         /// Select all files that contain data within a range of years
         let yearRange = signature.year.map { yearStr in
@@ -113,6 +117,14 @@ struct SyncCommand: AsyncCommand {
             return Timestamp(year, 1, 1) ..< Timestamp(year + 1, 1, 1)
         }
         
+        if let yearRange {
+            let start = yearRange.lowerBound.toComponents().year
+            let end = yearRange.upperBound.toComponents().year - 1
+            logger.info("Checking for files within year \(start)-\(end)")
+        } else {
+            logger.info("Checking for files to with more than \(pastDays) past days data")
+        }
+        
         let serverModelVariable: [(server: String, model: DomainRegistry, variables: [String])] = zip(serverSet, zip(modelsSet, variablesSet)).flatMap { server, arg1 -> [(server: String, model: DomainRegistry, variables: [String])] in
             let (models, variablesSig) = arg1
             
@@ -123,113 +135,119 @@ struct SyncCommand: AsyncCommand {
         }.grouped(by: { $0.server }).flatMap( { $0.value })
 
         /// Download from each server concurrently
-        await serverModelVariable.foreachConcurrent(nConcurrent: serverModelVariable.count) { (server, model, variablesSig) in
-            //let (models, variablesSig) = arg1
-            /// Undocumented switch to download all weather variables. This can generate immense traffic!
-            let downloadAllVariables = variablesSig.contains("really_download_all_variables")
-            let downloadAllButPressureOncePerDay = variablesSig.contains("really_download_all_but_pressure_once_per_day")
-            let downloadAllPreviousDay = variablesSig.contains("really_download_all_previous_day")
-            let downloadAllPressureLevel = variablesSig.contains("really_download_all_pressure_levels")
-            let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
-            let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
-            
-            // Note: Ceph S3 has issues with HTTP2 and API actions with empty body payloads. Fallback to HTTP1.1
-            // See: https://github.com/swift-server/async-http-client/issues/602
-            let client = server.contains(".your-objectstorage.com") ? context.application.http1Client : context.application.dedicatedHttpClient
-
-            /// 2025-07-28 For whatever reason, the hetzner s3 storage returns 404 from time to time. Maybe updates are not perfectly atomic
-            let curl = Curl(logger: logger, client: client, retryError4xx: true)
-            var lastPressureDownloadDate = Timestamp.now().with(hour: 0).add(days: -1)
-
+        try await serverModelVariable.chunks(ofCount: serverModelVariable.count / concurrentModels).foreachConcurrent(nConcurrent: serverModelVariable.count) {
             while true {
+                var lastPressureDownloadDate = Timestamp.now().with(hour: 0).add(days: -1)
                 /// Used for `really_download_all_but_pressure_once_per_day` to download pressure data only once per day
                 let downloadPressureNow = lastPressureDownloadDate != Timestamp.now().with(hour: 0)
-                do {
-                    if let yearRange {
-                        let start = yearRange.lowerBound.toComponents().year
-                        let end = yearRange.upperBound.toComponents().year - 1
-                        logger.info("Checking for files within year \(start)-\(end)")
-                    } else {
-                        logger.info("Checking for files to with more than \(pastDays) past days data")
+                for (server, model, variablesSig) in $0 {
+                    do {
+                        try await syncModel(
+                            application: context.application,
+                            concurrent: concurrent,
+                            server: server,
+                            model: model,
+                            variablesSig: variablesSig,
+                            yearRange: yearRange,
+                            pastDays: pastDays,
+                            apikey: signature.apikey,
+                            downloadPressureNow: downloadPressureNow
+                        )
+                    } catch {
+                        logger.critical("Error during sync \(error)")
+                        fatalError()
                     }
-
-                    let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
-
-                    /// Get a list of all variables from all models
-                    let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: signature.apikey, deadLineHours: 0.1).directories
-
-                    /// Filter variables to download
-                    let toDownload: [S3DataController.S3ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3DataController.S3ListV2File] in
-                        guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
-                            fatalError("could not get variable from string")
-                        }
-                        let variable = remoteDirectory[remoteDirectory.index(after: variablePos)..<remoteDirectory.index(before: remoteDirectory.endIndex)]
-                        let isPreviousDay = variable.contains("_previous_day")
-                        let isPressureLevel = variable.contains("hPa")
-                        let isSurface = !isPressureLevel && !variable.contains("_previous_day")
-                        guard downloadAllVariables ||
-                                (downloadAllButPressureOncePerDay && (!isPressureLevel || downloadPressureNow)) ||
-                                (downloadAllPressureLevel && isPressureLevel) ||
-                                (downloadAllSurface && isSurface) ||
-                                (downloadAllPreviousDay && isPreviousDay) ||
-                                variables.contains(where: { $0 == variable }) else {
-                            return []
-                        }
-                        let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: signature.apikey, deadLineHours: 0.1)
-                        let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
-                        return Array(filtered)
-                    }.flatMap({$0})
-
-                    /// Download all files
-                    let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
-                    logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
-                    let progress = TransferAmountTrackerActor(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
-                    let curlStartBytes = await curl.totalBytesTransfered.bytes
-                    try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
-                        var client = ClientRequest(url: URI("\(server)\(download.name)"))
-                        if signature.apikey != nil || signature.rate != nil {
-                            try client.query.encode(S3DataController.DownloadParams(apikey: signature.apikey, rate: signature.rate))
-                        }
-                        let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
-                        let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
-                        let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
-                        try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
-                        // Another process might be updating this file right now. E.g. Second sync operation
-                        FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
-                        if localFile.hasSuffix("/meta.json") {
-                            /// Update the `last_run_availability_time` within meta.json
-                            try await curl
-                                .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
-                                .readJSONDecodable(ModelUpdateMetaJson.self)?
-                                .with(last_run_availability_time: .now())
-                                .writeTo(path: localFile)
-                        } else {
-                            try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
-                        }
-                        await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
-                    }
-                    await progress.finish()
-
-                    guard let repeatInterval = signature.repeatInterval else {
-                        break
-                    }
-
-                    if let dataDirectoryMaxSize = signature.dataDirectoryMaxSize, dataDirectoryMaxSize > 0 {
-                        try cacheDirectoryCleanup(logger: logger, cacheDirectory: OpenMeteo.dataDirectory, maxSize: dataDirectoryMaxSize * 1 << 30, execute: signature.execute)
-                    }
-
-                    logger.info("Repeat in \(repeatInterval) minutes")
-                    try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
-                } catch {
-                    logger.critical("Error during sync \(error)")
-                    fatalError()
                 }
                 if downloadPressureNow {
                     lastPressureDownloadDate = Timestamp.now().with(hour: 0)
                 }
+                guard let repeatInterval = signature.repeatInterval else {
+                    break
+                }
+                logger.info("Repeat in \(repeatInterval) minutes for models \($0.map(\.model.rawValue).joined(separator: ","))")
+                try await Task.sleep(nanoseconds: UInt64(repeatInterval * 60_000_000_000))
             }
-            await curl.printStatistics()
         }
+    }
+    
+    func syncModel(application: Application, concurrent: Int, server: String, model: DomainRegistry, variablesSig: [String], yearRange: Range<Timestamp>?, pastDays: Int, apikey: String?, downloadPressureNow: Bool) async throws {
+        let logger = application.logger
+        
+        /// Undocumented switch to download all weather variables. This can generate immense traffic!
+        let downloadAllVariables = variablesSig.contains("really_download_all_variables")
+        let downloadAllButPressureOncePerDay = variablesSig.contains("really_download_all_but_pressure_once_per_day")
+        let downloadAllPreviousDay = variablesSig.contains("really_download_all_previous_day")
+        let downloadAllPressureLevel = variablesSig.contains("really_download_all_pressure_levels")
+        let downloadAllSurface = variablesSig.contains("really_download_all_surface_levels")
+        let variables = downloadAllPreviousDay ? Self.previousDayVariables : variablesSig
+        
+        // Note: Ceph S3 has issues with HTTP2 and API actions with empty body payloads. Fallback to HTTP1.1
+        // See: https://github.com/swift-server/async-http-client/issues/602
+        let client = server.contains(".your-objectstorage.com") ? application.http1Client : application.dedicatedHttpClient
+        
+        /// 2025-07-28 For whatever reason, the hetzner s3 storage returns 404 from time to time. Maybe updates are not perfectly atomic
+        let curl = Curl(logger: logger, client: client, retryError4xx: true)
+        
+        let timeRange = yearRange ?? Timestamp.now().add(-24 * 3600 * pastDays) ..< Timestamp(2200, 1, 1)
+        
+        /// Get a list of all variables from all models
+        let remoteDirectories = try await curl.s3list(server: server, prefix: "data/\(model.rawValue)/", apikey: apikey, deadLineHours: 0.1).directories
+        
+        /// Filter variables to download
+        let toDownload: [S3DataController.S3ListV2File] = try await remoteDirectories.mapConcurrent(nConcurrent: concurrent) { remoteDirectory -> [S3DataController.S3ListV2File] in
+            guard let variablePos = remoteDirectory.dropLast().lastIndex(of: "/") else {
+                fatalError("could not get variable from string")
+            }
+            let variable = remoteDirectory[remoteDirectory.index(after: variablePos)..<remoteDirectory.index(before: remoteDirectory.endIndex)]
+            let isPreviousDay = variable.contains("_previous_day")
+            let isPressureLevel = variable.contains("hPa")
+            let isSurface = !isPressureLevel && !variable.contains("_previous_day")
+            guard downloadAllVariables ||
+                    (downloadAllButPressureOncePerDay && (!isPressureLevel || downloadPressureNow)) ||
+                    (downloadAllPressureLevel && isPressureLevel) ||
+                    (downloadAllSurface && isSurface) ||
+                    (downloadAllPreviousDay && isPreviousDay) ||
+                    variables.contains(where: { $0 == variable }) else {
+                return []
+            }
+            let remote = try await curl.s3list(server: server, prefix: remoteDirectory, apikey: apikey, deadLineHours: 0.1)
+            let filtered = remote.files.includeFiles(timeRange: timeRange, domain: model).includeFiles(compareLocalDirectory: OpenMeteo.dataDirectory)
+            return Array(filtered)
+        }.flatMap({$0})
+        
+        guard toDownload.count > 0 else {
+            return
+        }
+        
+        let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
+        logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
+        let progress = TransferAmountTrackerActor(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
+        let curlStartBytes = await curl.totalBytesTransfered.bytes
+        try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
+            var client = ClientRequest(url: URI("\(server)\(download.name)"))
+            if apikey != nil {
+                try client.query.encode(S3DataController.DownloadParams(apikey: apikey, rate: nil))
+            }
+            let pathNoData = download.name[download.name.index(download.name.startIndex, offsetBy: 5)..<download.name.endIndex]
+            let localFile = "\(OpenMeteo.dataDirectory)/\(pathNoData)"
+            let localDir = String(localFile[localFile.startIndex ..< localFile.lastIndex(of: "/")!])
+            try FileManager.default.createDirectory(atPath: localDir, withIntermediateDirectories: true)
+            // Another process might be updating this file right now. E.g. Second sync operation
+            FileManager.default.waitIfFileWasRecentlyModified(at: "\(localFile)~", waitTimeMinutes: 1)
+            if localFile.hasSuffix("/meta.json") {
+                /// Update the `last_run_availability_time` within meta.json
+                try await curl
+                    .downloadInMemoryAsync(url: client.url.string, minSize: nil, deadLineHours: 0.1)
+                    .readJSONDecodable(ModelUpdateMetaJson.self)?
+                    .with(last_run_availability_time: .now())
+                    .writeTo(path: localFile)
+            } else {
+                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+            }
+            await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
+        }
+        await progress.finish()
+        await curl.printStatistics()
     }
 
     /**
@@ -407,7 +425,7 @@ fileprivate extension Curl {
         var request = ClientRequest(method: .GET, url: URI("\(server)"))
         let params = S3DataController.S3ListV2(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey)
         try request.query.encode(params)
-        var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours)
+        var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours, quiet: true)
         guard let body = response.readString(length: response.readableBytes) else {
             return ([], [])
         }
