@@ -93,6 +93,14 @@ struct MeteoSwissDownload: AsyncCommand {
         
         let timestamps = (0...domain.forecastLength).map { run.add(hours: $0) }
         
+        /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read(range: nil) else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
+        
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
@@ -134,16 +142,35 @@ struct MeteoSwissDownload: AsyncCommand {
                         guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &array2d) else {
                             continue
                         }
-                        if [MeteoSwissSurfaceVariable.shortwave_radiation, .relative_humidity_2m].contains(variable) {
-                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
-                            continue
-                        }
                         if variable == .precipitation {
                             await storagePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
-                        if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m].contains(variable) {
-                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
+                        /// CIN is set to -1000 for missing data. This is really bad for compression. Typical ranges 0...250. Set it to -1 to mark missing data.
+                        if variable == .convective_inhibition {
+                            for i in array2d.data.indices {
+                                if array2d.data[i] <= -999 {
+                                    array2d.data[i] = -1
+                                }
+                            }
                         }
+                        
+                        if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m, .freezing_level_height, .snowfall_height, .shortwave_radiation, .relative_humidity_2m].contains(variable) {
+                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
+                            
+                            try await storage.correctIconSnowfallHeight(snowfallHeight: .snowfall_height, temperature2m: .temperature_2m, domainElevation: domainElevation, writer: writer)
+                            try await storage.correctIconSnowfallHeight(snowfallHeight: .freezing_level_height, temperature2m: .temperature_2m, domainElevation: domainElevation, writer: writer)
+                            
+                            /// Calculate global shortwave radiation from diffuse and direct components
+                            try await storage.sumUpRemovingBoth(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
+                            
+                            /// Calculate relative humidity from temperature and dew point
+                            try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
+                        }
+                        
+                        if [MeteoSwissSurfaceVariable.freezing_level_height, .snowfall_height, .shortwave_radiation, .relative_humidity_2m].contains(variable) {
+                            continue
+                        }
+                        
                         logger.info("Processing \(variable) for \(timestamp.format_YYYYMMddHH) member \(member)")
                         try await writer.write(member: member, variable: variable, data: array2d.data)
                     }
@@ -158,11 +185,6 @@ struct MeteoSwissDownload: AsyncCommand {
                     )
                 }
             }
-            
-            /// Calculate global shortwave radiation from diffuse and direct components
-            try await storage.sumUp(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
-            /// Calculate relative humidity from temperature and dew point
-            try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
             
             let completed = i == timestamps.count - 1
             let handles = try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])

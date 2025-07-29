@@ -193,22 +193,6 @@ extension KmaDomain {
     }
 }
 
-extension VariablePerMemberStorage {
-    /// Sum up 2 variables
-    func sumUp(var1: V, var2: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        for (t, handles) in self.data
-            .groupedPreservedOrder(by: { $0.key.timestampAndMember }){
-            guard
-                t.timestamp == writer.time,
-                let var1 = handles.first(where: { $0.key.variable == var1 }),
-                let var2 = handles.first(where: { $0.key.variable == var2 }) else {
-                continue
-            }
-            let sum = zip(var1.value.data, var2.value.data).map(+)
-            try await writer.write(member: t.member, variable: outVariable, data: sum)
-        }
-    }
-}
 
 protocol KmaVariableDownloadable {
     func getKmaName(domain: KmaDomain) -> String?

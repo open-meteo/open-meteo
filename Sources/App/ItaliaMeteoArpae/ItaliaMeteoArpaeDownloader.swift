@@ -151,7 +151,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
 
                 /// Calculate 10m wind
                 if v.variable == .V_10M {
-                    guard let uWind = await inMemory.getAndForget(.init(variable: .init(variable: .U_10M, level: v.level), timestamp: time, member: member)) else {
+                    guard let uWind = await inMemory.remove(.init(variable: .init(variable: .U_10M, level: v.level), timestamp: time, member: member)) else {
                         fatalError("U_10M must be loaded before \(v.variable)")
                     }
                     let vWind = array2d.array
@@ -163,7 +163,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
 
                 /// Calculate pressure level wind
                 if v.variable == .V {
-                    guard let uWind = await inMemory.getAndForget(.init(variable: .init(variable: .U, level: v.level), timestamp: time, member: member)) else {
+                    guard let uWind = await inMemory.remove(.init(variable: .init(variable: .U, level: v.level), timestamp: time, member: member)) else {
                         fatalError("U wind must be loaded before \(v.variable)")
                     }
                     let vWind = array2d.array
