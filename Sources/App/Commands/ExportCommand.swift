@@ -176,8 +176,8 @@ struct ExportCommand: AsyncCommand {
 
     func run(using context: CommandContext, signature: Signature) async throws {
         let logger = context.application.logger
-        let domain = try ExportDomain.load(rawValue: signature.domain)
-        let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
+        let domain = try MultiDomains.load(rawValue: signature.domain)
+        //let regriddingDomain = try TargetGridDomain.load(rawValueOptional: signature.regriddingDomain)
         let format = try ExportFormat.load(rawValueOptional: signature.format) ?? .netcdf
         disableIdleSleep()
 
@@ -208,7 +208,11 @@ struct ExportCommand: AsyncCommand {
         try ncVariable.write(data)
         return*/
 
-        guard let time = try signature.getTime(dtSeconds: domain.genericDomain.dtSeconds) else {
+        guard let genericDomain = domain.genericDomain else {
+            fatalError("Export not supported for domain \(domain)")
+        }
+        
+        guard let time = try signature.getTime(dtSeconds: genericDomain.dtSeconds) else {
             fatalError("start_date and end_date must be specified")
         }
         logger.info("Exporing variable \(signature.variable) for dataset \(domain) to file '\(filePath)'")
@@ -222,7 +226,7 @@ struct ExportCommand: AsyncCommand {
                 variable: signature.variable,
                 time: time,
                 compressionLevel: signature.compressionLevel,
-                targetGridDomain: regriddingDomain,
+                //targetGridDomain: regriddingDomain,
                 outputCoordinates: signature.outputCoordinates,
                 outputElevation: signature.outputElevation,
                 normals: signature.normalsYears.map { ($0.split(separator: ",").map({ Int($0)! }), signature.normalsWith ?? 10) },
@@ -237,7 +241,7 @@ struct ExportCommand: AsyncCommand {
                 variables: signature.variable.split(separator: ",").map(String.init),
                 time: time,
                 // compressionLevel: signature.compressionLevel,
-                targetGridDomain: regriddingDomain,
+                //targetGridDomain: regriddingDomain,
                 // outputCoordinates: signature.outputCoordinates,
                 // outputElevation: signature.outputElevation,
                 normals: signature.normalsYears.map { ($0.split(separator: ",").map({ Int($0)! }), signature.normalsWith ?? 10) },
@@ -249,13 +253,17 @@ struct ExportCommand: AsyncCommand {
         }
     }
 
-    func generateParquet(application: Application, file: String, domain: ExportDomain, variables: [String], time: TimerangeDt, targetGridDomain: TargetGridDomain?, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?) async throws {
+    func generateParquet(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, /*targetGridDomain: TargetGridDomain?,*/ normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?) async throws {
         #if ENABLE_PARQUET
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
+        
+        guard let genericDomain = domain.genericDomain else {
+            fatalError("Export not supported for domain \(domain)")
+        }
 
-        let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
+        let grid = /*targetGridDomain?.genericDomain.grid ??*/ genericDomain.grid
         let writer = BufferedParquetFileWriter(file: file)
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
@@ -269,7 +277,7 @@ struct ExportCommand: AsyncCommand {
             let timestamps64 = normals.years.flatMap { TimerangeDt(start: Timestamp($0, 1, 1), nTime: 365, dtSeconds: 24 * 3600).map({ Int64($0.timeIntervalSince1970) }) }
             logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
 
-            if let targetGridDomain {
+            /*if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
                 guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
@@ -308,14 +316,16 @@ struct ExportCommand: AsyncCommand {
                 try writer.flush(closeFile: true)
                 progress.finish()
                 return
-            }
+            }*/
             // Loop over locations, read and write
-            guard let elevationFile = await domain.genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+            guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(domain)")
             }
             for gridpoint in 0..<grid.count {
                 // Read data
-                let reader = try await domain.getReader(position: gridpoint, options: options)
+                guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                    fatalError("Could not get reader for domain \(domain)")
+                }
                 let coords = grid.getCoordinates(gridpoint: gridpoint)
                 if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
                     continue
@@ -346,7 +356,7 @@ struct ExportCommand: AsyncCommand {
         let timestamps64 = time.map({ Int64($0.timeIntervalSince1970) })
 
         /// Interpolate data from one grid to another and perform bias correction
-        if let targetGridDomain {
+        /*if let targetGridDomain {
             let targetDomain = targetGridDomain.genericDomain
             guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
@@ -379,15 +389,17 @@ struct ExportCommand: AsyncCommand {
             try writer.flush(closeFile: true)
             progress.finish()
             return
-        }
+        }*/
 
         // Loop over locations, read and write
-        guard let elevationFile = await domain.genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
             fatalError("Could not read elevation file for domain \(domain)")
         }
         for gridpoint in 0..<grid.count {
             // Read data
-            let reader = try await domain.getReader(position: gridpoint, options: options)
+            guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                fatalError("Could not create reader for domain \(domain)")
+            }
             let coords = grid.getCoordinates(gridpoint: gridpoint)
             if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
                 continue
@@ -416,8 +428,11 @@ struct ExportCommand: AsyncCommand {
         #endif
     }
 
-    func generateNetCdf(application: Application, file: String, domain: ExportDomain, variable: String, time: TimerangeDt, compressionLevel: Int?, targetGridDomain: TargetGridDomain?, outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
-        let grid = targetGridDomain?.genericDomain.grid ?? domain.grid
+    func generateNetCdf(application: Application, file: String, domain: MultiDomains, variable: String, time: TimerangeDt, compressionLevel: Int?, /*targetGridDomain: TargetGridDomain?,*/ outputCoordinates: Bool, outputElevation: Bool, normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?) async throws {
+        guard let genericDomain = domain.genericDomain else {
+            fatalError("Export not supported for domain \(domain)")
+        }
+        let grid = genericDomain.grid //targetGridDomain?.genericDomain.grid ?? domain.grid
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
@@ -439,7 +454,7 @@ struct ExportCommand: AsyncCommand {
         if outputElevation {
             logger.info("Writing elevation information")
             var ncElevation = try ncFile.createVariable(name: "elevation", type: Float.self, dimensions: [latDimension, lonDimension])
-            let targetDomain = targetGridDomain?.genericDomain ?? domain.genericDomain
+            let targetDomain = /*targetGridDomain?.genericDomain ??*/ domain.genericDomain!
             guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
             }
@@ -460,7 +475,7 @@ struct ExportCommand: AsyncCommand {
 
             logger.info("Calculating daily normals. years=\(normals.years) width=\(normals.width) years. Total raw size \((grid.count * nTimeNormals * 4).bytesHumanReadable)")
 
-            if let targetGridDomain {
+            /*if let targetGridDomain {
                 let targetDomain = targetGridDomain.genericDomain
                 guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                     fatalError("Could not read elevation file for domain \(targetDomain)")
@@ -480,11 +495,13 @@ struct ExportCommand: AsyncCommand {
                 }
                 progress.finish()
                 return
-            }
+            }*/
             // Loop over locations, read and write
             for gridpoint in 0..<grid.count {
                 // Read data
-                let reader = try await domain.getReader(position: gridpoint, options: options)
+                guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                    fatalError("Could not create reader for domain \(domain)")
+                }
                 guard let data = try await reader.get(mixed: variable, time: time.toSettings())?.data else {
                     fatalError("Invalid variable \(variable)")
                 }
@@ -508,7 +525,7 @@ struct ExportCommand: AsyncCommand {
         let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4, name: "Processed")
 
         /// Interpolate data from one grid to another and perform bias correction
-        if let targetGridDomain {
+        /*if let targetGridDomain {
             let targetDomain = targetGridDomain.genericDomain
             guard let elevationFile = await targetDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
                 fatalError("Could not read elevation file for domain \(targetDomain)")
@@ -528,12 +545,14 @@ struct ExportCommand: AsyncCommand {
             }
             progress.finish()
             return
-        }
+        }*/
 
         // Loop over locations, read and write
         for gridpoint in 0..<grid.count {
             // Read data
-            let reader = try await domain.getReader(position: gridpoint, options: options)
+            guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                fatalError("Could not create reader for domain \(domain)")
+            }
             guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
                 fatalError("Invalid variable \(variable)")
             }
@@ -699,7 +718,7 @@ struct DailyNormalsCalculator {
     }
 }
 
-enum TargetGridDomain: String, CaseIterable {
+/*enum TargetGridDomain: String, CaseIterable {
     /// interpolates weights to 10 km, uses elevation information from era5 land
     case era5_interpolated_10km
     case era5_land
@@ -713,14 +732,14 @@ enum TargetGridDomain: String, CaseIterable {
             return SatelliteDomain.imerg_daily
         }
     }
-}
+}*/
 
 enum ExportFormat: String, RawRepresentableString, CaseIterable {
     case netcdf
     case parquet
 }
 
-enum ExportDomain: String, CaseIterable {
+/*enum ExportDomain: String, CaseIterable {
     case CMCC_CM2_VHR4
     case FGOALS_f3_H
     case HiRAM_SIT_HR
@@ -882,4 +901,4 @@ enum ExportDomain: String, CaseIterable {
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         }
     }
-}
+}*/

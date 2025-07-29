@@ -803,7 +803,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .archive_best_match:
             return nil
         case .era5_seamless, .copernicus_era5_seamless:
-            return nil
+            return CdsDomain.era5_land
         case .era5_ensemble, .copernicus_era5_ensemble:
             return CdsDomain.era5_ensemble
         case .ecmwf_ifs_analysis:
@@ -960,7 +960,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .archive_best_match:
             return nil
         case .era5_seamless, .copernicus_era5_seamless:
-            return nil
+            let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, position: gridpoint, options: options)
+            guard
+                let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
+            else {
+                // Not possible
+                throw ForecastapiError.noDataAvilableForThisLocation
+            }
+            return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         case .era5_ensemble, .copernicus_era5_ensemble:
             return try await Era5Factory.makeReader(domain: .era5_ensemble, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs_analysis:
