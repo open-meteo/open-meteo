@@ -86,8 +86,12 @@ extension Gridable {
             return .noData
         }
         if elevation <= -999 {
-            // sea gtid point
+            // sea grid point
             return .sea
+        }
+        if elevation >= 9999 {
+            // land, but no data
+            return .noData
         }
         return .elevation(elevation)
     }
@@ -100,8 +104,12 @@ extension Gridable {
         }
         // Due to interpolation, -999 is not clearly sea
         if elevation <= -50 {
-            // sea gtid point
+            // sea grid point
             return .sea
+        }
+        if elevation >= 9000 {
+            // land, but no data
+            return .noData
         }
         return .elevation(elevation)
     }
@@ -209,6 +217,10 @@ extension Gridable {
         }
         if elevationSurrounding[minPos] <= -999 {
             return (gridpoint, .sea)
+        }
+        if elevationSurrounding[minPos] >= 9999 {
+            /// 9999 marks land points in satellite datasets
+            return (gridpoint, .noData)
         }
         return (gridpoint, .elevation(elevationSurrounding[minPos]))
     }
