@@ -129,6 +129,23 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         guard let nc = try NetCDF.open(memory: data) else {
             fatalError("Could not open netcdf from memory")
         }
+        
+        // Generate surface elevation file if does not exist
+        let surfaceElevationFileOm = domain.surfaceElevationFileOm
+        if !surfaceElevationFileOm.exists() {
+            guard let qc = try nc.getVariable(name: "quality_flag")?.asType(UInt8.self)?.read() else {
+                fatalError("Could not open quality_flag")
+            }
+            // qc = 0 is sea, 255 outside domain
+            // Mark sea grid cells as -999 and land as 9999
+            var elevation: [Float] = qc.map {
+                $0 == 255 ? .nan : $0 == 0 ? -999 : 9999
+            }
+            elevation.flipLatitude(nt: 1, ny: ny, nx: nx)
+            try surfaceElevationFileOm.createDirectory()
+            try elevation.writeOmFile2D(file: surfaceElevationFileOm.getFilePath(), grid: domain.grid)
+        }
+        
         guard var shortwave_radiation = try nc.getVariable(name: "DSSF_TOT")?.readAndScale() else {
             fatalError("Could not open variable DSSF_TOT")
         }
