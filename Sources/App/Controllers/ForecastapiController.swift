@@ -841,13 +841,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .satellite_radiation_seamless:
             return nil
         case .eumetsat_sarah3:
-            return nil
+            return EumetsatSarahDomain.sarah3_30min
         case .eumetsat_lsa_saf_msg:
-            return nil
+            return EumetsatLsaSafDomain.msg
         case .eumetsat_lsa_saf_iodc:
-            return nil
+            return EumetsatLsaSafDomain.iodc
         case .jma_jaxa_himawari:
-            return nil
+            return JaxaHimawariDomain.himawari_10min
         case .kma_seamless:
             return nil
         case .kma_gdps:
@@ -997,13 +997,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .satellite_radiation_seamless:
             return nil
         case .eumetsat_sarah3:
-            return nil
+            return try await EumetsatSarahReader(domain: .sarah3_30min, gridpoint: gridpoint, options: options)
         case .eumetsat_lsa_saf_msg:
-            return nil
+            return try await EumetsatLsaSafReader(domain: .msg, gridpoint: gridpoint, options: options)
         case .eumetsat_lsa_saf_iodc:
-            return nil
+            return try await EumetsatLsaSafReader(domain: .iodc, gridpoint: gridpoint, options: options)
         case .jma_jaxa_himawari:
-            return nil
+            return try await JaxaHimawariReader(domain: .himawari_10min, gridpoint: gridpoint, options: options)
         case .kma_seamless:
             return nil
         case .kma_gdps:
