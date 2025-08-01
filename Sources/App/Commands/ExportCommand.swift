@@ -148,6 +148,9 @@ struct ExportCommand: AsyncCommand {
 
         @Option(name: "longitude-bounds")
         var longitudeBounds: String?
+        
+        @Flag(name: "only-full-bounding-box", help: "The entire domain must cover the bounding box. Otherwise cancel.")
+        var onlyFullBoundingBox: Bool
 
         @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
         var outputFilename: String?
@@ -260,16 +263,24 @@ struct ExportCommand: AsyncCommand {
                 longitudeBounds: longitudeBounds,
                 onlySeaAroundSearchRadius: signature.ignoreSea ? (signature.ignoreSeaSearchRadius ?? 0) : nil,
                 concurrent: signature.concurrent ?? 8,
-                concurrentChunksLength: signature.concurrentChunksLength ?? 100
+                concurrentChunksLength: signature.concurrentChunksLength ?? 100,
+                onlyFullBoundingBox: signature.onlyFullBoundingBox
             )
         }
     }
 
-    func generateParquet(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, /*targetGridDomain: TargetGridDomain?,*/ normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?, concurrent: Int, concurrentChunksLength: Int) async throws {
+    func generateParquet(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, /*targetGridDomain: TargetGridDomain?,*/ normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?, concurrent: Int, concurrentChunksLength: Int, onlyFullBoundingBox: Bool) async throws {
         #if ENABLE_PARQUET
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
+        
+        let variables = variables.map {
+            guard let variable = ForecastVariable(rawValue: $0) else {
+                fatalError("Could not parse variable name \($0)")
+            }
+            return variable
+        }
         
         guard let genericDomain = domain.genericDomain else {
             fatalError("Export not supported for domain \(domain)")
@@ -281,6 +292,18 @@ struct ExportCommand: AsyncCommand {
 
         guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
             fatalError("Could not read elevation file for domain \(domain)")
+        }
+        
+        if onlyFullBoundingBox, let latitudeBounds, let longitudeBounds {
+            guard
+                grid.findPoint(lat: latitudeBounds.lowerBound, lon: longitudeBounds.lowerBound) != nil,
+                grid.findPoint(lat: latitudeBounds.lowerBound, lon: longitudeBounds.upperBound) != nil,
+                grid.findPoint(lat: latitudeBounds.upperBound, lon: longitudeBounds.lowerBound) != nil,
+                grid.findPoint(lat: latitudeBounds.upperBound, lon: longitudeBounds.upperBound) != nil
+            else {
+                logger.info("Grid does not cover the entire bounding box")
+                return
+            }
         }
         
         let points: [(gridpoint: Int, elevation: Float)] = try await (0..<grid.count).asyncCompactMap { gridpoint -> (gridpoint: Int, elevation: Float)? in
@@ -364,17 +387,18 @@ struct ExportCommand: AsyncCommand {
                             fatalError("Could not get reader for domain \(domain)")
                         }
                         let rows = try await variables.asyncMap { variable in
-                            guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                            let (v, previousDay) = variable.variableAndPreviousDay
+                            guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
                                 fatalError("Invalid variable \(variable)")
                             }
-                            return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
+                            return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                         }
                         return (rows, gridpoint, coords.latitude, coords.longitude, elevation)
                     }
                 }
                 for try await chunk in stream {
                     for (rows, gridpoint, latitude, longitude, elevation) in chunk {
-                        try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
+                        try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
                         await progress.add(time.count * 4 * variables.count)
                     }
                 }
@@ -442,7 +466,8 @@ struct ExportCommand: AsyncCommand {
                         fatalError("Could not create reader for domain \(domain)")
                     }
                     let rows = try await variables.asyncMap { variable in
-                        guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
+                        let (v, previousDay) = variable.variableAndPreviousDay
+                        guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
                             fatalError("Invalid variable \(variable)")
                         }
                         return data
@@ -452,7 +477,7 @@ struct ExportCommand: AsyncCommand {
             }
             for try await chunk in stream {
                 for (rows, gridpoint, latitude, longitude, elevation) in chunk {
-                    try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
+                    try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
                     await progress.add(time.count * 4 * variables.count)
                 }
             }

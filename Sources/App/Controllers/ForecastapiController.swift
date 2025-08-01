@@ -338,6 +338,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case meteofrance_arpege_europe
     case meteofrance_arome_seamless
     case meteofrance_arome_france
+    case meteofrance_arome_france0025
+    case meteofrance_arpege_world025
     case meteofrance_arome_france_hd
     case meteofrance_arome_france_hd_15min
     case meteofrance_arome_france_15min
@@ -358,6 +360,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gem_global
     case gem_regional
     case gem_hrdps_continental
+    case cmc_gem_gdps
+    case cmc_gem_hrdps
+    case cmc_gem_rdps
 
     case icon_seamless
     case icon_mix
@@ -366,6 +371,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case icon_d2
     case dwd_icon_seamless
     case dwd_icon_global
+    case dwd_icon
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
@@ -536,12 +542,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return ([arpegeProbabilities] + (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
         case .meteofrance_arome_seamless, .arome_seamless:
             return try await MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
-        case .meteofrance_arpege_world, .arpege_world:
+        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return try await MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_arpege_europe, .arpege_europe:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return ([arpegeProbabilities] + (try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])).compactMap({ $0 })
-        case .meteofrance_arome_france, .arome_france:
+        case .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025:
             // Note: AROME PI 15min is not used for consistency here
             return try await MeteoFranceMixer(domains: [.arome_france], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_arome_france_hd, .arome_france_hd:
@@ -560,7 +566,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .icon_seamless, .icon_mix, .dwd_icon_seamless:
             let iconProbabilities = try await ProbabilityReader.makeIconReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [iconProbabilities] + (try await IconMixer(domains: [.icon, .iconEu, .iconD2, .iconD2_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
-        case .icon_global, .dwd_icon_global:
+        case .icon_global, .dwd_icon_global, .dwd_icon:
             let iconProbabilities = try await ProbabilityReader.makeIconGlobalReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [iconProbabilities] + (try await IconReader(domain: .icon, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .icon_eu, .dwd_icon_eu:
@@ -585,12 +591,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .gem_seamless:
             let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
-        case .gem_global:
+        case .gem_global, .cmc_gem_gdps:
             let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await GemReader(domain: .gem_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
-        case .gem_regional:
+        case .gem_regional, .cmc_gem_rdps:
             return try await GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .gem_hrdps_continental:
+        case .gem_hrdps_continental, .cmc_gem_hrdps:
             return try await GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .archive_best_match:
             return [try await Era5Factory.makeArchiveBestMatch(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
@@ -720,15 +726,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return GfsDomain.hrrr_conus_15min
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return GfsGraphCastDomain.graphcast025
-        case .meteofrance_arpege_world, .arpege_world:
+        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return MeteoFranceDomain.arpege_world
         case .meteofrance_arpege_europe, .arpege_europe:
             return MeteoFranceDomain.arpege_europe
-        case .meteofrance_arome_france, .arome_france:
+        case .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025:
             return MeteoFranceDomain.arome_france
         case .meteofrance_arome_france_hd, .arome_france_hd:
             return MeteoFranceDomain.arome_france_hd
-        case .icon_global, .dwd_icon_global:
+        case .icon_global, .dwd_icon_global, .dwd_icon:
             return IconDomains.icon
         case .icon_eu, .dwd_icon_eu:
             return IconDomains.iconEu
@@ -744,11 +750,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return EcmwfDomain.aifs025
         case .metno_nordic:
             return MetNoDomain.nordic_pp
-        case .gem_global:
+        case .gem_global, .cmc_gem_gdps:
             return GemDomain.gem_global
-        case .gem_regional:
+        case .gem_regional, .cmc_gem_rdps:
             return GemDomain.gem_regional
-        case .gem_hrdps_continental:
+        case .gem_hrdps_continental, .cmc_gem_hrdps:
             return GemDomain.gem_hrdps_continental
         case .era5, .copernicus_era5:
             return CdsDomain.era5
@@ -877,9 +883,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GfsReader(domain: .hrrr_conus_15min, gridpoint: gridpoint, options: options)
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, gridpoint: gridpoint, options: options)
-        case .meteofrance_arpege_world, .arpege_world:
+        case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return try await MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
-        case .meteofrance_arpege_europe, .arpege_europe:
+        case .meteofrance_arpege_europe, .arpege_europe, .meteofrance_arome_france0025:
             return try await MeteoFranceReader(domain: .arpege_europe, gridpoint: gridpoint, options: options)
         case .meteofrance_arome_france, .arome_france:
             return try await MeteoFranceReader(domain: .arome_france, gridpoint: gridpoint, options: options)
@@ -901,7 +907,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .arome_seamless:
             return nil
-        case .icon_global, .dwd_icon_global:
+        case .icon_global, .dwd_icon_global, .dwd_icon:
             return try await IconReader(domain: .icon, gridpoint: gridpoint, options: options)
         case .icon_eu, .dwd_icon_eu:
             return try await IconReader(domain: .iconEu, gridpoint: gridpoint, options: options)
@@ -917,11 +923,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await EcmwfReader(domain: .aifs025, gridpoint: gridpoint, options: options)
         case .metno_nordic:
             return try await MetNoReader(domain: .nordic_pp, gridpoint: gridpoint, options: options)
-        case .gem_global:
+        case .gem_global, .cmc_gem_gdps:
             return try await GemReader(domain: .gem_global, gridpoint: gridpoint, options: options)
-        case .gem_regional:
+        case .gem_regional, .cmc_gem_rdps:
             return try await GemReader(domain: .gem_regional, gridpoint: gridpoint, options: options)
-        case .gem_hrdps_continental:
+        case .gem_hrdps_continental, .cmc_gem_hrdps:
             return try await GemReader(domain: .gem_hrdps_continental, gridpoint: gridpoint, options: options)
         case .era5, .copernicus_era5:
             return try await Era5Factory.makeReader(domain: .era5, gridpoint: gridpoint, options: options)
