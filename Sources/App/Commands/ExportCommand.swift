@@ -276,7 +276,6 @@ struct ExportCommand: AsyncCommand {
         }
 
         let grid = /*targetGridDomain?.genericDomain.grid ??*/ genericDomain.grid
-        let writer = BufferedParquetFileWriter(file: file)
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
@@ -298,6 +297,13 @@ struct ExportCommand: AsyncCommand {
             }
             return (gridpoint, elevation.numeric)
         }
+        
+        guard points.isEmpty == false else {
+            logger.info("No grid-points match latitude/longitude bounds")
+            return
+        }
+        
+        let writer = BufferedParquetFileWriter(file: file)
         
         // Calculate daily normals
         if let normals {
