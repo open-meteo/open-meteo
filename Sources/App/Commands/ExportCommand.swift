@@ -63,11 +63,16 @@ final class BufferedParquetFileWriter {
     }
 
     func flush(closeFile: Bool) throws {
-        if locations.isEmpty {
-            return
-        }
         guard let schema, let writer else {
             fatalError("writer or schema not initialised")
+        }
+        if locations.isEmpty {
+            if closeFile {
+                try writer.close()
+                self.writer = nil
+                self.data.removeAll()
+            }
+            return
         }
         let table = try ArrowTable(schema: schema, arrays: [
             try ArrowArray(int64: locations),
