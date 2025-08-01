@@ -9,7 +9,7 @@ import SwiftArrowParquet
 /**
  Helper structure to buffer data before writing to a parquet file. Parquet files are not very efficient for small arrays.
  */
-final actor BufferedParquetFileWriter {
+final class BufferedParquetFileWriter {
     var locations = [Int64]()
     var latitudes = [Float]()
     var longitudes = [Float]()
@@ -280,9 +280,28 @@ struct ExportCommand: AsyncCommand {
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
+        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+            fatalError("Could not read elevation file for domain \(domain)")
+        }
+        
+        let points: [(gridpoint: Int, elevation: Float)] = try await (0..<grid.count).asyncCompactMap { gridpoint -> (gridpoint: Int, elevation: Float)? in
+            let coords = grid.getCoordinates(gridpoint: gridpoint)
+            if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                return nil
+            }
+            if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
+                return nil
+            }
+            let elevation = try await grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+            if let onlySeaAroundSearchRadius, try await grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
+                return nil
+            }
+            return (gridpoint, elevation.numeric)
+        }
+        
         // Calculate daily normals
         if let normals {
-            let progress = TransferAmountTrackerActor(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
+            let progress = TransferAmountTrackerActor(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
             let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
             let nTimeNormals = normalsCalculator.timeBins.count * 365
             // properties.setDataPageSize(nTimeNormals*4)
@@ -330,29 +349,13 @@ struct ExportCommand: AsyncCommand {
                 return
             }*/
             // Loop over locations, read and write
-            guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
-                fatalError("Could not read elevation file for domain \(domain)")
-            }
             do {
-                try await (0..<grid.count).chunks(ofCount: concurrentChunksLength).foreachConcurrent(nConcurrent: concurrent) { gridpoints in
-                    for gridpoint in gridpoints {
+                let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
+                    return try await points.asyncMap { (gridpoint, elevation) in
+                        let coords = grid.getCoordinates(gridpoint: gridpoint)
                         // Read data
                         guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
                             fatalError("Could not get reader for domain \(domain)")
-                        }
-                        let coords = grid.getCoordinates(gridpoint: gridpoint)
-                        if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
-                            await progress.add(time.count * 4 * variables.count)
-                            continue
-                        }
-                        if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
-                            await progress.add(time.count * 4 * variables.count)
-                            continue
-                        }
-                        let elevation = try await grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                        if let onlySeaAroundSearchRadius, try await grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
-                            await progress.add(time.count * 4 * variables.count)
-                            continue
                         }
                         let rows = try await variables.asyncMap { variable in
                             guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
@@ -360,23 +363,28 @@ struct ExportCommand: AsyncCommand {
                             }
                             return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                         }
-                        try await writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
+                        return (rows, gridpoint, coords.latitude, coords.longitude, elevation)
+                    }
+                }
+                for try await chunk in stream {
+                    for (rows, gridpoint, latitude, longitude, elevation) in chunk {
+                        try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
                         await progress.add(time.count * 4 * variables.count)
                     }
                 }
-                try await writer.flush(closeFile: true)
+                try writer.flush(closeFile: true)
                 await progress.finish()
             } catch {
                 logger.report(error: error)
                 // Always close file before throwing errors
-                try await writer.forceCloseFile()
+                try writer.forceCloseFile()
                 throw error
             }
             return
         }
 
-        logger.info("Writing data. Total raw size \((grid.count * time.count * 4 * variables.count).bytesHumanReadable)")
-        let progress = TransferAmountTrackerActor(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
+        logger.info("Writing data. Total raw size \((points.count * time.count * 4 * variables.count).bytesHumanReadable)")
+        let progress = TransferAmountTrackerActor(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
         let timestamps64 = time.map({ Int64($0.timeIntervalSince1970) })
 
         /// Interpolate data from one grid to another and perform bias correction
@@ -420,25 +428,12 @@ struct ExportCommand: AsyncCommand {
             fatalError("Could not read elevation file for domain \(domain)")
         }
         do {
-            try await (0..<grid.count).chunks(ofCount: concurrentChunksLength).foreachConcurrent(nConcurrent: concurrent) { gridpoints in
-                for gridpoint in gridpoints {
+            let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
+                return try await points.asyncMap { (gridpoint, elevation) in
+                    let coords = grid.getCoordinates(gridpoint: gridpoint)
                     // Read data
                     guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
                         fatalError("Could not create reader for domain \(domain)")
-                    }
-                    let coords = grid.getCoordinates(gridpoint: gridpoint)
-                    if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
-                        await progress.add(time.count * 4 * variables.count)
-                        continue
-                    }
-                    if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
-                        await progress.add(time.count * 4 * variables.count)
-                        continue
-                    }
-                    let elevation = try await grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                    if let onlySeaAroundSearchRadius, try await grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
-                        await progress.add(time.count * 4 * variables.count)
-                        continue
                     }
                     let rows = try await variables.asyncMap { variable in
                         guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
@@ -446,15 +441,20 @@ struct ExportCommand: AsyncCommand {
                         }
                         return data
                     }
-                    try await writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
+                    return (rows, gridpoint, coords.latitude, coords.longitude, elevation)
+                }
+            }
+            for try await chunk in stream {
+                for (rows, gridpoint, latitude, longitude, elevation) in chunk {
+                    try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
                     await progress.add(time.count * 4 * variables.count)
                 }
             }
-            try await writer.flush(closeFile: true)
+            try writer.flush(closeFile: true)
             await progress.finish()
         } catch {
             logger.report(error: error)
-            try await writer.forceCloseFile()
+            try writer.forceCloseFile()
             throw error
         }
 
