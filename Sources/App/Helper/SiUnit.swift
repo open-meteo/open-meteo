@@ -41,7 +41,11 @@ protocol ApiUnitsSelectable {
     var length_unit: LengthUnit? { get }
 }
 
-struct DataAndUnit {
+extension SiUnit: @retroactive @unchecked Sendable {
+    
+}
+
+struct DataAndUnit: Sendable {
     let data: [Float]
     let unit: SiUnit
 
