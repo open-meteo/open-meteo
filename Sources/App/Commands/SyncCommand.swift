@@ -133,9 +133,11 @@ struct SyncCommand: AsyncCommand {
                 return (server, model, variablesSig)
             }
         }.grouped(by: { $0.server }).flatMap( { $0.value })
+        
+        let modelsChunkLength = max(1, serverModelVariable.count / concurrentModels)
 
         /// Download from each server concurrently
-        try await serverModelVariable.chunks(ofCount: serverModelVariable.count / concurrentModels).foreachConcurrent(nConcurrent: serverModelVariable.count) {
+        try await serverModelVariable.chunks(ofCount: modelsChunkLength).foreachConcurrent(nConcurrent: serverModelVariable.count) {
             while true {
                 var lastPressureDownloadDate = Timestamp.now().with(hour: 0).add(days: -1)
                 /// Used for `really_download_all_but_pressure_once_per_day` to download pressure data only once per day
