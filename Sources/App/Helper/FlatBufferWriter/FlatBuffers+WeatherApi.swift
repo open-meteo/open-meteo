@@ -646,15 +646,15 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .jmaGsm
         case .gem_seamless:
             return .gemSeamless
-        case .gem_global:
+        case .gem_global, .cmc_gem_gdps:
             return .gemGlobal
-        case .gem_regional:
+        case .gem_regional, .cmc_gem_rdps:
             return .gemRegional
-        case .gem_hrdps_continental:
+        case .gem_hrdps_continental, .cmc_gem_hrdps:
             return .gemHrdpsContinental
         case .icon_mix, .icon_seamless, .dwd_icon_seamless:
             return .iconSeamless
-        case .icon_global, .dwd_icon_global:
+        case .icon_global, .dwd_icon_global, .dwd_icon:
             return .iconGlobal
         case .icon_eu, .dwd_icon_eu:
             return .iconEu
@@ -680,13 +680,13 @@ extension MultiDomains: ModelFlatbufferSerialisable {
             return .meteofranceAromeSeamless
         case .arpege_seamless:
             return .meteofranceArpegeSeamless
-        case .arpege_world:
+        case .arpege_world, .meteofrance_arpege_world025:
             return .meteofranceArpegeEurope
         case .arpege_europe:
             return .meteofranceArpegeEurope
         case .arome_seamless:
             return .meteofranceAromeSeamless
-        case .arome_france:
+        case .arome_france, .meteofrance_arome_france0025:
             return .meteofranceAromeFrance
         case .arome_france_hd:
             return .meteofranceAromeFranceHd

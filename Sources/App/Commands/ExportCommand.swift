@@ -63,11 +63,16 @@ final class BufferedParquetFileWriter {
     }
 
     func flush(closeFile: Bool) throws {
-        if locations.isEmpty {
-            return
-        }
         guard let schema, let writer else {
             fatalError("writer or schema not initialised")
+        }
+        if locations.isEmpty {
+            if closeFile {
+                try writer.close()
+                self.writer = nil
+                self.data.removeAll()
+            }
+            return
         }
         let table = try ArrowTable(schema: schema, arrays: [
             try ArrowArray(int64: locations),
@@ -92,6 +97,10 @@ final class BufferedParquetFileWriter {
             self.writer = nil
             self.data.removeAll()
         }
+    }
+    
+    func forceCloseFile() throws {
+        try writer?.close()
     }
 }
 #endif
@@ -144,6 +153,9 @@ struct ExportCommand: AsyncCommand {
 
         @Option(name: "longitude-bounds")
         var longitudeBounds: String?
+        
+        @Flag(name: "only-full-bounding-box", help: "The entire domain must cover the bounding box. Otherwise cancel.")
+        var onlyFullBoundingBox: Bool
 
         @Option(name: "output", short: "o", help: "Output file name. Default: ./output.nc")
         var outputFilename: String?
@@ -162,6 +174,12 @@ struct ExportCommand: AsyncCommand {
 
         @Option(name: "ignore_sea_search_radius", help: "Radius to search for land")
         var ignoreSeaSearchRadius: Int?
+        
+        @Option(name: "concurrent", help: "Number of concurrent threads to use to export Parquet files")
+        var concurrent: Int?
+        
+        @Option(name: "concurrent-chunk-length", help: "Number of grid cells processed by each chunk in parallel")
+        var concurrentChunksLength: Int?
 
         /// Get time range from parameters
         func getTime(dtSeconds: Int) throws -> TimerangeDt? {
@@ -248,29 +266,76 @@ struct ExportCommand: AsyncCommand {
                 rainDayDistribution: DailyNormalsCalculator.RainDayDistribution.load(rawValueOptional: signature.rainDayDistribution),
                 latitudeBounds: latitudeBounds,
                 longitudeBounds: longitudeBounds,
-                onlySeaAroundSearchRadius: signature.ignoreSea ? (signature.ignoreSeaSearchRadius ?? 0) : nil
+                onlySeaAroundSearchRadius: signature.ignoreSea ? (signature.ignoreSeaSearchRadius ?? 0) : nil,
+                concurrent: signature.concurrent ?? 8,
+                concurrentChunksLength: signature.concurrentChunksLength ?? 100,
+                onlyFullBoundingBox: signature.onlyFullBoundingBox
             )
         }
     }
 
-    func generateParquet(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, /*targetGridDomain: TargetGridDomain?,*/ normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?) async throws {
+    func generateParquet(application: Application, file: String, domain: MultiDomains, variables: [String], time: TimerangeDt, /*targetGridDomain: TargetGridDomain?,*/ normals: (years: [Int], width: Int)?, rainDayDistribution: DailyNormalsCalculator.RainDayDistribution?, latitudeBounds: ClosedRange<Float>?, longitudeBounds: ClosedRange<Float>?, onlySeaAroundSearchRadius: Int?, concurrent: Int, concurrentChunksLength: Int, onlyFullBoundingBox: Bool) async throws {
         #if ENABLE_PARQUET
         let logger = application.logger
         let client = application.http.client.shared
         let options = try GenericReaderOptions(logger: logger, httpClient: client)
+        
+        let variables = variables.map {
+            guard let variable = ForecastVariable(rawValue: $0) else {
+                fatalError("Could not parse variable name \($0)")
+            }
+            return variable
+        }
         
         guard let genericDomain = domain.genericDomain else {
             fatalError("Export not supported for domain \(domain)")
         }
 
         let grid = /*targetGridDomain?.genericDomain.grid ??*/ genericDomain.grid
-        let writer = BufferedParquetFileWriter(file: file)
 
         logger.info("Grid nx=\(grid.nx) ny=\(grid.ny) nTime=\(time.count) nVariables=\(variables.count) (\(time.prettyString()))")
 
+        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+            fatalError("Could not read elevation file for domain \(domain)")
+        }
+        
+        if onlyFullBoundingBox, let latitudeBounds, let longitudeBounds {
+            guard
+                grid.findPoint(lat: latitudeBounds.lowerBound, lon: longitudeBounds.lowerBound) != nil,
+                grid.findPoint(lat: latitudeBounds.lowerBound, lon: longitudeBounds.upperBound) != nil,
+                grid.findPoint(lat: latitudeBounds.upperBound, lon: longitudeBounds.lowerBound) != nil,
+                grid.findPoint(lat: latitudeBounds.upperBound, lon: longitudeBounds.upperBound) != nil
+            else {
+                logger.info("Grid does not cover the entire bounding box")
+                return
+            }
+        }
+        
+        let points: [(gridpoint: Int, elevation: Float)] = try await (0..<grid.count).asyncCompactMap { gridpoint -> (gridpoint: Int, elevation: Float)? in
+            let coords = grid.getCoordinates(gridpoint: gridpoint)
+            if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
+                return nil
+            }
+            if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
+                return nil
+            }
+            let elevation = try await grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
+            if let onlySeaAroundSearchRadius, try await grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
+                return nil
+            }
+            return (gridpoint, elevation.numeric)
+        }
+        
+        guard points.isEmpty == false else {
+            logger.info("No grid-points match latitude/longitude bounds")
+            return
+        }
+        
+        let writer = BufferedParquetFileWriter(file: file)
+        
         // Calculate daily normals
         if let normals {
-            let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
+            let progress = TransferAmountTrackerActor(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
             let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
             let nTimeNormals = normalsCalculator.timeBins.count * 365
             // properties.setDataPageSize(nTimeNormals*4)
@@ -318,41 +383,43 @@ struct ExportCommand: AsyncCommand {
                 return
             }*/
             // Loop over locations, read and write
-            guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
-                fatalError("Could not read elevation file for domain \(domain)")
-            }
-            for gridpoint in 0..<grid.count {
-                // Read data
-                guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
-                    fatalError("Could not get reader for domain \(domain)")
-                }
-                let coords = grid.getCoordinates(gridpoint: gridpoint)
-                if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
-                    continue
-                }
-                if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
-                    continue
-                }
-                let elevation = try await grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-                if let onlySeaAroundSearchRadius, try await grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
-                    continue
-                }
-                let rows = try await variables.asyncMap { variable in
-                    guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
-                        fatalError("Invalid variable \(variable)")
+            do {
+                let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
+                    return try await points.asyncMap { (gridpoint, elevation) in
+                        let coords = grid.getCoordinates(gridpoint: gridpoint)
+                        // Read data
+                        guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                            fatalError("Could not get reader for domain \(domain)")
+                        }
+                        let rows = try await variables.asyncMap { variable in
+                            let (v, previousDay) = variable.variableAndPreviousDay
+                            guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
+                                fatalError("Invalid variable \(variable)")
+                            }
+                            return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable.rawValue, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
+                        }
+                        return (rows, gridpoint, coords.latitude, coords.longitude, elevation)
                     }
-                    return DataAndUnit(normalsCalculator.calculateDailyNormals(variable: variable, values: ArraySlice(data.data), time: time, rainDayDistribution: rainDayDistribution ?? .end).round(digits: data.unit.significantDigits), data.unit)
                 }
-                try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
-                progress.add(time.count * 4 * variables.count)
+                for try await chunk in stream {
+                    for (rows, gridpoint, latitude, longitude, elevation) in chunk {
+                        try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
+                        await progress.add(time.count * 4 * variables.count)
+                    }
+                }
+                try writer.flush(closeFile: true)
+                await progress.finish()
+            } catch {
+                logger.report(error: error)
+                // Always close file before throwing errors
+                try writer.forceCloseFile()
+                throw error
             }
-            try writer.flush(closeFile: true)
-            progress.finish()
             return
         }
 
-        logger.info("Writing data. Total raw size \((grid.count * time.count * 4 * variables.count).bytesHumanReadable)")
-        let progress = TransferAmountTracker(logger: logger, totalSize: grid.count * time.count * 4 * variables.count, name: "Processed")
+        logger.info("Writing data. Total raw size \((points.count * time.count * 4 * variables.count).bytesHumanReadable)")
+        let progress = TransferAmountTrackerActor(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
         let timestamps64 = time.map({ Int64($0.timeIntervalSince1970) })
 
         /// Interpolate data from one grid to another and perform bias correction
@@ -395,33 +462,37 @@ struct ExportCommand: AsyncCommand {
         guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
             fatalError("Could not read elevation file for domain \(domain)")
         }
-        for gridpoint in 0..<grid.count {
-            // Read data
-            guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
-                fatalError("Could not create reader for domain \(domain)")
-            }
-            let coords = grid.getCoordinates(gridpoint: gridpoint)
-            if let latitudeBounds, !latitudeBounds.contains(coords.latitude) {
-                continue
-            }
-            if let longitudeBounds, !longitudeBounds.contains(coords.longitude) {
-                continue
-            }
-            let elevation = try await grid.readElevation(gridpoint: gridpoint, elevationFile: elevationFile)
-            if let onlySeaAroundSearchRadius, try await grid.onlySeaAround(gridpoint: gridpoint, elevationFile: elevationFile, searchRadius: onlySeaAroundSearchRadius) {
-                continue
-            }
-            let rows = try await variables.asyncMap { variable in
-                guard let data = try await reader.get(mixed: variable, time: time.toSettings()) else {
-                    fatalError("Invalid variable \(variable)")
+        do {
+            let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
+                return try await points.asyncMap { (gridpoint, elevation) in
+                    let coords = grid.getCoordinates(gridpoint: gridpoint)
+                    // Read data
+                    guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
+                        fatalError("Could not create reader for domain \(domain)")
+                    }
+                    let rows = try await variables.asyncMap { variable in
+                        let (v, previousDay) = variable.variableAndPreviousDay
+                        guard let data = try await reader.get(mixed: v.rawValue, time: time.toSettings(previousDay: previousDay)) else {
+                            fatalError("Invalid variable \(variable)")
+                        }
+                        return data
+                    }
+                    return (rows, gridpoint, coords.latitude, coords.longitude, elevation)
                 }
-                return data
             }
-            try writer.add(data: rows, variables: variables, timestamps: timestamps64, location: gridpoint, latitude: coords.latitude, longitude: coords.longitude, elevation: elevation.numeric)
-            progress.add(time.count * 4 * variables.count)
+            for try await chunk in stream {
+                for (rows, gridpoint, latitude, longitude, elevation) in chunk {
+                    try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
+                    await progress.add(time.count * 4 * variables.count)
+                }
+            }
+            try writer.flush(closeFile: true)
+            await progress.finish()
+        } catch {
+            logger.report(error: error)
+            try writer.forceCloseFile()
+            throw error
         }
-        try writer.flush(closeFile: true)
-        progress.finish()
 
         #else
         fatalError("Apache Parquet support not enabled")

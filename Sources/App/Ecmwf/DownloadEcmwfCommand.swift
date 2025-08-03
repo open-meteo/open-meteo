@@ -314,6 +314,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     // fatalError()
                     
+                    /// Note 2025-08-01: The latest AIFS update sets wrong stepRange parameter
+                    if domain == .aifs025_single && stepType == "accum" {
+                        logger.debug("Overwriting stepRange for AIFS025_single from \(stepRange) to 0-\(hour)")
+                        stepRange = "0-\(hour)"
+                    }
+                    
                     // solar shortwave radition show accum with step range "90"
                     if stepType == "accum" && !stepRange.contains("-") {
                         stepRange = "0-\(stepRange)"
@@ -356,7 +362,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         return
                     }
                     // Keep precip in memory for probability
-                    if domain == .ifs025_ensemble && variable == .precipitation {
+                    if domain.ensembleMembers > 1 && variable == .precipitation {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
