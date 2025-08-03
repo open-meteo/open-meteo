@@ -100,12 +100,13 @@ struct JmaDownload: AsyncCommand {
         }
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
-        let deaverager = GribDeaverager()
+        var deaverager = GribDeaverager()
         var validTimes: Set<Timestamp> = []
 
         let handles = try await filesToDownload.asyncFlatMap { filename -> [GenericVariableHandle] in
             let url = "\(server)\(filename)"
             return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+                let deaveragerScoped = await deaverager.copy()
                 let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                     guard let variable = message.toJmaVariable(),
@@ -133,7 +134,7 @@ struct JmaDownload: AsyncCommand {
 
                     // Deaccumulate precipitation. MSM model falsely marks `stepType` as accumulation for precipitation, resulting in negative values
                     if domain != .msm {
-                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                        guard await deaveragerScoped.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                             return
                         }
                     }
@@ -147,6 +148,7 @@ struct JmaDownload: AsyncCommand {
                     validTimes.insert(writer.time)
                 }
                 let completed = filename == filesToDownload.last
+                deaverager = deaveragerScoped
                 return try await writer.finalise(completed: completed, validTimes: Array(validTimes).sorted(), uploadS3Bucket: uploadS3Bucket)
             }
         }
