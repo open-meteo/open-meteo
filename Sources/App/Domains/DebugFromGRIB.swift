@@ -14,16 +14,6 @@ extension GribMessage {
 
     /// Print debug grid information
     func debugGrid(grid: Gridable, flipLatidude: Bool, shift180Longitude: Bool) throws {
-        guard let nx = get(attribute: "Nx")?.toInt() else {
-            fatalError("Could not get Nx")
-        }
-        guard let ny = get(attribute: "Ny")?.toInt() else {
-            fatalError("Could not get Ny")
-        }
-        guard nx == grid.nx, ny == grid.ny else {
-            fatalError("GRIB dimensions (nx=\(grid.nx), ny=\(grid.ny)) do not match domain grid dimensions (nx=\(nx), ny=\(ny))")
-        }
-
         for atr in self.iterate(namespace: .geography) {
             print(atr)
         }
@@ -36,6 +26,16 @@ extension GribMessage {
             print("\(gridType)")
             print("latitudeOfSouthernPoleInDegrees \(get(attribute: "latitudeOfSouthernPoleInDegrees") ?? "nil")")
             print("longitudeOfSouthernPoleInDegrees \(get(attribute: "longitudeOfSouthernPoleInDegrees") ?? "nil")")
+        }
+        
+        guard let nx = get(attribute: "Nx")?.toInt() else {
+            fatalError("Could not get Nx")
+        }
+        guard let ny = get(attribute: "Ny")?.toInt() else {
+            fatalError("Could not get Ny")
+        }
+        guard nx == grid.nx, ny == grid.ny else {
+            fatalError("GRIB dimensions (nx=\(grid.nx), ny=\(grid.ny)) do not match domain grid dimensions (nx=\(nx), ny=\(ny))")
         }
 
         var coords = [Coords]()

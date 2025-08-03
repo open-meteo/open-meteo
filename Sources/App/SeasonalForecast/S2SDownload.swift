@@ -23,6 +23,12 @@ struct S2SDownload: AsyncCommand {
         
         @Option(name: "cdskey", short: "k", help: "CDS API key like: f412e2d2-4123-456...")
         var cdskey: String?
+        
+        @Flag(name: "create-netcdf")
+        var createNetcdf: Bool
+        
+        @Option(name: "concurrent", short: "c", help: "Number of concurrent download/conversion jobs")
+        var concurrent: Int?
     }
 
     var help: String {
@@ -30,6 +36,8 @@ struct S2SDownload: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
+        let logger = context.application.logger
+        
         let domain = try S2S6HourlyDomain.load(rawValue: signature.domain)
         disableIdleSleep()
         
@@ -39,10 +47,13 @@ struct S2SDownload: AsyncCommand {
             fatalError("cds key is required")
         }
         
-        let _ = try await downloadEcds(application: context.application, domain: domain, run: run, cdskey: cdskey, concurrent: 1)
+        let concurrent = signature.concurrent ?? ProcessInfo.processInfo.activeProcessorCount
+        
+        
+        let handles = try await downloadEcds(application: context.application, domain: domain, run: run, cdskey: cdskey, concurrent: concurrent)
 
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: false)
        
-
         if let uploadS3Bucket = signature.uploadS3Bucket {
             try domain.domainRegistry.syncToS3(logger: context.application.logger, bucket: uploadS3Bucket, variables: CfsVariable.allCases)
         }
@@ -157,18 +168,19 @@ struct S2SDownload: AsyncCommand {
     func downloadEcds(application: Application, domain: S2S6HourlyDomain, run: Timestamp, cdskey: String, concurrent: Int) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-        let query = EcdsQuery(origin: "ecmwf", forecast_type: "control_forecast", level_type: "single_level", year: "2025", month: "07", day: "28", leadtime_hour: stride(from: 0, through: 12, by: 6).map(String.init), variable: [
-            "10m_u_component_of_wind",
-            "10m_v_component_of_wind",
+        let query = EcdsQuery(origin: "ecmwf", forecast_type: "control_forecast", level_type: "single_level", year: "2025", month: "07", day: "28", leadtime_hour: stride(from: 0, through: 6, by: 6).map(String.init), variable: [
+            //"10m_u_component_of_wind",
+            //"10m_v_component_of_wind",
             "maximum_2m_temperature_last_6_hours",
-            "minimum_2m_temperature_last_6_hours",
-            "total_precipitation"
+            //"minimum_2m_temperature_last_6_hours",
+            //"total_precipitation"
         ], time: "00:00")
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let h = try await curl.withCdsApi(dataset: "s2s-forecast", query: query, apikey: cdskey, server: "https://ecds-preprod.ecmwf.int/api") { stream in
+        let h = try await curl.withCdsApi(dataset: "s2s-forecasts", query: query, apikey: cdskey, nConcurrent: concurrent, server: "https://ecds-preprod.ecmwf.int/api") { stream in
             let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
+            let deaverager = GribDeaverager()
             
             try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                 let attributes = try GribAttributes(message: message)
@@ -181,7 +193,12 @@ struct S2SDownload: AsyncCommand {
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                try await writer.write(time: timestamp, member: attributes.perturbationNumber ?? 0, variable: variable, data: grib2d.array.data)
+                let member = attributes.perturbationNumber ?? 0
+                // Deaccumulate precipitation
+                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &grib2d) else {
+                    return
+                }
+                try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
             }
             return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
         }

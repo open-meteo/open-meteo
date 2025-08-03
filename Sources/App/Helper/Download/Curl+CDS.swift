@@ -176,10 +176,10 @@ extension Curl {
     /**
      Get GRIB data from the CDS API
      */
-    func withCdsApi<Query: Encodable, T>(dataset: String, query: Query, apikey: String, server: String = "https://cds.climate.copernicus.eu/api", body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+    func withCdsApi<Query: Encodable, T>(dataset: String, query: Query, apikey: String, nConcurrent: Int = 1, server: String = "https://cds.climate.copernicus.eu/api", body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
         let results = try await waitForCdsJob(job: job, apikey: apikey, server: server)
-        let result = try await withGribStream(url: results.asset.value.href, bzip2Decode: false, body: body)
+        let result = try await withGribStream(url: results.asset.value.href, bzip2Decode: false, nConcurrent: nConcurrent, body: body)
         try await cleanupCdsApiJob(job: job, apikey: apikey, server: server)
         return result
     }

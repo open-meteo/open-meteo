@@ -29,32 +29,7 @@ enum S2S6HourlyDomain: String, GenericDomain, CaseIterable {
     case cptec
     
     var grid: any Gridable {
-        switch self {
-        case .iap_cas:
-            fatalError()
-        case .cma:
-            fatalError()
-        case .eccc:
-            fatalError()
-        case .ecmwf:
-            fatalError()
-        case .ukmo:
-            fatalError()
-        case .isac_cnr:
-            fatalError()
-        case .ncep:
-            fatalError()
-        case .meteo_france:
-            fatalError()
-        case .kma:
-            fatalError()
-        case .hmcr:
-            fatalError()
-        case .jma:
-            fatalError()
-        case .cptec:
-            fatalError()
-        }
+        return RegularGrid(nx: 240, ny: 121, latMin: -90, lonMin: -180, dx: 1.5, dy: 1.5, searchRadius: 0)
     }
     
     var domainRegistry: DomainRegistry {
