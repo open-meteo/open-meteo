@@ -5,6 +5,31 @@ import Logging
  List of all integrated domains
  */
 enum DomainRegistry: String, CaseIterable {
+    case s2s_iap_cas_6hourly
+    case s2s_iap_cas_daily
+    case s2s_cma_6hourly
+    case s2s_cma_daily
+    case s2s_eccc_6hourly
+    case s2s_eccc_daily
+    case s2s_ecmwf_6hourly
+    case s2s_ecmwf_daily
+    case s2s_ukmo_6hourly
+    case s2s_ukmo_daily
+    case s2s_isac_cnr_6hourly
+    case s2s_isac_cnr_daily
+    case s2s_ncep_6hourly
+    case s2s_ncep_daily
+    case s2s_meteo_france_6hourly
+    case s2s_meteo_france_daily
+    case s2s_kma_6hourly
+    case s2s_kma_daily
+    case s2s_hmcr_6hourly
+    case s2s_hmcr_daily
+    case s2s_jma_6hourly
+    case s2s_jma_daily
+    case s2s_cptec_6hourly
+    case s2s_cptec_daily
+    
     case meteofrance_arome_france0025
     case meteofrance_arome_france_hd
     case meteofrance_arome_france0025_15min
@@ -357,6 +382,54 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoSwissDomain.icon_ch1_ensemble
         case .meteoswiss_icon_ch2_ensemble:
             return MeteoSwissDomain.icon_ch2_ensemble
+        case .s2s_iap_cas_6hourly:
+            return S2S6HourlyDomain.iap_cas
+        case .s2s_iap_cas_daily:
+            return S2SDailyDomain(domain: .iap_cas)
+        case .s2s_cma_6hourly:
+            return S2S6HourlyDomain.cma
+        case .s2s_cma_daily:
+            return S2SDailyDomain(domain: .cma)
+        case .s2s_eccc_6hourly:
+            return S2S6HourlyDomain.eccc
+        case .s2s_eccc_daily:
+            return S2SDailyDomain(domain: .eccc)
+        case .s2s_ecmwf_6hourly:
+            return S2S6HourlyDomain.ecmwf
+        case .s2s_ecmwf_daily:
+            return S2SDailyDomain(domain: .ecmwf)
+        case .s2s_ukmo_6hourly:
+            return S2S6HourlyDomain.ukmo
+        case .s2s_ukmo_daily:
+            return S2SDailyDomain(domain: .ukmo)
+        case .s2s_isac_cnr_6hourly:
+            return S2S6HourlyDomain.isac_cnr
+        case .s2s_isac_cnr_daily:
+            return S2SDailyDomain(domain: .isac_cnr)
+        case .s2s_ncep_6hourly:
+            return S2S6HourlyDomain.ncep
+        case .s2s_ncep_daily:
+            return S2SDailyDomain(domain: .ncep)
+        case .s2s_meteo_france_6hourly:
+            return S2S6HourlyDomain.meteo_france
+        case .s2s_meteo_france_daily:
+            return S2SDailyDomain(domain: .meteo_france)
+        case .s2s_kma_6hourly:
+            return S2S6HourlyDomain.kma
+        case .s2s_kma_daily:
+            return S2SDailyDomain(domain: .kma)
+        case .s2s_hmcr_6hourly:
+            return S2S6HourlyDomain.hmcr
+        case .s2s_hmcr_daily:
+            return S2SDailyDomain(domain: .hmcr)
+        case .s2s_jma_6hourly:
+            return S2S6HourlyDomain.jma
+        case .s2s_jma_daily:
+            return S2SDailyDomain(domain: .jma)
+        case .s2s_cptec_6hourly:
+            return S2S6HourlyDomain.cptec
+        case .s2s_cptec_daily:
+            return S2SDailyDomain(domain: .cptec)
         }
     }
 }
