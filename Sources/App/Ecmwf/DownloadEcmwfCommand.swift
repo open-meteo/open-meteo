@@ -217,7 +217,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
         let timestamps = forecastHours.map { run.add(hours: $0) }
-        let deaverager = GribDeaverager()
+        var deaverager = GribDeaverager()
         
         let storeOnDisk = domain == .ifs025 || domain == .aifs025_single
 
@@ -247,6 +247,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 let data = Meteorology.specificToRelativeHumidity(specificHumidity: q.data, temperature: t.data, pressure: .init(repeating: hpa, count: t.count))
                 try await writer.write(member: member, variable: rh, data: data)
             }
+            let deaveragerScoped = await deaverager.copy()
 
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
@@ -326,7 +327,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     
                     // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                    guard await deaveragerScoped.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return
                     }
                     
@@ -381,6 +382,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     try await writer.write(member: member, variable: variable, data: grib2d.array.data)
                 }
             }
+            deaverager = deaveragerScoped
 
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
