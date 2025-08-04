@@ -82,6 +82,10 @@ actor OmSpatialTimestepWriter {
     
     /// Write a single variable to the file
     func write(member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
+        if variables.contains(where: { "\($0.variable)" == "\(variable)" && $0.member == member}) {
+            return
+        }
+        
         let writer = try getWriter()
         
         let y = min(domain.grid.ny, 32)
