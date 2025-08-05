@@ -229,11 +229,14 @@ final class Curl: Sendable {
         let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
             let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
             let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
+            let chunkTimeOut = ExponentialBackOff(factor: .seconds(120), maximum: .seconds(300))
+            var i = 0
             while true {
+                i += 1
                 // 120 seconds timeout for each 16MB chunk
-                let deadlineShort = Date().addingTimeInterval(TimeInterval(120))
+                let deadLineChunk = chunkTimeOut.deadLine(attempt: i)
                 // Start the download and wait for the header
-                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadlineShort, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
+                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadLineChunk, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
 
                 // Retry failed file transfers after this point
                 do {
@@ -245,7 +248,7 @@ final class Curl: Sendable {
                     }
                     for try await fragement in response.body {
                         // await tracker.add(fragement.readableBytes)
-                        if Date() > deadlineShort {
+                        if Date() > deadLineChunk {
                             throw CurlError.timeoutPerChunkReached(httpRange: chunk)
                         }
                         try Task.checkCancellation()

@@ -26,6 +26,9 @@ struct DownloadCmaCommand: AsyncCommand {
 
         @Option(name: "concurrent", short: "c", help: "Numer of concurrent download/conversion jobs")
         var concurrent: Int?
+        
+        @Option(name: "max-forecast-hour", help: "Only download data until this forecast hour")
+        var maxForecastHour: Int?
 
         /*@Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
@@ -62,7 +65,7 @@ struct DownloadCmaCommand: AsyncCommand {
         }
 
         let nConcurrent = signature.concurrent ?? 1
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, maxForecastHour: signature.maxForecastHour)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
@@ -267,12 +270,12 @@ struct DownloadCmaCommand: AsyncCommand {
     /// Uses concurrent downloads and concurrent data conversion to process data as fast as possible
     /// Each download GRIB file is split into hundrets 16 MB parts and download in parallel using HTTP RANGE.
     /// Individual grib messages are extracted while downloading and processed concurrently
-    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours: Double = 10
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
-        let nForecastHours = domain.forecastHours(run: run.hour)
+        let nForecastHours = maxForecastHour ?? domain.forecastHours(run: run.hour)
         let timestamps = TimerangeDt(start: run, nTime: nForecastHours/3 + 1, dtSeconds: 3*3600).map{$0}
         var previous = GribDeaverager()
 

@@ -64,6 +64,10 @@ struct ExponentialBackOff {
         return TimeAmount.nanoseconds(jitteredWait)
     }
     
+    func deadLine(attempt n: Int) -> Date {
+        Date().addingTimeInterval(Double(waitTime(attempt: n).nanoseconds) / 1_000_000_000)
+    }
+    
     func sleep(attempt n: Int) async throws {
         let wait = waitTime(attempt: n)
         try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
