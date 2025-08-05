@@ -10,9 +10,18 @@ let projectHome = String(#filePath[...#filePath.range(of: "/Sources/")!.lowerBou
 FileManager.default.changeCurrentDirectoryPath(projectHome)
 #endif
 
-var env = try Environment.detect()
-try LoggingSystem.bootstrap(from: &env)
-let app = try await Application.make(env)
-try configure(app)
-try await app.execute()
-try await app.asyncShutdown()
+do {
+    var env = try Environment.detect()
+    try LoggingSystem.bootstrap(from: &env)
+    let app = try await Application.make(env)
+    try configure(app)
+    try await app.execute()
+    try await app.asyncShutdown()
+} catch {
+    let logger = Logger(label: "TopLevelError")
+    logger.critical("Uncaught top-level error", metadata: [
+        "type": "\(type(of: error))",
+        "message": "\(error)"
+    ])
+    exit(1)
+}
