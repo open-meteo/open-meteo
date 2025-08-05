@@ -87,7 +87,7 @@ struct GloFasDownloader: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
 
         let downloadTimeHours: Double = domain.isForecast ? 5 : 14
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: Int(3600 * downloadTimeHours))
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: downloadTimeHours, readTimeout: Int(3600 * downloadTimeHours), retryUnauthorized: true)
         let directory = domain.isForecast ? "fc_grib" : "seasonal_fc_grib"
         let nMembers = domain.isForecast ? 1 : 51
         let handles = try await (0..<nMembers).asyncFlatMap { member -> [GenericVariableHandle] in
