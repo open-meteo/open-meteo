@@ -1,3 +1,9 @@
+#if os(Linux)
+    @preconcurrency import Glibc
+#else
+    import Darwin.C
+#endif
+
 import App
 import Vapor
 
