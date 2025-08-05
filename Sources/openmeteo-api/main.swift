@@ -17,6 +17,8 @@ do {
     try configure(app)
     try await app.execute()
     try await app.asyncShutdown()
+} catch let error as CommandError {
+    fputs("\(error)\n", stderr)
 } catch {
     let logger = Logger(label: "TopLevelError")
     logger.critical("Uncaught top-level error", metadata: [
