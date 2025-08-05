@@ -51,13 +51,16 @@ final class Curl: Sendable {
 
     /// Chunk size for concurrent downloads
     let chunkSize: Int
+    
+    /// Default throw if unauthorized error occures
+    let retryUnauthorized: Bool
 
     /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16, retryUnauthorized: Bool = false) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
@@ -67,6 +70,7 @@ final class Curl: Sendable {
         self.client = client
         self.headers = headers
         self.chunkSize = chunkSizeMB * (2 << 19)
+        self.retryUnauthorized = retryUnauthorized
     }
 
     deinit {
@@ -158,7 +162,7 @@ final class Curl: Sendable {
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     // await print(try response.body.collect(upTo: 10000000).readStringImmutable())
-                    if response.status == .unauthorized {
+                    if !retryUnauthorized && response.status == .unauthorized {
                         throw CurlErrorNonRetry.unauthorized
                     }
                     throw CurlError.downloadFailed(code: response.status)
