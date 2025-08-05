@@ -188,14 +188,15 @@ struct S2SDownload: AsyncCommand {
                 guard let variable = S2SVariable6Hourly.fromGrib(attributes: attributes) else {
                     fatalError("Could not find \(attributes) in grib")
                 }
-                logger.info("Converting variable \(variable) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
+                let member = attributes.perturbationNumber ?? 0
+                logger.info("Converting variable \(variable) member \(member) \(timestamp.format_YYYYMMddHH) \(message.get(attribute: "name")!)")
                 var grib2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
                 if let fma = variable.multiplyAdd {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
-                let member = attributes.perturbationNumber ?? 0
                 // Deaccumulate precipitation
                 guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &grib2d) else {
+                    logger.debug("Skipping \(variable) \(attributes.stepType) \(attributes.stepRange)")
                     return
                 }
                 try await writer.write(time: timestamp, member: member, variable: variable, data: grib2d.array.data)
