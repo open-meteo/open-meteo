@@ -144,14 +144,13 @@ struct GloFasDownloader: AsyncCommand {
         if months.count >= 2 {
             let year = months.lowerBound.year
             let months = months.lowerBound.month ... months.upperBound.advanced(by: -1).month
-            let monthNames = ["", "january", "february", "march", "april", "may", "june", "july", "august", "september", "october", "november", "december"]
 
             logger.info("Downloading year \(year) months \(months)")
             let query = GlofasQuery(
                 system_version: domain.version,
                 hyear: "\(year)",
-                hmonth: Array(monthNames[months]),
-                hday: (0...31).map { $0.zeroPadded(len: 2) },
+                hmonth: months.map({$0.zeroPadded(len: 2)}),
+                hday: (1...31).map { $0.zeroPadded(len: 2) },
                 product_type: domain.productType
             )
             let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 24)
@@ -289,7 +288,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
     var grid: Gridable {
         switch self {
         case .consolidated, .intermediate, .seasonal, .forecast:
-            return RegularGrid(nx: 7200, ny: 3000, latMin: -60, lonMin: -180, dx: 0.05, dy: 0.05)
+            return RegularGrid(nx: 7200, ny: 3000, latMin: -59.975, lonMin: -180.025, dx: 0.05, dy: 0.05)
         case .consolidatedv3, .intermediatev3, .seasonalv3, .forecastv3:
             return RegularGrid(nx: 3600, ny: 1500, latMin: -60, lonMin: -180, dx: 0.1, dy: 0.1)
         }
