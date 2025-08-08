@@ -278,63 +278,67 @@ struct DownloadCmaCommand: AsyncCommand {
         let nForecastHours = maxForecastHour ?? domain.forecastHours(run: run.hour)
         let timestamps = TimerangeDt(start: run, nTime: nForecastHours/3 + 1, dtSeconds: 3*3600).map{$0}
         var previous = GribDeaverager()
-
-        let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+        var handles = [GenericVariableHandle]()
+        for (i,timestamp) in timestamps.enumerated() {
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let timeint = (run.hour % 12 == 6) ? "f0_f120_3h" : "f0_f240_6h"
             let url = "\(server)t\(run.hh)00/\(timeint)/Z_NAFP_C_BABJ_\(run.format_YYYYMMddHH)0000_P_NWPC-GRAPES-GFS-GLB-\(forecastHour.zeroPadded(len: 3))00.grib2"
             // Split download into 16 MB parts and download concurrently
             // In case processing is too slow, incoming data will be buffered
-            let handles = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                let previousScoped = await previous.copy()
-                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
-                // Process each grib message concurrently. Independent from download thread
-                try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
-                    /*
-                     if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            do {
+                let h = try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+                    let previousScoped = await previous.copy()
+                    let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+                    // Process each grib message concurrently. Independent from download thread
+                    try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
+                        /*
+                         if !FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
                          try await writeElevation(grib: grib, domain: domain)
-                     }
-                     */
-                    guard let stepRange = message.get(attribute: "stepRange"),
-                          let stepType = message.get(attribute: "stepType")
-                    else {
-                        fatalError("could not get step range or type")
-                    }
-                    if stepType == "accum" && forecastHour == 0 {
-                        return
-                    }
-                    guard let variable = getCmaVariable(logger: logger, message: message) else {
-                        return
-                    }
-                    if let variable = variable as? CmaSurfaceVariable {
-                        if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
+                         }
+                         */
+                        guard let stepRange = message.get(attribute: "stepRange"),
+                              let stepType = message.get(attribute: "stepType")
+                        else {
+                            fatalError("could not get step range or type")
+                        }
+                        if stepType == "accum" && forecastHour == 0 {
                             return
                         }
+                        guard let variable = getCmaVariable(logger: logger, message: message) else {
+                            return
+                        }
+                        if let variable = variable as? CmaSurfaceVariable {
+                            if (variable == .snow_depth || variable == .wind_gusts_10m) && forecastHour == 0 {
+                                return
+                            }
+                        }
+                        
+                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                        // message.dumpAttributes()
+                        try grib2d.load(message: message)
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+                        
+                        // Scaling before compression with scalefactor
+                        if let fma = variable.multiplyAdd {
+                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        }
+                        
+                        // Deaccumulate precipitation
+                        guard await previousScoped.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                            return
+                        }
+                        
+                        logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
+                        try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
                     }
-
-                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    // message.dumpAttributes()
-                    try grib2d.load(message: message)
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
-
-                    // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd {
-                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-
-                    // Deaccumulate precipitation
-                    guard await previousScoped.deaccumulateIfRequired(variable: variable, member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                        return
-                    }
-
-                    logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
+                    previous = previousScoped
+                    let completed = i == timestamps.count - 1
+                    return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
                 }
-                previous = previousScoped
-                let completed = i == timestamps.count - 1
-                return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                handles.append(contentsOf: h)
+            } catch CurlError.timeoutReached {
+                logger.warning("Timeout reached, downloaded until forecast hour \(forecastHour)")
             }
-            return handles
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)
