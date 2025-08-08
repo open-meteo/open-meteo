@@ -60,4 +60,4 @@ jobs:
           --header 'AccessKey: ${{ secrets.ftp_password_dpkg_manual }}' \
           --header 'Content-Type: application/octet-stream' \
           --header 'accept: application/json'  \
-          --data-binary @openmeteo-api_0.0.0_jammy_amd64.deb
+          --data-binary "@openmeteo-api_0.0.0_jammy_amd64.deb"
