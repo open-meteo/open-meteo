@@ -138,6 +138,7 @@ struct GloFasDownloader: AsyncCommand {
         let nx = domain.grid.nx
 
         let months = timeinterval.toYearMonth()
+        let server = "https://ewds.climate.copernicus.eu/api"
 
         /// download multiple months at once
         if months.count >= 2 {
@@ -158,6 +159,7 @@ struct GloFasDownloader: AsyncCommand {
                 dataset: "cems-glofas-historical",
                 query: query,
                 apikey: cdskey,
+                server: server,
                 destinationFile: gribFile
             )
             try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
@@ -185,6 +187,7 @@ struct GloFasDownloader: AsyncCommand {
                     dataset: "cems-glofas-historical",
                     query: query,
                     apikey: cdskey,
+                    server: server,
                     destinationFile: gribFile
                 )
                 try convertGribFileToDaily(logger: logger, domain: domain, gribFile: gribFile)
