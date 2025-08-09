@@ -99,6 +99,9 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let start_date: [String]
     /// included end date `2022-06-01`
     let end_date: [String]
+    
+    /// Select an individual run. Format `2022-02-01T00:00`
+    let run: IsoDateTime?
 
     /// iso starting date `2022-02-01T00:00`
     let start_hour: [String]
@@ -150,6 +153,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         azimuth = try c.decodeIfPresent(Float.self, forKey: .azimuth)
         disable_bias_correction = try c.decodeIfPresent(Bool.self, forKey: .disable_bias_correction)
         domains = try c.decodeIfPresent(CamsQuery.Domain.self, forKey: .domains)
+        run = try c.decodeIfPresent(IsoDateTime.self, forKey: .run)
 
         // Provide a default value if missing:
         bounding_box = try c.decodeIfPresent([String].self, forKey: .bounding_box) ?? []

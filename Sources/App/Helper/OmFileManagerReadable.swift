@@ -17,7 +17,7 @@ enum OmFileManagerReadable: Hashable {
     case meta(domain: DomainRegistry)
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
-    case run(domain: DomainRegistry, variable: String, run: Timestamp)
+    case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
 
     /// Assemble the full file system path
     func getFilePath() -> String {

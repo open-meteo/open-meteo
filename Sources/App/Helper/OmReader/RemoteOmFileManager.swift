@@ -27,23 +27,23 @@ final class RemoteOmFileManager: Sendable {
     let cache = RemoteOmFileManagerCache()
     
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
-    func with<R>(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, fn: (any OmFileReaderArrayProtocol<Float>) async throws -> R) async throws -> R? {
+    func with<R>(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, fn: (_ reader: any OmFileReaderArrayProtocol<Float>, _ timestamps: [Timestamp]?) async throws -> R) async throws -> R? {
         guard let reader = try await get(file: file, client: client, logger: logger, forceNew: false) else {
             return nil
         }
         do {
-            return try await fn(reader)
+            return try await fn(reader.reader, reader.timestamps)
         } catch CurlErrorNonRetry.fileModifiedSinceLastDownload {
             guard let reader = try await get(file: file, client: client, logger: logger, forceNew: true) else {
                 return nil
             }
-            return try await fn(reader)
+            return try await fn(reader.reader, reader.timestamps)
         }
     }
     
     /// Check if the file is available locally or remotely. `with<R>()` is recommended
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> (any OmFileReaderArrayProtocol<Float>)? {
+    func get(file: OmFileManagerReadable, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?)? {
         guard let backend = try await cache.get(key: file, forceNew: forceNew, provider: {
             return try await file.newReader(client: client, logger: logger)
         }) else {
@@ -59,36 +59,37 @@ final class RemoteOmFileManager: Sendable {
 }
 
 enum OmFileLocalOrRemote {
-    case local(OmFileReaderArray<MmapFile, Float>)
-    case remote(OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>)
+    case local(OmFileReaderArray<MmapFile, Float>, timestamps: [Timestamp]?)
+    case remote(OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>, timestamps: [Timestamp]?)
     
-    func toReader() -> any OmFileReaderArrayProtocol<Float> {
+    func toReader() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
         switch self {
-        case .local(let local):
-            return local
-        case .remote(let remote):
-            return remote
+        case .local(let local, let timestamps):
+            return (local, timestamps)
+        case .remote(let remote, let timestamps):
+            return (remote, timestamps)
         }
     }
 }
 
 extension OmFileManagerReadable {
     func newReader(client: HTTPClient, logger: Logger) async throws -> OmFileLocalOrRemote? {
-        /// TODO: for data_run support there needs to be a switch here
-        /// Also needs fix in revalidate
-        let file = self.getRelativeFilePath()
-        let localFile = "\(OpenMeteo.dataDirectory)\(file)"
-        
+        let localFile = getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
-            guard let reader =  try await OmFileReader(fn: try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly)).asArray(of: Float.self) else {
+            let reader = try await OmFileReader(fn: try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly))
+            guard let arrayReader = reader.asArray(of: Float.self) else {
                 return nil
             }
-            return .local(reader)
+            if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+                return .local(arrayReader, timestamps: times)
+            }
+            return .local(arrayReader, timestamps: nil)
         }
         if let remoteDirectory = OpenMeteo.remoteDataDirectory {
-            let remoteFile = "\(remoteDirectory)\(file)"
-            if let remote = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile), let reader = try await remote.asCachedReader().asArray(of: Float.self) {
-                return .remote(reader)
+            let relativeFile = self.getRelativeFilePath()
+            let remoteFile = "\(remoteDirectory)\(relativeFile)"
+            if let remote = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile)?.asRemoteReader() {
+                return remote
             }
         }
         return nil
@@ -216,7 +217,7 @@ final actor RemoteOmFileManagerCache {
             }
             
             // Always check if local files got deleted or overwritten
-            if case .local(let local) = entry.value, local.fn.file.wasDeleted() {
+            if case .local(let local, _) = entry.value, local.fn.file.wasDeleted() {
                 statistics.localModified += 1
                 cache.removeValue(forKey: key)
                 continue
@@ -235,23 +236,23 @@ final actor RemoteOmFileManagerCache {
                 entry.lastValidated = .now()
                 let remoteFile = "\(remoteDirectory)\(key.getRelativeFilePath())"
                 if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
-                    if case .remote(let old) = entry.value {
+                    if case .remote(let old, _) = entry.value {
                         guard old.fn.cacheKey != new.cacheKey else {
                             continue // do not update if the existing entry is the same
                         }
                         statistics.remoteModified += 1
-                        guard let reader = try await new.asCachedReaderArray() else {
+                        guard let reader = try await new.asRemoteReader() else {
                             entry.value = nil
                             continue
                         }
-                        entry.value = .remote(reader)
+                        entry.value = reader
                     } else {
                         statistics.remoteModified += 1
-                        guard let reader = try await new.asCachedReaderArray() else {
+                        guard let reader = try await new.asRemoteReader() else {
                             entry.value = nil
                             continue
                         }
-                        entry.value = .remote(reader)
+                        entry.value = reader
                     }
                 } else {
                     statistics.remoteModified += 1
@@ -274,5 +275,27 @@ extension OmHttpReaderBackend {
     
     func asCachedReaderArray() async throws -> OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>? {
         return try await asCachedReader().asArray(of: Float.self)
+    }
+    
+    func asRemoteReader() async throws -> OmFileLocalOrRemote? {
+        let cachedReader = try await asCachedReader()
+        guard let arrayReader = cachedReader.asArray(of: Float.self) else {
+            return nil
+        }
+        if let times = try await cachedReader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+            return .remote(arrayReader, timestamps: times)
+        }
+        return .remote(arrayReader, timestamps: nil)
+    }
+}
+
+extension OmFileReader {
+    func getChild(name: String) async throws -> Self? {
+        for i in 0..<numberOfChildren {
+            if let child = try await getChild(i), child.getName() == name {
+                return child
+            }
+        }
+        return nil
     }
 }

@@ -132,7 +132,7 @@ struct GenericVariableHandle: Sendable {
             
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * nTime * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(nTime) timesteps")
             
-            let file = OmFileManagerReadable.run(domain: domain.domainRegistry, variable: variable.omFileName.file, run: run)
+            let file = OmFileManagerReadable.run(domain: domain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
             try file.createDirectory()
             let filePath = file.getFilePath()
             let fileTemp = "\(filePath)~"

@@ -58,13 +58,13 @@ extension GenericDomain {
                 file: .staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
                 client: httpClient,
                 logger: logger
-            )
+            )?.reader
         case .elevation:
             return try? await RemoteOmFileManager.instance.get(
                 file: .staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger
-            )
+            )?.reader
         }
     }
 
