@@ -272,7 +272,7 @@ struct DownloadCmaCommand: AsyncCommand {
     /// Individual grib messages are extracted while downloading and processed concurrently
     func download(application: Application, domain: CmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?, maxForecastHour: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 10
+        let deadLineHours: Double = 6
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let nForecastHours = maxForecastHour ?? domain.forecastHours(run: run.hour)

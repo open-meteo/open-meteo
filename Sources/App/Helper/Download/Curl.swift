@@ -255,6 +255,9 @@ final class Curl: Sendable {
                         if Date() > deadLineChunk {
                             throw CurlError.timeoutPerChunkReached(httpRange: chunk)
                         }
+                        if Date() > deadline {
+                            throw CurlError.timeoutReached
+                        }
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }
