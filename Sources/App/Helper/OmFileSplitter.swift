@@ -153,12 +153,12 @@ struct OmFileSplitter {
         }
     }
 
-    func read2D(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> Array2DFastTime {
+    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> Array2DFastTime {
         let data = try await read(variable: variable, location: location, level: level, time: time, logger: logger, httpClient: httpClient)
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
 
-    func read(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> [Float] {
+    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
@@ -167,32 +167,47 @@ struct OmFileSplitter {
         
         /// Read individual runs from dedicated database
         if let run = time.run {
-            let file = OmFileManagerReadable.run(domain: domain, variable: variable, run: run)
+            let file = OmFileManagerReadable.run(domain: domain, variable: variable.omFileName.file, run: run)
             try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps) in
                 guard let timestamps else {
                     return
                 }
                 let fullRunTime = TimerangeDt(start: timestamps[0], to: timestamps[timestamps.count - 1].add(time.dtSeconds), dtSeconds: time.dtSeconds)
+                guard let offsets = indexTime.intersect(fileTime: fullRunTime.toIndexTime()) else {
+                    return
+                }
                 
                 /// Fixed time resolution. Can use linear reads into output array
                 if fullRunTime.count == timestamps.count {
-                    if let offsets = indexTime.intersect(fileTime: fullRunTime.toIndexTime()) {
-                        try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
-                    }
+                    try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     return
                 }
                 
                 /// Run is using irregular time spacing. Read entire run and copy timestamps afterwards
-                var runData = [Float](repeating: .nan, count: timestamps.count * location.count)
+                var runData = [Float](repeating: .nan, count: fullRunTime.count * location.count)
                 try await reader.read3D(into: &runData, ny: ny, nx: nx, nTime: timestamps.count, nMembers: nMembers, location: location, level: level, timeOffsets: (file: 0..<timestamps.count, array:  0..<timestamps.count))
                 
-                /// Map timestamps into correct position
-                for t in timestamps.enumerated() {
-                    guard let pos = time.time.index(of: t.element) else {
+                /// Correct the timestep placement... E.g. DDDDD--- to DDDD-D-D-D
+                for t in timestamps.enumerated().reversed() {
+                    guard let pos = fullRunTime.index(of: t.element), pos != t.offset else {
                         continue
                     }
                     for l in 0..<location.count {
-                        out[l * nTime + pos] = runData[l * timestamps.count + t.offset]
+                        runData[l * timestamps.count + pos] = runData[l * timestamps.count + t.offset]
+                        runData[l * timestamps.count + t.offset] = .nan
+                    }
+                }
+                guard let grid = domain.getDomain()?.grid else {
+                    fatalError("Did not get domain grid for \(domain)")
+                }
+                
+                /// Interpolate missing time steps
+                runData.interpolateInplace(type: variable.interpolation, time: fullRunTime, grid: grid, locationRange: location)
+                
+                /// Map timestamps into correct position
+                for (array, file) in zip(offsets.array, offsets.file) {
+                    for l in 0..<location.count {
+                        out[l * nTime + array] = runData[l * fullRunTime.count + file]
                     }
                 }
             }
@@ -201,7 +216,7 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable.omFileName.file, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
                 try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                     try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
@@ -221,7 +236,7 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+                let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable.omFileName.file, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
                 try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                     try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
@@ -238,7 +253,7 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                 try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }

@@ -157,7 +157,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        var data = try await omFileSplitter.read(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+        var data = try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
         
         // TODO interpolate missing timesteps after 
 
