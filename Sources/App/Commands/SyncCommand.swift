@@ -157,7 +157,6 @@ struct SyncCommand: AsyncCommand {
                         )
                     } catch {
                         logger.critical("Error during sync \(error)")
-                        fatalError()
                     }
                 }
                 if downloadPressureNow {
