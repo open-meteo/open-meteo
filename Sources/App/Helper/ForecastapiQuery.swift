@@ -297,23 +297,22 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Throws errors on invalid coordinates, timezones or invalid counts
     private func getCoordinatesWithTimezone(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
         let coordinates = try await getCoordinates(logger: logger, httpClient: httpClient)
-        let timezones = allowTimezones ? self.timezone : nil
 
-        guard let timezones else {
+        guard allowTimezones, timezone.count > 0 else {
             // if no timezone is specified, use GMT for all locations
             return coordinates.map {
                 ($0, .gmt)
             }
         }
-        if timezones.count == 1 {
+        if timezone.count == 1 {
             return try coordinates.map {
-                ($0, try timezones[0].resolve(coordinate: $0))
+                ($0, try timezone[0].resolve(coordinate: $0))
             }
         }
-        guard timezones.count == coordinates.count else {
+        guard timezone.count == coordinates.count else {
             throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
         }
-        return try zip(coordinates, timezones).map {
+        return try zip(coordinates, timezone).map {
             ($0, try $1.resolve(coordinate: $0))
         }
     }
@@ -395,6 +394,9 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
                 minutely15: minutely_15.add(-1 * actualUtcOffset)
             )
         }
+        
+        // If a single run is selected, start time-range from run
+        let current = self.run.map({$0.toTimestamp()}) ?? current
 
         // Evaluate any forecast_xxx, past_xxx parameter or fallback to default time
         let daily = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days, forecastSteps: forecast_days, pastStepsMax: pastDaysMax, forecastStepsMax: forecastDaysMax, forecastStepsDefault: forecastDaysDefault, initialStep: nil, dtSeconds: 86400) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecastDaysDefault, initialStep: nil, dtSeconds: 86400)
