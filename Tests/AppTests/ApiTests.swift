@@ -25,8 +25,8 @@ import VaporTesting
 
             let params = try request.parseApiParams()
 
-            #expect(params.latitude == ["52.52"])
-            #expect(params.longitude == ["13.41"])
+            #expect(params.latitude == [52.52])
+            #expect(params.longitude == [13.41])
             #expect(params.start_date == [])
             #expect(params.end_date == [])
             #expect(params.bounding_box == [])
@@ -59,8 +59,38 @@ import VaporTesting
 
             let params = try request.parseApiParams()
 
-            #expect(params.latitude == ["52.52"])
-            #expect(params.longitude == ["13.41"])
+            #expect(params.latitude == [52.52])
+            #expect(params.longitude == [13.41])
+            #expect(params.start_date == [])
+            #expect(params.end_date == [])
+            #expect(params.bounding_box == [])
+            #expect(params.start_hour == [])
+            #expect(params.end_hour == [])
+            #expect(params.start_minutely_15 == [])
+            #expect(params.end_minutely_15 == [])
+        }
+        try await withApp { app in
+            let body = """
+            {
+                "latitude": [52.52],
+                "longitude": [13.41],
+            }
+            """
+            var headers = HTTPHeaders()
+            headers.add(name: .contentType, value: "application/json")
+            let request = Request(
+                application: app,
+                method: .POST,
+                url: URI(path: "/forecast"),
+                headers: headers,
+                collectedBody: .init(buffer: ByteBuffer(string: body)),
+                on: app.eventLoopGroup.next()
+            )
+
+            let params = try request.parseApiParams()
+
+            #expect(params.latitude == [52.52])
+            #expect(params.longitude == [13.41])
             #expect(params.start_date == [])
             #expect(params.end_date == [])
             #expect(params.bounding_box == [])

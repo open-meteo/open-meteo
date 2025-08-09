@@ -39,8 +39,8 @@ enum ApiTemporalResolution: String, Codable {
 
 /// All API parameter that are accepted and decoded via GET
 struct ApiQueryParameter: Content, ApiUnitsSelectable {
-    let latitude: [String]
-    let longitude: [String]
+    let latitude: [Float]
+    let longitude: [Float]
     let minutely_15: [String]?
     /// Select individual variables for current weather
     let current: [String]?
@@ -49,9 +49,9 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// For seasonal forecast
     let six_hourly: [String]?
     let current_weather: Bool?
-    let elevation: [String]?
-    let location_id: [String]?
-    let timezone: [String]?
+    let elevation: [Float]
+    let location_id: [Int]
+    let timezone: [TimeZoneOrAuto]
     let temperature_unit: TemperatureUnit?
     let windspeed_unit: WindspeedUnit?
     let wind_speed_unit: WindspeedUnit?
@@ -119,17 +119,17 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        latitude = try c.decode([String].self, forKey: .latitude)
-        longitude = try c.decode([String].self, forKey: .longitude)
+        latitude = try (try? c.decode([Float].self, forKey: .latitude)) ?? Float.load(commaSeparated: c.decode([String].self, forKey: .latitude))
+        longitude = try (try? c.decode([Float].self, forKey: .longitude)) ?? Float.load(commaSeparated: c.decode([String].self, forKey: .longitude))
         minutely_15 = try c.decodeIfPresent([String].self, forKey: .minutely_15)
         current = try c.decodeIfPresent([String].self, forKey: .current)
         hourly = try c.decodeIfPresent([String].self, forKey: .hourly)
         daily = try c.decodeIfPresent([String].self, forKey: .daily)
         six_hourly = try c.decodeIfPresent([String].self, forKey: .six_hourly)
         current_weather = try c.decodeIfPresent(Bool.self, forKey: .current_weather)
-        elevation = try c.decodeIfPresent([String].self, forKey: .elevation)
-        location_id = try c.decodeIfPresent([String].self, forKey: .location_id)
-        timezone = try c.decodeIfPresent([String].self, forKey: .timezone)
+        elevation = try (try? c.decode([Float].self, forKey: .elevation)) ?? Float.load(commaSeparated: c.decode([String].self, forKey: .elevation))
+        location_id = try (try? c.decode([Int].self, forKey: .location_id)) ?? Int.load(commaSeparated: c.decode([String].self, forKey: .location_id))
+        timezone = try TimeZoneOrAuto.load(commaSeparated: c.decode([String].self, forKey: .timezone))
         temperature_unit = try c.decodeIfPresent(TemperatureUnit.self, forKey: .temperature_unit)
         windspeed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .windspeed_unit)
         wind_speed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .wind_speed_unit)
@@ -220,7 +220,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     func prepareCoordinates(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> ApiRequestGeometry {
         let dates = try getStartEndDates()
         if let bb = try getBoundingBox() {
-            let timezones = allowTimezones ? try TimeZoneOrAuto.load(commaSeparatedOptional: timezone) ?? [] : []
+            let timezones = allowTimezones ? self.timezone : []
             guard timezones.count <= 1 else {
                 throw ForecastapiError.generic(message: "Only one timezone may be specified with bounding box queries")
             }
@@ -297,7 +297,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Throws errors on invalid coordinates, timezones or invalid counts
     private func getCoordinatesWithTimezone(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
         let coordinates = try await getCoordinates(logger: logger, httpClient: httpClient)
-        let timezones = allowTimezones ? try TimeZoneOrAuto.load(commaSeparatedOptional: timezone) : nil
+        let timezones = allowTimezones ? self.timezone : nil
 
         guard let timezones else {
             // if no timezone is specified, use GMT for all locations
@@ -322,19 +322,15 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// If no elevation is provided, a DEM is used to resolve the elevation
     /// Throws errors on invalid coordinate ranges
     private func getCoordinates(logger: Logger, httpClient: HTTPClient) async throws -> [CoordinatesAndElevation] {
-        let latitude = try Float.load(commaSeparated: self.latitude)
-        let longitude = try Float.load(commaSeparated: self.longitude)
-        let elevation = try Float.load(commaSeparatedOptional: self.elevation)
-        let locationIds = try Int.load(commaSeparatedOptional: self.location_id)
         guard latitude.count == longitude.count else {
             throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
         }
-        if let locationIds {
-            guard locationIds.count == longitude.count else {
+        if location_id.count > 0 {
+            guard location_id.count == longitude.count else {
                 throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
             }
         }
-        if let elevation {
+        if elevation.count > 0 {
             guard elevation.count == longitude.count else {
                 throw ForecastapiError.coordinatesAndElevationCountMustBeTheSame
             }
@@ -342,7 +338,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
                 try await CoordinatesAndElevation(
                     latitude: $0.element.0,
                     longitude: $0.element.1.0,
-                    locationId: locationIds?[$0.offset] ?? $0.offset,
+                    locationId: location_id.count > 0 ? location_id[$0.offset] : $0.offset,
                     elevation: $0.element.1.1,
                     logger: logger,
                     httpClient: httpClient
@@ -353,7 +349,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             try await CoordinatesAndElevation(
                 latitude: $0.element.0,
                 longitude: $0.element.1,
-                locationId: locationIds?[$0.offset] ?? $0.offset,
+                locationId: location_id.count > 0 ? location_id[$0.offset] : $0.offset,
                 elevation: nil,
                 logger: logger,
                 httpClient: httpClient
@@ -595,7 +591,7 @@ enum Timeformat: String, Codable {
 }
 
 /// Differentiate between a user defined timezone or `auto` which is later resolved using coordinates
-enum TimeZoneOrAuto {
+enum TimeZoneOrAuto: Codable {
     /// User specified `auto`
     case auto
 
@@ -604,15 +600,13 @@ enum TimeZoneOrAuto {
 
     /// Take a string array which contains timezones or `auto`. Does an additional decoding step to split coma separated timezones.
     /// Throws errors on invalid timezones
-    static func load(commaSeparatedOptional: [String]?) throws -> [TimeZoneOrAuto]? {
-        return try commaSeparatedOptional.map {
-            try $0.flatMap { s in
-                try s.split(separator: ",").map { timezone in
-                    if timezone == "auto" {
-                        return .auto
-                    }
-                    return .timezone(try TimeZone.initWithFallback(String(timezone)))
+    static func load(commaSeparated: [String]) throws -> [TimeZoneOrAuto] {
+        return try commaSeparated.flatMap { s in
+            try s.split(separator: ",").map { timezone in
+                if timezone == "auto" {
+                    return .auto
                 }
+                return .timezone(try TimeZone.initWithFallback(String(timezone)))
             }
         }
     }

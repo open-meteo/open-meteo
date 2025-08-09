@@ -4,8 +4,8 @@ import Vapor
 struct DemController {
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter("api") { _, params in
-            let latitude = try Float.load(commaSeparated: params.latitude)
-            let longitude = try Float.load(commaSeparated: params.longitude)
+            let latitude = params.latitude
+            let longitude = params.longitude
 
             guard latitude.count == longitude.count else {
                 throw ForecastapiError.latitudeAndLongitudeSameCount
