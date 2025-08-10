@@ -119,17 +119,17 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        latitude = try (try? c.decode([Float].self, forKey: .latitude)) ?? Float.load(commaSeparated: c.decode([String].self, forKey: .latitude))
-        longitude = try (try? c.decode([Float].self, forKey: .longitude)) ?? Float.load(commaSeparated: c.decode([String].self, forKey: .longitude))
+        latitude = try (try? c.decodeIfPresent([Float].self, forKey: .latitude)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .latitude)) ?? []
+        longitude = try (try? c.decodeIfPresent([Float].self, forKey: .longitude)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .longitude)) ?? []
         minutely_15 = try c.decodeIfPresent([String].self, forKey: .minutely_15)
         current = try c.decodeIfPresent([String].self, forKey: .current)
         hourly = try c.decodeIfPresent([String].self, forKey: .hourly)
         daily = try c.decodeIfPresent([String].self, forKey: .daily)
         six_hourly = try c.decodeIfPresent([String].self, forKey: .six_hourly)
         current_weather = try c.decodeIfPresent(Bool.self, forKey: .current_weather)
-        elevation = try (try? c.decode([Float].self, forKey: .elevation)) ?? Float.load(commaSeparated: c.decode([String].self, forKey: .elevation))
-        location_id = try (try? c.decode([Int].self, forKey: .location_id)) ?? Int.load(commaSeparated: c.decode([String].self, forKey: .location_id))
-        timezone = try TimeZoneOrAuto.load(commaSeparated: c.decode([String].self, forKey: .timezone))
+        elevation = try (try? c.decodeIfPresent([Float].self, forKey: .elevation)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .elevation)) ?? []
+        location_id = try (try? c.decodeIfPresent([Int].self, forKey: .location_id)) ?? Int.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .location_id)) ?? []
+        timezone = try TimeZoneOrAuto.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .timezone)) ?? []
         temperature_unit = try c.decodeIfPresent(TemperatureUnit.self, forKey: .temperature_unit)
         windspeed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .windspeed_unit)
         wind_speed_unit = try c.decodeIfPresent(WindspeedUnit.self, forKey: .wind_speed_unit)
@@ -602,7 +602,10 @@ enum TimeZoneOrAuto: Codable {
 
     /// Take a string array which contains timezones or `auto`. Does an additional decoding step to split coma separated timezones.
     /// Throws errors on invalid timezones
-    static func load(commaSeparated: [String]) throws -> [TimeZoneOrAuto] {
+    static func load(commaSeparatedOptional: [String]?) throws -> [TimeZoneOrAuto]? {
+        guard let commaSeparated = commaSeparatedOptional else {
+            return nil
+        }
         return try commaSeparated.flatMap { s in
             try s.split(separator: ",").map { timezone in
                 if timezone == "auto" {

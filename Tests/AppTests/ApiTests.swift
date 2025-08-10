@@ -13,6 +13,7 @@ import VaporTesting
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
     }
 
+    @Test
     func testParseApiParamsGET() async throws {
         try await withApp { app in
             let url = URI(string: "/forecast?latitude=52.52&longitude=13.41")
@@ -34,6 +35,19 @@ import VaporTesting
             #expect(params.end_hour == [])
             #expect(params.start_minutely_15 == [])
             #expect(params.end_minutely_15 == [])
+            
+            let url2 = URI(string: "/forecast?latitude=52.52,45.1&longitude=13.41,14.2&elevation=23%2C45")
+            let request2 = Request(
+                application: app,
+                method: .GET,
+                url: url2,
+                on: app.eventLoopGroup.next()
+            )
+
+            let params2 = try request2.parseApiParams()
+            #expect(params2.latitude == [52.52, 45.1])
+            #expect(params2.longitude == [13.41, 14.2])
+            #expect(params2.elevation == [23.0, 45.0])
         }
     }
 
