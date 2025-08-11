@@ -18,12 +18,16 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
         self.cacheKey = cacheKey
     }
     
+    /// Calculate cache key for block. 100 blocks are stored consecutive in cache.
+    @inlinable func calculateCacheKey(block: Int) -> UInt64 {
+        return (cacheKey ^ (UInt64(block / 100) &* 0x100000001b3)) &+ UInt64(block % 100)
+    }
     
     func prefetchData(offset: Int, count: Int) async throws {
         let blockSize = cache.cache.blockSize
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         for block in blocks {
-            cache.prefetchData(key: cacheKey &+ UInt64(block))
+            cache.prefetchData(key: calculateCacheKey(block: block))
         }
     }
     
@@ -38,7 +42,8 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         
         /// Check if all blocks are available sequentially in cache
-        if let ptr = cache.cache.get(key: cacheKey &+ UInt64(blocks.lowerBound), count: UInt64(blocks.count)) {
+        let sameSuperBlock = blocks.lowerBound / 100 == (blocks.upperBound-1) / 100
+        if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
             let blockRange = blocks.lowerBound * blockSize ..< blocks.upperBound * blockSize
             let range = dataRange.intersect(fileTime: blockRange)!
             return try fn(UnsafeRawBufferPointer(rebasing: ptr[range.file]))
@@ -52,7 +57,7 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
             let range = dataRange.intersect(fileTime: blockRange)!
             let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
             let ptr = try await cache.get(
-                key: cacheKey &+ UInt64(block),
+                key: calculateCacheKey(block: block),
                 backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
             }))
@@ -68,7 +73,8 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
         let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
         
         /// Check if all blocks are available sequentially in cache
-        if let ptr = cache.cache.get(key: cacheKey &+ UInt64(blocks.lowerBound), count: UInt64(blocks.count)) {
+        let sameSuperBlock = blocks.lowerBound / 100 == (blocks.upperBound-1) / 100
+        if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
             let blockRange = blocks.lowerBound * blockSize ..< blocks.upperBound * blockSize
             let range = dataRange.intersect(fileTime: blockRange)!
             return Data(ptr[range.file])
@@ -84,7 +90,7 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
             let range = dataRange.intersect(fileTime: blockRange)!
             let dest = UnsafeMutableRawBufferPointer(rebasing: data[range.array])
             let ptr = try await cache.get(
-                key: cacheKey &+ UInt64(block),
+                key: calculateCacheKey(block: block),
                 backendFetch: ({
                 try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
             }))
