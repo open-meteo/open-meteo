@@ -24,16 +24,21 @@ enum OmFileManagerReadable: Hashable {
         return "\(getDataDirectoryPath())\(getRelativeFilePath())"
     }
     
-    /// Get the remote URL. May replace "data" with "data_run" for single run selection
+    /// Get the remote URL. May replace "data" with "data_run"
     func getRemoteUrl() -> String? {
         guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
             return nil
         }
+        let file = getRelativeFilePath()
         switch self {
-        case .run(_, _, _):
-            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run"))\(getRelativeFilePath())"
-        default:
-            return "\(remoteDirectory)\(getRelativeFilePath())"
+        case .run(let domain, _, _):
+            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run").replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+        case .domainChunk(let domain, _, _, _, _, _):
+            return "\(remoteDirectory.replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+        case .staticFile(domain: let domain, _, _):
+            return "\(remoteDirectory.replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+        case .meta(domain: let domain):
+            return "\(remoteDirectory.replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
         }
     }
     

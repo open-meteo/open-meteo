@@ -6,6 +6,7 @@ import Logging
 enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
     case fileModifiedSinceLastDownload
+    case forbidden
 }
 
 enum CurlErrorRetry: Error {
@@ -40,6 +41,8 @@ extension HTTPClientResponse {
             throw CurlErrorNonRetry.unauthorized
         case .preconditionFailed:
             throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        case .forbidden:
+            throw CurlErrorNonRetry.forbidden
         default:
             break
         }

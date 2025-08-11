@@ -59,8 +59,9 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         self.client = client
         var headRequest = HTTPClientRequest(url: url)
         headRequest.method = .HEAD
+        try headRequest.applyS3Credentials()
         do {
-            logger.debug("Sending HEAD requests to \(url)")
+            logger.debug("Sending HEAD requests to \(headRequest.url)")
             let backoff = ExponentialBackOff(maximum: .milliseconds(500))
             let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5), timeoutPerRequest: .seconds(1), backOffSettings: backoff)
             guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
@@ -89,7 +90,8 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
             request.headers.add(name: "If-Match", value: eTag)
         }
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
-        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(url)")
+        try request.applyS3Credentials()
+        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
         return try await response.body.collect(upTo: count)
     }
