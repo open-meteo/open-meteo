@@ -48,7 +48,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let daily: [String]?
     /// For seasonal forecast
     let six_hourly: [String]?
-    let current_weather: Bool?
+    let current_weather: Bool
     let elevation: [Float]
     let location_id: [Int]
     let timezone: [TimeZoneOrAuto]
@@ -60,7 +60,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let timeformat: Timeformat?
     let temporal_resolution: ApiTemporalResolution?
 
-    let bounding_box: [String]
+    let bounding_box: [Float]
 
     let past_days: Int?
     let past_hours: Int?
@@ -96,22 +96,22 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let domains: CamsQuery.Domain? // sams
 
     /// iso starting date `2022-02-01`
-    let start_date: [String]
+    let start_date: [IsoDate]
     /// included end date `2022-06-01`
-    let end_date: [String]
+    let end_date: [IsoDate]
     
     /// Select an individual run. Format `2022-02-01T00:00`
     let run: IsoDateTime?
 
     /// iso starting date `2022-02-01T00:00`
-    let start_hour: [String]
+    let start_hour: [IsoDateTime]
     /// included end date `2022-06-01T23:00`
-    let end_hour: [String]
+    let end_hour: [IsoDateTime]
 
     /// iso starting date `2022-02-01T00:00`
-    let start_minutely_15: [String]
+    let start_minutely_15: [IsoDateTime]
     /// included end date `2022-06-01T23:45`
-    let end_minutely_15: [String]
+    let end_minutely_15: [IsoDateTime]
 
     var timeformatOrDefault: Timeformat {
         return timeformat ?? .iso8601
@@ -126,7 +126,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         hourly = try c.decodeIfPresent([String].self, forKey: .hourly)
         daily = try c.decodeIfPresent([String].self, forKey: .daily)
         six_hourly = try c.decodeIfPresent([String].self, forKey: .six_hourly)
-        current_weather = try c.decodeIfPresent(Bool.self, forKey: .current_weather)
+        current_weather = try c.decodeIfPresent(Bool.self, forKey: .current_weather) ?? false
         elevation = try (try? c.decodeIfPresent([Float].self, forKey: .elevation)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .elevation)) ?? []
         location_id = try (try? c.decodeIfPresent([Int].self, forKey: .location_id)) ?? Int.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .location_id)) ?? []
         timezone = try TimeZoneOrAuto.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .timezone)) ?? []
@@ -156,14 +156,14 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         run = try c.decodeIfPresent(IsoDateTime.self, forKey: .run)
 
         // Provide a default value if missing:
-        bounding_box = try c.decodeIfPresent([String].self, forKey: .bounding_box) ?? []
+        bounding_box = try (try? c.decodeIfPresent([Float].self, forKey: .bounding_box)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .bounding_box)) ?? []
         ensemble = try c.decodeIfPresent(Bool.self, forKey: .ensemble) ?? false
-        start_date = try c.decodeIfPresent([String].self, forKey: .start_date) ?? []
-        end_date = try c.decodeIfPresent([String].self, forKey: .end_date) ?? []
-        start_hour = try c.decodeIfPresent([String].self, forKey: .start_hour) ?? []
-        end_hour = try c.decodeIfPresent([String].self, forKey: .end_hour) ?? []
-        start_minutely_15 = try c.decodeIfPresent([String].self, forKey: .start_minutely_15) ?? []
-        end_minutely_15 = try c.decodeIfPresent([String].self, forKey: .end_minutely_15) ?? []
+        start_date = try c.decodeIfPresent([String].self, forKey: .start_date).map(IsoDate.load) ?? []
+        end_date = try c.decodeIfPresent([String].self, forKey: .end_date).map(IsoDate.load) ?? []
+        start_hour = try c.decodeIfPresent([String].self, forKey: .start_hour).map(IsoDateTime.load) ?? []
+        end_hour = try c.decodeIfPresent([String].self, forKey: .end_hour).map(IsoDateTime.load) ?? []
+        start_minutely_15 = try c.decodeIfPresent([String].self, forKey: .start_minutely_15).map(IsoDateTime.load) ?? []
+        end_minutely_15 = try c.decodeIfPresent([String].self, forKey: .end_minutely_15).map(IsoDateTime.load) ?? []
         
         if run != nil {
             guard start_date.isEmpty else {
@@ -286,7 +286,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     /// Parse `&bounding_box=` parameter. Format: lat1, lon1, lat2, lon2
     func getBoundingBox() throws -> BoundingBoxWGS84? {
-        let coordinates = try Float.load(commaSeparated: self.bounding_box)
+        let coordinates = self.bounding_box
         guard coordinates.count > 0 else {
             return nil
         }

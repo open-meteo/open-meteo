@@ -3,7 +3,7 @@ import Foundation
 /**
  Simple year, month, day container which is decoded to iso dates `2022-01-01`
  */
-public struct IsoDate: Codable {
+public struct IsoDate: Codable, Sendable, Equatable {
     /// Encoded as integer `20220101`
     public let date: Int32
 
@@ -90,12 +90,12 @@ extension IsoDate {
         }
     }
 
-    static func loadRange(start: [String], end: [String]) throws -> [ClosedRange<Timestamp>] {
+    static func loadRange(start: [IsoDate], end: [IsoDate]) throws -> [ClosedRange<Timestamp>] {
         if start.isEmpty, end.isEmpty {
             return []
         }
-        let startDate = try load(commaSeparated: start)
-        let endDate = try load(commaSeparated: end)
+        let startDate = start
+        let endDate = end
         guard startDate.count == endDate.count else {
             throw ForecastApiError.startAndEndDateCountMustBeTheSame
         }

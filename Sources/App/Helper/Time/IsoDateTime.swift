@@ -154,12 +154,12 @@ extension IsoDateTime {
         }
     }
 
-    static func loadRange(start: [String], end: [String]) throws -> [ClosedRange<Timestamp>] {
+    static func loadRange(start: [IsoDateTime], end: [IsoDateTime]) throws -> [ClosedRange<Timestamp>] {
         if start.isEmpty, end.isEmpty {
             return []
         }
-        let startDate = try load(commaSeparated: start)
-        let endDate = try load(commaSeparated: end)
+        let startDate = start
+        let endDate = end
         guard startDate.count == endDate.count else {
             throw ForecastApiError.startAndEndDateCountMustBeTheSame
         }
