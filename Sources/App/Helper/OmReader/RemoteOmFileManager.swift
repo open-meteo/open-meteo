@@ -258,9 +258,9 @@ final actor RemoteOmFileManagerCache {
             }
         }
         if statistics.ticks.isMultiple(of: 10), total > 0 {
-            logger.info("OmFileManager: \(total) open files, \(running) running. Removed since last check: \(statistics.inactivity) inactive, \(statistics.localModified) local modified, \(statistics.remoteModified) remote modified")
+            logger.warning("OmFileManager: \(total) open files, \(running) running. Removed since last check: \(statistics.inactivity) inactive, \(statistics.localModified) local modified, \(statistics.remoteModified) remote modified")
             if OpenMeteo.remoteDataDirectory != nil {
-                logger.info("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
+                logger.warning("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
             }
             statistics.reset()
         }
