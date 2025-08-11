@@ -174,7 +174,7 @@ struct S3DataController: RouteCollection {
             var request = HTTPClientRequest(url: "\(remote.replacing("MODEL", with: model.replacing("_", with: "-")))\(pathNoData)")
             try request.applyS3Credentials()
             let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
-            return Response(status: response.status, headers: response.headers, body: .init(asyncStream: { writer in
+            let r = Response(status: response.status, body: .init(asyncStream: { writer in
                 Task {
                     do {
                         for try await buffer in response.body {
@@ -186,6 +186,8 @@ struct S3DataController: RouteCollection {
                     }
                 }
             }))
+            r.headers.contentType = response.headers.contentType
+            return r
         }
         let response = try await req.fileio.asyncStreamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
         return response

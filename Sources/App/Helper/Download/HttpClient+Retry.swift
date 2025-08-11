@@ -60,7 +60,7 @@ struct ExponentialBackOff {
     }
     
     func waitTime(attempt n: Int) -> TimeAmount {
-        let baseWait = min(factor.nanoseconds * Int64(pow(2, Double(n - 1))), maximum.nanoseconds)
+        let baseWait = min(factor.nanoseconds * Int64(pow(2, Double(min(n, 20) - 1))), maximum.nanoseconds)
         let jitterRange = Int64(baseWait / 4)
         let jitter = Int64.random(in: -jitterRange...jitterRange)
         let jitteredWait = max(0, baseWait + jitter)
