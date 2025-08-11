@@ -93,7 +93,7 @@ struct WeatherApiController {
         case historicalForecast
         case previousRuns
         case satellite
-        case modelRunsApi
+        case singleRunsApi
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -105,8 +105,8 @@ struct WeatherApiController {
             if host.starts(with: "previous-runs-api") || host.starts(with: "customer-previous-runs-api") {
                 return .previousRuns
             }
-            if host.starts(with: "model-runs-api") || host.starts(with: "customer-model-runs-api") {
-                return .modelRunsApi
+            if host.starts(with: "single-runs-api") || host.starts(with: "customer-single-runs-api") {
+                return .singleRunsApi
             }
             if host.starts(with: "archive-api") || host.starts(with: "customer-archive-api") {
                 return .archive
@@ -152,16 +152,16 @@ struct WeatherApiController {
                 forecastDaysMax = 1
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(1983, 1, 1)
-            case .modelRunsApi:
-                forecastDaysMax = 1
-                forecastDayDefault = 1
+            case .singleRunsApi:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
                 historyStartDate = Timestamp(2023, 1, 1)
 
             }
             switch type {
             case .none:
                 break
-            case .modelRunsApi:
+            case .singleRunsApi:
                 guard params.run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
