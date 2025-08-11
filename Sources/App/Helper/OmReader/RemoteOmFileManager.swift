@@ -85,9 +85,7 @@ extension OmFileManagerReadable {
             }
             return .local(arrayReader, timestamps: nil)
         }
-        if let remoteDirectory = OpenMeteo.remoteDataDirectory {
-            let relativeFile = self.getRelativeFilePath()
-            let remoteFile = "\(remoteDirectory)\(relativeFile)"
+        if let remoteFile = self.getRemoteUrl() {
             if let remote = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile)?.asRemoteReader() {
                 return remote
             }
@@ -232,9 +230,8 @@ final actor RemoteOmFileManagerCache {
             
             // Revalidate remote files every 3 minutes
             // File may got added, modified or removed
-            if let remoteDirectory = OpenMeteo.remoteDataDirectory, entry.lastValidated < revalidateAfter {
+            if entry.lastValidated < revalidateAfter, let remoteFile = key.getRemoteUrl() {
                 entry.lastValidated = .now()
-                let remoteFile = "\(remoteDirectory)\(key.getRelativeFilePath())"
                 if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
                     if case .remote(let old, _) = entry.value {
                         guard old.fn.cacheKey != new.cacheKey else {
@@ -260,8 +257,11 @@ final actor RemoteOmFileManagerCache {
                 }
             }
         }
-        if statistics.ticks.isMultiple(of: 10), total > 10 {
+        if statistics.ticks.isMultiple(of: 10), total > 0 {
             logger.info("OmFileManager: \(total) open files, \(running) running. Removed since last check: \(statistics.inactivity) inactive, \(statistics.localModified) local modified, \(statistics.remoteModified) remote modified")
+            if OpenMeteo.remoteDataDirectory != nil {
+                logger.info("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
+            }
             statistics.reset()
         }
     }

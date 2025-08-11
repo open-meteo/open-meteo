@@ -24,6 +24,19 @@ enum OmFileManagerReadable: Hashable {
         return "\(getDataDirectoryPath())\(getRelativeFilePath())"
     }
     
+    /// Get the remote URL. May replace "data" with "data_run" for single run selection
+    func getRemoteUrl() -> String? {
+        guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
+            return nil
+        }
+        switch self {
+        case .run(_, _, _):
+            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run"))\(getRelativeFilePath())"
+        default:
+            return "\(remoteDirectory)\(getRelativeFilePath())"
+        }
+    }
+    
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`
     func getRelativeFilePath() -> String {
         switch self {

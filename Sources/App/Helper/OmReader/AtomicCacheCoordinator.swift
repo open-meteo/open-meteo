@@ -12,7 +12,7 @@ struct AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         self.queue = .init()
     }
     
-    func get<T: ContiguousBytes & Sendable>(key: UInt64, backendFetch: @Sendable () async throws -> T) async throws -> UnsafeRawBufferPointer {
+    func get<T: ContiguousBytes>(key: UInt64, backendFetch: @Sendable () async throws -> T) async throws -> UnsafeRawBufferPointer {
         if let result = cache.get(key: key) {
             return result
         }
