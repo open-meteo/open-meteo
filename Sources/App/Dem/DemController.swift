@@ -8,20 +8,20 @@ struct DemController {
             let longitude = params.longitude
 
             guard latitude.count == longitude.count else {
-                throw ForecastapiError.latitudeAndLongitudeSameCount
+                throw ForecastApiError.latitudeAndLongitudeSameCount
             }
             guard !latitude.isEmpty else {
-                throw ForecastapiError.latitudeAndLongitudeNotEmpty
+                throw ForecastApiError.latitudeAndLongitudeNotEmpty
             }
             guard latitude.count <= 100 else {
-                throw ForecastapiError.latitudeAndLongitudeMaximum(max: 100)
+                throw ForecastApiError.latitudeAndLongitudeMaximum(max: 100)
             }
             try zip(latitude, longitude).forEach { latitude, longitude in
                 if latitude > 90 || latitude < -90 || latitude.isNaN {
-                    throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
+                    throw ForecastApiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
                 }
                 if longitude > 180 || longitude < -180 || longitude.isNaN {
-                    throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
+                    throw ForecastApiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
                 }
             }
             return DemResponder(latitude: latitude, longitude: longitude, logger: req.logger, httpClient: req.application.http.client.shared)

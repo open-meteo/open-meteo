@@ -93,6 +93,7 @@ struct WeatherApiController {
         case historicalForecast
         case previousRuns
         case satellite
+        case modelRunsApi
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -103,6 +104,9 @@ struct WeatherApiController {
             }
             if host.starts(with: "previous-runs-api") || host.starts(with: "customer-previous-runs-api") {
                 return .previousRuns
+            }
+            if host.starts(with: "model-runs-api") || host.starts(with: "customer-model-runs-api") {
+                return .modelRunsApi
             }
             if host.starts(with: "archive-api") || host.starts(with: "customer-archive-api") {
                 return .archive
@@ -148,6 +152,23 @@ struct WeatherApiController {
                 forecastDaysMax = 1
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(1983, 1, 1)
+            case .modelRunsApi:
+                forecastDaysMax = 1
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(2023, 1, 1)
+
+            }
+            switch type {
+            case .none:
+                break
+            case .modelRunsApi:
+                guard params.run != nil else {
+                    throw ForecastApiError.parameterIsRequired(name: "run")
+                }
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite:
+                guard params.run == nil else {
+                    throw ForecastApiError.parameterMostNotBeSet(name: "run")
+                }
             }
             
             let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
@@ -279,7 +300,7 @@ struct WeatherApiController {
                     )
                 }
                 guard !readers.isEmpty else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
@@ -617,7 +638,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let probabilities = try await ProbabilityReader.makeBomReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
-            throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
+            throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .knmi_harmonie_arome_europe:
             return try await KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .knmi_harmonie_arome_netherlands:
@@ -942,7 +963,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .bom_access_global:
             return try await BomReader(domain: .access_global, gridpoint: gridpoint, options: options)
         case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m, .arpae_cosmo_seamless:
-            throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
+            throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
             return nil
         case .gfs_seamless, .ncep_seamless, .gfs_mix:
@@ -971,7 +992,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
             else {
                 // Not possible
-                throw ForecastapiError.noDataAvilableForThisLocation
+                throw ForecastApiError.noDataAvailableForThisLocation
             }
             return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         case .era5_ensemble, .copernicus_era5_ensemble:

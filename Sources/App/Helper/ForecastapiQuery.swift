@@ -69,7 +69,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let forecast_hours: Int?
     let forecast_minutely_15: Int?
 
-    /// If forecast_hours is set, the default is to start from the current hour. With `initial_hours`, a different hout of the day can be selected
+    /// If forecast_hours is set, the default is to start from the current hour. With `initial_hours`, a different hour of the day can be selected
     /// E.g. initial_hours=0 and forecast_hours=12 would return the first 12 hours of the current day.
     let initial_hours: Int?
     let initial_minutely_15: Int?
@@ -164,6 +164,27 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         end_hour = try c.decodeIfPresent([String].self, forKey: .end_hour) ?? []
         start_minutely_15 = try c.decodeIfPresent([String].self, forKey: .start_minutely_15) ?? []
         end_minutely_15 = try c.decodeIfPresent([String].self, forKey: .end_minutely_15) ?? []
+        
+        if run != nil {
+            guard start_date.isEmpty else {
+                throw ForecastApiError.parameterMostNotBeSet(name: "start_date")
+            }
+            guard end_date.isEmpty else {
+                throw ForecastApiError.parameterMostNotBeSet(name: "end_date")
+            }
+            guard start_hour.isEmpty else {
+                throw ForecastApiError.parameterMostNotBeSet(name: "start_hour")
+            }
+            guard end_hour.isEmpty else {
+                throw ForecastApiError.parameterMostNotBeSet(name: "end_hour")
+            }
+            guard start_minutely_15.isEmpty else {
+                throw ForecastApiError.parameterMostNotBeSet(name: "start_minutely_15")
+            }
+            guard end_minutely_15.isEmpty else {
+                throw ForecastApiError.parameterMostNotBeSet(name: "end_minutely_15")
+            }
+        }
     }
 
     func readerOptions(logger: Logger, httpClient: HTTPClient) throws -> GenericReaderOptions {
@@ -184,22 +205,22 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return []
         }
         if let past_days, past_days != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
         }
         if let forecast_days, forecast_days != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
         }
         if let past_hours, past_hours != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
         }
         if let forecast_hours, forecast_hours != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
         }
         if let past_minutely_15, past_minutely_15 != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
         }
         if let forecast_minutely_15, forecast_minutely_15 != 0 {
-            throw ForecastapiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
         }
         let count = max(max(dates.count, hourRange.count), minutely15Range.count)
         return (0..<count).map {
@@ -222,12 +243,12 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         if let bb = try getBoundingBox() {
             let timezones = allowTimezones ? self.timezone : []
             guard timezones.count <= 1 else {
-                throw ForecastapiError.generic(message: "Only one timezone may be specified with bounding box queries")
+                throw ForecastApiError.generic(message: "Only one timezone may be specified with bounding box queries")
             }
             let timezone: TimezoneWithOffset = try timezones.first.map({
                 switch $0 {
                 case .auto:
-                    throw ForecastapiError.generic(message: "Timezone 'auto' not supported with bounding box queries")
+                    throw ForecastApiError.generic(message: "Timezone 'auto' not supported with bounding box queries")
                 case .timezone(let t):
                     return TimezoneWithOffset(timezone: t)
                 }
@@ -256,7 +277,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             })
         }
         guard dates.count == coordinates.count else {
-            throw ForecastapiError.coordinatesAndStartEndDatesCountMustBeTheSame
+            throw ForecastApiError.coordinatesAndStartEndDatesCountMustBeTheSame
         }
         return .coordinates(zip(coordinates, dates).map {
             CoordinatesAndTimeZonesAndDates(coordinate: $0.0.coordinate, timezone: $0.0.timezone, startEndDate: $0.1)
@@ -270,7 +291,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return nil
         }
         guard coordinates.count == 4 else {
-            throw ForecastapiError.generic(message: "Parameter bounding_box must have 4 values")
+            throw ForecastApiError.generic(message: "Parameter bounding_box must have 4 values")
         }
         let lat1 = coordinates[0]
         let lon1 = coordinates[1]
@@ -278,16 +299,16 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let lon2 = coordinates[3]
 
         guard lat1 < lat2 else {
-            throw ForecastapiError.generic(message: "The first latitude must be smaller than the second latitude")
+            throw ForecastApiError.generic(message: "The first latitude must be smaller than the second latitude")
         }
         guard (-90...90).contains(lat1), (-90...90).contains(lat2) else {
-            throw ForecastapiError.generic(message: "Latitudes must be between -90 and 90")
+            throw ForecastApiError.generic(message: "Latitudes must be between -90 and 90")
         }
         guard lon1 < lon2 else {
-            throw ForecastapiError.generic(message: "The first longitude must be smaller than the second longitude")
+            throw ForecastApiError.generic(message: "The first longitude must be smaller than the second longitude")
         }
         guard (-180...180).contains(lon1), (-180...180).contains(lon2) else {
-            throw ForecastapiError.generic(message: "Longitudes must be between -180 and 180")
+            throw ForecastApiError.generic(message: "Longitudes must be between -180 and 180")
         }
         return BoundingBoxWGS84(latitude: lat1..<lat2, longitude: lon1..<lon2)
     }
@@ -310,7 +331,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             }
         }
         guard timezone.count == coordinates.count else {
-            throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
+            throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
         }
         return try zip(coordinates, timezone).map {
             ($0, try $1.resolve(coordinate: $0))
@@ -322,16 +343,16 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Throws errors on invalid coordinate ranges
     private func getCoordinates(logger: Logger, httpClient: HTTPClient) async throws -> [CoordinatesAndElevation] {
         guard latitude.count == longitude.count else {
-            throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
+            throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
         }
         if location_id.count > 0 {
             guard location_id.count == longitude.count else {
-                throw ForecastapiError.latitudeAndLongitudeCountMustBeTheSame
+                throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
             }
         }
         if elevation.count > 0 {
             guard elevation.count == longitude.count else {
-                throw ForecastapiError.coordinatesAndElevationCountMustBeTheSame
+                throw ForecastApiError.coordinatesAndElevationCountMustBeTheSame
             }
             return try await zip(latitude, zip(longitude, elevation)).enumerated().asyncMap({
                 try await CoordinatesAndElevation(
@@ -360,6 +381,26 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let actualUtcOffset = timezone.utcOffsetSeconds
         /// Align data to nearest hour -> E.g. timezones in india may have 15 minutes offsets
         let utcOffset = (actualUtcOffset / 3600) * 3600
+        
+        // If a single run is selected, start time-range from run
+        if let run {
+            let current = run.toTimestamp()
+            let daily = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_days ?? forecastDaysDefault, initialStep: 0, dtSeconds: 86400)
+            
+            let defaultForecastHours = (forecast_days ?? forecastDaysDefault)*24
+            let hourly = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_hours ?? defaultForecastHours, initialStep: run.hour, dtSeconds: 3600)
+            
+            let defaultForecastMinutely15 = (forecast_hours ?? defaultForecastHours)*4
+            let minutely_15 = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_minutely_15 ?? defaultForecastMinutely15, initialStep: run.hour*4, dtSeconds: 900)
+            
+            return ForecastApiTimeRange(
+                dailyDisplay: daily.add(-1 * actualUtcOffset),
+                dailyRead: daily.add(-1 * utcOffset),
+                hourlyDisplay: hourly.add(-1 * actualUtcOffset),
+                hourlyRead: hourly.add(-1 * utcOffset),
+                minutely15: minutely_15.add(-1 * actualUtcOffset)
+            )
+        }
 
         if let startEndDate {
             // Start and end data parameter have been set
@@ -368,22 +409,22 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             let minutely_15 = startEndDate.minutely_15?.toRange(dt: 900) ?? hourly.with(dtSeconds: 900)
 
             guard allowedRange.contains(daily.range.lowerBound) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "start_date", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "start_date", allowed: allowedRange)
             }
             guard allowedRange.contains(daily.range.upperBound.add(-1 * daily.dtSeconds)) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "end_date", allowed: allowedRange)
             }
             guard allowedRange.contains(hourly.range.lowerBound) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "start_hourly", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "start_hourly", allowed: allowedRange)
             }
             guard allowedRange.contains(hourly.range.upperBound.add(-1 * hourly.dtSeconds)) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "end_hourly", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "end_hourly", allowed: allowedRange)
             }
             guard allowedRange.contains(minutely_15.range.lowerBound) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "start_minutely_15", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "start_minutely_15", allowed: allowedRange)
             }
             guard allowedRange.contains(minutely_15.range.upperBound.add(-1 * minutely_15.dtSeconds)) else {
-                throw ForecastapiError.dateOutOfRange(parameter: "end_minutely_15", allowed: allowedRange)
+                throw ForecastApiError.dateOutOfRange(parameter: "end_minutely_15", allowed: allowedRange)
             }
 
             return ForecastApiTimeRange(
@@ -394,9 +435,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
                 minutely15: minutely_15.add(-1 * actualUtcOffset)
             )
         }
-        
-        // If a single run is selected, start time-range from run
-        let current = self.run.map({$0.toTimestamp()}) ?? current
 
         // Evaluate any forecast_xxx, past_xxx parameter or fallback to default time
         let daily = try Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: past_days, forecastSteps: forecast_days, pastStepsMax: pastDaysMax, forecastStepsMax: forecastDaysMax, forecastStepsDefault: forecastDaysDefault, initialStep: nil, dtSeconds: 86400) ?? Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecastDaysDefault, initialStep: nil, dtSeconds: 86400)
@@ -441,10 +479,10 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let forecastSteps = forecastSteps ?? forecastStepsDefault
 
         if forecastSteps < 0 || forecastSteps > forecastStepsMax {
-            throw ForecastapiError.forecastDaysInvalid(given: forecastStepsMax, allowed: 0...forecastStepsMax)
+            throw ForecastApiError.forecastDaysInvalid(given: forecastStepsMax, allowed: 0...forecastStepsMax)
         }
         if pastSteps < 0 || pastSteps > pastStepsMax {
-            throw ForecastapiError.pastDaysInvalid(given: pastSteps, allowed: 0...pastStepsMax)
+            throw ForecastApiError.pastDaysInvalid(given: pastSteps, allowed: 0...pastStepsMax)
         }
         return Self.forecastTimeRange2(currentTime: currentTime, utcOffset: utcOffset, pastSteps: pastSteps, forecastSteps: forecastSteps, initialStep: initialStep, dtSeconds: dtSeconds)
     }
@@ -466,17 +504,17 @@ struct ForecastApiTimeRange {
     let minutely15: TimerangeDt
 }
 
-enum ForecastapiError: Error {
+enum ForecastApiError: Error {
     case latitudeMustBeInRangeOfMinus90to90(given: Float)
     case longitudeMustBeInRangeOfMinus180to180(given: Float)
     case pastDaysInvalid(given: Int, allowed: ClosedRange<Int>)
     case forecastDaysInvalid(given: Int, allowed: ClosedRange<Int>)
-    case enddateMustBeLargerEqualsThanStartdate
+    case endDateMustBeLargerEqualsThanStartDate
     case dateOutOfRange(parameter: String, allowed: Range<Timestamp>)
-    case startAndEnddataMustBeSpecified
+    case startAndEndDateMustBeSpecified
     case invalidTimezone
     case timezoneNotSupported
-    case noDataAvilableForThisLocation
+    case noDataAvailableForThisLocation
     case pastDaysParameterNotAllowedWithStartEndRange
     case forecastDaysParameterNotAllowedWithStartEndRange
     case latitudeAndLongitudeSameCount
@@ -488,10 +526,12 @@ enum ForecastapiError: Error {
     case coordinatesAndStartEndDatesCountMustBeTheSame
     case coordinatesAndElevationCountMustBeTheSame
     case generic(message: String)
-    case cannotReturnModelsWithDiffernetTimeIntervals
+    case cannotReturnModelsWithDifferentTimeIntervals
+    case parameterIsRequired(name: String)
+    case parameterMostNotBeSet(name: String)
 }
 
-extension ForecastapiError: AbortError {
+extension ForecastApiError: AbortError {
     var status: HTTPResponseStatus {
         return .badRequest
     }
@@ -508,11 +548,11 @@ extension ForecastapiError: AbortError {
             return "Forecast days is invalid. Allowed range \(allowed.lowerBound) to \(allowed.upperBound). Given \(given)."
         case .invalidTimezone:
             return "Invalid timezone"
-        case .enddateMustBeLargerEqualsThanStartdate:
+        case .endDateMustBeLargerEqualsThanStartDate:
             return "End-date must be larger or equals than start-date"
         case .dateOutOfRange(let paramater, let allowed):
             return "Parameter '\(paramater)' is out of allowed range from \(allowed.lowerBound.iso8601_YYYY_MM_dd) to \(allowed.upperBound.add(-86400).iso8601_YYYY_MM_dd)"
-        case .startAndEnddataMustBeSpecified:
+        case .startAndEndDateMustBeSpecified:
             return "Both 'start_date' and 'end_date' must be set in the url"
         case .pastDaysParameterNotAllowedWithStartEndRange:
             return "Parameter 'past_days' is mutually exclusive with 'start_date' and 'end_date'"
@@ -530,7 +570,7 @@ extension ForecastapiError: AbortError {
             return "Parameter 'latitude' and 'longitude' must have the same number of elements"
         case .locationIdCountMustBeTheSame:
             return "Parameter 'location_id' and coordinates must have the same number of elements"
-        case .noDataAvilableForThisLocation:
+        case .noDataAvailableForThisLocation:
             return "No data is available for this location"
         case .startAndEndDateCountMustBeTheSame:
             return "Parameter 'start_date' and 'end_date' must have the same number of elements"
@@ -540,8 +580,12 @@ extension ForecastapiError: AbortError {
             return "Parameter 'elevation' must have the same number of elements as coordinates"
         case .generic(message: let message):
             return message
-        case .cannotReturnModelsWithDiffernetTimeIntervals:
+        case .cannotReturnModelsWithDifferentTimeIntervals:
             return "Cannot return models with different time-intervals"
+        case .parameterIsRequired(let name):
+            return "Parameter '\(name)' is required"
+        case .parameterMostNotBeSet(let name):
+            return "Parameter '\(name)' most not be set"
         }
     }
 }
@@ -556,10 +600,10 @@ struct CoordinatesAndElevation {
     /// If elevation is `nil` it will resolve it from DEM. If `NaN` it stays `NaN`.
     init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan, logger: Logger, httpClient: HTTPClient) async throws {
         if latitude > 90 || latitude < -90 || latitude.isNaN {
-            throw ForecastapiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
+            throw ForecastApiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
         }
         if longitude > 180 || longitude < -180 || longitude.isNaN {
-            throw ForecastapiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
+            throw ForecastApiError.longitudeMustBeInRangeOfMinus180to180(given: longitude)
         }
         self.latitude = latitude
         self.longitude = longitude
@@ -593,7 +637,7 @@ enum Timeformat: String, Codable {
 }
 
 /// Differentiate between a user defined timezone or `auto` which is later resolved using coordinates
-enum TimeZoneOrAuto: Codable {
+enum TimeZoneOrAuto: Codable, Equatable {
     /// User specified `auto`
     case auto
 
@@ -656,7 +700,7 @@ struct TimezoneWithOffset {
 
     public init(latitude: Float, longitude: Float) throws {
         guard let identifier = TimezoneWithOffset.timezoneDatabase.simple(latitude: latitude, longitude: longitude) else {
-            throw ForecastapiError.invalidTimezone
+            throw ForecastApiError.invalidTimezone
         }
         self.init(timezone: try TimeZone.initWithFallback(identifier))
     }
@@ -683,7 +727,7 @@ extension TimeZone {
             if identifier == "America/Ciudad_Juarez", let tz = TimeZone(identifier: "America/Mexico_City") {
                 return tz
             }
-            throw ForecastapiError.invalidTimezone
+            throw ForecastApiError.invalidTimezone
         }
         return tz
     }

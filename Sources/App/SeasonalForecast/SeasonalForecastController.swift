@@ -151,7 +151,7 @@ struct SeasonalForecastController {
 
             let prepared = try await params.prepareCoordinates(allowTimezones: false, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
-                throw ForecastapiError.generic(message: "Bounding box not supported")
+                throw ForecastApiError.generic(message: "Bounding box not supported")
             }
             /// Will be configurable by API later
             let domains = [SeasonalForecastDomainApi.cfsv2]
@@ -236,7 +236,7 @@ struct SeasonalForecastController {
                     )
                 }
                 guard !readers.isEmpty else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }

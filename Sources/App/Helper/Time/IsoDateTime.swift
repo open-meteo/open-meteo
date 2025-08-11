@@ -161,13 +161,13 @@ extension IsoDateTime {
         let startDate = try load(commaSeparated: start)
         let endDate = try load(commaSeparated: end)
         guard startDate.count == endDate.count else {
-            throw ForecastapiError.startAndEndDateCountMustBeTheSame
+            throw ForecastApiError.startAndEndDateCountMustBeTheSame
         }
         return try zip(startDate, endDate).map { startDate, endDate in
             let start = startDate.toTimestamp()
             let includedEnd = endDate.toTimestamp()
             guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
-                throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
+                throw ForecastApiError.endDateMustBeLargerEqualsThanStartDate
             }
             return start...includedEnd
         }

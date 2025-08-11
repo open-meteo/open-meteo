@@ -68,7 +68,7 @@ extension ForecastapiResult.PerLocation {
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         let sections = try await runAllSections()
         let current = try await first.current?()

@@ -16,7 +16,7 @@ import VaporTesting
     @Test
     func testParseApiParamsGET() async throws {
         try await withApp { app in
-            let url = URI(string: "/forecast?latitude=52.52&longitude=13.41")
+            let url = URI(string: "/forecast?latitude=52.52&longitude=13.41&timezone=auto")
             let request = Request(
                 application: app,
                 method: .GET,
@@ -32,6 +32,7 @@ import VaporTesting
             #expect(params.end_date == [])
             #expect(params.bounding_box == [])
             #expect(params.start_hour == [])
+            #expect(params.timezone == [.auto])
             #expect(params.end_hour == [])
             #expect(params.start_minutely_15 == [])
             #expect(params.end_minutely_15 == [])
