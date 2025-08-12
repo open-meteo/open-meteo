@@ -164,7 +164,7 @@ extension Request {
             throw ApiKeyManagerError.apiProfessionalRequired
         }
         let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
-        let maxConcurrent = max(2, limit / 5_000_000 * 2)
+        let maxConcurrent = max(2, limit / 5_000_000)
         let slot = apikey.hash
         try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: maxConcurrent, maxConcurrentHard: 256)
         defer {
