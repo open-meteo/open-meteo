@@ -107,16 +107,22 @@ final actor RemoteOmFileManagerCache {
     typealias Key = OmFileManagerReadable
     typealias Value = OmFileLocalOrRemote?
     
-    final class Statistics {
+    struct Statistics {
         var ticks = 0
         var inactivity = 0
         var localModified = 0
         var remoteModified = 0
+        var remoteDeleted = 0
+        var remoteRevalidated = 0
+        var remoteCheckedExist = 0
         
-        func reset() {
+        mutating func reset() {
             inactivity = 0
             localModified = 0
             remoteModified = 0
+            remoteDeleted = 0
+            remoteRevalidated = 0
+            remoteCheckedExist = 0
         }
     }
     
@@ -199,8 +205,8 @@ final actor RemoteOmFileManagerCache {
         var total = 0
         statistics.ticks += 1
         
-        let removeLastAccessedThan: Timestamp = .now().subtract(minutes: 15)
-        let revalidateAfter: Timestamp = .now().subtract(minutes: 3)
+        let now = Timestamp.now()
+        let removeLastAccessedThan = now.subtract(minutes: 15)
         for (key, state) in cache {
             total += 1
             guard case .cached(let entry) = state else {
@@ -228,37 +234,50 @@ final actor RemoteOmFileManagerCache {
                 continue
             }
             
-            // Revalidate remote files every 3 minutes
-            // File may got added, modified or removed
-            if entry.lastValidated < revalidateAfter, let remoteFile = key.getRemoteUrl() {
-                entry.lastValidated = .now()
-                if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
-                    if case .remote(let old, _) = entry.value {
-                        guard old.fn.cacheKey != new.cacheKey else {
-                            continue // do not update if the existing entry is the same
-                        }
-                        statistics.remoteModified += 1
-                        guard let reader = try await new.asRemoteReader() else {
+            if let remoteFile = key.getRemoteUrl() {
+                // Remote file is open
+                if case .remote(let old, _) = entry.value {
+                    let revalidateSeconds = key.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
+                    if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
+                        entry.lastValidated = .now()
+                        statistics.remoteRevalidated += 1
+                        // TODO: `OmHttpReaderBackend` should use a local cache to quickly reopen remote files. Cache last modified and etag
+                        if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
+                            guard old.fn.cacheKey != new.cacheKey else {
+                                continue // do not update if the existing entry is the same
+                            }
+                            statistics.remoteModified += 1
+                            guard let reader = try await new.asRemoteReader() else {
+                                entry.value = nil
+                                continue
+                            }
+                            entry.value = reader
+                        } else {
+                            // File was deleted on remote server
+                            statistics.remoteDeleted += 1
                             entry.value = nil
-                            continue
                         }
-                        entry.value = reader
-                    } else {
-                        statistics.remoteModified += 1
-                        guard let reader = try await new.asRemoteReader() else {
-                            entry.value = nil
-                            continue
-                        }
-                        entry.value = reader
                     }
                 } else {
-                    statistics.remoteModified += 1
-                    entry.value = nil
+                    // Check if a remote file is now available on the remote server
+                    let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
+                    if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
+                        entry.lastValidated = .now()
+                        statistics.remoteCheckedExist += 1
+                        if let new = try await OmHttpReaderBackend(client: client, logger: logger, url: remoteFile) {
+                            statistics.remoteModified += 1
+                            guard let reader = try await new.asRemoteReader() else {
+                                entry.value = nil
+                                continue
+                            }
+                            entry.value = reader
+                        }
+                    }
                 }
             }
         }
         if statistics.ticks.isMultiple(of: 10), total > 0 {
-            logger.warning("OmFileManager: \(total) open files, \(running) running. Removed since last check: \(statistics.inactivity) inactive, \(statistics.localModified) local modified, \(statistics.remoteModified) remote modified")
+            logger.warning("OmFileManager: \(total) open files, \(running) running. \(statistics)")
             if OpenMeteo.remoteDataDirectory != nil {
                 logger.warning("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
             }

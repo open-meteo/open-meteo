@@ -55,6 +55,20 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         return url.fnv1aHash64 ^ (eTag?.fnv1aHash64 ?? 0) ^ (lastModified?.fnv1aHash64 ?? 0)
     }
     
+    var lastModifiedTimestamp: Timestamp? {
+        guard let lastModified else {
+            return nil
+        }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = fmt.date(from: lastModified) else {
+            return nil
+        }
+        return Timestamp(Int(date.timeIntervalSince1970))
+    }
+    
     init?(client: HTTPClient, logger: Logger, url: String) async throws {
         self.client = client
         var headRequest = HTTPClientRequest(url: url)

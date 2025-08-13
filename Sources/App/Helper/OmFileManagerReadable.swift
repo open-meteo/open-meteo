@@ -24,6 +24,49 @@ enum OmFileManagerReadable: Hashable {
         return "\(getDataDirectoryPath())\(getRelativeFilePath())"
     }
     
+    /// How often this file should be checked for modifications. Some files update every hour, some never update.
+    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+        switch self {
+        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+            switch type {
+            case .chunk:
+                guard let domain = domain.getDomain(), let chunk else {
+                    return 24*3600
+                }
+                let chunkTime = Timestamp(chunk * domain.omFileLength) ..< Timestamp((chunk + 1) * domain.omFileLength)
+                
+                /// Chunk contains data older than 7 days or 2 times updateTime (seasonal forecast = 31 days)
+                /// Covers era5 with 5 days delay
+                /// Fore more precise checks, domain needs to report how much past data is updated
+                let chunkFinalised = chunkTime.upperBound < now.subtract(seconds: max(7*24*3600, domain.updateIntervalSeconds * 2))
+                if chunkFinalised {
+                    return 24*3600
+                }
+                if let modificationTime {
+                    if modificationTime < now.subtract(seconds: domain.updateIntervalSeconds / 2) {
+                        return 15*60
+                    }
+                    if modificationTime < now.subtract(seconds: Int(Double(domain.updateIntervalSeconds) * 0.9)) {
+                        return 3*60
+                    }
+                }
+                return 10*60
+            case .year:
+                return 24*3600
+            case .master:
+                return 24*3600
+            case .linear_bias_seasonal:
+                return 24*3600
+            }
+        case .staticFile(let domain, let variable, let chunk):
+            return 24*3600
+        case .meta(let domain):
+            return 24*3600
+        case .run(let domain, let variable, let run):
+            return 24*3600
+        }
+    }
+    
     /// Get the remote URL. May replace "data" with "data_run"
     func getRemoteUrl() -> String? {
         guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
