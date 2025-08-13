@@ -4,6 +4,14 @@ import Testing
 import VaporTesting
 
 @Suite struct ApiTests {
+    /*@Test func generateS3SyncCommands() throws {
+        for domain in DomainRegistry.allCases {
+            let d = domain.rawValue
+            print("aws s3 sync --profile hetzner --exclude \"*~\" /var/lib/openmeteo-api/data/\(d) s3://openmeteo-\(domain.bucketName)/data/\(d)")
+        }
+        return
+    }*/
+    
     @Test func timeSelection() throws {
         let current = Timestamp(2024, 02, 03, 12, 24)
         let a = try ApiQueryParameter.forecastTimeRange2(currentTime: current, utcOffset: 3600, pastSteps: nil, forecastSteps: 4, pastStepsMax: 10, forecastStepsMax: 10, forecastStepsDefault: 7, initialStep: nil, dtSeconds: 3600)

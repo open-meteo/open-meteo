@@ -32,13 +32,13 @@ enum OmFileManagerReadable: Hashable {
         let file = getRelativeFilePath()
         switch self {
         case .run(let domain, _, _):
-            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run").replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run").replacing("MODEL", with: domain.bucketName))\(file)"
         case .domainChunk(let domain, _, _, _, _, _):
-            return "\(remoteDirectory.replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
         case .staticFile(domain: let domain, _, _):
-            return "\(remoteDirectory.replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
         case .meta(domain: let domain):
-            return "\(remoteDirectory.replacing("MODEL", with: domain.rawValue.replacing("_", with: "-")))\(file)"
+            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
         }
     }
     
