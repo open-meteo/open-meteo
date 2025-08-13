@@ -238,7 +238,8 @@ final actor RemoteOmFileManagerCache {
                 // Remote file is open
                 if case .remote(let old, _) = entry.value {
                     let revalidateSeconds = key.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
-                    if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
+                    let lastValidated = max(entry.lastValidated, old.fn.lastBackendFetchTimestamp)
+                    if lastValidated < now.subtract(seconds: revalidateSeconds) {
                         entry.lastValidated = .now()
                         statistics.remoteRevalidated += 1
                         // TODO: `OmHttpReaderBackend` should use a local cache to quickly reopen remote files. Cache last modified and etag

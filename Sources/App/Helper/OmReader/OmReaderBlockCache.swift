@@ -1,14 +1,22 @@
 import OmFileFormat
 import Foundation
-
+import Synchronization
 
 /**
  Chunk data into blocks of 64k and store blocks in a KV cache
  */
-struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheStorable>: OmFileReaderBackend, Sendable {
+final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheStorable>: OmFileReaderBackend, Sendable {
     let backend: Backend
     private let cache: AtomicCacheCoordinator<Cache>
     let cacheKey: UInt64
+    
+    /// Timestamp in seconds when the last data was successfully fetched from the backend. 0 if never fetched.
+    private let lastBackendFetch: Atomic<Int> = .init(0)
+    
+    /// Timestamp when the last data was successfully fetched from the backend. 0 if never fetched.
+    var lastBackendFetchTimestamp: Timestamp {
+        return Timestamp(lastBackendFetch.load(ordering: .relaxed))
+    }
     
     typealias DataType = Data
     
@@ -59,8 +67,11 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
             let ptr = try await cache.get(
                 key: calculateCacheKey(block: block),
                 backendFetch: ({
-                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }))
+                    let value = try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
+                    lastBackendFetch.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+                    return value
+                })
+            )
             let _ = ptr[range.file].copyBytes(to: dest)
         }
         return try fn(UnsafeRawBufferPointer(data))
@@ -92,8 +103,11 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
             let ptr = try await cache.get(
                 key: calculateCacheKey(block: block),
                 backendFetch: ({
-                try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
-            }))
+                    let value = try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
+                    lastBackendFetch.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+                    return value
+                })
+            )
             let _ = ptr[range.file].copyBytes(to: dest)
         }
         return dataRet
