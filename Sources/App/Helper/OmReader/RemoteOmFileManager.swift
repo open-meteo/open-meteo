@@ -127,7 +127,7 @@ extension OmFileManagerReadable {
                 return (try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), .now())
             }
             /// Reuse cached meta attributes
-            return (OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag), lastValidated)
+            return (OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated), lastValidated)
             
         case .none:
             return (try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), .now())
@@ -279,11 +279,11 @@ final actor RemoteOmFileManagerCache {
                 // Remote file is open
                 if case .remote(let old, _) = entry.value {
                     let revalidateSeconds = key.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
-                    if old.fn.lastBackendFetchTimestamp > entry.lastValidated {
+                    if old.fn.backend.lastValidated > entry.lastValidated {
                         /// Update meta cache to also reflect updates in `lastBackendFetchTimestamp`
-                        try OmHttpMetaCache.set(url: remoteFile, state: .available(lastValidated: old.fn.lastBackendFetchTimestamp, contentLength: old.fn.backend.count, lastModified: old.fn.backend.lastModifiedTimestamp, eTag: old.fn.backend.eTag))
+                        try OmHttpMetaCache.set(url: remoteFile, state: .available(lastValidated: old.fn.backend.lastValidated, contentLength: old.fn.backend.count, lastModified: old.fn.backend.lastModifiedTimestamp, eTag: old.fn.backend.eTag))
                     }
-                    let lastValidated = max(entry.lastValidated, old.fn.lastBackendFetchTimestamp)
+                    let lastValidated = max(entry.lastValidated, old.fn.backend.lastValidated)
                     if lastValidated < now.subtract(seconds: revalidateSeconds) {
                         entry.lastValidated = .now()
                         statistics.remoteRevalidated += 1

@@ -27,7 +27,7 @@ enum OmFileManagerReadable: Hashable {
     /// How often this file should be checked for modifications. Some files update every hour, some never update.
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         switch self {
-        case .domainChunk(let domain, let variable, let type, let chunk, let ensembleMember, let previousDay):
+        case .domainChunk(let domain, _, let type, let chunk, _, _):
             switch type {
             case .chunk:
                 guard let domain = domain.getDomain(), let chunk else {
@@ -58,11 +58,11 @@ enum OmFileManagerReadable: Hashable {
             case .linear_bias_seasonal:
                 return 24*3600
             }
-        case .staticFile(let domain, let variable, let chunk):
+        case .staticFile(_, _, _):
             return 24*3600
-        case .meta(let domain):
+        case .meta(_):
             return 24*3600
-        case .run(let domain, let variable, let run):
+        case .run(_, _, _):
             return 24*3600
         }
     }

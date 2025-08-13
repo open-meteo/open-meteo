@@ -3,6 +3,7 @@ import AsyncHTTPClient
 import Foundation
 import Logging
 import NIO
+import Synchronization
 
 enum OmHttpReaderBackendError: Error {
     case contentLengthMissing
@@ -25,6 +26,14 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     let url: String
     
     let logger: Logger
+    
+    /// Timestamp in seconds when the last data was successfully fetched from the backend.
+    private let lastValidatedAtomic: Atomic<Int>
+    
+    /// Timestamp when the last data was successfully fetched from the backend.
+    var lastValidated: Timestamp {
+        return Timestamp(lastValidatedAtomic.load(ordering: .relaxed))
+    }
     
     typealias DataType = ByteBuffer
     
@@ -63,18 +72,20 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
             self.count = contentLength
             self.url = url
             self.logger = logger
+            self.lastValidatedAtomic = .init(Timestamp.now().timeIntervalSince1970)
         } catch CurlError.fileNotFound {
             return nil
         }
     }
     
-    init(client: HTTPClient, logger: Logger, url: String, count: Int, lastModified: Timestamp?, eTag: String?) {
+    init(client: HTTPClient, logger: Logger, url: String, count: Int, lastModified: Timestamp?, eTag: String?, lastValidated: Timestamp) {
         self.client = client
         self.logger = logger
         self.url = url
         self.count = count
         self.lastModified = lastModified?.lastModifiedHttpDateFormat
         self.eTag = eTag
+        self.lastValidatedAtomic = .init(lastValidated.timeIntervalSince1970)
     }
     
     func prefetchData(offset: Int, count: Int) async throws {
@@ -93,7 +104,9 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         try request.applyS3Credentials()
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
-        return try await response.body.collect(upTo: count)
+        let buffer = try await response.body.collect(upTo: count)
+        lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+        return buffer
     }
     
     func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
