@@ -33,7 +33,7 @@ enum OmFileManagerReadable: Hashable {
                 guard let domain = domain.getDomain(), let chunk else {
                     return 24*3600
                 }
-                let chunkTime = Timestamp(chunk * domain.omFileLength) ..< Timestamp((chunk + 1) * domain.omFileLength)
+                let chunkTime = Timestamp(chunk * domain.omFileLength * domain.dtSeconds) ..< Timestamp((chunk + 1) * domain.omFileLength * domain.dtSeconds)
                 
                 /// Chunk contains data older than 7 days or 2 times updateTime (seasonal forecast = 31 days)
                 /// Covers era5 with 5 days delay
