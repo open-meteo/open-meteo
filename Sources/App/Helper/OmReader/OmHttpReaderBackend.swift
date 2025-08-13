@@ -68,6 +68,15 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         }
     }
     
+    init(client: HTTPClient, logger: Logger, url: String, count: Int, lastModified: Timestamp?, eTag: String?) {
+        self.client = client
+        self.logger = logger
+        self.url = url
+        self.count = count
+        self.lastModified = lastModified?.lastModifiedHttpDateFormat
+        self.eTag = eTag
+    }
+    
     func prefetchData(offset: Int, count: Int) async throws {
         // nothing do do here
     }
@@ -97,5 +106,15 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
 extension ByteBuffer: @retroactive ContiguousBytes {
     public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         try self.withUnsafeReadableBytes(body)
+    }
+}
+
+extension Timestamp {
+    var lastModifiedHttpDateFormat: String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return fmt.string(from: self.toDate())
     }
 }

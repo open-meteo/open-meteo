@@ -37,6 +37,14 @@ enum OpenMeteo {
         return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
     }()
     
+    /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. Fixed size.
+    static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
+        let cacheFile = Environment.get("CACHE_META_FILE") ?? "\(dataDirectory)/cache_file_meta.bin"
+        let blockSize = MemoryLayout<OmHttpMetaCache.Entry>.stride
+        let blockCount = 128*1024
+        return try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount)
+    }()
+    
     /// Data directory with trailing slash
     static let dataSpatialDirectory: String? = {
         if let dir = Environment.get("DATA_SPATIAL_DIRECTORY") {

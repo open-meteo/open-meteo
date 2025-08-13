@@ -5,6 +5,20 @@ import VaporTesting
 import OmFileFormat
 
 @Suite struct OmReaderTests {
+    @Test func metaCache() throws {
+        #expect(MemoryLayout<OmHttpMetaCache.Entry>.stride == 72)
+        
+        let entry = try OmHttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasf")
+        #expect(entry.eTag.string.count == 12)
+        #expect(entry.lastModified.timeIntervalSince1970 == 252454)
+        #expect(entry.lastValidated.timeIntervalSince1970 == 34598743)
+        #expect(entry.eTag.string == "srgkjnsrgasf")
+        
+        let entry48 = try OmHttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
+        #expect(entry48.eTag.string.count == 48)
+        #expect(entry48.eTag.string == "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
+    }
+    
     @Test func httpRead() async throws {
         try await withApp { app in
             let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
