@@ -20,7 +20,7 @@ struct OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockCacheS
     
     /// Calculate cache key for block. 100 blocks are stored consecutive in cache.
     @inlinable func calculateCacheKey(block: Int) -> UInt64 {
-        return (cacheKey ^ (UInt64(block / 100) &* 0x100000001b3)) &+ UInt64(block % 100)
+        return cacheKey.addFnv1aHash(UInt64(block / 10)) &+ UInt64(block % 100)
     }
     
     func prefetchData(offset: Int, count: Int) async throws {

@@ -8,29 +8,6 @@ enum OmHttpReaderBackendError: Error {
     case contentLengthMissing
 }
 
-extension String {
-    /// Get FNV hash of the string
-    var fnv1aHash64: UInt64 {
-        let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
-        let fnvPrime: UInt64 = 0x100000001b3
-        return self.withContiguousStorageIfAvailable { ptr in
-            var hash = fnvOffsetBasis
-            for byte in UnsafeRawBufferPointer(ptr) {
-                hash ^= UInt64(byte)
-                hash = hash &* fnvPrime
-            }
-            return hash
-        } ?? {
-            var hash = fnvOffsetBasis
-            for byte in self.utf8 {
-                hash ^= UInt64(byte)
-                hash = hash &* fnvPrime
-            }
-            return hash
-        }()
-    }
-}
-
 /**
  Reader backend to read from an HTTP server on demand. Checks last modified header and ETag.
  */
@@ -52,7 +29,7 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     typealias DataType = ByteBuffer
     
     var cacheKey: UInt64 {
-        return url.fnv1aHash64 ^ (eTag?.fnv1aHash64 ?? 0) ^ (lastModified?.fnv1aHash64 ?? 0)
+        return url.fnv1aHash64.addFnv1aHash(eTag ?? "").addFnv1aHash(lastModified ?? "")
     }
     
     var lastModifiedTimestamp: Timestamp? {
