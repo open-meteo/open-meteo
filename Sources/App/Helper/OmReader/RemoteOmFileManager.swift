@@ -245,6 +245,7 @@ final actor RemoteOmFileManagerCache {
         var running = 0
         var total = 0
         statistics.ticks += 1
+        let startRevalidation = DispatchTime.now()
         
         let now = Timestamp.now()
         let removeLastAccessedThan = now.subtract(minutes: 15)
@@ -330,7 +331,7 @@ final actor RemoteOmFileManagerCache {
             }
         }
         if statistics.ticks.isMultiple(of: 10), total > 0 {
-            logger.warning("OmFileManager: \(total) open files, \(running) running. \(statistics)")
+            logger.warning("OmFileManager: \(total) open files, \(running) running. Revalidation took \(startRevalidation.timeElapsedPretty()). \(statistics)")
             if OpenMeteo.remoteDataDirectory != nil {
                 logger.warning("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
             }
