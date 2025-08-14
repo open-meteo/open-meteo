@@ -292,7 +292,15 @@ final actor RemoteOmFileManagerCache {
                                 continue // do not update if the existing entry is the same
                             }
                             statistics.remoteModified += 1
-                            guard let reader = try await new.asRemoteReader() else {
+                            let blockCached = new.asBlockCached()
+                            let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*90)
+                            logger.warning("Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
+                            if activeBlocks.count > 0 {
+                                let startPreload = DispatchTime.now()
+                                try await blockCached.preloadBlocks(blocks: activeBlocks)
+                                logger.warning("Preload completed in \(startPreload.timeElapsedPretty())")
+                            }
+                            guard let reader = try await blockCached.asCachedReader().asRemoteReader() else {
                                 entry.value = nil
                                 continue
                             }
@@ -332,26 +340,32 @@ final actor RemoteOmFileManagerCache {
 }
 
 extension OmHttpReaderBackend {
-    func asCachedReader() async throws -> OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>> {
-        let cacheFn = OmReaderBlockCache(backend: self, cache: OpenMeteo.dataBlockCache, cacheKey: self.cacheKey)
-        return try await OmFileReader(fn: cacheFn)
+    func asBlockCached() -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        return OmReaderBlockCache(backend: self, cache: OpenMeteo.dataBlockCache, cacheKey: self.cacheKey)
     }
-    
-    func asCachedReaderArray() async throws -> OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>? {
-        return try await asCachedReader().asArray(of: Float.self)
-    }
-    
     func asRemoteReader() async throws -> OmFileLocalOrRemote? {
-        let cachedReader = try await asCachedReader()
-        guard let arrayReader = cachedReader.asArray(of: Float.self) else {
+        return try await asBlockCached().asCachedReader().asRemoteReader()
+    }
+}
+
+extension OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+    func asCachedReader() async throws -> OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>> {
+        return try await OmFileReader(fn: self)
+    }
+}
+
+extension OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>> {
+    func asRemoteReader() async throws -> OmFileLocalOrRemote? {
+        guard let arrayReader = self.asArray(of: Float.self) else {
             return nil
         }
-        if let times = try await cachedReader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+        if let times = try await self.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
             return .remote(arrayReader, timestamps: times)
         }
         return .remote(arrayReader, timestamps: nil)
     }
 }
+
 
 extension OmFileReader {
     func getChild(name: String) async throws -> Self? {

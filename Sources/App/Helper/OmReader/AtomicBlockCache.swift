@@ -151,7 +151,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     }
     
     /// Find key in cache, updates the LRU timestamp and returns a pointer to the memory region. There is a slight chance, that data is modified while reading, but it should practically never happen
-    func get(key: UInt64) -> UnsafeRawBufferPointer? {
+    func get(key: UInt64, maxAccessedAgeInSeconds: UInt) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
@@ -166,6 +166,12 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     guard entry.first == key && entry.second & 0x1 == 1 else {
                         break
                     }
+                    
+                    // Check if cached entry is not older than requested
+                    guard entry.second >= time - maxAccessedAgeInSeconds * 1_000_000_000 else {
+                        return nil
+                    }
+                    
                     // Update last modified timestamp
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
                     let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)

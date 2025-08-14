@@ -100,4 +100,35 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
         }
         return dataRet
     }
+    
+    /// Which blocks have been accessed recently. When a file is modified on the remote server, use a list of blocks to preload the new file.
+    func listOfActiveBlocks(maxAgeSeconds: UInt) -> [Int] {
+        let totalCount = self.backend.count
+        let blockSize = cache.cache.blockSize
+        let blocks = 0..<totalCount.divideRoundedUp(divisor: blockSize)
+        return blocks.compactMap({ block in
+            return cache.cache.get(key: calculateCacheKey(block: block), maxAccessedAgeInSeconds: maxAgeSeconds).map{_ in block}
+        })
+    }
+    
+    /// Load list of blocks into cache. This is used to prefetch data after rotating files.
+    func preloadBlocks(blocks: [Int]) async throws {
+        let blockSize = cache.cache.blockSize
+        let totalCount = self.backend.count
+        let totalBlockCount = totalCount.divideRoundedUp(divisor: blockSize)
+        for block in blocks {
+            guard block < totalBlockCount else {
+                /// The list of blocks is from an older file revision.
+                /// The new file could be smaller and contain fewer blocks.
+                continue
+            }
+            let blockRange = block * blockSize ..< min((block + 1) * blockSize, totalCount)
+            let _ = try await cache.get(
+                key: calculateCacheKey(block: block),
+                backendFetch: ({
+                    return try await backend.getData(offset: blockRange.lowerBound, count: blockRange.count)
+                })
+            )
+        }
+    }
 }
