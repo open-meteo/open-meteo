@@ -109,7 +109,7 @@ struct CamsController {
                     )
                 }
                 guard !readers.isEmpty else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }

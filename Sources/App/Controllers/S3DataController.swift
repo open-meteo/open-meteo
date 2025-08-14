@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import AsyncHTTPClient
 
 /**
  Expose database as S3 endpoint. This can be used to pull data from one server to another. It is used only internally to transfer data between Open-Meteo API nodes. Note: This is only a limited implementation and not fully compatible.
@@ -167,6 +168,26 @@ struct S3DataController: RouteCollection {
                 response.headers.add(name: "X-Accel-Limit-Rate", value: "\((rate) * 1024 * 1024)")
             }
             return response
+        }
+        /// TODO consider caching
+        if let remote = OpenMeteo.remoteDataDirectory, let model = pathNoData.firstIndex(of: "/").map({ pathNoData[..<$0] }) {
+            var request = HTTPClientRequest(url: "\(remote.replacing("MODEL", with: model.replacing("_", with: "-").lowercased()))\(pathNoData)")
+            try request.applyS3Credentials()
+            let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
+            let r = Response(status: response.status, body: .init(asyncStream: { writer in
+                Task {
+                    do {
+                        for try await buffer in response.body {
+                            try await writer.write(.buffer(buffer))
+                        }
+                        try await writer.write(.end)
+                    } catch {
+                        try? await writer.write(.error(error))
+                    }
+                }
+            }))
+            r.headers.contentType = response.headers.contentType
+            return r
         }
         let response = try await req.fileio.asyncStreamFile(at: "\(OpenMeteo.dataDirectory)\(pathNoData)")
         return response

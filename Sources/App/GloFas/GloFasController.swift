@@ -95,11 +95,11 @@ struct GloFasController {
 
             let prepared = try await params.prepareCoordinates(allowTimezones: false, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
-                throw ForecastapiError.generic(message: "Bounding box not supported")
+                throw ForecastApiError.generic(message: "Bounding box not supported")
             }
             let domains = try GlofasDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
             guard let paramsDaily = try GloFasVariableOrDerived.load(commaSeparatedOptional: params.daily) else {
-                throw ForecastapiError.generic(message: "Parameter 'daily' required")
+                throw ForecastApiError.generic(message: "Parameter 'daily' required")
             }
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
@@ -153,7 +153,7 @@ struct GloFasController {
                     )
                 }
                 guard !readers.isEmpty else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }

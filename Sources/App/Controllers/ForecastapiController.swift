@@ -17,7 +17,7 @@ public struct ForecastapiController: RouteCollection {
 
         categoriesRoute.getAndPost("forecast", use: WeatherApiController(
             defaultModel: .best_match,
-            alias: ["historical-forecast-api", "previous-runs-api"]).query
+            alias: ["historical-forecast-api", "previous-runs-api", "single-runs-api"]).query
         )
         categoriesRoute.getAndPost("dwd-icon", use: WeatherApiController(
             defaultModel: .icon_seamless).query
@@ -93,6 +93,7 @@ struct WeatherApiController {
         case historicalForecast
         case previousRuns
         case satellite
+        case singleRunsApi
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -103,6 +104,9 @@ struct WeatherApiController {
             }
             if host.starts(with: "previous-runs-api") || host.starts(with: "customer-previous-runs-api") {
                 return .previousRuns
+            }
+            if host.starts(with: "single-runs-api") || host.starts(with: "customer-single-runs-api") {
+                return .singleRunsApi
             }
             if host.starts(with: "archive-api") || host.starts(with: "customer-archive-api") {
                 return .archive
@@ -148,6 +152,23 @@ struct WeatherApiController {
                 forecastDaysMax = 1
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(1983, 1, 1)
+            case .singleRunsApi:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2023, 1, 1)
+
+            }
+            switch type {
+            case .none:
+                break
+            case .singleRunsApi:
+                guard params.run != nil else {
+                    throw ForecastApiError.parameterIsRequired(name: "run")
+                }
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite:
+                guard params.run == nil else {
+                    throw ForecastApiError.parameterMostNotBeSet(name: "run")
+                }
             }
             
             let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
@@ -194,30 +215,30 @@ struct WeatherApiController {
                             if let paramsCurrent {
                                 for variable in paramsCurrent {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try await reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))
+                                    try await reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay, run: params.run))
                                 }
                             }
                             if let paramsMinutely {
                                 for variable in paramsMinutely {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try await reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))
+                                    try await reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, run: params.run))
                                 }
                             }
                             if let paramsHourly {
                                 for variable in paramsHourly {
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    try await reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))
+                                    try await reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, run: params.run))
                                 }
                             }
                             if let paramsDaily {
-                                try await reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings())
+                                try await reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(run: params.run))
                             }
                         },
                         current: paramsCurrent.map { variables in
                             return {
                                 .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    guard let d = try await reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    guard let d = try await reader.get(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay, run: params.run))?.convertAndRound(params: params) else {
                                         return .init(variable: variable.resultVariable, unit: .undefined, value: .nan)
                                     }
                                     return .init(variable: variable.resultVariable, unit: d.unit, value: d.data.first ?? .nan)
@@ -228,7 +249,7 @@ struct WeatherApiController {
                             return {
                                 return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    guard let d = try await reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    guard let d = try await reader.get(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, run: params.run))?.convertAndRound(params: params) else {
                                         return .init(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: timeHourlyRead.count))])
                                     }
                                     assert(timeHourlyRead.count == d.data.count)
@@ -255,7 +276,7 @@ struct WeatherApiController {
                                         return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
                                     }
 
-                                    guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings()) else {
+                                    guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(run: params.run)) else {
                                         return ApiColumn(variable: variable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.dailyRead.count))])
                                     }
                                     assert(time.dailyRead.count == d.data.count)
@@ -268,7 +289,7 @@ struct WeatherApiController {
                             return {
                                 return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
                                     let (v, previousDay) = variable.variableAndPreviousDay
-                                    guard let d = try await reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay))?.convertAndRound(params: params) else {
+                                    guard let d = try await reader.get(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, run: params.run))?.convertAndRound(params: params) else {
                                         return ApiColumn(variable: variable.resultVariable, unit: .undefined, variables: [.float([Float](repeating: .nan, count: time.minutely15.count))])
                                     }
                                     assert(time.minutely15.count == d.data.count)
@@ -279,7 +300,7 @@ struct WeatherApiController {
                     )
                 }
                 guard !readers.isEmpty else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
@@ -617,7 +638,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let probabilities = try await ProbabilityReader.makeBomReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
         case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
-            throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
+            throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .knmi_harmonie_arome_europe:
             return try await KnmiReader(domain: KnmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .knmi_harmonie_arome_netherlands:
@@ -942,7 +963,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .bom_access_global:
             return try await BomReader(domain: .access_global, gridpoint: gridpoint, options: options)
         case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m, .arpae_cosmo_seamless:
-            throw ForecastapiError.generic(message: "ARPAE COSMO models are not available anymore")
+            throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
             return nil
         case .gfs_seamless, .ncep_seamless, .gfs_mix:
@@ -971,7 +992,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
             else {
                 // Not possible
-                throw ForecastapiError.noDataAvilableForThisLocation
+                throw ForecastApiError.noDataAvailableForThisLocation
             }
             return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         case .era5_ensemble, .copernicus_era5_ensemble:

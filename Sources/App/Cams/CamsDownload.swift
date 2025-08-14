@@ -117,7 +117,7 @@ struct DownloadCamsCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
 
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryUnauthorized: true)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
 

@@ -6,6 +6,7 @@ import Logging
 enum CurlErrorNonRetry: NonRetryError {
     case unauthorized
     case fileModifiedSinceLastDownload
+    case forbidden
 }
 
 enum CurlErrorRetry: Error {
@@ -40,6 +41,8 @@ extension HTTPClientResponse {
             throw CurlErrorNonRetry.unauthorized
         case .preconditionFailed:
             throw CurlErrorNonRetry.fileModifiedSinceLastDownload
+        case .forbidden:
+            throw CurlErrorNonRetry.forbidden
         default:
             break
         }
@@ -57,11 +60,15 @@ struct ExponentialBackOff {
     }
     
     func waitTime(attempt n: Int) -> TimeAmount {
-        let baseWait = min(factor.nanoseconds * Int64(pow(2, Double(n - 1))), maximum.nanoseconds)
+        let baseWait = min(factor.nanoseconds * Int64(pow(2, Double(min(n, 20) - 1))), maximum.nanoseconds)
         let jitterRange = Int64(baseWait / 4)
         let jitter = Int64.random(in: -jitterRange...jitterRange)
         let jitteredWait = max(0, baseWait + jitter)
         return TimeAmount.nanoseconds(jitteredWait)
+    }
+    
+    func deadLine(attempt n: Int) -> Date {
+        Date().addingTimeInterval(Double(waitTime(attempt: n).nanoseconds) / 1_000_000_000)
     }
     
     func sleep(attempt n: Int) async throws {

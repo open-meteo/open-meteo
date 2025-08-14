@@ -130,7 +130,7 @@ struct IconWaveController {
 
             let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: logger, httpClient: httpClient)
             guard case .coordinates(let prepared) = prepared else {
-                throw ForecastapiError.generic(message: "Bounding box not supported")
+                throw ForecastApiError.generic(message: "Bounding box not supported")
             }
             let domains = try IconWaveDomainApi.load(commaSeparatedOptional: params.models) ?? [.best_match]
             let paramsHourly = try MarineVariable.load(commaSeparatedOptional: params.hourly)
@@ -248,7 +248,7 @@ struct IconWaveController {
                     )
                 }
                 guard !readers.isEmpty else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }

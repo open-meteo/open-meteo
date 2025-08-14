@@ -17,11 +17,72 @@ enum OmFileManagerReadable: Hashable {
     case meta(domain: DomainRegistry)
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
-    case run(domain: DomainRegistry, variable: String, run: Timestamp)
+    case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
 
     /// Assemble the full file system path
     func getFilePath() -> String {
         return "\(getDataDirectoryPath())\(getRelativeFilePath())"
+    }
+    
+    /// How often this file should be checked for modifications. Some files update every hour, some never update.
+    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+        switch self {
+        case .domainChunk(let domain, _, let type, let chunk, _, _):
+            switch type {
+            case .chunk:
+                guard let domain = domain.getDomain(), let chunk else {
+                    return 24*3600
+                }
+                let chunkTime = Timestamp(chunk * domain.omFileLength * domain.dtSeconds) ..< Timestamp((chunk + 1) * domain.omFileLength * domain.dtSeconds)
+                
+                /// Chunk contains data older than 7 days or 2 times updateTime (seasonal forecast = 31 days)
+                /// Covers era5 with 5 days delay
+                /// Fore more precise checks, domain needs to report how much past data is updated
+                let chunkFinalised = chunkTime.upperBound < now.subtract(seconds: max(7*24*3600, domain.updateIntervalSeconds * 2))
+                if chunkFinalised {
+                    return 24*3600
+                }
+                if let modificationTime {
+                    if modificationTime < now.subtract(seconds: domain.updateIntervalSeconds / 2) {
+                        return 15*60
+                    }
+                    if modificationTime < now.subtract(seconds: Int(Double(domain.updateIntervalSeconds) * 0.9)) {
+                        return 3*60
+                    }
+                }
+                return 10*60
+            case .year:
+                return 24*3600
+            case .master:
+                return 24*3600
+            case .linear_bias_seasonal:
+                return 24*3600
+            }
+        case .staticFile(_, _, _):
+            return 24*3600
+        case .meta(_):
+            return 24*3600
+        case .run(_, _, _):
+            return 24*3600
+        }
+    }
+    
+    /// Get the remote URL. May replace "data" with "data_run"
+    func getRemoteUrl() -> String? {
+        guard let remoteDirectory = OpenMeteo.remoteDataDirectory else {
+            return nil
+        }
+        let file = getRelativeFilePath()
+        switch self {
+        case .run(let domain, _, _):
+            return "\(remoteDirectory.replacingOccurrences(of: "data", with: "data_run").replacing("MODEL", with: domain.bucketName))\(file)"
+        case .domainChunk(let domain, _, _, _, _, _):
+            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
+        case .staticFile(domain: let domain, _, _):
+            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
+        case .meta(domain: let domain):
+            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
+        }
     }
     
     /// Relative file path like `/dwd_icon/temperature_2m/chunk_1234.om`

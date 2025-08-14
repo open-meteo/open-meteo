@@ -1,8 +1,11 @@
+#if os(Linux)
+    @preconcurrency import Glibc
+#else
+    import Darwin.C
+#endif
+
 import App
 import Vapor
-
-/// Increase open file limit
-Process.setOpenFileLimitto64k()
 
 /// Xcode sets current working directory to something in derived data
 #if Xcode
@@ -10,9 +13,21 @@ let projectHome = String(#filePath[...#filePath.range(of: "/Sources/")!.lowerBou
 FileManager.default.changeCurrentDirectoryPath(projectHome)
 #endif
 
-var env = try Environment.detect()
-try LoggingSystem.bootstrap(from: &env)
-let app = try await Application.make(env)
-try configure(app)
-try await app.execute()
-try await app.asyncShutdown()
+do {
+    var env = try Environment.detect()
+    try LoggingSystem.bootstrap(from: &env)
+    let app = try await Application.make(env)
+    Process.increaseOpenFileLimit(logger: app.logger)
+    try configure(app)
+    try await app.execute()
+    try await app.asyncShutdown()
+} catch let error as CommandError {
+    fputs("\(error)\n", stderr)
+} catch {
+    let logger = Logger(label: "TopLevelError")
+    logger.critical("Uncaught top-level error", metadata: [
+        "type": "\(type(of: error))",
+        "message": "\(error)"
+    ])
+    exit(1)
+}

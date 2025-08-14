@@ -70,7 +70,7 @@ enum Era5Factory {
     public static func makeReader(domain: CdsDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> Era5Reader<GenericReaderCached<CdsDomain, Era5Variable>> {
         guard let reader = try await GenericReader<CdsDomain, Era5Variable>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             // should not be possible
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         return .init(reader: GenericReaderCached(reader: reader), options: options)
     }
@@ -87,7 +87,7 @@ enum Era5Factory {
               let era5ens = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         else {
             // should not be possible
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         return .init(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5ens), GenericReaderCached(reader: era5)]), options: options)
     }
@@ -102,7 +102,7 @@ enum Era5Factory {
             let era5land = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_land, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         else {
             // should not be possible
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         return .init(reader: GenericReaderMixerSameDomain(reader: [/*GenericReaderCached(reader: era5ocean), */GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
     }
@@ -113,7 +113,7 @@ enum Era5Factory {
               let ecmwfIfs = try await GenericReader<CdsDomain, Era5Variable>(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         else {
             // should not be possible
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         return .init(reader: GenericReaderMixerSameDomain(reader: [
             GenericReaderCached(reader: era5),
@@ -406,7 +406,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             }), .percentage)
         case .soil_moisture_index_0_to_7cm:
             guard let soilType = try await self.getStatic(type: .soilType) else {
-                throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
+                throw ForecastApiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
@@ -415,7 +415,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_7_to_28cm:
             guard let soilType = try await self.getStatic(type: .soilType) else {
-                throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
+                throw ForecastApiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
@@ -424,7 +424,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_28_to_100cm:
             guard let soilType = try await self.getStatic(type: .soilType) else {
-                throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
+                throw ForecastApiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
@@ -433,7 +433,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_100_to_255cm:
             guard let soilType = try await self.getStatic(type: .soilType) else {
-                throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
+                throw ForecastApiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
@@ -442,7 +442,7 @@ struct Era5Reader<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, Ge
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         case .soil_moisture_index_0_to_100cm:
             guard let soilType = try await self.getStatic(type: .soilType) else {
-                throw ForecastapiError.generic(message: "Could not read ERA5 soil type")
+                throw ForecastApiError.generic(message: "Could not read ERA5 soil type")
             }
             guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
                 return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)

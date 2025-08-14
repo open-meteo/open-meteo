@@ -279,7 +279,7 @@ extension GenericDomain {
     }
 
     func openBiasCorrectionFile(for variable: String, client: HTTPClient, logger: Logger) async throws -> (any OmFileReaderArrayProtocol<Float>)? {
-        return try await RemoteOmFileManager.instance.get(file: getBiasCorrectionFile(for: variable), client: client, logger: logger)
+        return try await RemoteOmFileManager.instance.get(file: getBiasCorrectionFile(for: variable), client: client, logger: logger)?.reader
     }
 }
 

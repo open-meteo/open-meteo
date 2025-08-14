@@ -31,13 +31,13 @@ struct GenericReaderOptions {
         /// Tilt of a solar panel for GTI calculation. 0° horizontal, 90° vertical. Throws out of bounds error.
         if let tilt {
             guard tilt.isNaN || (tilt >= 0 && tilt <= 90) else {
-                throw ForecastapiError.generic(message: "Parameter `&tilt=` must be within 0° and 90°")
+                throw ForecastApiError.generic(message: "Parameter `&tilt=` must be within 0° and 90°")
             }
         }
         /// Azimuth of a solar panel for GTI calculation. 0° south, -90° east, 90° west. Throws out of bounds error.
         if let azimuth {
             guard azimuth.isNaN || (azimuth >= -180 && azimuth <= 180) else {
-                throw ForecastapiError.generic(message: "Parameter `&azimuth=` must be within -180° and 180°")
+                throw ForecastApiError.generic(message: "Parameter `&azimuth=` must be within -180° and 180°")
             }
         }
         self.tilt = tilt ?? 0

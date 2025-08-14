@@ -51,13 +51,16 @@ final class Curl: Sendable {
 
     /// Chunk size for concurrent downloads
     let chunkSize: Int
+    
+    /// Default throw if unauthorized error occures
+    let retryUnauthorized: Bool
 
     /// If the environment varibale `HTTP_CACHE` is set, use it as a directory to cache all HTTP requests
     static var cacheDirectory: String? {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16, retryUnauthorized: Bool = false) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx
@@ -67,6 +70,7 @@ final class Curl: Sendable {
         self.client = client
         self.headers = headers
         self.chunkSize = chunkSizeMB * (2 << 19)
+        self.retryUnauthorized = retryUnauthorized
     }
 
     deinit {
@@ -158,7 +162,7 @@ final class Curl: Sendable {
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     // await print(try response.body.collect(upTo: 10000000).readStringImmutable())
-                    if response.status == .unauthorized {
+                    if !retryUnauthorized && response.status == .unauthorized {
                         throw CurlErrorNonRetry.unauthorized
                     }
                     throw CurlError.downloadFailed(code: response.status)
@@ -229,11 +233,14 @@ final class Curl: Sendable {
         let stream = chunks.mapStream(nConcurrent: nConcurrent) { chunk in
             let range = "\(chunk.lowerBound)-\(chunk.upperBound - 1)"
             let timeout = TimeoutTracker(logger: self.logger, deadline: deadline)
+            let chunkTimeOut = ExponentialBackOff(factor: .seconds(120), maximum: .seconds(300))
+            var i = 0
             while true {
+                i += 1
                 // 120 seconds timeout for each 16MB chunk
-                let deadlineShort = Date().addingTimeInterval(TimeInterval(120))
+                let deadLineChunk = chunkTimeOut.deadLine(attempt: i)
                 // Start the download and wait for the header
-                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadlineShort, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
+                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadLineChunk, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
 
                 // Retry failed file transfers after this point
                 do {
@@ -245,8 +252,11 @@ final class Curl: Sendable {
                     }
                     for try await fragement in response.body {
                         // await tracker.add(fragement.readableBytes)
-                        if Date() > deadlineShort {
+                        if Date() > deadLineChunk {
                             throw CurlError.timeoutPerChunkReached(httpRange: chunk)
+                        }
+                        if Date() > deadline {
+                            throw CurlError.timeoutReached
                         }
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)

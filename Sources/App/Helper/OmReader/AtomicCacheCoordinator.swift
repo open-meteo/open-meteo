@@ -12,8 +12,8 @@ struct AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
         self.queue = .init()
     }
     
-    func get<T: ContiguousBytes & Sendable>(key: UInt64, backendFetch: @Sendable () async throws -> T) async throws -> UnsafeRawBufferPointer {
-        if let result = cache.get(key: key) {
+    func get<T: ContiguousBytes>(key: UInt64, backendFetch: @Sendable () async throws -> T) async throws -> UnsafeRawBufferPointer {
+        if let result = cache.get(key: key, maxAccessedAgeInSeconds: 365*24*3600) {
             return result
         }
         // Note: Not 100% sure if there could be a race condition between cache check and calling the actor

@@ -208,7 +208,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
     /// Download ECMWF ifs open data
     func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        // Retry unauthorized errors, because ECMWF servers randomly return this error code
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryUnauthorized: true)
         Process.alarm(seconds: 6 * 3600)
         defer { Process.alarm(seconds: 0) }
 

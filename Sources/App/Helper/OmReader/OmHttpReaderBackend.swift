@@ -3,32 +3,10 @@ import AsyncHTTPClient
 import Foundation
 import Logging
 import NIO
+import Synchronization
 
 enum OmHttpReaderBackendError: Error {
     case contentLengthMissing
-}
-
-extension String {
-    /// Get FNV hash of the string
-    var fnv1aHash64: UInt64 {
-        let fnvOffsetBasis: UInt64 = 0xcbf29ce484222325
-        let fnvPrime: UInt64 = 0x100000001b3
-        return self.withContiguousStorageIfAvailable { ptr in
-            var hash = fnvOffsetBasis
-            for byte in UnsafeRawBufferPointer(ptr) {
-                hash ^= UInt64(byte)
-                hash = hash &* fnvPrime
-            }
-            return hash
-        } ?? {
-            var hash = fnvOffsetBasis
-            for byte in self.utf8 {
-                hash ^= UInt64(byte)
-                hash = hash &* fnvPrime
-            }
-            return hash
-        }()
-    }
 }
 
 /**
@@ -49,18 +27,41 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
     
     let logger: Logger
     
+    /// Timestamp in seconds when the last data was successfully fetched from the backend.
+    private let lastValidatedAtomic: Atomic<Int>
+    
+    /// Timestamp when the last data was successfully fetched from the backend.
+    var lastValidated: Timestamp {
+        return Timestamp(lastValidatedAtomic.load(ordering: .relaxed))
+    }
+    
     typealias DataType = ByteBuffer
     
     var cacheKey: UInt64 {
-        return url.fnv1aHash64 ^ (eTag?.fnv1aHash64 ?? 0) ^ (lastModified?.fnv1aHash64 ?? 0)
+        return url.fnv1aHash64.addFnv1aHash(eTag ?? "").addFnv1aHash(lastModified ?? "")
+    }
+    
+    var lastModifiedTimestamp: Timestamp? {
+        guard let lastModified else {
+            return nil
+        }
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        guard let date = fmt.date(from: lastModified) else {
+            return nil
+        }
+        return Timestamp(Int(date.timeIntervalSince1970))
     }
     
     init?(client: HTTPClient, logger: Logger, url: String) async throws {
         self.client = client
         var headRequest = HTTPClientRequest(url: url)
         headRequest.method = .HEAD
+        try headRequest.applyS3Credentials()
         do {
-            logger.debug("Sending HEAD requests to \(url)")
+            logger.debug("Sending HEAD requests to \(headRequest.url)")
             let backoff = ExponentialBackOff(maximum: .milliseconds(500))
             let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5), timeoutPerRequest: .seconds(1), backOffSettings: backoff)
             guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
@@ -71,9 +72,20 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
             self.count = contentLength
             self.url = url
             self.logger = logger
+            self.lastValidatedAtomic = .init(Timestamp.now().timeIntervalSince1970)
         } catch CurlError.fileNotFound {
             return nil
         }
+    }
+    
+    init(client: HTTPClient, logger: Logger, url: String, count: Int, lastModified: Timestamp?, eTag: String?, lastValidated: Timestamp) {
+        self.client = client
+        self.logger = logger
+        self.url = url
+        self.count = count
+        self.lastModified = lastModified?.lastModifiedHttpDateFormat
+        self.eTag = eTag
+        self.lastValidatedAtomic = .init(lastValidated.timeIntervalSince1970)
     }
     
     func prefetchData(offset: Int, count: Int) async throws {
@@ -89,9 +101,12 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
             request.headers.add(name: "If-Match", value: eTag)
         }
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
-        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(url)")
+        try request.applyS3Credentials()
+        logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
         let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(5))
-        return try await response.body.collect(upTo: count)
+        let buffer = try await response.body.collect(upTo: count)
+        lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
+        return buffer
     }
     
     func withData<T>(offset: Int, count: Int, fn: @Sendable (UnsafeRawBufferPointer) throws -> T) async throws -> T {
@@ -104,5 +119,15 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
 extension ByteBuffer: @retroactive ContiguousBytes {
     public func withUnsafeBytes<R>(_ body: (UnsafeRawBufferPointer) throws -> R) rethrows -> R {
         try self.withUnsafeReadableBytes(body)
+    }
+}
+
+extension Timestamp {
+    var lastModifiedHttpDateFormat: String {
+        let fmt = DateFormatter()
+        fmt.locale = Locale(identifier: "en_US_POSIX")
+        fmt.timeZone = TimeZone(secondsFromGMT: 0)
+        fmt.dateFormat = "EEE, dd MMM yyyy HH:mm:ss zzz"
+        return fmt.string(from: self.toDate())
     }
 }

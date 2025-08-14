@@ -71,7 +71,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     }
     
     @discardableResult
-    func set<DataIn: ContiguousBytes & Sendable>(key: UInt64, value: DataIn) -> UnsafeRawBufferPointer {
+    func set<DataIn: ContiguousBytes>(key: UInt64, value: DataIn) -> UnsafeRawBufferPointer {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         /// For in-flight requests set bit 0 to zero
         let inFlightKey = WordPair(first: UInt(key), second: time & ~0x1)
@@ -151,7 +151,7 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
     }
     
     /// Find key in cache, updates the LRU timestamp and returns a pointer to the memory region. There is a slight chance, that data is modified while reading, but it should practically never happen
-    func get(key: UInt64) -> UnsafeRawBufferPointer? {
+    func get(key: UInt64, maxAccessedAgeInSeconds: UInt) -> UnsafeRawBufferPointer? {
         let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
         let lookAheadCount: UInt64 = 1024
         let blockCount = blockCount
@@ -166,6 +166,12 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                     guard entry.first == key && entry.second & 0x1 == 1 else {
                         break
                     }
+                    
+                    // Check if cached entry is not older than requested
+                    guard entry.second >= time - maxAccessedAgeInSeconds * 1_000_000_000 else {
+                        return nil
+                    }
+                    
                     // Update last modified timestamp
                     let updateTimestamp = WordPair(first: UInt(key), second: time | 0x1)
                     let updated = entries[slot].compareExchange(expected: entry, desired: updateTimestamp, ordering: .relaxed)
@@ -224,6 +230,62 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
             }
             return nil
         }
+    }
+    
+    func statistics() -> AtomicBlockCacheStatistics {
+        var used = 0,
+            free = 0,
+            accessed_15min = 0,
+            accessed_30min = 0,
+            accessed_60min = 0,
+            accessed_3hours = 0,
+            accessed_24hours = 0
+        
+        let now = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
+        
+        return data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            for block in 0..<blockCount {
+                let time = entries[block].load(ordering: .relaxed).second
+                if time == 0 {
+                    free += blockSize
+                    continue
+                }
+                used += blockSize
+                if time > now - 900 * 1_000_000_000 {
+                    accessed_15min += blockSize
+                }
+                if time > now - 1800 * 1_000_000_000 {
+                    accessed_30min += blockSize
+                }
+                if time > now - 3_600 * 1_000_000_000 {
+                    accessed_60min += blockSize
+                }
+                if time > now - 10_800 * 1_000_000_000 {
+                    accessed_3hours += blockSize
+                }
+                if time > now - 86_400 * 1_000_000_000 {
+                    accessed_24hours += blockSize
+                }
+            }
+            return AtomicBlockCacheStatistics(
+                used: used,
+                free: free,
+                accessed_15min: accessed_15min,
+                accessed_30min: accessed_30min,
+                accessed_60min: accessed_60min,
+                accessed_3hours: accessed_3hours,
+                accessed_24hours: accessed_24hours
+            )
+        }
+    }
+}
+
+struct AtomicBlockCacheStatistics {
+    let used, free, accessed_15min, accessed_30min, accessed_60min, accessed_3hours, accessed_24hours: Int
+    
+    var prettyPrint: String {
+        return "AtomicBlockCache used \(used.bytesHumanReadable), free \(free.bytesHumanReadable), accessed_15min \(accessed_15min.bytesHumanReadable), accessed_30min \(accessed_30min.bytesHumanReadable), accessed_60min \(accessed_60min.bytesHumanReadable), accessed_3hours \(accessed_3hours.bytesHumanReadable), accessed_24hours \(accessed_24hours.bytesHumanReadable)"
     }
 }
 

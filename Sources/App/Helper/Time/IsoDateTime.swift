@@ -3,7 +3,7 @@ import Foundation
 /**
  Simple year, month, day container which is decoded to iso dates `2022-01-01T00:00:00`
  */
-public struct IsoDateTime {
+public struct IsoDateTime: Sendable {
     /// Encoded as integer `20220101235959`
     public let date: Int
 
@@ -70,6 +70,11 @@ public struct IsoDateTime {
         // day of week = Int(t.tm_wday)
         self.init(year: Int(t.tm_year + 1900), month: Int(t.tm_mon + 1), day: Int(t.tm_mday), hour: Int(t.tm_hour), minute: Int(t.tm_min), second: Int(t.tm_sec))
     }
+    
+    /// With format `yyyy/MM/dd/hh:mmZ`
+    var format_directoriesYYYYMMddhhmm: String {
+        return "\(year)/\(month.zeroPadded(len: 2))/\(day.zeroPadded(len: 2))/\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))Z"
+    }
 
     /// Decode from `2022-12-23` or `2022-12-23T00:00` or `2022-12-23T00:00:00`
     public init(fromIsoString str: String) throws {
@@ -120,6 +125,26 @@ public struct IsoDateTime {
     }
 }
 
+extension IsoDateTime: Equatable {
+    
+}
+
+extension IsoDateTime: Hashable {
+    
+}
+
+extension IsoDateTime: Codable {
+    public init(from decoder: any Decoder) throws {
+        let str = try decoder.singleValueContainer().decode(String.self)
+        self = try .init(fromIsoString: str)
+    }
+    
+    public func encode(to encoder: any Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(self.toIsoString())
+    }
+}
+
 extension IsoDateTime {
     static func load(commaSeparated: [String]) throws -> [IsoDateTime] {
         try commaSeparated.flatMap { s in
@@ -129,20 +154,20 @@ extension IsoDateTime {
         }
     }
 
-    static func loadRange(start: [String], end: [String]) throws -> [ClosedRange<Timestamp>] {
+    static func loadRange(start: [IsoDateTime], end: [IsoDateTime]) throws -> [ClosedRange<Timestamp>] {
         if start.isEmpty, end.isEmpty {
             return []
         }
-        let startDate = try load(commaSeparated: start)
-        let endDate = try load(commaSeparated: end)
+        let startDate = start
+        let endDate = end
         guard startDate.count == endDate.count else {
-            throw ForecastapiError.startAndEndDateCountMustBeTheSame
+            throw ForecastApiError.startAndEndDateCountMustBeTheSame
         }
         return try zip(startDate, endDate).map { startDate, endDate in
             let start = startDate.toTimestamp()
             let includedEnd = endDate.toTimestamp()
             guard includedEnd.timeIntervalSince1970 >= start.timeIntervalSince1970 else {
-                throw ForecastapiError.enddateMustBeLargerEqualsThanStartdate
+                throw ForecastApiError.endDateMustBeLargerEqualsThanStartDate
             }
             return start...includedEnd
         }

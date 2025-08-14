@@ -50,25 +50,54 @@ actor VariablePerMemberStorage<V: Hashable & Sendable> {
 }
 
 extension VariablePerMemberStorage {
+    /// Get 2 variables at once and remove them from storage
+    func getTwoRemoving(first: V, second: V) -> (first: Array2D, second: Array2D, timestamp: Timestamp, member: Int)? {
+        for key in data.keys {
+            guard
+                key.variable == first,
+                let secondData = data.removeValue(forKey: .init(variable: second, timestamp: key.timestamp, member: key.member)),
+                let firstData = data.removeValue(forKey: key)
+            else {
+                continue
+            }
+            return (firstData, secondData, key.timestamp, key.member)
+        }
+        return nil
+    }
+    
+    /// Get 2 variables at once and remove them from storage
+    func getTwoRemoving(first: V, second: V, timestamp: Timestamp) -> (first: Array2D, second: Array2D, member: Int)? {
+        for key in data.keys {
+            guard
+                key.variable == first,
+                key.timestamp == timestamp,
+                let secondData = data.removeValue(forKey: .init(variable: second, timestamp: timestamp, member: key.member)),
+                let firstData = data.removeValue(forKey: key)
+            else {
+                continue
+            }
+            return (firstData, secondData, key.member)
+        }
+        return nil
+    }
+}
+
+extension VariablePerMemberStorage {
     /// Calculate wind speed and direction from U/V components for all available members for all timesteps
     /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
     /// Removes processed variables from `self.data`
     nonisolated func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialMultistepWriter, trueNorth: [Float]? = nil) async throws {
         // Note: A for loop + remove is not thread safe due to reentrance issues
-        while
-            let uKey = await data.first(where: { $0.key.variable == u })?.key,
-            let u = await remove(variable: u, timestamp: uKey.timestamp, member: uKey.member),
-            let v = await remove(variable: v, timestamp: uKey.timestamp, member: uKey.member)
-        {
+        while let (u, v, timestamp, member) = await getTwoRemoving(first: u, second: v) {
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-            try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outSpeedVariable, data: speed)
+            try await writer.write(time: timestamp, member: member, variable: outSpeedVariable, data: speed)
 
             if let outDirectionVariable {
                 var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 if let trueNorth {
                     direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                 }
-                try await writer.write(time: uKey.timestamp, member: uKey.member, variable: outDirectionVariable, data: direction)
+                try await writer.write(time: timestamp, member: member, variable: outDirectionVariable, data: direction)
             }
         }
     }
@@ -78,20 +107,16 @@ extension VariablePerMemberStorage {
     /// Removes processed variables from `self.data`
     nonisolated func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
         // Note: A for loop + remove is not thread safe due to reentrance issues
-        while
-            let uKey = await data.first(where: { $0.key.variable == u && $0.key.timestamp == writer.time })?.key,
-            let u = await remove(variable: u, timestamp: uKey.timestamp, member: uKey.member),
-            let v = await remove(variable: v, timestamp: uKey.timestamp, member: uKey.member)
-        {
+        while let (u, v, member) = await getTwoRemoving(first: u, second: v, timestamp: writer.time) {
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-            try await writer.write(member: uKey.member, variable: outSpeedVariable, data: speed)
+            try await writer.write(member: member, variable: outSpeedVariable, data: speed)
 
             if let outDirectionVariable {
                 var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
                 if let trueNorth {
                     direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
                 }
-                try await writer.write(member: uKey.member, variable: outDirectionVariable, data: direction)
+                try await writer.write(member: member, variable: outDirectionVariable, data: direction)
             }
         }
     }
@@ -166,13 +191,9 @@ extension VariablePerMemberStorage {
     /// Sum up 2 variables, and remove them from storage
     nonisolated func sumUpRemovingBoth(var1: V, var2: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         // Note: A for loop + remove is not thread safe due to reentrance issues
-        while
-            let key = await data.first(where: {$0.key.variable == var1 && $0.key.timestamp == writer.time})?.key,
-            let var1 = await remove(variable: var1, timestamp: key.timestamp, member: key.member),
-            let var2 = await remove(variable: var2, timestamp: key.timestamp, member: key.member)
-        {
+        while let (var1, var2, member) = await getTwoRemoving(first: var1, second: var2, timestamp: writer.time) {
             let sum = zip(var1.data, var2.data).map(+)
-            try await writer.write(member: key.member, variable: outVariable, data: sum)
+            try await writer.write(member: member, variable: outVariable, data: sum)
         }
     }
     
@@ -207,7 +228,7 @@ extension VariablePerMemberStorage {
         }
     }
     
-    /// Calculate relative humidity. Removed dew-point from storage afterwards
+    /// Calculate relative humidity. Removes dew-point from storage afterwards
     nonisolated func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
         // Note: A for loop + remove is not thread safe due to reentrance issues
         while

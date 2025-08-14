@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 
 #if os(Linux)
     import Glibc
@@ -10,13 +11,14 @@ import Foundation
 
 extension Process {
     /// Set open files limit to 64k
-    public static func setOpenFileLimitto64k() {
+    public static func increaseOpenFileLimit(logger: Logger) {
         for limit in [1024 * 1024, 524288, 65536] {
             var filelimit = rlimit(rlim_cur: rlim_t(limit), rlim_max: rlim_t(limit))
             guard setrlimit(OS_RLIMIT, &filelimit) != -1 else {
-                print("[ WARNING ] Could not set number of open file limit to \(limit). \(String(cString: strerror(errno)))")
+                logger.debug("Could not set number of open file limit to \(limit). \(String(cString: strerror(errno)))")
                 continue
             }
+            logger.debug("Set open file limit to \(limit).")
             return
         }
     }

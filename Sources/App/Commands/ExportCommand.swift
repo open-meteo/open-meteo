@@ -948,7 +948,7 @@ enum ExportFormat: String, RawRepresentableString, CaseIterable {
                 let era5 = try await GenericReader<CdsDomain, Era5Variable>(domain: .era5, lat: era5land.modelLat, lon: era5land.modelLon, elevation: era5land.targetElevation, mode: .nearest, options: options)
             else {
                 // Not possible
-                throw ForecastapiError.noDataAvilableForThisLocation
+                throw ForecastapiError.noDataAvailableForThisLocation
             }
             return Era5Reader<GenericReaderMixerSameDomain<GenericReaderCached<CdsDomain, Era5Variable>>>(reader: GenericReaderMixerSameDomain(reader: [GenericReaderCached(reader: era5), GenericReaderCached(reader: era5land)]), options: options)
         }
@@ -961,17 +961,17 @@ enum ExportFormat: String, RawRepresentableString, CaseIterable {
         switch targetGridDomain {
         case .era5_interpolated_10km:
             guard let biasCorrector = try await Cmip6BiasCorrectorInterpolatedWeights(domain: cmipDomain, referenceDomain: CdsDomain.era5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
+                throw ForecastapiError.noDataAvailableForThisLocation
             }
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         case .era5_land:
             guard let biasCorrector = try await Cmip6BiasCorrectorEra5Seamless(domain: cmipDomain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
+                throw ForecastapiError.noDataAvailableForThisLocation
             }
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         case .imerg:
             guard let biasCorrector = try await Cmip6BiasCorrectorGenericDomain(domain: cmipDomain, referenceDomain: SatelliteDomain.imerg_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                throw ForecastapiError.noDataAvilableForThisLocation
+                throw ForecastapiError.noDataAvailableForThisLocation
             }
             return Cmip6ReaderPostBiasCorrected(reader: biasCorrector, domain: cmipDomain)
         }
