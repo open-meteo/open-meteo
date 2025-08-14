@@ -18,7 +18,8 @@ extension BodyStreamWriter {
             .flatMapError({ error in
                 return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
                     .flatMap({
-                        write(.error(error))
+                        write(.end)
+                        //write(.error(error))
                     })
                 })
     }
