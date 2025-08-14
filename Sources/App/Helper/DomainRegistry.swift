@@ -385,10 +385,14 @@ extension Process {
 }
 
 extension DomainRegistry {
+    var bucketName: String {
+        return rawValue.replacing("_", with: "-").lowercased()
+    }
+    
     func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
         return buckets.split(separator: ",").map { bucket in
             let bucketSplit = bucket.split(separator: "@")
-            let bucket = String(bucketSplit[0].replacing("MODEL", with: rawValue.replacing("_", with: "-")))
+            let bucket = String(bucketSplit[0].replacing("MODEL", with: bucketName))
             let profile = bucketSplit.count > 1 ? String(bucketSplit[1]) : nil
             return (bucket, profile)
         }

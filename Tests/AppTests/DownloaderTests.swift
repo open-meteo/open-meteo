@@ -24,4 +24,12 @@ import AsyncHTTPClient
         //print(response.status)
         //print(try await response.body.collect(upTo: 10000).readStringImmutable()!)
     }
+    
+    @Test func testAwsSignClient() async throws {
+        let url = "https://AKIAIOSFODNN7EXAMPLE:wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY@examplebucket.s3.amazonaws.com/test.txt"
+        var request = HTTPClientRequest(url: url)
+        try request.applyS3Credentials()
+        #expect(request.headers.contains(name: "Authorization"))
+        #expect(request.url == "https://examplebucket.s3.amazonaws.com/test.txt")
+    }
 }

@@ -127,7 +127,7 @@ extension Request {
 
         if isFreeApi {
             guard let address = peerAddress ?? remoteAddress else {
-                throw ForecastapiError.generic(message: "Could not get remote address")
+                throw ForecastApiError.generic(message: "Could not get remote address")
             }
             let slot = address.rateLimitSlot
             try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: 1, maxConcurrentHard: 5)
@@ -138,13 +138,13 @@ extension Request {
             let params = try parseApiParams()
             guard params.apikey == nil else {
                 guard self.method != .POST else {
-                    throw ForecastapiError.generic(message: "Please use the customer- prefixed URL for POST requests")
+                    throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
                 }
                 return self.redirect(to: "\(scheme)://customer-\(host)/\(url.string)")
             }
             let responder = try await fn(host, params)
             if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
-                throw ForecastapiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
+                throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
             let response = try await responder.response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: slot)
@@ -172,7 +172,7 @@ extension Request {
         }
         let responder = try await fn(host, params)
         if responder.numberOfLocations > numberOfLocationsMaximum {
-            throw ForecastapiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
+            throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
         }
         let weight = responder.calculateQueryWeight(nVariablesModels: nil)
         let response = try await responder.response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: slot)

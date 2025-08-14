@@ -18,7 +18,8 @@ extension BodyStreamWriter {
             .flatMapError({ error in
                 return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
                     .flatMap({
-                        write(.error(error))
+                        write(.end)
+                        //write(.error(error))
                     })
                 })
     }
@@ -68,7 +69,7 @@ extension ForecastapiResult.PerLocation {
     fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         let sections = try await runAllSections()
         let current = try await first.current?()

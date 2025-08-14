@@ -37,6 +37,15 @@ enum OpenMeteo {
         return AtomicCacheCoordinator(cache: try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount))
     }()
     
+    /// Cache remote file meta data if `REMOTE_DATA_DIRECTORY` is set. 1 MB => 12k files
+    static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
+        let cacheFile = Environment.get("CACHE_META_FILE") ?? "\(dataDirectory)/cache_file_meta.bin"
+        let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_META_SIZE") ?? "1MB")
+        let blockSize = MemoryLayout<OmHttpMetaCache.Entry>.stride
+        let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
+        return try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount)
+    }()
+    
     /// Data directory with trailing slash
     static let dataSpatialDirectory: String? = {
         if let dir = Environment.get("DATA_SPATIAL_DIRECTORY") {
@@ -222,6 +231,7 @@ public func configure(_ app: Application) throws {
         delay: .seconds(2),
         MetaFileManager.instance.backgroundTask
     )
+    // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(10),

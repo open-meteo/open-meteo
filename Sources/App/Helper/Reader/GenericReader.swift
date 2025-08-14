@@ -18,16 +18,19 @@ protocol GenericReaderProtocol {
 }
 
 /**
- Each call to `get` or `prefetch` is acompanied by time, ensemble member and previous day information
+ Each call to `get` or `prefetch` is accompanied by time, ensemble member and previous day information
  */
 struct TimerangeDtAndSettings: Hashable  {
     let time: TimerangeDt
     /// Member stored in separate files
     let ensembleMember: Int
-    /// Member stored as an addiitonal dimention int the same file
+    /// Member stored as an additional dimension int the same file
     let ensembleMemberLevel: Int
 
     let previousDay: Int
+    
+    /// If a single run is selected
+    let run: IsoDateTime?
 
     var dtSeconds: Int {
         time.dtSeconds
@@ -38,21 +41,21 @@ struct TimerangeDtAndSettings: Hashable  {
     }
 
     func with(start: Timestamp) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time.with(start: start), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, run: run)
     }
 
     func with(time: TimerangeDt? = nil, ensembleMember: Int? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time ?? self.time, ensembleMember: ensembleMember ?? self.ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, run: run)
     }
 
     func with(dtSeconds: Int) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay)
+        return TimerangeDtAndSettings(time: time.with(dtSeconds: dtSeconds), ensembleMember: ensembleMember, ensembleMemberLevel: ensembleMemberLevel, previousDay: previousDay, run: run)
     }
 }
 
 extension TimerangeDt {
-    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil) -> TimerangeDtAndSettings {
-        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0)
+    func toSettings(ensembleMember: Int? = nil, previousDay: Int? = nil, ensembleMemberLevel: Int? = nil, run: IsoDateTime? = nil) -> TimerangeDtAndSettings {
+        return TimerangeDtAndSettings(time: self, ensembleMember: ensembleMember ?? 0, ensembleMemberLevel: ensembleMemberLevel ?? 0, previousDay: previousDay ?? 0, run: run)
     }
 }
 
@@ -154,7 +157,9 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
 
     /// Read and scale if required
     private func readAndScale(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        var data = try await omFileSplitter.read(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+        var data = try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+        
+        // TODO interpolate missing timesteps after 
 
         /// Scale pascal to hecto pasal. Case in era5
         if variable.unit == .pascal {

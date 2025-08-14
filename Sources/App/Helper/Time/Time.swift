@@ -119,6 +119,10 @@ public struct Timestamp: Hashable, Sendable {
     public func toComponents() -> IsoDate {
         return IsoDate(timeIntervalSince1970: timeIntervalSince1970)
     }
+    
+    public func toIsoDateTime() -> IsoDateTime {
+        return IsoDateTime(timeIntervalSince1970: timeIntervalSince1970)
+    }
 
     public func subtract(days: Int = 0, hours: Int = 0, minutes: Int = 0, seconds: Int = 0) -> Timestamp {
         let dtSeconds = seconds + minutes * 60 + hours * 3600 + days * 86400

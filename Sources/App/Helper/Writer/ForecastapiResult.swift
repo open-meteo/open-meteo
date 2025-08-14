@@ -42,10 +42,10 @@ fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable:
             })
         })
         guard let first = run.first else {
-            throw ForecastapiError.noDataAvilableForThisLocation
+            throw ForecastApiError.noDataAvailableForThisLocation
         }
         guard !run.contains(where: { $0.time.dtSeconds != first.time.dtSeconds }) else {
-            throw ForecastapiError.cannotReturnModelsWithDiffernetTimeIntervals
+            throw ForecastApiError.cannotReturnModelsWithDifferentTimeIntervals
         }
         return ApiSectionString(name: first.name, time: first.time, columns: run.flatMap { $0.columns })
     }
@@ -105,7 +105,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
                     })
                 })
                 guard let first = run.first else {
-                    throw ForecastapiError.noDataAvilableForThisLocation
+                    throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: run.flatMap { $0.columns })
             }
@@ -248,7 +248,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         //let loop = ForecastapiController.runLoop
         //return try await loop.next() {
             if format == .xlsx && results.count > 100 {
-                throw ForecastapiError.generic(message: "XLSX supports only up to 100 locations")
+                throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
             }
             for location in results {
                 for model in location.results {
