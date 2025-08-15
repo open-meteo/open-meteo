@@ -160,7 +160,7 @@ extension Request {
             throw ApiKeyManagerError.apiKeyInvalid
         }
         let apiProfessionalApis = ["archive-api.", "climate-api.", "flood-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api."]
-        if limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
+        if limit > 0 && limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
             throw ApiKeyManagerError.apiProfessionalRequired
         }
         let numberOfLocationsMaximum = limit >= 20_000_000 ? 200_000 : 10_000
