@@ -4,16 +4,19 @@ import Foundation
 struct GaussianGrid: Gridable {
     enum GridType {
         case o1280
+        case o320
         case n320
 
-        /// Note quite sure if there is an analysical soltiuion for N type grid. https://confluence.ecmwf.int/display/FCST/Gaussian+grid+with+320+latitude+lines+between+pole+and+equator
+        /// Note quite sure if there is an analytical solution for N type grid. https://confluence.ecmwf.int/display/FCST/Gaussian+grid+with+320+latitude+lines+between+pole+and+equator
         /// Therefore here is a lookup table
         static let n320CountPerLine = [18, 25, 36, 40, 45, 50, 60, 64, 72, 72, 75, 81, 90, 96, 100, 108, 120, 120, 125, 135, 144, 144, 150, 160, 180, 180, 180, 192, 192, 200, 216, 216, 216, 225, 240, 240, 240, 250, 256, 270, 270, 288, 288, 288, 300, 300, 320, 320, 320, 324, 360, 360, 360, 360, 360, 360, 375, 375, 384, 384, 400, 400, 405, 432, 432, 432, 432, 450, 450, 450, 480, 480, 480, 480, 480, 486, 500, 500, 500, 512, 512, 540, 540, 540, 540, 540, 576, 576, 576, 576, 576, 576, 600, 600, 600, 600, 640, 640, 640, 640, 640, 640, 640, 648, 648, 675, 675, 675, 675, 720, 720, 720, 720, 720, 720, 720, 720, 720, 729, 750, 750, 750, 750, 768, 768, 768, 768, 800, 800, 800, 800, 800, 800, 810, 810, 864, 864, 864, 864, 864, 864, 864, 864, 864, 864, 864, 900, 900, 900, 900, 900, 900, 900, 900, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 960, 972, 972, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1024, 1024, 1024, 1024, 1024, 1024, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1080, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1125, 1152, 1152, 1152, 1152, 1152, 1152, 1152, 1152, 1152, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1200, 1215, 1215, 1215, 1215, 1215, 1215, 1215, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280, 1280]
 
         var count: Int {
             switch self {
-            case .o1280:
-                return 4 * 1280 * (1280 + 9) // 6599680
+            case .o1280, .o320:
+                // o128 = 6599680
+                // o320 = 421120
+                return 4 * latitudeLines * (latitudeLines + 9)
             case .n320:
                 return 542080
             }
@@ -23,6 +26,8 @@ struct GaussianGrid: Gridable {
             switch self {
             case .o1280:
                 return 1280
+            case .o320:
+                return 320
             case .n320:
                 return 320
             }
@@ -30,7 +35,7 @@ struct GaussianGrid: Gridable {
 
         @inlinable func nxOf(y: Int) -> Int {
             switch self {
-            case .o1280:
+            case .o1280, .o320:
                 return y < latitudeLines ? (20 + y * 4) : ((2 * latitudeLines - y - 1) * 4 + 20)
             case .n320:
                 return y < latitudeLines ? Self.n320CountPerLine[y] : Self.n320CountPerLine[2 * Self.n320CountPerLine.count - y - 1]
@@ -40,7 +45,7 @@ struct GaussianGrid: Gridable {
         /// Integrate the number of grid points at this latitude line
         @inlinable func integral(y: Int) -> Int {
             switch self {
-            case .o1280:
+            case .o1280, .o320:
                 return y < latitudeLines ? (2 * y * y + 18 * y) : (count - (2 * (2 * latitudeLines - y) * (2 * latitudeLines - y) + 18 * (2 * latitudeLines - y)))
             case .n320:
                 if y < latitudeLines {
@@ -51,10 +56,10 @@ struct GaussianGrid: Gridable {
             }
         }
 
-        /// Find latiture line for given gridpoint
+        /// Find latitude line for given grid-point
         @inlinable func getPos(gridpoint: Int) -> (y: Int, x: Int, nxPerLine: Int) {
             switch self {
-            case .o1280:
+            case .o1280, .o320:
                 let y = gridpoint < count / 2 ? Int((sqrt(2 * Float(gridpoint) + 81) - 9) / 2) : (2 * latitudeLines - 1 - Int((sqrt(2 * Float(count - gridpoint - 1) + 81) - 9) / 2))
                 let x = gridpoint - integral(y: y)
                 let nx = nxOf(y: y)
