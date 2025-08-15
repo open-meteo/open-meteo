@@ -76,14 +76,19 @@ extension OmFileManagerReadable {
     func newReader(client: HTTPClient, logger: Logger) async throws -> (value: OmFileLocalOrRemote?, lastValidated: Timestamp) {
         let localFile = getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
-            let reader = try await OmFileReader(fn: try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly))
-            guard let arrayReader = reader.asArray(of: Float.self) else {
+            do {
+                let reader = try await OmFileReader(fn: try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly))
+                guard let arrayReader = reader.asArray(of: Float.self) else {
+                    return (nil, .now())
+                }
+                if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+                    return (.local(arrayReader, timestamps: times), .now())
+                }
+                return (.local(arrayReader, timestamps: nil), .now())
+            } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
+                print("[ ERROR ] Not an OpenMeteo file \(localFile)")
                 return (nil, .now())
             }
-            if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
-                return (.local(arrayReader, timestamps: times), .now())
-            }
-            return (.local(arrayReader, timestamps: nil), .now())
         }
         let (reader, lastValidated) = try await self.makeOrCachedRemoteReader(client: client, logger: logger)
         return (try await reader?.asRemoteReader(), lastValidated)
@@ -301,7 +306,7 @@ final actor RemoteOmFileManagerCache {
                                 try await blockCached.preloadBlocks(blocks: activeBlocks)
                                 logger.warning("Preload completed in \(startPreload.timeElapsedPretty())")
                             }
-                            guard let reader = try await blockCached.asCachedReader().asRemoteReader() else {
+                            guard let reader = try await blockCached.asCachedReader()?.asRemoteReader() else {
                                 entry.value = nil
                                 continue
                             }
@@ -345,13 +350,18 @@ extension OmHttpReaderBackend {
         return OmReaderBlockCache(backend: self, cache: OpenMeteo.dataBlockCache, cacheKey: self.cacheKey)
     }
     func asRemoteReader() async throws -> OmFileLocalOrRemote? {
-        return try await asBlockCached().asCachedReader().asRemoteReader()
+        return try await asBlockCached().asCachedReader()?.asRemoteReader()
     }
 }
 
 extension OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-    func asCachedReader() async throws -> OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>> {
-        return try await OmFileReader(fn: self)
+    func asCachedReader() async throws -> OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>>? {
+        do {
+            return try await OmFileReader(fn: self)
+        } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
+            print("[ ERROR ] Not an OpenMeteo file \(self.backend.url)")
+            return nil
+        }
     }
 }
 
