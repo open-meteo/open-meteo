@@ -466,6 +466,13 @@ extension DomainRegistry {
                 dest: "\(dest)meta.json",
                 profile: profile
             )
+            // Additional sync to make sure everything is synced
+            try Process.awsSync(
+                src: "\(directory)\(dir)/",
+                dest: "s3://\(bucket)/data_run/\(dir)/",
+                exclude: ["*~", "meta.json"],
+                profile: profile
+            )
             logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         }
     }

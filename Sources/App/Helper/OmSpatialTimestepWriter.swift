@@ -194,6 +194,9 @@ actor OmSpatialTimestepWriter {
                     if completed {
                         let destLatest = "\(destDomain)latest\(realm).json"
                         try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)
+                        
+                        // Additional sync to make sure everything is uploaded
+                        try Process.awsSync(src: directorySpatial, dest: destDomain, profile: profile)
                     }
                 }
             }

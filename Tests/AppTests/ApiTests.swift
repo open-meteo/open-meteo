@@ -7,7 +7,8 @@ import VaporTesting
     /*@Test func generateS3SyncCommands() throws {
         for domain in DomainRegistry.allCases {
             let d = domain.rawValue
-            print("aws s3 sync --profile hetzner --exclude \"*~\" /var/lib/openmeteo-api/data/\(d) s3://openmeteo-\(domain.bucketName)/data/\(d)")
+            //print("aws s3 sync --profile hetzner --exclude \"*~\" /var/lib/openmeteo-api/data/\(d) s3://openmeteo-\(domain.bucketName)/data/\(d)")
+            print("find /var/lib/openmeteo-api/data/\(d) ! -name '*~' -mtime +4 -print0 | sed -z 's/^/--include=/' | xargs -0 aws s3 sync --profile hetzner /var/lib/openmeteo-api/data/\(d) s3://openmeteo-\(domain.bucketName)/data/\(d) --exclude '*'")
         }
         return
     }*/
