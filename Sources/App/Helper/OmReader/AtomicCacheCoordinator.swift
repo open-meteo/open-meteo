@@ -94,11 +94,11 @@ final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
                             let key = fetchStart &+ UInt64(block)
                             let blockRange = block * blockSize ..< min((block + 1) * blockSize, fetched.count)
                             let blockData = UnsafeRawBufferPointer(rebasing: fetched[blockRange])
-                            cache.set(key: key, value: blockData)
+                            let cachedBlock = cache.set(key: key, value: blockData)
                             queue.removeValue(forKey: key)?.forEach({
-                                $0.resume(with: .success(blockData))
+                                $0.resume(with: .success(cachedBlock))
                             })
-                            dataCallback(key, blockData)
+                            dataCallback(key, cachedBlock)
                         }
                     })
                 } catch {
