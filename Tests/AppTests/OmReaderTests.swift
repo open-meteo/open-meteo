@@ -42,7 +42,7 @@ import OmFileFormat
         #expect(value.first == 214)
         
         let activeBlocks = cacheFn.listOfActiveBlocks(maxAgeSeconds: 10)
-        #expect(activeBlocks == [0, 3, 8])
+        #expect(activeBlocks == [3, 8])
         
         let value2 = try await read.read(range: [250..<251, 420..<421])
         #expect(value2.first == 214)
@@ -50,7 +50,62 @@ import OmFileFormat
         let value3 = try await read.read(range: [120..<121, 420..<421])
         #expect(value3.first == 743)
         let activeBlocks2 = cacheFn.listOfActiveBlocks(maxAgeSeconds: 10)
-        #expect(activeBlocks2 == [0, 1, 3, 8])
+        #expect(activeBlocks2 == [1, 3, 8])
+    }
+    
+    /// Consecutive reads that are not cached should be merged
+    @Test func consecutiveBlockReads() async throws {
+        let file = "cache64k50_consecutive.bin"
+        try FileManager.default.removeItemIfExists(at: file)
+        defer { try! FileManager.default.removeItem(atPath: file) }
+        let cache = try AtomicBlockCache(file: file, blockSize: 20, blockCount: 10)
+        let coordinator = AtomicCacheCoordinator(cache: cache)
+        // Read 2 blocks, both not cached
+        try await coordinator.get(key: 123, count: 2, provider: { key,count in
+            #expect(key == 123)
+            #expect(count == 2)
+            return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
+        }, dataCallback: { key, data in
+            switch key {
+            case 123:
+                #expect(data[4] == 4)
+            case 124:
+                #expect(data[4] == 24)
+            default:
+                #expect(Bool(false))
+            }
+        })
+        // First block cached, second missing
+        try await coordinator.get(key: 124, count: 2, provider: { key,count in
+            #expect(key == 125)
+            #expect(count == 1)
+            return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
+        }, dataCallback: { key, data in
+            switch key {
+            case 124:
+                #expect(data[4] == 24)
+            case 125:
+                #expect(data[4] == 4)
+            default:
+                #expect(Bool(false))
+            }
+        })
+        // Both blocks cached
+        try await coordinator.get(key: 123, count: 3, provider: { key,count in
+            #expect(Bool(false))
+            return (0..<count * cache.blockSize).map{UInt8(truncatingIfNeeded: $0)}
+        }, dataCallback: { key, data in
+            switch key {
+            case 123:
+                #expect(data[4] == 4)
+            case 124:
+                #expect(data[4] == 24)
+            case 125:
+                #expect(data[4] == 4)
+            default:
+                #expect(Bool(false))
+            }
+        })
     }
 
     @Test func blockCacheConcurrent() async throws {

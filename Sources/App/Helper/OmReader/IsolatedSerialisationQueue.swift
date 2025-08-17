@@ -1,7 +1,7 @@
 /**
  Ensure that only a single task is running to return a resource
  */
-final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
+/*final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
     private var queue: [Key: [CheckedContinuation<Value, any Error>]] = [:]
     
     /**
@@ -9,6 +9,7 @@ final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
      */
     func get(key: Key, provider: () async throws -> Value) async throws -> Value {
         guard queue[key] == nil else {
+            // Another thread is already getting the data
             let value = try await withCheckedThrowingContinuation { continuation in
                 queue[key, default: []].append(continuation)
             }
@@ -28,7 +29,7 @@ final actor IsolatedSerialisationQueue<Key: Hashable, Value: Sendable> {
             throw error
         }
     }
-}
+}*/
 
 /**
  KV cache, but a resource is resolved not in parallel
