@@ -24,7 +24,7 @@ struct GaussianGrid: Gridable {
             case .n320:
                 return 542080
             case .n160:
-                return 108160
+                return 138346
             }
         }
 
