@@ -71,40 +71,29 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             
             let deaverager = GribDeaverager()
             // Download and process concurrently
-            let messages = try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).mapStream(nConcurrent: concurrent) { message in
+            try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                 
                 let attributes = try message.getAttributes()
                 let time = attributes.timestamp
-                let member = 0
                 var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
-                /*switch v.variable {
-                case .T, .TD_2M, .T_2M, .T_SO:
-                    array2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
-                case .PMSL:
-                    array2d.array.data.multiplyAdd(multiply: 1 / 100, add: 0)
-                case .FI:
-                    // convert geopotential to height (WMO defined gravity constant)
-                    array2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                default:
-                    break
-                }*/
+                
+                let variable = EcmwfSeasVariableSingleLevel.from(shortName: attributes.shortName)!
+                
+                if let fma = variable.multiplyAdd {
+                    array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
                 
                 // Deaccumulate precipitation
-                guard await deaverager.deaccumulateIfRequired(variable: v, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &array2d) else {
-                    continue
+                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &array2d) else {
+                    return
                 }
+                
+                // TODO On the fly conversions: Specific humidity to relative humidity
 
-                if let variable = v.variable.getGenericVariable(attributes: attributes) {
-                    try await writer.write(time: time, member: 0, variable: variable, data: array2d.array.data)
-                }
+                try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
             }
-            
-            
         }
-        
-        //return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
-        
-        fatalError()
+        return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
     }
 }
