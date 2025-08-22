@@ -132,6 +132,21 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
         })
     }
     
+    /// Remove cached data blocks that are older then a couple of seconds. Return the number of deleted blocks
+    func deleteCachedBlocks(olderThanSeconds: UInt) -> Int {
+        let blockSize = cache.cache.blockSize
+        let dataRange = 0..<backend.count
+        let blocks = dataRange.divideRoundedUp(divisor: blockSize)
+        let superBlocks = dataRange.divideRoundedUp(divisor: blockSize * superBlockLength)
+        var deletedCount = 0
+        for superBlock in superBlocks {
+            let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
+            let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
+            deletedCount += cache.cache.delete(key: superKey, count: UInt64(blocks.count), olderThanSeconds: olderThanSeconds)
+        }
+        return deletedCount
+    }
+    
     /// Load list of blocks into cache. This is used to prefetch data after rotating files.
     func preloadBlocks(blocks: [Int]) async throws {
         // TODO: preload consecutive blocks as [Range<Int>]

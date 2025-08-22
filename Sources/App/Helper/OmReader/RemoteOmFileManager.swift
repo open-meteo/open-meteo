@@ -299,12 +299,12 @@ final actor RemoteOmFileManagerCache {
                             }
                             statistics.remoteModified += 1
                             let blockCached = new.asBlockCached()
-                            let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*90)
-                            logger.warning("Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
+                            let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
+                            logger.warning("OmFileManager: Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
                             if activeBlocks.count > 0 {
                                 let startPreload = DispatchTime.now()
                                 try await blockCached.preloadBlocks(blocks: activeBlocks)
-                                logger.warning("Preload completed in \(startPreload.timeElapsedPretty())")
+                                logger.warning("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
                             }
                             guard let reader = try await blockCached.asCachedReader()?.asRemoteReader() else {
                                 entry.value = nil
@@ -313,8 +313,16 @@ final actor RemoteOmFileManagerCache {
                             entry.value = reader
                         } else {
                             // File was deleted on remote server
+                            logger.warning("OmFileManager: Remote file deleted \(key).")
                             statistics.remoteDeleted += 1
                             entry.value = nil
+                        }
+                        // Remove data from local cache
+                        // Keep blocks that have been accessed less than 60 seconds ago, because they still could be used
+                        // If they are deleted, the cache might immediately write new data into the cached slot
+                        let deletedBlocks = old.fn.deleteCachedBlocks(olderThanSeconds: 60)
+                        if deletedBlocks > 0 {
+                            logger.warning("OmFileManager: \(deletedBlocks) blocks have been deleted")
                         }
                     }
                 } else {
