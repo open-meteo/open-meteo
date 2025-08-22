@@ -35,7 +35,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         let domain = try EcmwfSeasDomain.load(rawValue: signature.domain)
 
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(day: 0)
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(day: 1)
 
         let logger = context.application.logger
 
@@ -44,9 +44,17 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             fatalError("Parameter server is required")
         }
         
-        logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
+        let generateTimeSeries: Bool
+        switch domain {
+        case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly:
+            generateTimeSeries = false
+        case .seas5_monthly, .seas5_monthly_upper_level:
+            generateTimeSeries = true
+        }
+        
+        logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: generateTimeSeries)
     }
 
     func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
@@ -60,40 +68,87 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let ny = domain.grid.ny
         
         let runMonth = run.toComponents().month
-        
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
+        let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
 
-        
-        for month in 0...7 {
+        let deaverager = GribDeaverager()
+        for month in 0...0 {
             let monthToDownload = (runMonth + month - 1) % 12 + 1
-            let file = "A1L\(runMonth.zeroPadded(len: 2))\010000\(monthToDownload.zeroPadded(len: 2))______1"
-            let url = "\(server)\(file)"
-            
-            let deaverager = GribDeaverager()
-            // Download and process concurrently
-            try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
+            for package in domain.downloadPackages {
+                let file = "A\(package)L\(runMonth.zeroPadded(len: 2))010000\(monthToDownload.zeroPadded(len: 2))______1"
+                let url = "\(server)\(file)"
                 
-                let attributes = try message.getAttributes()
-                let time = attributes.timestamp
-                var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
-                let member = message.getLong(attribute: "perturbationNumber") ?? 0
-                
-                let variable = EcmwfSeasVariableSingleLevel.from(shortName: attributes.shortName)!
-                
-                if let fma = variable.multiplyAdd {
-                    array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                // Download and process concurrently
+                try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
+                    let attributes = try message.getAttributes()
+                    let time = attributes.timestamp
+                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
+                    let member = message.getLong(attribute: "perturbationNumber") ?? 0
+                    
+                    let variable: (any EcmwfSeasVariable)?
+                    switch domain {
+                    case .seas5_6hourly:
+                        variable = EcmwfSeasVariableSingleLevel.from(shortName: attributes.shortName)
+                    case .seas5_12hourly:
+                        variable = EcmwfSeasVariableUpperLevel.from(shortName: attributes.shortName, level: attributes.levelStr)
+                    case .seas5_24hourly:
+                        variable = EcmwfSeasVariable24HourlySingleLevel.from(shortName: attributes.shortName)
+                    case .seas5_monthly_upper_level:
+                        variable = nil
+                    case .seas5_monthly:
+                        variable = EcmwfSeasVariableMonthly.from(shortName: attributes.shortName)
+                    }
+                    
+                    guard let variable  else {
+                        logger.info("Could not find variable for short name \(attributes.shortName)")
+                        return
+                    }
+                    
+                    if let fma = variable.multiplyAdd {
+                        array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    
+                    logger.info("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
+                    
+                    
+                    // Deaccumulate precipitation
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &array2d) else {
+                        return
+                    }
+                    
+                    // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
+                    
+                    try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }
-                
-                // Deaccumulate precipitation
-                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &array2d) else {
-                    return
-                }
-                
-                // TODO On the fly conversions: Specific humidity to relative humidity
-
-                try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
             }
         }
         return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+    }
+}
+
+extension EcmwfSeasDomain {
+    /**
+     A1: 12h model levels N160
+     A2: 6h single levels O320
+     A3: 24h single levels O320
+     A4: 12h pressure levels N160
+     A5: monthly single level means O320
+     A6: monthly pressure level means N160
+     A7: monthly single level anomaly O320
+     A8: monthly pressure level anomalies N160
+     */
+    var downloadPackages: [Int] {
+        switch self {
+        case .seas5_6hourly:
+            return [2]
+        case .seas5_12hourly:
+            return [1, 4]
+        case .seas5_24hourly:
+            return [3]
+        case .seas5_monthly_upper_level:
+            return [6, 8]
+        case .seas5_monthly:
+            return [5, 7]
+        }
     }
 }
