@@ -102,15 +102,15 @@ import Vapor
         // Exactly on the border
         let pos = grid.findPoint(lat: 89.90001, lon: 179.80002)!
         let (lat, lon) = grid.getCoordinates(gridpoint: pos)
-        #expect(pos == 0)
-        #expect(lat.isApproximatelyEqual(to: -90.0, absoluteTolerance: 0.001))
-        #expect(lon.isApproximatelyEqual(to: -180.0, absoluteTolerance: 0.001))
+        #expect(pos == 294911)
+        #expect(lat.isApproximatelyEqual(to: 89.53125, absoluteTolerance: 0.001))
+        #expect(lon.isApproximatelyEqual(to: 179.53125, absoluteTolerance: 0.001))
 
         let pos2 = IconDomains.icon.grid.findPoint(lat: -16.805414, lon: 179.990623)!
         let (lat2, lon2) = IconDomains.icon.grid.getCoordinates(gridpoint: pos2)
-        #expect(pos2 == 1687095)
+        #expect(pos2 == 1689972)
         #expect(lat2.isApproximatelyEqual(to: -16.75, absoluteTolerance: 0.001))
-        #expect(lon2.isApproximatelyEqual(to: -179.875, absoluteTolerance: 0.001))
+        #expect(lon2.isApproximatelyEqual(to: 179.75, absoluteTolerance: 0.001))
     }
 
     @Test(

@@ -34,8 +34,8 @@ struct RegularGrid: Gridable {
         let x = Int(roundf((lon - lonMin) / dx))
         let y = Int(roundf((lat - latMin) / dy))
 
-        // Allow points on the border.
-        let xx = Float(nx) * dx >= 359 ? x == -1 ? 0 : x == nx ? nx-1 : x : x
+        /// Allow points on the border. `x == nx+1` is for ICON global to work on the date line crossing
+        let xx = Float(nx) * dx >= 359 ? x == -1 ? 0 : (x == nx || x == nx+1) ? nx-1 : x : x
         let yy = Float(ny) * dy >= 179 ? y == -1 ? 0 : y == ny ? ny-1 : y : y
         if yy < 0 || xx < 0 || yy >= ny || xx >= nx {
             return nil
