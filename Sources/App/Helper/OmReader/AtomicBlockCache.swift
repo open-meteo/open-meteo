@@ -232,6 +232,34 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
         }
     }
     
+    /// Delete a key (or range) if it older than a specified number of seconds
+    @discardableResult
+    func delete(key: UInt64, count: UInt64, olderThanSeconds: UInt) -> Int {
+        let time = UInt(Date().timeIntervalSince1970 * 1_000_000_000)
+        let olderThan = time - (olderThanSeconds * 1_000_000_000)
+        let lookAheadCount: UInt64 = 1024
+        let blockCount = blockCount
+        return data.withMutableUnsafeBytes { bytes in
+            let entries = bytes.assumingMemoryBound(to: Atomic<WordPair>.self)
+            var deleted = 0
+            for lookAhead in 0..<count + lookAheadCount {
+                let slot = Int((key &+ lookAhead) % UInt64(blockCount))
+                let entry = entries[slot].load(ordering: .relaxed)
+                // check if key matches from key..<key+count
+                let keyDistance = entry.first &- UInt(key)
+                guard keyDistance >= 0 && keyDistance < count else {
+                    break
+                }
+                guard entry.second <= olderThan else {
+                    break
+                }
+                entries[slot].store(.init(first: 0, second: 0), ordering: .relaxed)
+                deleted += 1
+            }
+            return deleted
+        }
+    }
+    
     func statistics() -> AtomicBlockCacheStatistics {
         var used = 0,
             free = 0,
