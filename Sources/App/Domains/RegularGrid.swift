@@ -70,7 +70,7 @@ struct RegularGrid: Gridable {
             return []
         }
 
-        let xRange = x1 ..< x2
+        let xRange = x1 > x2 && x2 == 0 ? x1 ..< x2 + nx : x1 ..< x2
         let yRange = y1 > y2 ? y2 ..< y1 : y1 ..< y2
 
         return RegularGridSlice(grid: self, yRange: yRange, xRange: xRange)
@@ -130,7 +130,7 @@ struct GridSliceXyIterator: IteratorProtocol {
     let nxSlice: Int
     /// Number of x steps in the grid
     let nx: Int
-    
+
     let yLowerBound: Int
     let xLowerBound: Int
 
