@@ -193,6 +193,12 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable {
             return .soil_moisture_28_to_100cm
         case "swvl4":
             return .soil_moisture_100_to_255cm
+        case "mean2t24":
+            return .temperature_2m_mean24h
+        case "mn2t24":
+            return .temperature_2m_min24h
+        case "mx2t24":
+            return .temperature_2m_max24h
         default:
             return nil
         }
@@ -281,10 +287,12 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable {
 /// Model levels 85/87/89 https://confluence.ecmwf.int/display/UDOC/L91+model+level+definitions
 /// 85=309.04m, 87=167.39m, 89=67.88m
 enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
+    case temperature_1000hPa
     case temperature_850hPa
     case temperature_500hPa
-    case geopotential_height_500hPa
+    case geopotential_height_1000hPa
     case geopotential_height_850hPa
+    case geopotential_height_500hPa
     
     case relative_humidity_70m
     case relative_humidity_170m
@@ -301,13 +309,17 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     
     static func from(shortName: String, level: String) -> Self? {
         switch (shortName, level) {
+        case ("t", "1000"):
+            return .temperature_1000hPa
         case ("t", "850"):
             return .temperature_850hPa
         case ("t", "500"):
             return .temperature_500hPa
+        case ("gh", "1000"):
+            return .geopotential_height_1000hPa
         case ("gh", "850"):
             return .geopotential_height_850hPa
-        case ("t", "500"):
+        case ("gh", "500"):
             return .geopotential_height_500hPa
         case ("t", "85"):
             return .temperature_310m
@@ -340,9 +352,9 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_850hPa, .temperature_500hPa:
+        case .temperature_1000hPa, .temperature_850hPa, .temperature_500hPa:
             return (1, -273.15)
-        case .geopotential_height_500hPa, .geopotential_height_850hPa:
+        case .geopotential_height_1000hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
             return (1 / 9.80665, 0)
         default:
             return nil
@@ -355,9 +367,9 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     
     var scalefactor: Float {
         switch self {
-        case .temperature_850hPa, .temperature_500hPa:
+        case .temperature_1000hPa, .temperature_850hPa, .temperature_500hPa:
             return 20
-        case .geopotential_height_500hPa, .geopotential_height_850hPa:
+        case .geopotential_height_1000hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
             return 1
         case .relative_humidity_70m, .relative_humidity_170m, .relative_humidity_310m:
             return 1
@@ -372,9 +384,9 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_850hPa, .temperature_500hPa:
+        case .temperature_1000hPa, .temperature_850hPa, .temperature_500hPa:
             return .hermite(bounds: nil)
-        case .geopotential_height_500hPa, .geopotential_height_850hPa:
+        case .geopotential_height_1000hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
             return .hermite(bounds: nil)
         case .relative_humidity_70m, .relative_humidity_170m, .relative_humidity_310m:
             return .hermite(bounds: 0...100)
@@ -389,9 +401,9 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     
     var unit: SiUnit {
         switch self {
-        case .temperature_850hPa, .temperature_500hPa:
+        case .temperature_1000hPa, .temperature_850hPa, .temperature_500hPa:
             return .celsius
-        case .geopotential_height_500hPa, .geopotential_height_850hPa:
+        case .geopotential_height_1000hPa, .geopotential_height_500hPa, .geopotential_height_850hPa:
             return .metre
         case .relative_humidity_70m, .relative_humidity_170m, .relative_humidity_310m:
             return .celsius
@@ -521,7 +533,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     case soil_moisture_100_to_255cm_anomaly
     case temperature_2m_max24h_anomaly
     case temperature_2m_min24h_anomaly
-    case temperature_2m_anomaly24h_anomaly
+    case temperature_2m_mean24h_anomaly
 
     
     var multiplyAdd: (multiply: Float, add: Float)? {
@@ -578,7 +590,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return 200
         case .soil_moisture_0_to_7cm_anomaly, .soil_moisture_7_to_28cm_anomaly, .soil_moisture_28_to_100cm_anomaly, .soil_moisture_100_to_255cm_anomaly:
             return 10000
-        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly, .temperature_2m_anomaly24h_anomaly:
+        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly, .temperature_2m_mean24h_anomaly:
             return 200
         case .sunshine_duration_anomaly:
             return 10/60
@@ -641,7 +653,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .kelvin
         case .soil_moisture_0_to_7cm_anomaly, .soil_moisture_7_to_28cm_anomaly, .soil_moisture_28_to_100cm_anomaly, .soil_moisture_100_to_255cm_anomaly:
             return .cubicMetrePerCubicMetre
-        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly, .temperature_2m_anomaly24h_anomaly:
+        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly, .temperature_2m_mean24h_anomaly:
             return .kelvin
         case .sunshine_duration_anomaly:
             return .seconds
@@ -730,6 +742,12 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .cloud_cover_mean
         case "tp":
             return .precipitation_mean
+        case "mean2t24":
+            return .temperature_2m_mean24h_mean
+        case "mn2t24":
+            return .temperature_2m_min24h_mean
+        case "mx2t24":
+            return .temperature_2m_max24h_mean
         case "stl1a":
             return .soil_temperature_0_to_7cm_anomaly
         case "stl2a":
@@ -766,6 +784,12 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .cloud_cover_anomaly
         case "tpa":
             return .precipitation_anomaly
+        case "mean2t24a":
+            return .temperature_2m_mean24h_anomaly
+        case "mn2t24a":
+            return .temperature_2m_min24h_anomaly
+        case "mx2t24a":
+            return .temperature_2m_max24h_anomaly
         default:
             return nil
         }

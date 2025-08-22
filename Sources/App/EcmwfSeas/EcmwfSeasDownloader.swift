@@ -75,6 +75,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         for month in 0...0 {
             let monthToDownload = (runMonth + month - 1) % 12 + 1
             for package in domain.downloadPackages {
+                if package == 1 && month == 6 {
+                    continue
+                }
                 let file = "A\(package)L\(runMonth.zeroPadded(len: 2))010000\(monthToDownload.zeroPadded(len: 2))______1"
                 let url = "\(server)\(file)"
                 
@@ -100,7 +103,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     }
                     
                     guard let variable  else {
-                        logger.info("Could not find variable for short name \(attributes.shortName)")
+                        logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
                         return
                     }
                     
@@ -108,7 +111,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     
-                    logger.info("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
+                    logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
                     
                     
                     // Deaccumulate precipitation
@@ -128,7 +131,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
 extension EcmwfSeasDomain {
     /**
-     A1: 12h model levels N160
+     A1: 12h model levels N160 (only 6 months)
      A2: 6h single levels O320
      A3: 24h single levels O320
      A4: 12h pressure levels N160
@@ -149,6 +152,16 @@ extension EcmwfSeasDomain {
             return [6, 8]
         case .seas5_monthly:
             return [5, 7]
+        }
+    }
+    
+    var ensembleMembers: Int {
+        // Note: model levels = 11 member, pressure levels full 51
+        switch self {
+        case .seas5_6hourly, .seas5_24hourly, .seas5_monthly:
+            return 51
+        case .seas5_12hourly, .seas5_monthly_upper_level:
+            return 11
         }
     }
 }
