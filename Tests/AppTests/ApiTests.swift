@@ -12,7 +12,7 @@ import VaporTesting
         }
         return
     }*/
-    
+
     @Test func timeSelection() throws {
         let current = Timestamp(2024, 02, 03, 12, 24)
         let a = try ApiQueryParameter.forecastTimeRange2(currentTime: current, utcOffset: 3600, pastSteps: nil, forecastSteps: 4, pastStepsMax: 10, forecastStepsMax: 10, forecastStepsDefault: 7, initialStep: nil, dtSeconds: 3600)
@@ -22,8 +22,7 @@ import VaporTesting
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
     }
 
-    @Test
-    func testParseApiParamsGET() async throws {
+    @Test func parseApiParamsGET() async throws {
         try await withApp { app in
             let url = URI(string: "/forecast?latitude=52.52&longitude=13.41&timezone=auto")
             let request = Request(
@@ -45,7 +44,7 @@ import VaporTesting
             #expect(params.end_hour == [])
             #expect(params.start_minutely_15 == [])
             #expect(params.end_minutely_15 == [])
-            
+
             let url2 = URI(string: "/forecast?latitude=52.52,45.1&longitude=13.41,14.2&elevation=23%2C45")
             let request2 = Request(
                 application: app,
@@ -61,8 +60,7 @@ import VaporTesting
         }
     }
 
-    @Test
-    func testParseApiParamsPOST() async throws {
+    @Test func parseApiParamsPOST() async throws {
         try await withApp { app in
             let body = """
             {

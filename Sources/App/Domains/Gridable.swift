@@ -5,7 +5,7 @@ public protocol Gridable: Sendable {
     var nx: Int { get }
     var ny: Int { get }
 
-    /// Typically `1` to seach in a `3x3` grid. Use `2` for `5x5`. E.g. MF Wave has large boarders around the coast
+    /// Typically `1` to search in a `3x3` grid. Use `2` for `5x5`. E.g. MF Wave has large boarders around the coast
     var searchRadius: Int { get }
 
     func findPoint(lat: Float, lon: Float) -> Int?
@@ -173,7 +173,7 @@ extension Gridable {
         }
         return (center, .elevation(elevationSurrounding[elevationSurrounding.count / 2]))
     }
-    
+
     /// Return distance squared of a coordinate to a grid point
     fileprivate func distanceSquared(x: Int, y: Int, lat: Float, lon: Float) -> Float {
         let coordinate = getCoordinates(gridpoint: y * nx + x)
