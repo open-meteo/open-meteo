@@ -32,4 +32,14 @@ import Testing
         let sub3 = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.0..<45.2, longitude: 9..<9.5))!
         #expect(sub3.map { $0 } == [823068, 823069, 823070, 823071, 825636, 825637, 825638, 825639])
     }
+
+    @Test func boundingBoxAtBorder() {
+        let grid = RegularGrid(nx: 1000, ny: 361, latMin: -90, lonMin: -180, dx: 360/1000, dy: 180/360)
+        let sliceLatBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 88..<89.75, longitude: 10..<10.25)) as! RegularGridSlice
+        #expect(sliceLatBorder.yRange == 356..<360)
+        #expect(sliceLatBorder.xRange == 528..<528)
+        let sliceLonBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 10.4..<10.6, longitude: 179..<180)) as! RegularGridSlice
+        #expect(sliceLonBorder.yRange == 201..<201)
+        #expect(sliceLonBorder.xRange == 997..<1000)
+    }
 }
