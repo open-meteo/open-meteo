@@ -72,7 +72,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
 
         let deaverager = GribDeaverager()
-        for month in 0...0 {
+        for month in 0...1 {
             let monthToDownload = (runMonth + month - 1) % 12 + 1
             for package in domain.downloadPackages {
                 if package == 1 && month == 6 {
@@ -82,7 +82,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 let url = "\(server)\(file)"
                 
                 /// Single GRIB files contains multiple time-steps in mixed order
-                let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableSingleLevel>()
+                let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableAny>()
                 
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
@@ -116,8 +116,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     
                     logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
                     
-                    if let variable = variable as? EcmwfSeasVariableSingleLevel, variable.isAccumulated {
-                        await inMemoryAccumulated.set(variable: variable, timestamp: time, member: member, data: array2d.array)
+                    if variable.isAccumulated {
+                        await inMemoryAccumulated.set(variable: .init(variable: variable), timestamp: time, member: member, data: array2d.array)
                         return
                     }
                     
@@ -132,7 +132,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     guard await deaverager.deaccumulateIfRequired(variable: key.variable, member: key.member, stepType: "accum", stepRange: "0-\(forecastHour)", array2d: &data) else {
                         continue
                     }
-                    try await writer.write(time: key.timestamp, member: key.member, variable: key.variable, data: data.data)
+                    try await writer.write(time: key.timestamp, member: key.member, variable: key.variable.variable, data: data.data)
                 }
             }
         }

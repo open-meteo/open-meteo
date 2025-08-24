@@ -3,6 +3,23 @@ protocol EcmwfSeasVariable: GenericVariable, Hashable {
     var isAccumulated: Bool { get }
 }
 
+/// Used to type erase and make EcmwfSeasVariable hashable
+struct EcmwfSeasVariableAny: Hashable {
+    let variable: any EcmwfSeasVariable
+    
+    static func == (lhs: EcmwfSeasVariableAny, rhs: EcmwfSeasVariableAny) -> Bool {
+        lhs.hashValue == rhs.hashValue
+    }
+    
+    var hashValue: Int {
+        return variable.hashValue
+    }
+    
+    func hash(into hasher: inout Hasher) {
+        variable.hash(into: &hasher)
+    }
+}
+
 /// 6-hourly variables in O320 grid
 /// 10U/10V/2D/2T/MSL/SF/SSRD/SST/STL1/TCC/TP
 enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
@@ -223,7 +240,12 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable {
     }
     
     var isAccumulated: Bool {
-        return false
+        switch self {
+        case .sunshine_duration:
+            return true
+        default:
+            return false
+        }
     }
     
     var multiplyAdd: (multiply: Float, add: Float)? {
