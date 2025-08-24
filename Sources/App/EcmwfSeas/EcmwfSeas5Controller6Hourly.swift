@@ -53,16 +53,16 @@ struct EcmwfSeas5Controller6Hourly: GenericReaderDerivedSimple, GenericReaderPro
 
     typealias Derived = EcmwfSeasVariableSingleLevelDerived
 
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Domain, EcmwfSeasVariableSingleLevel>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+    public init?(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        guard let reader = try await GenericReader<Domain, EcmwfSeasVariableSingleLevel>(domain: .seas5_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
     
-    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
-        let reader = try await GenericReader<Domain, EcmwfSeasVariableSingleLevel>(domain: domain, position: gridpoint, options: options)
+    public init(gridpoint: Int, options: GenericReaderOptions) async throws {
+        let reader = try await GenericReader<Domain, EcmwfSeasVariableSingleLevel>(domain: .seas5_6hourly, position: gridpoint, options: options)
         self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }

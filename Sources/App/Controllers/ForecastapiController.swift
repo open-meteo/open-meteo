@@ -662,13 +662,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .ecmwf_aifs025_single:
             return try await EcmwfReader(domain: .aifs025_single, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_seas5_6hourly:
-            return try await EcmwfSeas5Controller6Hourly(domain: .seas5_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return try await EcmwfSeas5Controller6Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_seas5_24hourly:
-            return try await EcmwfSeas5Controller24Hourly(domain: .seas5_24hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return try await EcmwfSeas5Controller24Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_seas5_seamless:
             return [
-                try await EcmwfSeas5Controller24Hourly(domain: .seas5_24hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await EcmwfSeas5Controller6Hourly(domain: .seas5_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                try await EcmwfSeas5Controller6Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
+                try await EcmwfSeas5Controller24Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             ].compactMap({$0})
         case .metno_nordic:
             return try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
@@ -1012,9 +1012,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .ecmwf_aifs025:
             return try await EcmwfReader(domain: .aifs025, gridpoint: gridpoint, options: options)
         case .ecmwf_seas5_6hourly:
-            return try await EcmwfSeas5Controller6Hourly(domain: .seas5_6hourly, gridpoint: gridpoint, options: options)
+            return try await EcmwfSeas5Controller6Hourly(gridpoint: gridpoint, options: options)
         case .ecmwf_seas5_24hourly:
-            return try await EcmwfSeas5Controller24Hourly(domain: .seas5_24hourly, gridpoint: gridpoint, options: options)
+            return try await EcmwfSeas5Controller24Hourly(gridpoint: gridpoint, options: options)
         case .ecmwf_seas5_seamless:
             return nil
         case .metno_nordic:
