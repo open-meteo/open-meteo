@@ -1,5 +1,6 @@
 protocol EcmwfSeasVariable: GenericVariable, Hashable {
     var multiplyAdd: (multiply: Float, add: Float)? { get }
+    var isAccumulated: Bool { get }
 }
 
 /// 6-hourly variables in O320 grid
@@ -39,8 +40,21 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
             return .cloud_cover
         case "tp":
             return .precipitation
+        case "sst":
+            return .sea_surface_temperature
         default:
             return nil
+        }
+    }
+    
+    var isAccumulated: Bool {
+        switch self {
+        case .precipitation, .snowfall_water_equivalent:
+            return true
+        case .shortwave_radiation:
+            return true
+        default:
+            return false
         }
     }
     
@@ -129,8 +143,12 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)
+        case .cloud_cover:
+            return (100, 0)
         case .shortwave_radiation:
-            return (1 / 6*3600, 0)
+            return (1 / (6*3600), 0)
+        case .precipitation:
+            return (1000, 0) // meters to millimeter
         default:
             return nil
         }
@@ -202,6 +220,10 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable {
         default:
             return nil
         }
+    }
+    
+    var isAccumulated: Bool {
+        return false
     }
     
     var multiplyAdd: (multiply: Float, add: Float)? {
@@ -348,6 +370,10 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
         default:
             return nil
         }
+    }
+    
+    var isAccumulated: Bool {
+        return false
     }
     
     var multiplyAdd: (multiply: Float, add: Float)? {
@@ -607,6 +633,10 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         default:
             return nil
         }
+    }
+    
+    var isAccumulated: Bool {
+        return false
     }
     
     var omFileName: (file: String, level: Int) {

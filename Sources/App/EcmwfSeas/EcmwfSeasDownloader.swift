@@ -31,7 +31,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
-        disableIdleSleep()
+        //disableIdleSleep()
 
         let domain = try EcmwfSeasDomain.load(rawValue: signature.domain)
 
@@ -81,6 +81,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 let file = "A\(package)L\(runMonth.zeroPadded(len: 2))010000\(monthToDownload.zeroPadded(len: 2))______1"
                 let url = "\(server)\(file)"
                 
+                /// Single GRIB files contains multiple time-steps in mixed order
+                let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableSingleLevel>()
+                
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
@@ -113,15 +116,23 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     
                     logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
                     
-                    
-                    // Deaccumulate precipitation
-                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: attributes.stepType.rawValue, stepRange: attributes.stepRange, grib2d: &array2d) else {
+                    if let variable = variable as? EcmwfSeasVariableSingleLevel, variable.isAccumulated {
+                        await inMemoryAccumulated.set(variable: variable, timestamp: time, member: member, data: array2d.array)
                         return
                     }
                     
                     // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
                     
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
+                }
+                
+                for (key, value) in await inMemoryAccumulated.data.sorted(by: {$0.key.timestamp < $1.key.timestamp}) {
+                    var data = value
+                    let forecastHour = (key.timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+                    guard await deaverager.deaccumulateIfRequired(variable: key.variable, member: key.member, stepType: "accum", stepRange: "0-\(forecastHour)", array2d: &data) else {
+                        continue
+                    }
+                    try await writer.write(time: key.timestamp, member: key.member, variable: key.variable, data: data.data)
                 }
             }
         }

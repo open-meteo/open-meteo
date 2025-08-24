@@ -125,7 +125,7 @@ struct GenericVariableHandle: Sendable {
         let nx = grid.nx
         let ny = grid.ny
 
-        for (_, handles) in handles.filter({FullRunsVariables.includes($0.variable.omFileName.file)}).groupedPreservedOrder(by: \.variable.omFileName.file) {
+        try await handles.filter({FullRunsVariables.includes($0.variable.omFileName.file)}).groupedPreservedOrder(by: \.variable.omFileName.file).foreachConcurrent(nConcurrent: concurrent) { (_, handles) in
             let variable = handles[0].variable
             let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""

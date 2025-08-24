@@ -129,7 +129,7 @@ struct WeatherApiController {
             let historyStartDate: Timestamp
             switch type {
             case .none:
-                forecastDaysMax = 16
+                forecastDaysMax = 217
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(1940, 1, 1)
             case .forecast:
