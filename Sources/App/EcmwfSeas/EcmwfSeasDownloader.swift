@@ -104,28 +104,22 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     case .seas5_monthly:
                         variable = EcmwfSeasVariableMonthly.from(shortName: attributes.shortName)
                     }
-                    
-                    guard let variable  else {
+                    guard let variable else {
                         logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
                         return
                     }
-                    
                     if let fma = variable.multiplyAdd {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-                    
                     logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
-                    
                     if variable.isAccumulated {
                         await inMemoryAccumulated.set(variable: .init(variable: variable), timestamp: time, member: member, data: array2d.array)
                         return
                     }
-                    
                     // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
-                    
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }
-                
+                logger.info("Processing accumulated values")
                 for (key, value) in await inMemoryAccumulated.data.sorted(by: {$0.key.timestamp < $1.key.timestamp}) {
                     var data = value
                     let forecastHour = (key.timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
