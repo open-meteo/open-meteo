@@ -55,9 +55,9 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
         case .seas5_24hourly:
             return 24*3600
         case .seas5_monthly_upper_level:
-            return 30*24*3600
+            return 31*24*3600
         case .seas5_monthly:
-            return 30*24*3600
+            return 31*24*3600
         }
     }
     

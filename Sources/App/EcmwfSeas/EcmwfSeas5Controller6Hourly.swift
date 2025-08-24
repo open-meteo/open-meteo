@@ -42,8 +42,8 @@ enum EcmwfSeasVariableSingleLevelDerived: String, RawRepresentableString, Generi
     }
 }
 
-struct EcmwfSeas5Controller6Hourly<Reader: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol where Reader.MixingVar == EcmwfSeasVariableSingleLevel {
-    let reader: Reader
+struct EcmwfSeas5Controller6Hourly: GenericReaderDerivedSimple, GenericReaderProtocol {
+    let reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>
 
     let options: GenericReaderOptions
 
@@ -53,8 +53,17 @@ struct EcmwfSeas5Controller6Hourly<Reader: GenericReaderProtocol>: GenericReader
 
     typealias Derived = EcmwfSeasVariableSingleLevelDerived
 
-    public init(reader: Reader, options: GenericReaderOptions) {
-        self.reader = reader
+    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
+        guard let reader = try await GenericReader<Domain, EcmwfSeasVariableSingleLevel>(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+            return nil
+        }
+        self.reader = GenericReaderCached(reader: reader)
+        self.options = options
+    }
+    
+    public init(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
+        let reader = try await GenericReader<Domain, EcmwfSeasVariableSingleLevel>(domain: domain, position: gridpoint, options: options)
+        self.reader = GenericReaderCached(reader: reader)
         self.options = options
     }
 

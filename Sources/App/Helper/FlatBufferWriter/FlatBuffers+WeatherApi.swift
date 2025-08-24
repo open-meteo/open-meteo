@@ -777,6 +777,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .meteoswiss_icon_seamless:
             // TODO register
             return .iconSeamless
+        case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
+            // TODO register
+            return .ecmwfIfs
         }
     }
 }
