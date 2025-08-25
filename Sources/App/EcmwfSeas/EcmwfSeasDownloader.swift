@@ -72,7 +72,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
 
         let deaverager = GribDeaverager()
-        for month in 0...1 {
+        for month in 0...6 {
             let monthToDownload = (runMonth + month - 1) % 12 + 1
             for package in domain.downloadPackages {
                 if package == 1 && month == 6 {
