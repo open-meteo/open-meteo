@@ -115,7 +115,7 @@ struct WeatherApiController {
             if host.starts(with: "satellite-api") || host.starts(with: "customer-satellite-api") {
                 return .satellite
             }
-            if host.starts(with: "seasonal-forecast-api") || host.starts(with: "customer-seasonal-forecast-api") {
+            if host.starts(with: "seasonal-api") || host.starts(with: "customer-seasonal-api") {
                 return .seasonal
             }
             return .forecast
