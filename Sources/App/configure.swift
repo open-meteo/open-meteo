@@ -202,6 +202,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
+    app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
