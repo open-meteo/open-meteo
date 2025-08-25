@@ -111,22 +111,31 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     if let fma = variable.multiplyAdd {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
-                    logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
                     if variable.isAccumulated {
+                        if run == time {
+                            logger.debug("Skipping accumulated variable as forecast hour 0")
+                            return
+                        }
+                        // Collect all accumulated variables and process them as soon as they are in sequential order
                         await inMemoryAccumulated.set(variable: .init(variable: variable), timestamp: time, member: member, data: array2d.array)
+                        while true {
+                            let step = (await deaverager.lastStep(variable, member) ?? 0) + domain.dtHours
+                            let time = run.add(hours: step)
+                            guard var data = await inMemoryAccumulated.remove(variable: EcmwfSeasVariableAny(variable: variable), timestamp: time, member: member) else {
+                                break
+                            }
+                            guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(step)", array2d: &data) else {
+                                continue
+                            }
+                            let count = await inMemoryAccumulated.data.count
+                            logger.debug("Writing accumulated variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            try await writer.write(time: time, member: member, variable: variable, data: data.data)
+                        }
                         return
                     }
+                    logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
                     // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
-                }
-                logger.info("Processing accumulated values")
-                for (key, value) in await inMemoryAccumulated.data.sorted(by: {$0.key.timestamp < $1.key.timestamp}) {
-                    var data = value
-                    let forecastHour = (key.timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
-                    guard await deaverager.deaccumulateIfRequired(variable: key.variable, member: key.member, stepType: "accum", stepRange: "0-\(forecastHour)", array2d: &data) else {
-                        continue
-                    }
-                    try await writer.write(time: key.timestamp, member: key.member, variable: key.variable.variable, data: data.data)
                 }
             }
         }

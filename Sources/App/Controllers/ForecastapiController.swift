@@ -94,6 +94,7 @@ struct WeatherApiController {
         case previousRuns
         case satellite
         case singleRunsApi
+        case seasonal
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -113,6 +114,9 @@ struct WeatherApiController {
             }
             if host.starts(with: "satellite-api") || host.starts(with: "customer-satellite-api") {
                 return .satellite
+            }
+            if host.starts(with: "seasonal-forecast-api") || host.starts(with: "customer-seasonal-forecast-api") {
+                return .seasonal
             }
             return .forecast
         }
@@ -156,11 +160,14 @@ struct WeatherApiController {
                 forecastDaysMax = 16
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(2023, 1, 1)
-
+            case .seasonal:
+                forecastDaysMax = 217
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2020, 1, 1)
             }
             let run = params.run
             switch type {
-            case .none:
+            case .none, .seasonal:
                 break
             case .singleRunsApi:
                 guard run != nil else {

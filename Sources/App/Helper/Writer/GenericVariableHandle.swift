@@ -426,6 +426,15 @@ actor GribDeaverager {
         data[key] = (step, d)
         return previous
     }
+    
+    /// Get the last step of variable + member
+    func lastStep<V: Hashable>(_ variable: V, _ member: Int) -> Int? {
+        var hash = Hasher()
+        hash.combine(variable)
+        hash.combine(member)
+        let key = hash.finalize()
+        return data[key]?.step
+    }
 
     /// Make a deep copy
     func copy() -> GribDeaverager {
