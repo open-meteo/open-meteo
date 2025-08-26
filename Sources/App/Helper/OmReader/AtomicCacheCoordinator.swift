@@ -122,8 +122,4 @@ final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             }
         }
     }
-    
-    nonisolated func prefetchData(key: UInt64) {
-        cache.prefetch(key: key)
-    }
 }
