@@ -62,8 +62,8 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         try headRequest.applyS3Credentials()
         do {
             logger.debug("Sending HEAD requests to \(headRequest.url)")
-            let backoff = ExponentialBackOff(maximum: .milliseconds(500))
-            let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(5), timeoutPerRequest: .seconds(1), backOffSettings: backoff)
+            let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(2))
+            let headResponse = try await client.executeRetry(headRequest, logger: logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2), backOffSettings: backoff)
             guard let contentLength = headResponse.headers["Content-Length"].first.flatMap(Int.init) else {
                 throw OmHttpReaderBackendError.contentLengthMissing
             }
@@ -103,7 +103,8 @@ final class OmHttpReaderBackend: OmFileReaderBackend, Sendable {
         request.headers.add(name: "Range", value: "bytes=\(offset)-\(offset + count - 1)")
         try request.applyS3Credentials()
         logger.debug("Getting data range \(offset)-\(offset + count - 1) from \(request.url)")
-        let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(10), timeoutPerRequest: .seconds(2))
+        let backoff = ExponentialBackOff(factor: .milliseconds(500), maximum: .seconds(5))
+        let response = try await client.executeRetry(request, logger: logger, deadline: .seconds(30), timeoutPerRequest: .seconds(10), backOffSettings: backoff)
         let buffer = try await response.body.collect(upTo: count)
         lastValidatedAtomic.store(Timestamp.now().timeIntervalSince1970, ordering: .relaxed)
         return buffer
