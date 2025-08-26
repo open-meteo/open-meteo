@@ -158,6 +158,18 @@ import OmFileFormat
         // Keys 1048 until 1050 are sequentially in cache again, but offset by 2 and wraps at the end of the cache
         #expect(cache.get(key: 1048, count: 2) != nil)
 
+        #expect(cache.delete(key: 1000, count: 2, olderThanSeconds: 10) == 0)
+        #expect(cache.delete(key: 1000, count: 2, olderThanSeconds: 0) == 2)
+        #expect(cache.get(key: 1000, count: 2) == nil)
+        
+        // Test key delete across last cached block
+        #expect(cache.get(key: 1047, count: 2) == nil)
+        #expect(cache.get(key: 1047, count: 1) != nil)
+        #expect(cache.get(key: 1048, count: 1) != nil)
+        #expect(cache.delete(key: 1047, count: 2, olderThanSeconds: 0) == 2)
+        #expect(cache.get(key: 1047, count: 1) == nil)
+        #expect(cache.get(key: 1048, count: 1) == nil)
+        
         cache.set(key: .max, value: Data(repeating: 123, count: 64))
         #expect(cache.get(key: .max, maxAccessedAgeInSeconds: 10)!.data == Data(repeating: 123, count: 64))
     }
