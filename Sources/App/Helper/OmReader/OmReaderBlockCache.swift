@@ -36,12 +36,39 @@ final class OmReaderBlockCache<Backend: OmFileReaderBackend, Cache: AtomicBlockC
     }
     
     func prefetchData(offset: Int, count: Int) async throws {
-        // TODO: Prefetch data from backend in detached Task
-        
         let blockSize = cache.cache.blockSize
-        let blocks = offset / blockSize ..< (offset + count).divideRoundedUp(divisor: blockSize)
-        for block in blocks {
-            cache.prefetchData(key: calculateCacheKey(block: block))
+        let dataRange = offset ..< (offset + count)
+        let fileSize = self.backend.count
+        let blocks = dataRange.divideRoundedUp(divisor: blockSize)
+        let superBlocks = dataRange.divideRoundedUp(divisor: blockSize * superBlockLength)
+        
+        /// Check if all blocks are available sequentially in cache
+        let sameSuperBlock = superBlocks.count == 1
+        if sameSuperBlock, let ptr = cache.cache.get(key: calculateCacheKey(block: blocks.lowerBound), count: UInt64(blocks.count)) {
+            let offset = cache.cache.data.withMutableUnsafeBytes { data in
+                data.distance(from: data.startIndex, to: ptr.startIndex)
+            }
+            cache.cache.data.prefetchData(offset: offset, count: ptr.count)
+            return
+        }
+        /// Prefetch data from the HTTP backend in a detached task
+        Task {
+            for superBlock in superBlocks {
+                let superKey = cacheKey.addFnv1aHash(UInt64(superBlock))
+                let blocks = (superBlock * superBlockLength ..< (superBlock + 1) * superBlockLength).clamped(to: blocks)
+                let keyStart = superKey &+ UInt64(blocks.lowerBound)
+                //print("withData blocks \(blocks)")
+                try await cache.get(key: keyStart, count: blocks.count, provider: ({ (key, count) in
+                    let block = blocks.lowerBound + Int(key &- keyStart)
+                    let fileRange = block * blockSize ..< min((block + count) * blockSize, fileSize)
+                    return try await backend.getData(offset: fileRange.lowerBound, count: fileRange.count)
+                }), dataCallback: {(_, value) in
+                    let offset = cache.cache.data.withMutableUnsafeBytes { data in
+                        data.distance(from: data.startIndex, to: value.startIndex)
+                    }
+                    cache.cache.data.prefetchData(offset: offset, count: value.count)
+                })
+            }
         }
     }
     

@@ -248,10 +248,10 @@ public struct AtomicBlockCache<Backend: AtomicBlockCacheStorable>: Sendable {
                 // check if key matches from key..<key+count
                 let keyDistance = entry.first &- UInt(key)
                 guard keyDistance >= 0 && keyDistance < count else {
-                    break
+                    continue
                 }
                 guard entry.second <= olderThan else {
-                    break
+                    continue
                 }
                 entries[slot].store(.init(first: 0, second: 0), ordering: .relaxed)
                 deleted += 1
