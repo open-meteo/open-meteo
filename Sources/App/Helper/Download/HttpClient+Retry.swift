@@ -94,14 +94,14 @@ extension HTTPClient {
             do {
                 n += 1
                 let response = try await execute(request, timeout: timeoutPerRequest, logger: logger)
-                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status), from URL \(request.url)")
+                logger.debug("Response for HTTP request #\(n) returned HTTP status code: \(response.status). URL \(request.url)\(request.rangePrettyPrint)")
                 try response.throwOnError()
                 return response
             } catch CurlErrorNonRetry.unauthorized {
-                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)")
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
-                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(request.url)")
+                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(request.url)\(request.rangePrettyPrint)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
@@ -120,16 +120,22 @@ extension HTTPClient {
 
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(request.url)")
+                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(request.url)\(request.rangePrettyPrint)")
                     lastPrint = Date()
                 }
                 if Date() > deadline {
-                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(request.url)")
+                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(request.url)\(request.rangePrettyPrint)")
                     throw CurlError.timeoutReached
                 }
                 try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
             }
         }
+    }
+}
+
+fileprivate extension HTTPClientRequest {
+    var rangePrettyPrint: String {
+        headers.range.map{" [Range: \($0)]"} ?? ""
     }
 }
 
