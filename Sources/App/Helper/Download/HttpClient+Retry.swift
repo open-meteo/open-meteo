@@ -135,7 +135,7 @@ extension HTTPClient {
 
 fileprivate extension HTTPClientRequest {
     var rangePrettyPrint: String {
-        headers.range.map{" [Range: \($0)]"} ?? ""
+        headers.range.map{" [Range: \($0.serialize())]"} ?? ""
     }
 }
 
