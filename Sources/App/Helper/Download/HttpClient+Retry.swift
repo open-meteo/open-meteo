@@ -98,10 +98,10 @@ extension HTTPClient {
                 try response.throwOnError()
                 return response
             } catch CurlErrorNonRetry.unauthorized {
-                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key.")
+                logger.info("Download failed with 401 Unauthorized error, credentials rejected. Possibly outdated API key. URL \(request.url)")
                 throw CurlErrorNonRetry.unauthorized
             } catch let error as CurlErrorNonRetry {
-                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key.")
+                logger.info("Download failed unrecoverable with \(error). Please make sure the API credentials are correct. Possibly outdated API key. URL \(request.url)")
                 throw error
             } catch {
                 var wait = backOffSettings.waitTime(attempt: n)
@@ -120,11 +120,11 @@ extension HTTPClient {
 
                 let timeElapsed = Date().timeIntervalSince(startTime)
                 if Date().timeIntervalSince(lastPrint) > 60 {
-                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]'")
+                    logger.info("Download failed. Attempt \(n). Elapsed \(timeElapsed.prettyPrint). Retry in \(wait.prettyPrint). Error '\(error) [\(type(of: error))]' URL \(request.url)")
                     lastPrint = Date()
                 }
                 if Date() > deadline {
-                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]'")
+                    logger.error("Deadline reached. Attempt \(n). Elapsed \(timeElapsed.prettyPrint).  Error '\(error) [\(type(of: error))]' URL \(request.url)")
                     throw CurlError.timeoutReached
                 }
                 try await _Concurrency.Task.sleep(nanoseconds: UInt64(wait.nanoseconds))
