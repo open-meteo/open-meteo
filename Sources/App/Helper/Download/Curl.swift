@@ -96,11 +96,6 @@ final class Curl: Sendable {
             return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
         }
 
-        // Check in cache
-        if let cacheDirectory, method == .GET {
-            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent, headers: headers)
-        }
-
         // Ensure sufficient wait time using head requests
         if let waitAfterLastModifiedBeforeDownload {
             let head = try await initiateDownload(url: _url, range: range, minSize: minSize, method: .HEAD, deadline: deadline, nConcurrent: 1, waitAfterLastModifiedBeforeDownload: nil)
@@ -109,6 +104,11 @@ final class Curl: Sendable {
 
         if nConcurrent > 1 {
             return try await initiateDownloadConcurrent(url: _url, range: range, minSize: nil, deadline: deadline, nConcurrent: nConcurrent)
+        }
+        
+        // Check in cache
+        if let cacheDirectory, method == .GET {
+            return try await initiateDownloadCached(url: _url, range: range, minSize: minSize, cacheDirectory: cacheDirectory, nConcurrent: nConcurrent, headers: headers)
         }
         
         // URL might contain password, strip them from logging
