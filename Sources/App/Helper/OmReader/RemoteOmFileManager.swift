@@ -126,13 +126,19 @@ extension OmFileManagerReadable {
             return (nil, lastValidated)
             
         case .available(let lastValidated, let count, let lastModified, let eTag):
+            let cached = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated)
             let revalidateSeconds = self.revalidateEverySeconds(modificationTime: lastModified, now: now)
             if lastValidated < now.subtract(seconds: revalidateSeconds) {
                 // need to revalidate
-                return (try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), .now())
+                let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile)
+                if new?.cacheKey != cached.cacheKey {
+                    let deletedBlocks = cached.asBlockCached().deleteCachedBlocks(olderThanSeconds: 60)
+                    logger.warning("OmFileManager: Opened stale file. New file version available. \(deletedBlocks) previously cached blocks have been deleted")
+                }
+                return (new, .now())
             }
             /// Reuse cached meta attributes
-            return (OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated), lastValidated)
+            return (cached, lastValidated)
             
         case .none:
             return (try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), .now())
