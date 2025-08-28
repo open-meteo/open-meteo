@@ -83,7 +83,7 @@ struct GfsDownload: AsyncCommand {
         let variables: [any GfsVariableDownloadable]
 
         switch domain {
-        case .gfs05_ens, .gfs025_ens, .gfs013, .hrrr_conus_15min, .hrrr_conus, .gfs025:
+        case .gfs05_ens, .gfs025_ens, .gfs013, .hrrr_conus_15min, .hrrr_conus, .gfs025, .nam_conus:
             let onlyVariables: [any GfsVariableDownloadable]? = try signature.onlyVariables.map {
                 try $0.split(separator: ",").map {
                     if let variable = GfsPressureVariable(rawValue: String($0)) {
@@ -191,7 +191,7 @@ struct GfsDownload: AsyncCommand {
             deadLineHours = 5
         case .hrrr_conus_15min:
             deadLineHours = 2
-        case .hrrr_conus:
+        case .hrrr_conus, .nam_conus:
             deadLineHours = 2
         case .gfs025_ens, .gfswave025_ens:
             deadLineHours = 8

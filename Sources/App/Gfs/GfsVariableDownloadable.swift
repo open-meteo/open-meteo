@@ -8,6 +8,81 @@ protocol GfsVariableDownloadable: GenericVariable, Hashable {
 extension GfsSurfaceVariable: GfsVariableDownloadable {
     func gribIndexName(for domain: GfsDomain, timestep: Int?) -> String? {
         switch domain {
+        case .nam_conus:
+            switch self {
+            case .temperature_2m:
+                return ":TMP:2 m above ground:"
+            case .surface_temperature:
+                return ":TMP:surface:"
+            case .cloud_cover:
+                return ":TCDC:entire atmosphere (considered as a single layer):"
+            case .cloud_cover_low:
+                return ":LCDC:low cloud layer:"
+            case .cloud_cover_mid:
+                return ":MCDC:middle cloud layer:"
+            case .cloud_cover_high:
+                return ":HCDC:high cloud layer:"
+            case .relative_humidity_2m:
+                return ":RH:2 m above ground:"
+            case .pressure_msl:
+                return ":PRMSL:mean sea level:"
+            case .precipitation:
+                return ":APCP:surface:"
+            case .wind_v_component_10m:
+                return ":VGRD:10 m above ground:"
+            case .wind_u_component_10m:
+                return ":UGRD:10 m above ground:"
+            case .wind_v_component_80m:
+                return ":VGRD:80 m above ground:"
+            case .wind_u_component_80m:
+                return ":UGRD:80 m above ground:"
+            case .soil_temperature_0_to_10cm:
+                return ":TSOIL:0-0.1 m below ground:"
+            case .soil_temperature_10_to_40cm:
+                return ":TSOIL:0.1-0.4 m below ground:"
+            case .soil_temperature_40_to_100cm:
+                return ":TSOIL:0.4-1 m below ground:"
+            case .soil_temperature_100_to_200cm:
+                return ":TSOIL:1-2 m below ground:"
+            case .soil_moisture_0_to_10cm:
+                return ":SOILW:0-0.1 m below ground:"
+            case .soil_moisture_10_to_40cm:
+                return ":SOILW:0.1-0.4 m below ground:"
+            case .soil_moisture_40_to_100cm:
+                return ":SOILW:0.4-1 m below ground:"
+            case .soil_moisture_100_to_200cm:
+                return ":SOILW:1-2 m below ground:"
+            case .snow_depth:
+                return ":SNOD:surface:"
+            case .sensible_heat_flux:
+                return ":SHTFL:surface:"
+            case .latent_heat_flux:
+                return ":LHTFL:surface:"
+            //case .showers:
+            //    return ":CPRAT:surface:"
+            case .shortwave_radiation:
+                return ":DSWRF:surface:"
+            case .frozen_precipitation_percent:
+                return ":CPOFP:surface"
+            //case .diffuse_radiation:
+            //    return ":VDDSF:surface:"
+            case .boundary_layer_height:
+                return ":HPBL:surface:"
+            case .total_column_integrated_water_vapour:
+                return ":PWAT:entire atmosphere (considered as a single layer):"
+            case .visibility:
+                return ":VIS:surface:"
+            case .wind_gusts_10m:
+                return ":GUST:surface:"
+            case .categorical_freezing_rain:
+                return ":CFRZR:surface:"
+            case .convective_inhibition:
+                return ":CIN:surface:"
+            case .cape:
+                return ":CAPE:surface:"
+            default:
+                return nil
+            }
         case .gfswave025, .gfswave025_ens, .gfswave016:
             return nil
         case .gfs013:
@@ -387,7 +462,7 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .showers, .precipitation:
             switch domain {
-            case .gfswave025, .gfswave025_ens, .gfswave016:
+            case .gfswave025, .gfswave025_ens, .gfswave016, .nam_conus:
                 return nil
             case .gfs013, .gfs025, .hrrr_conus_15min, .hrrr_conus:
                 // precipitation rate per second to hourly precipitation
@@ -436,12 +511,12 @@ extension GfsPressureVariable: GfsVariableDownloadable {
                 return nil
             case .gfs013:
                 return nil
-            case .gfs025:
+            case .gfs025, .nam_conus:
                 // Vertical Velocity (Geometric) [m/s]
                 return ":DZDT:\(level) mb:"
             case .gfs05_ens, .hrrr_conus_15min, .hrrr_conus:
                 // Vertical Velocity (Pressure) [Pa/s]
-                // Converted later while downlading
+                // Converted later while downloading
                 return ":VVEL:\(level) mb:"
             case .gfs025_ens:
                 return nil
