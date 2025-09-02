@@ -285,7 +285,7 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
         return nil
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .consolidated, .intermediate, .seasonal, .forecast:
             return RegularGrid(nx: 7200, ny: 3000, latMin: -59.975, lonMin: -180.025, dx: 0.05, dy: 0.05)

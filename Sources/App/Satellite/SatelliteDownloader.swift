@@ -236,7 +236,7 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
         return 24 * 21
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .imerg_daily:
             return RegularGrid(nx: 3600, ny: 1800, latMin: -89.95, lonMin: -179.95, dx: 0.1, dy: 0.1)

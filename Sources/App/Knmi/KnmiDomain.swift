@@ -8,7 +8,7 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
     case harmonie_arome_europe
     case harmonie_arome_netherlands
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .harmonie_arome_europe:
             return ProjectionGrid(

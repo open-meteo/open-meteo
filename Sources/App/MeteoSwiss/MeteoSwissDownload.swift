@@ -194,7 +194,7 @@ struct MeteoSwissDownload: AsyncCommand {
         return handles
     }
     
-    func calculateNNMapping(latitudes: [Float], longitudes: [Float], grid: Gridable) async -> [Int] {
+    func calculateNNMapping(latitudes: [Float], longitudes: [Float], grid: any Gridable) async -> [Int] {
         let count = grid.count
         return await (0..<grid.count).mapConcurrent(nConcurrent: System.coreCount) { gridIndex in
             if gridIndex % 1000 == 0 {

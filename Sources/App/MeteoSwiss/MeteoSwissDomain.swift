@@ -73,7 +73,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
         // Domain area selected by OpenMeteo to exclude
         // ICON CH2: 2 pixel at the boarder contain invalid data. Additional 18 pixel are removed because the model is not stable at the border

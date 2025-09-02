@@ -64,13 +64,15 @@ struct RegularGrid: Gridable {
         return GridPoint2DFraction(gridpoint: Int(y) * nx + Int(x), xFraction: xFraction, yFraction: yFraction)
     }
 
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> (any Sequence<Int>)? {
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> RegularGridSlice? {
         let x1 = Int(roundf((bb.longitude.lowerBound - lonMin) / dx))
-        let y1 = Int(roundf((bb.latitude.lowerBound - latMin) / dy))
+        let yLower = Int(roundf((bb.latitude.lowerBound - latMin) / dy))
         let x2 = Int(roundf((bb.longitude.upperBound - lonMin) / dx))
-        let y2 = Int(roundf((bb.latitude.upperBound - latMin) / dy))
+        let yUpper = Int(roundf((bb.latitude.upperBound - latMin) / dy))
+        let y1 = dy > 0 ? yLower : yUpper
+        let y2 = dy > 0 ? yUpper : yLower
         guard x1 >= 0, x2 >= 0, x1 <= nx, x2 <= nx, y1 >= 0, y2 >= 0, y1 <= ny, y2 <= ny, x1 <= x2, y1 <= y2 else {
-            return []
+            return RegularGridSlice(grid: self, yRange: 0..<0, xRange: 0..<0)
         }
         let xRange = x1 ..< x2
         let yRange = y1 ..< y2

@@ -14,7 +14,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     case gfs013
 
     case gfs025
-    // case nam_conus // disabled because it only add 12 forecast hours
+    case nam_conus
     case hrrr_conus
 
     case hrrr_conus_15min
@@ -52,6 +52,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return .ncep_gefswave025
         case .gfswave016:
             return .ncep_gfswave016
+        case .nam_conus:
+            return .ncep_nam_conus
         }
     }
 
@@ -84,7 +86,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 6 * 3600
         case .hrrr_conus, .hrrr_conus_15min:
             return 3600
-        case .gfs025_ens, .gfs05_ens:
+        case .gfs025_ens, .gfs05_ens, .nam_conus:
             return 6 * 3600
         case .gfswave025, .gfswave025_ens, .gfswave016:
             return 6 * 3600
@@ -97,7 +99,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .gfs025:
             return 3600
-        case .hrrr_conus:
+        case .hrrr_conus, .nam_conus:
             return 3600
         case .gfs025_ens, .gfswave025_ens:
             return 3 * 3600
@@ -116,7 +118,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return true
         case .gfs025:
             return true
-        case .hrrr_conus:
+        case .hrrr_conus, .nam_conus:
             return false
         case .gfs025_ens, .gfswave025_ens:
             return true
@@ -136,9 +138,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .gfs05_ens, .gfs025_ens, .gfswave025_ens, .gfs013, .gfs025, .gfswave025, .gfswave016:
             // GFS has a delay of 3:40 hours after initialisation. Cronjobs starts at 3:40
             return t.subtract(hours: 3).floor(toNearestHour: 6)
-        // case .nam_conus:
+        case .nam_conus:
             // NAM has a delay of 1:40 hours after initialisation. Cronjob starts at 1:40
-            // return ((t.hour - 1 + 24) % 24) / 6 * 6
+            return  t.subtract(hours: 1).floor(toNearestHour: 6)
         case .hrrr_conus_15min, .hrrr_conus:
             // HRRR has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
             return t.with(hour: t.hour)
@@ -168,8 +170,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 0, through: 240, by: 3))
         case .gfs013, .gfs025:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
-        // case .nam_conus:
-            // return Array(0...60)
+         case .nam_conus:
+            return Array(0...60)
         case .hrrr_conus:
             return (run % 6 == 0) ? Array(0...48) : Array(0...18)
         case .hrrr_conus_15min:
@@ -197,7 +199,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             // let all = [0.01, 0.02, 0.04, 0.07, 0.1, 0.2, 0.4, 0.7, 1, 2, 3, 5, 7, 10, 15, 20, 30, 40, 50, 70, 100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 975, 1000]
             // pgrb2b
             return [10, 15, 20, 30, 40, 50, 70, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
-        // case .nam_conus:
+        case .nam_conus:
+            return []
             // nam uses level 75 instead of 70. Level 15 and 40 missing. Only use the same levels as HRRR.
             // return [                            100, 150, 200, 250, 300, 350, 400, 450, 500, 550, 600, 650, 700, 750, 800, 850, 900, 925, 950, 975, 1000] // disabled: 50, 75,
         case .hrrr_conus:
@@ -216,8 +219,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gfs05_ens:
             return (840 + 4 * 24) / 3 + 1 // 313
-        // case .nam_conus:
-            // return 60 + 4*24
+        case .nam_conus:
+            return 60 + 4*24
         case .gfs013, .gfs025, .gfs025_ens:
             return 384 + 1 + 4 * 24
         case .hrrr_conus:
@@ -231,7 +234,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .gfs05_ens:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
@@ -240,10 +243,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536 - 1) / 2, lonMin: -180, dx: 360 / 3072, dy: 0.11714935)
         case .gfs025_ens, .gfs025, .gfswave025, .gfswave025_ens:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        /*case .nam_conus:
-            /// labert conforomal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
-            let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5)
-            return LambertConformalGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)*/
+        case .nam_conus:
+            /// labert conformal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
+            let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
+            return ProjectionGrid(nx: 1799, ny: 1059, latitude: 21.138...47.8424, longitude: (-122.72)...(-60.918), projection: proj)
         case .gfswave016:
             /// 0.166° resolution
             return RegularGrid(nx: 2160, ny: 406, latMin: -15, lonMin: -180, dx: 360 / 2160, dy: (52.5 + 15) / (406 - 1))
@@ -311,8 +314,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             // https://nomads.ncep.noaa.gov/pub/data/nccf/com/gens/prod/gefs.20240619/00/wave/gridded/gefs.wave.t00z.c00.global.0p25.f000.grib2
             let memberString = member == 0 ? "c00" : "p\(member.zeroPadded(len: 2))"
             return ["\(gefsServer)gefs.\(yyyymmdd)/\(hh)/wave/gridded/gefs.wave.t\(hh)z.\(memberString).global.0p25.f\(fHHH).grib2"]
-        // case .nam_conus:
-        //    return "https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"
+         case .nam_conus:
+            return ["https://nomads.ncep.noaa.gov/pub/data/nccf/com/nam/prod/nam.\(run.format_YYYYMMdd)/nam.t\(run.hh)z.conusnest.hiresf\(fHH).tm00.grib2"]
         case .hrrr_conus:
             // let google = "https://storage.googleapis.com/high-resolution-rapid-refresh/"
             return ["\(hrrrServer)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"]

@@ -7,7 +7,7 @@ import Vapor
  */
 protocol GenericDomain: Sendable {
     /// The grid definition. Could later be replaced with a more generic implementation
-    var grid: Gridable { get }
+    var grid: any Gridable { get }
 
     /// Domain name used as data directory
     var domainRegistry: DomainRegistry { get }

@@ -7,7 +7,7 @@ import Foundation
 enum DmiDomain: String, GenericDomain, CaseIterable {
     case harmonie_arome_europe
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .harmonie_arome_europe:
             /*

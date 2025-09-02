@@ -15,10 +15,17 @@ import Testing
         #expect(RegularGridSlice(grid: grid, yRange: 1..<3, xRange: 4..<4).map { $0 }.isEmpty)
         #expect(RegularGridSlice(grid: grid, yRange: 1..<1, xRange: 4..<6).map { $0 }.isEmpty)
 
-        let slice = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 10.4..<10.6, longitude: 10.7..<10.9)) as! RegularGridSlice
+        let slice = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 10.4..<10.6, longitude: 10.7..<10.9))!
         #expect(slice.yRange == 4..<6)
         #expect(slice.xRange == 7..<9)
         #expect(slice.map { $0 } == [47, 48, 57, 58])
+        
+        /// Cams Europe grid uses negative dy
+        let grid2 = RegularGrid(nx: 700, ny: 420, latMin: 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
+        let slice2 = grid2.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.15..<48.5, longitude: 5.0..<11))!
+        #expect(slice2.yRange == 234..<268)
+        #expect(slice2.xRange == 300..<360)
+        #expect(slice2.count == 2040)
     }
 
     @Test func gaussianGridSlice() {
@@ -35,16 +42,16 @@ import Testing
 
     @Test func boundingBoxAtBorder() {
         let grid = RegularGrid(nx: 360, ny: 180, latMin: -90, lonMin: -180, dx: 1, dy: 1)
-        let sliceLatBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 88..<90, longitude: 10..<11)) as! RegularGridSlice
+        let sliceLatBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 88..<90, longitude: 10..<11))!
         #expect(sliceLatBorder.yRange == 178..<180)
         #expect(sliceLatBorder.xRange == 190..<191)
-        let sliceSLatBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: -90..<(-88), longitude: -11..<(-10))) as! RegularGridSlice
+        let sliceSLatBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: -90..<(-88), longitude: -11..<(-10)))!
         #expect(sliceSLatBorder.yRange == 0..<2)
         #expect(sliceSLatBorder.xRange == 169..<170)
-        let sliceLonBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 10..<11, longitude: 179..<180)) as! RegularGridSlice
+        let sliceLonBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: 10..<11, longitude: 179..<180))!
         #expect(sliceLonBorder.yRange == 100..<101)
         #expect(sliceLonBorder.xRange == 359..<360)
-        let sliceELonBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: -11..<(-10), longitude: -180..<(-179))) as! RegularGridSlice
+        let sliceELonBorder = grid.findBox(boundingBox: BoundingBoxWGS84(latitude: -11..<(-10), longitude: -180..<(-179)))!
         #expect(sliceELonBorder.yRange == 79..<80)
         #expect(sliceELonBorder.xRange == 0..<1)
     }

@@ -408,6 +408,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ncep_hrrr_conus
     case ncep_hrrr_conus_15min
     case ncep_gfs_graphcast025
+    case ncep_nam_conus
     
     case meteofrance_seamless
     case meteofrance_mix
@@ -614,6 +615,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             ].compactMap({ $0 })
         case .ncep_hrrr_conus_15min:
             return try await GfsReader(domains: [.hrrr_conus_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_nam_conus:
+            return try await GfsReader(domains: [.nam_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
@@ -815,6 +818,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return GfsDomain.hrrr_conus
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
+        case .ncep_nam_conus:
+            return GfsDomain.nam_conus
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return GfsGraphCastDomain.graphcast025
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
@@ -978,6 +983,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GfsReader(domain: .hrrr_conus, gridpoint: gridpoint, options: options)
         case .ncep_hrrr_conus_15min:
             return try await GfsReader(domain: .hrrr_conus_15min, gridpoint: gridpoint, options: options)
+        case .ncep_nam_conus:
+            return try await GfsReader(domain: .nam_conus, gridpoint: gridpoint, options: options)
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:

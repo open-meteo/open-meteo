@@ -12,7 +12,7 @@ public enum Zensun {
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// This function is performance critical for updates. This explains redundant code.
-    public static func calculateRadiationBackwardsAveraged(grid: Gridable, locationRange: some RandomAccessCollection<Int>, timerange: TimerangeDt) -> Array2DFastTime {
+    public static func calculateRadiationBackwardsAveraged(grid: any Gridable, locationRange: some RandomAccessCollection<Int>, timerange: TimerangeDt) -> Array2DFastTime {
         var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
 
         for (t, timestamp) in timerange.enumerated() {
@@ -76,7 +76,7 @@ public enum Zensun {
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// To get zenith angle, use `acos`
-    public static func calculateSunElevationBackwards(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
+    public static func calculateSunElevationBackwards(grid: any Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
 
@@ -158,7 +158,7 @@ public enum Zensun {
     }*/
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is space oriented!
-    public static func calculateRadiationInstant(grid: Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
+    public static func calculateRadiationInstant(grid: any Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> [Float] {
         var out = [Float]()
         let yrange = yrange ?? 0..<grid.ny
         out.reserveCapacity(yrange.count * grid.nx * timerange.count)
@@ -209,7 +209,7 @@ public enum Zensun {
     }
 
     /// 2d field. Calculate scaling factor from backwards to instant radiation factor
-    public static func backwardsAveragedToInstantFactor(grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt) -> Array2DFastTime {
+    public static func backwardsAveragedToInstantFactor(grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt) -> Array2DFastTime {
         var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
 
         for (t, timestamp) in timerange.enumerated() {
@@ -281,7 +281,7 @@ public enum Zensun {
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
     /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them....
     /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
-    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double], sunDeclinationCutOffDegrees: Float) {
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double], sunDeclinationCutOffDegrees: Float) {
         let decang = timerange.map { $0.getSunDeclination() }
         let eqtime = timerange.map { $0.getSunEquationOfTime() }
 

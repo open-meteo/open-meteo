@@ -127,7 +127,7 @@ struct GfsReaderLowLevel: GenericReaderProtocol {
         }
 
         /// Make sure showers are `0` instead of `NaN` in HRRR, otherwise it is mixed with GFS showers
-        if domain == .hrrr_conus || domain == .hrrr_conus_15min, case let .surface(variable) = raw, variable == .showers {
+        if domain == .hrrr_conus || domain == .hrrr_conus_15min || domain == .nam_conus, case let .surface(variable) = raw, variable == .showers {
             let precipitation = try await reader.get(variable: .surface(.precipitation), time: time)
             return DataAndUnit(precipitation.data.map({ min($0, 0) }), precipitation.unit)
         }
@@ -142,7 +142,7 @@ struct GfsReaderLowLevel: GenericReaderProtocol {
         }*/
 
         /// GFS ensemble has no diffuse radiation
-        if domain == .gfs025_ens || domain == .gfs05_ens, case let .surface(variable) = raw, variable == .diffuse_radiation {
+        if domain == .gfs025_ens || domain == .gfs05_ens || domain == .nam_conus, case let .surface(variable) = raw, variable == .diffuse_radiation {
             let ghi = try await reader.get(variable: .surface(.shortwave_radiation), time: time)
             let dhi = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: ghi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
             return DataAndUnit(dhi, ghi.unit)
@@ -165,12 +165,12 @@ struct GfsReaderLowLevel: GenericReaderProtocol {
         }
 
         /// Make sure showers are `0` in HRRR, otherwise it is mixed with GFS showers
-        if domain == .hrrr_conus || domain == .hrrr_conus_15min, case let .surface(variable) = raw, variable == .showers {
+        if domain == .hrrr_conus || domain == .hrrr_conus_15min || domain == .nam_conus, case let .surface(variable) = raw, variable == .showers {
             return try await reader.prefetchData(variable: .surface(.precipitation), time: time)
         }
 
         /// GFS ensemble has no diffuse radiation
-        if domain == .gfs025_ens || domain == .gfs05_ens, case let .surface(variable) = raw, variable == .diffuse_radiation {
+        if domain == .gfs025_ens || domain == .gfs05_ens || domain == .nam_conus, case let .surface(variable) = raw, variable == .diffuse_radiation {
             return try await reader.prefetchData(variable: .surface(.shortwave_radiation), time: time)
         }
 

@@ -221,7 +221,7 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
         return self == .CMCC_CM2_VHR4 || self == .FGOALS_f3_H /*|| self == .FGOALS_f3_H_highresSST*/
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .CMCC_CM2_VHR4:
             return RegularGrid(nx: 1152, ny: 768, latMin: -90, lonMin: -180, dx: 0.3125, dy: 180 / 768)

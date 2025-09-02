@@ -796,6 +796,9 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
             // TODO register
             return .ecmwfIfs
+        case .ncep_nam_conus:
+            // TODO register
+            return .ncepNbmConus
         }
     }
 }

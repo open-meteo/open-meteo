@@ -10,7 +10,7 @@ enum BomDomain: String, GenericDomain, CaseIterable {
     case access_global
     case access_global_ensemble
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .access_global:
             return RegularGrid(nx: 2048, ny: 1536, latMin: -89.941406, lonMin: -179.912109, dx: 360 / 2048, dy: 180 / 1536)
