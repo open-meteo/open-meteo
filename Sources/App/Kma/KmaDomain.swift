@@ -4,7 +4,7 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
     case gdps
     case ldps
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .gdps:
             return RegularGrid(nx: 2560, ny: 1920, latMin: -90 + 180 / 1920 / 2, lonMin: -180 + 360 / 2560 / 2, dx: 360 / 2560, dy: 180 / 1920)

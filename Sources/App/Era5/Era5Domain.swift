@@ -130,7 +130,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .era5, .era5_daily:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)

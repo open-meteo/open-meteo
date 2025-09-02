@@ -115,7 +115,7 @@ extension Array where Element == Float {
     }
 
     /// Write a spatial om file using grid dimensions and 20x20 chunks. Mostly used to write elevation files
-    func writeOmFile2D(file: String, grid: Gridable, chunk0: Int = 20, chunk1: Int = 20, compression: OmCompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
+    func writeOmFile2D(file: String, grid: any Gridable, chunk0: Int = 20, chunk1: Int = 20, compression: OmCompressionType = .pfor_delta2d_int16, scalefactor: Float = 1, createNetCdf: Bool = false) throws {
         let chunk0 = Swift.min(grid.ny, 20)
         try writeOmFile(file: file, dimensions: [grid.ny, grid.nx], chunks: [chunk0, 400 / chunk0], compression: compression, scalefactor: scalefactor, createNetCdf: createNetCdf)
     }

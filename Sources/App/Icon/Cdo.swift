@@ -6,7 +6,7 @@ import SwiftNetCDF
 
 struct CdoHelper: Sendable {
     let cdo: CdoIconGlobal?
-    let grid: Gridable
+    let grid: any Gridable
     let domain: IconDomains
     let curl: Curl
 

@@ -13,7 +13,7 @@ extension GribMessage {
     }
 
     /// Print debug grid information
-    func debugGrid(grid: Gridable, flipLatidude: Bool, shift180Longitude: Bool) throws {
+    func debugGrid(grid: any Gridable, flipLatidude: Bool, shift180Longitude: Bool) throws {
         guard let nx = get(attribute: "Nx")?.toInt() else {
             fatalError("Could not get Nx")
         }

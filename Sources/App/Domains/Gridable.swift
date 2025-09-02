@@ -10,7 +10,8 @@ public protocol Gridable: Sendable {
 
     func findPoint(lat: Float, lon: Float) -> Int?
     func findPointInterpolated(lat: Float, lon: Float) -> GridPoint2DFraction?
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> (any Sequence<Int>)?
+    associatedtype SliceType: Sequence<Int>
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
 }
 

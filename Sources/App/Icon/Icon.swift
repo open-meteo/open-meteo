@@ -140,7 +140,7 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         }
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .icon:
             return RegularGrid(nx: 2879, ny: 1441, latMin: -90, lonMin: -180, dx: 0.125, dy: 0.125)

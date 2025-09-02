@@ -7,7 +7,7 @@ extension Array3DFastTime {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: any RandomAccessCollection<Int>) {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
@@ -19,7 +19,7 @@ extension Array2DFastTime {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: any RandomAccessCollection<Int>) {
         precondition(nTime == time.count)
         data.interpolateInplace(type: type, time: time, grid: grid, locationRange: locationRange)
     }
@@ -32,7 +32,7 @@ extension Array where Element == Float {
     ///
     /// interpolate missing steps.. E.g. `DDDDDD-D-D-D-D-D`
     /// Automatically detects data spacing `--D--D--D` for deaverging or backfilling
-    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>) {
+    mutating func interpolateInplace(type: ReaderInterpolation, time: TimerangeDt, grid: any Gridable, locationRange: any RandomAccessCollection<Int>) {
         switch type {
         case .linear:
             interpolateInplaceLinear(nTime: time.count)
@@ -245,7 +245,7 @@ extension Array where Element == Float {
     ///
     /// If `missingValuesAreBackwardsAveraged` is set, it is assumed that values after missing data is properly averaged over the missing time-steps.
     /// `true` for weather model data. `false` for satellite data and other measurements
-    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: Gridable, locationRange: any RandomAccessCollection<Int>, missingValuesAreBackwardsAveraged: Bool) {
+    mutating func interpolateInplaceSolarBackwards(time: TimerangeDt, grid: any Gridable, locationRange: any RandomAccessCollection<Int>, missingValuesAreBackwardsAveraged: Bool) {
         let nTime = time.count
         precondition(nTime <= self.count)
         precondition(self.count % nTime == 0)

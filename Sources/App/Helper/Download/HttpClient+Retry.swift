@@ -140,9 +140,9 @@ fileprivate extension HTTPClientRequest {
         }
         let count = range.ranges.reduce(0, {
             switch $1 {
-            case .start(value: let value):
+            case .start(value: _):
                 return $0
-            case .tail(value: let value):
+            case .tail(value: _):
                 return $0
             case .within(start: let start, end: let end):
                 return $0 - start + end

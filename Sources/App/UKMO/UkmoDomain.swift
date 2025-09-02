@@ -11,7 +11,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
     case uk_deterministic_2km
     case uk_ensemble_2km
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .global_deterministic_10km:
             return RegularGrid(

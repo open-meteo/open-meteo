@@ -123,7 +123,7 @@ struct GaussianGrid: Gridable {
         return integral(y: y) + x
     }
 
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> (any Sequence<Int>)? {
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> Slice? {
         return Slice(type: type, bb: bb)
     }
 }

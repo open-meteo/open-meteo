@@ -3,7 +3,7 @@ import Foundation
 enum ItaliaMeteoArpaeDomain: String, GenericDomain, CaseIterable {
     case icon_2i
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .icon_2i:
             return RegularGrid(nx: 761, ny: 761, latMin: 33.7, lonMin: 3, dx: 0.025, dy: 0.02)

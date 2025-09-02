@@ -90,7 +90,7 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         return 264 + 1 + 2 * 24 // 313
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .nbm_conus:
             /** grib dump

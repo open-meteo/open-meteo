@@ -234,7 +234,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var grid: Gridable {
+    var grid: any Gridable {
         switch self {
         case .gfs05_ens:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)

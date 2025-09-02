@@ -97,12 +97,12 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         return trueNorthDirection
     }
 
-    func findBox(boundingBox bb: BoundingBoxWGS84) -> (any Sequence<Int>)? {
+    func findBox(boundingBox bb: BoundingBoxWGS84) -> ProjectionGridSlice<Projection>? {
         guard let sw = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.lowerBound),
               let se = findPointXy(lat: bb.latitude.lowerBound, lon: bb.longitude.upperBound),
               let nw = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.lowerBound),
               let ne = findPointXy(lat: bb.latitude.upperBound, lon: bb.longitude.upperBound) else {
-            return []
+            return ProjectionGridSlice(grid: self, yRange: 0..<0, xRange: 0..<0)
         }
 
         let xRange = min(sw.x, nw.x) ..< max(se.x, ne.x)

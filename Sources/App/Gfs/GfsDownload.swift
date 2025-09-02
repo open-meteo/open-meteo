@@ -115,7 +115,7 @@ struct GfsDownload: AsyncCommand {
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
-    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileManagerReadable, grid: Gridable, isGlobal: Bool) async throws {
+    func downloadNcepElevation(application: Application, url: [String], surfaceElevationFileOm: OmFileManagerReadable, grid: any Gridable, isGlobal: Bool) async throws {
         let logger = application.logger
 
         /// download seamask and height

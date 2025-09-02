@@ -81,7 +81,7 @@ struct MigrationCommand: AsyncCommand {
 
     /// Read om file and write it as version 3 and reshape data to proper 3d files
     /// If no grid is given, assume that files are converted 1:1. This is the case for the DEM model
-    func convertToNewFormat(logger: Logger, file: String, grid: Gridable?, execute: Bool) async throws {
+    func convertToNewFormat(logger: Logger, file: String, grid: (any Gridable)?, execute: Bool) async throws {
         let temporary = "\(file)~"
         FileManager.default.waitIfFileWasRecentlyModified(at: temporary)
         try FileManager.default.removeItemIfExists(at: temporary)
