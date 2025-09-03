@@ -239,4 +239,12 @@ extension VariablePerMemberStorage {
             try await writer.write(member: t2m.key.member, variable: outVariable, data: rh)
         }
     }
+    
+    /// Calculate relative humidity. Removes both from storage afterwards
+    nonisolated func calculateRelativeHumidityRemoveBoth(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        while let (t2m, dewpoint, member) = await getTwoRemoving(first: temperature, second: dewpoint, timestamp: writer.time) {
+            let rh = zip(t2m.data, dewpoint.data).map(Meteorology.relativeHumidity)
+            try await writer.write(member: member, variable: outVariable, data: rh)
+        }
+    }
 }

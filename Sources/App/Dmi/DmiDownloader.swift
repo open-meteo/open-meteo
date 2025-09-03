@@ -146,6 +146,7 @@ struct DmiDownload: AsyncCommand {
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
+                let inMemory2 = VariablePerMemberStorage<DmiSurfaceVariable>()
                 let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
 
                 // process sequentialy, as precipitation need to be in order for deaveraging
@@ -208,25 +209,7 @@ struct DmiDownload: AsyncCommand {
 
                     // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
                     // fatalError()
-
-                    if let variable = variable as? DmiSurfaceVariable {
-                        switch variable {
-                        case .shortwave_radiation, .direct_radiation:
-                            // GRIB unit says W/m2, but it's J/s
-                            grib2d.array.data.multiplyAdd(multiply: 1 / 3600, add: 0)
-                        case .cloud_top, .cloud_base:
-                            // Cloud base and top mark "no clouds" as NaN
-                            // Set it to 0 to work with conversion
-                            for i in grib2d.array.data.indices {
-                                if grib2d.array.data[i].isNaN {
-                                    grib2d.array.data[i] = 0
-                                }
-                            }
-                        default:
-                            break
-                        }
-                    }
-
+                    
                     switch unit {
                     case "K":
                         grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
@@ -242,6 +225,31 @@ struct DmiDownload: AsyncCommand {
                         // grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0) // to W/m2
                     default:
                         break
+                    }
+
+                    if let variable = variable as? DmiSurfaceVariable {
+                        switch variable {
+                        case .shortwave_radiation, .direct_radiation:
+                            // GRIB unit says W/m2, but it's J/s
+                            grib2d.array.data.multiplyAdd(multiply: 1 / 3600, add: 0)
+                        case .cloud_top, .cloud_base:
+                            // Cloud base and top mark "no clouds" as NaN
+                            // Set it to 0 to work with conversion
+                            for i in grib2d.array.data.indices {
+                                if grib2d.array.data[i].isNaN {
+                                    grib2d.array.data[i] = 0
+                                }
+                            }
+                        case .temperature_2m, .relative_humidity_2m:
+                            // RH2m downloads dewpoint. Convert to rh2 using temperature 2m
+                            await inMemory2.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            try await inMemory2.calculateRelativeHumidityRemoveBoth(temperature: .temperature_2m, dewpoint: .relative_humidity_2m, outVariable: DmiSurfaceVariable.relative_humidity_2m, writer: writer)
+                            if variable == .relative_humidity_2m {
+                                return
+                            }
+                        default:
+                            break
+                        }
                     }
 
                     // Deaccumulate precipitation
@@ -319,7 +327,8 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.wind_direction_10m // ok
         case ("10si", "heightAboveGround", "10"): // testing wdir
             return DmiSurfaceVariable.wind_speed_10m // ok
-        case ("2r", "heightAboveGround", "2"):
+        case ("2d", "heightAboveGround", "2"):
+            // 2025-09-03: Relative humidity is corrupted. Use dew point and calculate it manually
             return DmiSurfaceVariable.relative_humidity_2m // ok
         case ("pres", "heightAboveSea", "0"):
             return DmiSurfaceVariable.pressure_msl // ok
