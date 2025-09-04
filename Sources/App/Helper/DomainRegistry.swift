@@ -147,6 +147,20 @@ enum DomainRegistry: String, CaseIterable {
     var directorySpatial: String? {
         return OpenMeteo.dataSpatialDirectory.map { "\($0)\(rawValue)/" }
     }
+    
+    var remoteDataDirectory: String? {
+        guard let remote = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: bucketName) else {
+            return nil
+        }
+        return "\(remote)\(rawValue)/"
+    }
+    
+    var remoteDataRunDirectory: String? {
+        guard let remote = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: bucketName) else {
+            return nil
+        }
+        return "\(remote)\(rawValue)/".replacingOccurrences(of: "data/", with: "data_run/")
+    }
 
     func getDomain() -> GenericDomain? {
         switch self {
@@ -488,7 +502,7 @@ extension DomainRegistry {
             try Process.awsSync(
                 src: "\(directory)\(dir)/",
                 dest: "s3://\(bucket)/data_run/\(dir)/",
-                exclude: ["*~", "meta.json"],
+                exclude: ["*~"],
                 profile: profile
             )
             logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")

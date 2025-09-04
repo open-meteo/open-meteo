@@ -85,7 +85,7 @@ struct ModelUpdateMetaJson: Codable {
             data_end_time: end.timeIntervalSince1970,
             update_interval_seconds: domain.updateIntervalSeconds
         )
-        let path = ModelUpdateMetaJsonKey(domain: domain.domainRegistry)
+        let path = ModelUpdateMetaFile(domain: domain.domainRegistry)
         try path.createDirectory()
         let pathString = path.getFilePath()
         try meta.writeTo(path: pathString)
@@ -104,16 +104,9 @@ struct ModelUpdateMetaJson: Codable {
     }
 }
 
-struct ModelUpdateMetaJsonKey: RemoteFileManageableSimple {
+struct ModelUpdateMetaFile: RemoteFileManageableJson {
     typealias Value = ModelUpdateMetaJson
     let domain: DomainRegistry
-    
-    func readFrom(data: Data) throws -> ModelUpdateMetaJson {
-        guard let json = try? JSONDecoder().decode(ModelUpdateMetaJson.self, from: data) else {
-            throw ForecastApiError.generic(message: "could not cast file to ModelUpdateMetaJson")
-        }
-        return json
-    }
     
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         return 30
@@ -124,9 +117,9 @@ struct ModelUpdateMetaJsonKey: RemoteFileManageableSimple {
     }
     
     func getRemoteUrl() -> String? {
-        guard let remoteDirectory = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: domain.bucketName) else {
+        guard let directory = domain.remoteDataDirectory else {
             return nil
         }
-        return "\(remoteDirectory)\(domain.rawValue)/static/meta.json"
+        return "\(directory)static/meta.json"
     }
 }

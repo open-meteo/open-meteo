@@ -216,8 +216,8 @@ struct WeatherApiController {
                     let domain = readerAndDomain.domain
                     let members = 0..<reader.domain.countEnsembleMember
                     
-                    // TODO automatic run selection for seasonal domains
-                    let run = run == nil && (domain == .ecmwf_seas5_6hourly || domain == .ecmwf_seas5_24hourly || domain == .ecmwf_seas5_seamless) ? IsoDateTime(timeIntervalSince1970: Timestamp.now().with(day: 1).timeIntervalSince1970) : run
+                    // TODO option to set run to "latest"
+                    let run = run == nil && (domain == .ecmwf_seas5_6hourly || domain == .ecmwf_seas5_24hourly || domain == .ecmwf_seas5_seamless) ? IsoDateTime(timeIntervalSince1970: try await EcmwfSeasDomain.seas5_6hourly.getLatestFullRun(client: req.application.http.client.shared, logger: req.logger)?.timeIntervalSince1970 ?? Timestamp.now().with(day: 1).timeIntervalSince1970) : run
 
                     return .init(
                         model: domain,

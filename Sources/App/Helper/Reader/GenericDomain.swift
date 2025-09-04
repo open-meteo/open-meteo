@@ -71,10 +71,18 @@ extension GenericDomain {
     /// Meta JSON for time-series data
     func getMetaJson(client: HTTPClient, logger: Logger) async throws -> ModelUpdateMetaJson? {
         return try await RemoteFileManager.instance.get(
-            file: ModelUpdateMetaJsonKey(domain: self.domainRegistry),
+            file: ModelUpdateMetaFile(domain: self.domainRegistry),
             client: client,
             logger: logger
         )
+    }
+    
+    func getLatestFullRun(client: HTTPClient, logger: Logger) async throws -> Timestamp? {
+        return try await RemoteFileManager.instance.get(
+            file: FullRunMetaFile.latest(self.domainRegistry),
+            client: client,
+            logger: logger
+        )?.reference_time.toTimestamp()
     }
 
     /// Filename of the surface elevation file

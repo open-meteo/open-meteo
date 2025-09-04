@@ -1,5 +1,6 @@
 import OmFileFormat
 import Foundation
+import Vapor
 
 /// Represents a "File" that could be read from local or remote
 protocol RemoteFileManageable: Sendable, Hashable {
@@ -26,41 +27,4 @@ protocol LocalFileRepresentable<Value>: Sendable {
     associatedtype Value
     var fn: MmapFile { get }
     func cast() -> Value
-}
-
-/// A simplified interface to simply cast `Data` into a value
-protocol RemoteFileManageableSimple: RemoteFileManageable {
-    func readFrom(data: Data) throws -> Value
-}
-
-extension RemoteFileManageableSimple {
-    func makeLocalReader(file: MmapFile) async throws -> LocalFileRepresentableSimple<Value> {
-        let data = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: file.data.baseAddress!), count: file.count, deallocator: .none)
-        return LocalFileRepresentableSimple(fn: file, value: try readFrom(data: data))
-    }
-    
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> RemoteFileRepresentableSimple<Value> {
-        let value = try await file.withData(offset: 0, count: file.count) { buffer in
-            try readFrom(data: buffer.data)
-        }
-        return RemoteFileRepresentableSimple(fn: file, value: value)
-    }
-}
-
-struct RemoteFileRepresentableSimple<Value: Sendable>: RemoteFileRepresentable {
-    let fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>
-    let value: Value
-    
-    func cast() -> Value {
-        return value
-    }
-}
-
-struct LocalFileRepresentableSimple<Value: Sendable>: LocalFileRepresentable {
-    let fn: MmapFile
-    let value: Value
-    
-    func cast() -> Value {
-        return value
-    }
 }
