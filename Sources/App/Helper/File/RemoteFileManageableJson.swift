@@ -7,17 +7,17 @@ protocol RemoteFileManageableJson: RemoteFileManageable where Value: Decodable {
 extension RemoteFileManageableJson {
     func makeLocalReader(file: MmapFile) async throws -> LocalFileRepresentableSimple<Value> {
         let data = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: file.data.baseAddress!), count: file.count, deallocator: .none)
-        guard let json = try? JSONDecoder().decode(Value.self, from: data) else {
-            throw ForecastApiError.generic(message: "could not cast file to \(Value.self)")
-        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let json = try decoder.decode(Value.self, from: data)
         return LocalFileRepresentableSimple(fn: file, value: json)
     }
     
     func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> RemoteFileRepresentableSimple<Value> {
         let buffer = try await file.getData(offset: 0, count: file.count)
-        guard let json = try? JSONDecoder().decode(Value.self, from: buffer) else {
-            throw ForecastApiError.generic(message: "could not cast file to \(Value.self)")
-        }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let json = try decoder.decode(Value.self, from: buffer)
         return RemoteFileRepresentableSimple(fn: file, value: json)
     }
 }
