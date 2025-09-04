@@ -11,7 +11,9 @@ enum OmFileManagerType: String {
     case linear_bias_seasonal
 }
 
-enum OmFileManagerReadable: Hashable {
+enum OmFileManagerReadable: Hashable, OmFileManageable {
+    typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?)
+    
     case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
     case meta(domain: DomainRegistry)
@@ -19,11 +21,24 @@ enum OmFileManagerReadable: Hashable {
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
     
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> any OmFileRemoteManaged {
-        fatalError()
+    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> (any OmFileRemoteManaged<Value>)? {
+        do {
+            let reader = try await OmFileReader(fn: file)
+            
+            guard let arrayReader = reader.asArray(of: Float.self) else {
+                return nil
+            }
+            if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+                return OmFileRemoteOmReader(reader: arrayReader, timestamps: times)
+            }
+            return OmFileRemoteOmReader(reader: arrayReader, timestamps: nil)
+        } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
+            print("[ ERROR ] Not an OpenMeteo file \(file.backend.url)")
+            return nil
+        }
     }
     
-    func makeLocalReader(file: FileHandle) async throws -> OmFileLocalManaged {
+    func makeLocalReader(file: FileHandle) async throws -> any OmFileLocalManaged<Value> {
         let reader = try await OmFileReader(fn: try MmapFile(fn: file, mode: .readOnly))
         guard let arrayReader = reader.asArray(of: Float.self) else {
             throw ForecastApiError.generic(message: "Om file does not contain float array")
@@ -153,12 +168,16 @@ enum OmFileManagerReadable: Hashable {
 }
 
 struct OmFileRemoteOmReader: OmFileRemoteManaged {
+    let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
+    let timestamps: [Timestamp]?
+    
     var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
         reader.fn
     }
     
-    let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
-    let timestamps: [Timestamp]?
+    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
+        return (reader, timestamps)
+    }
 }
 
 struct OmFileLocalOmReader: OmFileLocalManaged {
@@ -167,6 +186,10 @@ struct OmFileLocalOmReader: OmFileLocalManaged {
     
     var fn: FileHandle {
         reader.fn.file
+    }
+    
+    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
+        return (reader, timestamps)
     }
 }
 
