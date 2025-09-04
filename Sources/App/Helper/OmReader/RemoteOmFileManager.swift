@@ -95,21 +95,6 @@ final class RemoteOmFileManager: Sendable {
 fileprivate enum OmFileLocalOrRemote {
     case local(any OmFileLocalManaged)
     case remote(any OmFileRemoteManaged)
-    
-    func toReader() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
-        switch self {
-        case .local(let file):
-            guard let reader = file as? OmFileLocalOmReader else {
-                fatalError("Not cast-able to OmFileLocalOmReader")
-            }
-            return (reader.reader, reader.timestamps)
-        case .remote(let file):
-            guard let reader = file as? OmFileRemoteOmReader else {
-                fatalError("Not cast-able to OmFileRemoteOmReader")
-            }
-            return (reader.reader, reader.timestamps)
-        }
-    }
 }
 
 
@@ -125,11 +110,6 @@ fileprivate extension OmHttpReaderBackend {
     }
 }
 
-extension OmFileReaderProtocol {
-    func asArray<OmType: OmFileArrayDataTypeProtocol>(of: OmType.Type) -> (any OmFileReaderArrayProtocol<OmType>)? {
-        return asArray(of: of, io_size_max: 65536, io_size_merge: 512)
-    }
-}
 
 /**
  KV cache, but a resource is resolved not in parallel
@@ -253,11 +233,6 @@ fileprivate final actor RemoteOmFileManagerCache {
                 logger.warning("OmFileManager: Opened stale file. New file version available. \(deletedBlocks) previously cached blocks have been deleted")
             }
             guard let reader = try await key.makeRemoteCaptureNotOmFile(file: new) else {
-                return (nil, .now())
-            }
-            return (.remote(reader), .now())
-        case .none:
-            guard let file = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), let reader = try await key.makeRemoteCaptureNotOmFile(file: file) else {
                 return (nil, .now())
             }
             return (.remote(reader), .now())
@@ -420,16 +395,5 @@ fileprivate extension OmFileManageable {
             print("[ ERROR ] Not an OpenMeteo file \(file.backend.url)")
             return nil
         }
-    }
-}
-
-extension OmFileReader {
-    func getChild(name: String) async throws -> Self? {
-        for i in 0..<numberOfChildren {
-            if let child = try await getChild(i), child.getName() == name {
-                return child
-            }
-        }
-        return nil
     }
 }

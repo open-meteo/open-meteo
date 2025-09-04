@@ -8,8 +8,8 @@ enum OmHttpMetaCache {
         case available(lastValidated: Timestamp, contentLength: Int, lastModified: Timestamp?, eTag: String?)
     }
     
-    static func get(url: String) -> State? {
-        return OpenMeteo.fileMetaCache.get(key: url.fnv1aHash64, maxAccessedAgeInSeconds: 365*24*3600)?.assumingMemoryBound(to: Entry.self)[0].state
+    static func get(url: String) -> State {
+        return OpenMeteo.fileMetaCache.get(key: url.fnv1aHash64, maxAccessedAgeInSeconds: 365*24*3600)?.assumingMemoryBound(to: Entry.self)[0].state ?? .missing(lastValidated: Timestamp(0))
     }
     
     static func set(url: String, state: State) throws {

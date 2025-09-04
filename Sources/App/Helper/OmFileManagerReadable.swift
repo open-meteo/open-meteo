@@ -23,9 +23,7 @@ enum OmFileManagerReadable: Hashable, OmFileManageable {
     
     func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> any OmFileRemoteManaged<Value> {
         let reader = try await OmFileReader(fn: file)
-        guard let arrayReader = reader.asArray(of: Float.self) else {
-            throw ForecastApiError.generic(message: "Om file does not contain float array")
-        }
+        let arrayReader = try reader.expectArray(of: Float.self)
         if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
             return OmFileRemoteOmReader(reader: arrayReader, timestamps: times)
         }
@@ -34,9 +32,7 @@ enum OmFileManagerReadable: Hashable, OmFileManageable {
     
     func makeLocalReader(file: FileHandle) async throws -> any OmFileLocalManaged<Value> {
         let reader = try await OmFileReader(fn: try MmapFile(fn: file, mode: .readOnly))
-        guard let arrayReader = reader.asArray(of: Float.self) else {
-            throw ForecastApiError.generic(message: "Om file does not contain float array")
-        }
+        let arrayReader = try reader.expectArray(of: Float.self)
         if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
             return OmFileLocalOmReader(reader: arrayReader, timestamps: times)
         }

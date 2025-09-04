@@ -56,9 +56,7 @@ struct ConvertOmCommand: AsyncCommand {
             return
         } else if format == "netcdf" {
             // Handle conversion to NetCDF
-            guard let om = try await OmFileReader(file: signature.infile).asArray(of: Float.self) else {
-                throw ConvertOmError("Not a float array")
-            }
+            let om = try await OmFileReader(file: signature.infile).expectArray(of: Float.self)
             let dimensions = Array(om.getDimensions())
             let chunks = Array(om.getChunkDimensions())
             logger.info("File dimensions: \(dimensions), chunks: \(chunks)")
@@ -166,10 +164,7 @@ struct ConvertOmCommand: AsyncCommand {
     /// Read om file and write it as version 3 and reshape data to proper 3d files
     func convertOmv3(src: String, dest: String, grid: any Gridable) async throws {
         // Read data from the input OM file
-        guard let readfile = try? await OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))),
-              let reader = readfile.asArray(of: Float.self) else {
-            throw ConvertOmError("Failed to open file: \(src)")
-        }
+        let reader = try await OmFileReader(fn: try MmapFile(fn: FileHandle.openFileReading(file: src))).expectArray(of: Float.self)
 
         let dimensions = Array(reader.getDimensions())
         let chunks = Array(reader.getChunkDimensions())

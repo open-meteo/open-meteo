@@ -3,14 +3,6 @@ import SwiftNetCDF
 import Foundation
 import Logging
 
-/// TODO: Move to library
-extension OmFileWriter {
-    public func writeArray<OmType: OmFileArrayDataTypeProtocol>(data: [OmType], dimensions: [UInt64], chunkDimensions: [UInt64], compression: OmCompressionType, scale_factor: Float, add_offset: Float) throws -> OmFileWriterArrayFinalised {
-        let prepare = try self.prepareArray(type: OmType.self, dimensions: dimensions, chunkDimensions: chunkDimensions, compression: compression, scale_factor: scale_factor, add_offset: add_offset)
-        try prepare.writeData(array: data)
-        return try prepare.finalise()
-    }
-}
 
 /// Downloaders return FileHandles to keep files open while downloading
 /// If another download starts and would overlap, this still keeps the old file open
@@ -21,7 +13,7 @@ struct GenericVariableHandle: Sendable {
     let reader: OmFileReaderArray<MmapFile, Float>
 
     public init(variable: GenericVariable, time: Timestamp, member: Int, fn: FileHandle, domain: GenericDomain) async throws {
-        self.reader = try await OmFileReader(fn: try MmapFile(fn: fn)).asArray(of: Float.self)!
+        self.reader = try await OmFileReader(fn: try MmapFile(fn: fn)).expectArray(of: Float.self)
         let dimensions = reader.getDimensions()
         let nt = dimensions.count == 3 ? Int(dimensions[2]) : 1
         guard dimensions[0] == domain.grid.ny && dimensions[1] == domain.grid.nx else {
