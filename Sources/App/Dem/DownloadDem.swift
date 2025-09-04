@@ -55,8 +55,8 @@ struct Dem90: GenericDomain {
         let lonrow = UInt64((lon + 180) * Float(px))
         var value: Float = .nan
         
-        let file = OmFileManagerReadable.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
-        try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+        let file = OmFileType.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lati)
+        try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
             try await reader.read(into: &value, range: [latrow..<latrow + 1, lonrow..<lonrow + 1], intoCubeOffset: nil, intoCubeDimension: nil)
         }
         return value
@@ -186,7 +186,7 @@ struct DownloadDemCommand: AsyncCommand {
             var scheduledCompressions = 0
 
             for lat in -90..<90 {
-                let file = OmFileManagerReadable.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lat)
+                let file = OmFileType.staticFile(domain: .copernicus_dem90, variable: "lat", chunk: lat)
                 if FileManager.default.fileExists(atPath: file.getFilePath()) {
                     continue
                 }

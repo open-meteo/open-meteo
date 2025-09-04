@@ -104,7 +104,7 @@ struct ModelUpdateMetaJson: Codable {
     }
 }
 
-struct ModelUpdateMetaJsonKey: OmFileManageableSimple {
+struct ModelUpdateMetaJsonKey: RemoteFileManageableSimple {
     typealias Value = ModelUpdateMetaJson
     let domain: DomainRegistry
     

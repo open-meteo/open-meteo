@@ -4,17 +4,17 @@ import NIOConcurrencyHelpers
 import Vapor
 import NIO
 
-enum OmFileManagerType: String {
+enum OmFileSeriesType: String {
     case chunk
     case year
     case master
     case linear_bias_seasonal
 }
 
-enum OmFileManagerReadable: Hashable, OmFileManageable {
+enum OmFileType: Hashable, RemoteFileManageable {
     typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?)
     
-    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?, ensembleMember: Int, previousDay: Int)
+    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileSeriesType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
@@ -132,9 +132,10 @@ enum OmFileManagerReadable: Hashable, OmFileManageable {
             return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
         }
     }
+
 }
 
-extension OmFileManageable {
+extension RemoteFileManageable {
     func createDirectory() throws {
         let file = getFilePath()
         guard let last = file.lastIndex(of: "/") else {
@@ -150,7 +151,7 @@ extension OmFileManageable {
     }
 }
 
-struct OmFileRemoteOmReader: OmFileRemoteManaged {
+struct OmFileRemoteOmReader: RemoteFileRepresentable {
     let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
     let timestamps: [Timestamp]?
     
@@ -163,7 +164,7 @@ struct OmFileRemoteOmReader: OmFileRemoteManaged {
     }
 }
 
-struct OmFileLocalOmReader: OmFileLocalManaged {
+struct OmFileLocalOmReader: LocalFileRepresentable {
     let reader: OmFileReaderArray<MmapFile, Float>
     let timestamps: [Timestamp]?
     

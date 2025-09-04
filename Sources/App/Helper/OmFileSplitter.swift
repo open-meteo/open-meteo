@@ -84,8 +84,8 @@ struct OmFileSplitter {
         
         /// Read individual runs from dedicated database
         if let run = time.run {
-            let file = OmFileManagerReadable.run(domain: domain, variable: variable, run: run)
-            try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps) in
+            let file = OmFileType.run(domain: domain, variable: variable, run: run)
+            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps) in
                 guard let timestamps else {
                     return
                 }
@@ -107,9 +107,9 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                     try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -130,8 +130,8 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+                let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                     try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -146,8 +146,8 @@ struct OmFileSplitter {
             guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+            let file = OmFileType.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                 try await reader.willNeed3D(ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
             }
         }
@@ -167,8 +167,8 @@ struct OmFileSplitter {
         
         /// Read individual runs from dedicated database
         if let run = time.run {
-            let file = OmFileManagerReadable.run(domain: domain, variable: variable.omFileName.file, run: run)
-            try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps) in
+            let file = OmFileType.run(domain: domain, variable: variable.omFileName.file, run: run)
+            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, timestamps) in
                 guard let timestamps else {
                     return
                 }
@@ -216,9 +216,9 @@ struct OmFileSplitter {
 
         if let masterTimeRange {
             let fileTime = TimerangeDt(range: masterTimeRange, dtSeconds: time.dtSeconds).toIndexTime()
-            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable.omFileName.file, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .master, chunk: 0, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
             if let offsets = indexTime.intersect(fileTime: fileTime) {
-                try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                     try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -236,8 +236,8 @@ struct OmFileSplitter {
                 guard let offsets = indexTime.intersect(fileTime: fileTime) else {
                     continue
                 }
-                let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable.omFileName.file, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-                try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+                let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .year, chunk: year, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+                try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                     try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: offsets)
                     start = fileTime.upperBound
                 }
@@ -253,8 +253,8 @@ struct OmFileSplitter {
             guard let offsets = subring.intersect(fileTime: fileTime) else {
                 continue
             }
-            let file = OmFileManagerReadable.domainChunk(domain: domain, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
-            try await RemoteOmFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
+            let file = OmFileType.domainChunk(domain: domain, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: time.ensembleMember, previousDay: time.previousDay)
+            try await RemoteFileManager.instance.with(file: file, client: httpClient, logger: logger) { (reader, _) in
                 try await reader.read3D(into: &out, ny: ny, nx: nx, nTime: nTime, nMembers: nMembers, location: location, level: level, timeOffsets: (offsets.file, offsets.array.add(delta)))
             }
         }
@@ -319,7 +319,7 @@ struct OmFileSplitter {
 
             return try await previousDaysRange.asyncMap { previousDay -> WriterPerStep in
                 let skip = previousDay * 86400 / time.dtSeconds
-                let readFile = OmFileManagerReadable.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
                 let tempFile = readFile.getFilePath() + "~"
                 // Another process might be updating this file right now. E.g. Second flush of GFS ensemble

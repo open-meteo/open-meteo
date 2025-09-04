@@ -54,14 +54,14 @@ extension GenericDomain {
         }
         switch type {
         case .soilType:
-            return try? await RemoteOmFileManager.instance.get(
-                file: OmFileManagerReadable.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
+            return try? await RemoteFileManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
         case .elevation:
-            return try? await RemoteOmFileManager.instance.get(
-                file: OmFileManagerReadable.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
+            return try? await RemoteFileManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
@@ -70,7 +70,7 @@ extension GenericDomain {
 
     /// Meta JSON for time-series data
     func getMetaJson(client: HTTPClient, logger: Logger) async throws -> ModelUpdateMetaJson? {
-        return try await RemoteOmFileManager.instance.get(
+        return try await RemoteFileManager.instance.get(
             file: ModelUpdateMetaJsonKey(domain: self.domainRegistry),
             client: client,
             logger: logger
@@ -78,11 +78,11 @@ extension GenericDomain {
     }
 
     /// Filename of the surface elevation file
-    var surfaceElevationFileOm: OmFileManagerReadable {
+    var surfaceElevationFileOm: OmFileType {
         .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "HSURF", chunk: nil)
     }
 
-    var soilTypeFileOm: OmFileManagerReadable {
+    var soilTypeFileOm: OmFileType {
         .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "soil_type", chunk: nil)
     }
 }

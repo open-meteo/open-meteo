@@ -1,70 +1,6 @@
 import OmFileFormat
 import Vapor
 
-/// Represents a "File" that could be read from local or remote
-protocol OmFileManageable: Sendable, Hashable {
-    associatedtype Value: Sendable
-    associatedtype Local: OmFileLocalManaged<Value>
-    associatedtype Remote: OmFileRemoteManaged<Value>
-    
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Remote
-    func makeLocalReader(file: MmapFile) async throws -> Local
-    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int
-    func getFilePath() -> String
-    func getRemoteUrl() -> String?
-}
-
-/// An intermediate **remote** file representation that can be cast to a final value
-protocol OmFileRemoteManaged<Value>: Sendable {
-    associatedtype Value
-    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> { get }
-    func cast() -> Value
-}
-
-/// An intermediate **local** file representation that can be cast to a final value
-protocol OmFileLocalManaged<Value>: Sendable {
-    associatedtype Value
-    var fn: MmapFile { get }
-    func cast() -> Value
-}
-
-/// A simplified interface to simply cast `Data` into a value
-protocol OmFileManageableSimple: OmFileManageable {
-    func readFrom(data: Data) throws -> Value
-}
-
-extension OmFileManageableSimple {
-    func makeLocalReader(file: MmapFile) async throws -> OmFileLocalManagedSimple<Value> {
-        let data = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: file.data.baseAddress!), count: file.count, deallocator: .none)
-        return OmFileLocalManagedSimple(fn: file, value: try readFrom(data: data))
-    }
-    
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteManagedSimple<Value> {
-        let value = try await file.withData(offset: 0, count: file.count) { buffer in
-            try readFrom(data: buffer.data)
-        }
-        return OmFileRemoteManagedSimple(fn: file, value: value)
-    }
-}
-
-struct OmFileRemoteManagedSimple<Value: Sendable>: OmFileRemoteManaged {
-    let fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>
-    let value: Value
-    
-    func cast() -> Value {
-        return value
-    }
-}
-
-struct OmFileLocalManagedSimple<Value: Sendable>: OmFileLocalManaged {
-    let fn: MmapFile
-    let value: Value
-    
-    func cast() -> Value {
-        return value
-    }
-}
-
 
 /**
  Keep track of local and remote OM files. If a OM file is locally available, use it, otherwise check a remote http endpoint.
@@ -84,14 +20,14 @@ struct OmFileLocalManagedSimple<Value: Sendable>: OmFileLocalManaged {
  - Support multiple cache files. Could be useful if multiple NVMe drive are available for caching
  - Support cache tiering for HDD + NVME cache
  */
-final class RemoteOmFileManager: Sendable {
-    public static let instance = RemoteOmFileManager()
+final class RemoteFileManager: Sendable {
+    public static let instance = RemoteFileManager()
     
     /// Isolate requests to files
-    private let cache = RemoteOmFileManagerCache()
+    private let cache = RemoteFileManagerCache()
     
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
-    func with<R, Key: OmFileManageable>(file: Key, client: HTTPClient, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
+    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
         guard let value = try await get(file: file, client: client, logger: logger, forceNew: false) else {
             return nil
         }
@@ -108,19 +44,19 @@ final class RemoteOmFileManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: OmFileManageable>(file: Key, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
+    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
         guard let backend = try await cache.get(key: file, client: client, logger: logger, forceNew: forceNew) else {
             return nil
         }
         switch backend {
         case .local(let value):
-            guard let value = value as? (any OmFileLocalManaged<Key.Value>) else {
-                fatalError("Not cast-able to OmFileLocalManaged")
+            guard let value = value as? (any LocalFileRepresentable<Key.Value>) else {
+                fatalError("Not cast-able to LocalFileRepresentable")
             }
             return value.cast()
         case .remote(let value):
-            guard let value = value as? (any OmFileRemoteManaged<Key.Value>) else {
-                fatalError("Not cast-able to OmFileRemoteManaged")
+            guard let value = value as? (any RemoteFileRepresentable<Key.Value>) else {
+                fatalError("Not cast-able to RemoteFileRepresentable")
             }
             return value.cast()
         }
@@ -132,9 +68,9 @@ final class RemoteOmFileManager: Sendable {
     }
 }
 
-fileprivate enum OmFileLocalOrRemote {
-    case local(any OmFileLocalManaged)
-    case remote(any OmFileRemoteManaged)
+fileprivate enum LocalOrRemote {
+    case local(any LocalFileRepresentable)
+    case remote(any RemoteFileRepresentable)
 }
 
 
@@ -142,10 +78,10 @@ fileprivate extension OmHttpReaderBackend {
     /// Create a new remote reader and store in meta cache if the file is available
     static func makeRemoteReaderAndCacheMeta(client: HTTPClient, logger: Logger, url: String) async throws -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile>? {
         guard let reader = try await OmHttpReaderBackend(client: client, logger: logger, url: url) else {
-            try OmHttpMetaCache.set(url: url, state: .missing(lastValidated: .now()))
+            try HttpMetaCache.set(url: url, state: .missing(lastValidated: .now()))
             return nil
         }
-        try OmHttpMetaCache.set(url: url, state: .available(lastValidated: .now(), contentLength: reader.count, lastModified: reader.lastModifiedTimestamp, eTag: reader.eTag))
+        try HttpMetaCache.set(url: url, state: .available(lastValidated: .now(), contentLength: reader.count, lastModified: reader.lastModifiedTimestamp, eTag: reader.eTag))
         return OmReaderBlockCache(backend: reader, cache: OpenMeteo.dataBlockCache, cacheKey: reader.cacheKey)
     }
 }
@@ -154,13 +90,10 @@ fileprivate extension OmHttpReaderBackend {
 /**
  KV cache, but a resource is resolved not in parallel
  */
-fileprivate final actor RemoteOmFileManagerCache {
-    typealias Key = AnyOmFileManageable
-    typealias Value = OmFileLocalOrRemote?
-    
-    /// Wrap `any OmFileManageable` into a hashable key
-    struct AnyOmFileManageable: Hashable {
-        let key: (any OmFileManageable)
+fileprivate final actor RemoteFileManagerCache {
+        /// Wrap `any RemoteFileManageable` into a hashable key
+    struct AnyRemoteFileManageable: Hashable {
+        let key: (any RemoteFileManageable)
         static func == (lhs: Self, rhs: Self) -> Bool {
             return lhs.key.hashValue == rhs.key.hashValue
         }
@@ -191,11 +124,11 @@ fileprivate final actor RemoteOmFileManagerCache {
     
     
     final class Entry {
-        var value: Value
+        var value: LocalOrRemote?
         var lastValidated: Timestamp
         var lastAccessed: Timestamp
         
-        init(value: Value, lastValidated: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
+        init(value: LocalOrRemote?, lastValidated: Timestamp = .now(), lastAccessed: Timestamp = .now()) {
             self.value = value
             self.lastValidated = lastValidated
             self.lastAccessed = lastAccessed
@@ -205,7 +138,7 @@ fileprivate final actor RemoteOmFileManagerCache {
     enum State {
         /// Value and last accessed timestamp
         case cached(Entry)
-        case running([CheckedContinuation<Value, any Error>])
+        case running([CheckedContinuation<LocalOrRemote?, any Error>])
         
         var isCached: Bool {
             switch self {
@@ -217,11 +150,11 @@ fileprivate final actor RemoteOmFileManagerCache {
         }
     }
     
-    var cache = [Key: State]()
+    var cache = [AnyRemoteFileManageable: State]()
     var statistics: Statistics = .init()
     
     /// On cache miss, create a new reader
-    nonisolated private func open<Key: OmFileManageable>(key: Key, client: HTTPClient, logger: Logger) async throws -> (value: OmFileLocalOrRemote?, lastValidated: Timestamp) {
+    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
         let localFile = key.getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
             let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
@@ -239,7 +172,7 @@ fileprivate final actor RemoteOmFileManagerCache {
         }
         let now = Timestamp.now()
                 
-        switch OmHttpMetaCache.get(url: remoteFile) {
+        switch HttpMetaCache.get(url: remoteFile) {
         case .missing(let lastValidated):
             let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
             if lastValidated >= now.subtract(seconds: revalidateSeconds) {
@@ -282,8 +215,8 @@ fileprivate final actor RemoteOmFileManagerCache {
     /**
      Get a resource identified by a key. If the request is currently being requested, enqueue the request
      */
-    func get<Key: OmFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> Value {
-        let key = AnyOmFileManageable(key: key)
+    func get<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> LocalOrRemote? {
+        let key = AnyRemoteFileManageable(key: key)
         guard let state = cache[key], !(forceNew == true && state.isCached) else {
             // Value not cached or needs to be refreshed
             cache[key] = .running([])
@@ -365,7 +298,7 @@ fileprivate final actor RemoteOmFileManagerCache {
                     let revalidateSeconds = key2.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
                     if old.fn.backend.lastValidated > entry.lastValidated {
                         /// Update meta cache to also reflect updates in `lastBackendFetchTimestamp`
-                        try OmHttpMetaCache.set(url: remoteFile, state: .available(lastValidated: old.fn.backend.lastValidated, contentLength: old.fn.backend.count, lastModified: old.fn.backend.lastModifiedTimestamp, eTag: old.fn.backend.eTag))
+                        try HttpMetaCache.set(url: remoteFile, state: .available(lastValidated: old.fn.backend.lastValidated, contentLength: old.fn.backend.count, lastModified: old.fn.backend.lastModifiedTimestamp, eTag: old.fn.backend.eTag))
                     }
                     let lastValidated = max(entry.lastValidated, old.fn.backend.lastValidated)
                     if lastValidated < now.subtract(seconds: revalidateSeconds) {
@@ -427,8 +360,8 @@ fileprivate final actor RemoteOmFileManagerCache {
     }
 }
 
-fileprivate extension OmFileManageable {
-    func makeRemoteCaptureNotOmFile(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> (any OmFileRemoteManaged<Value>)? {
+fileprivate extension RemoteFileManageable {
+    func makeRemoteCaptureNotOmFile(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> (any RemoteFileRepresentable<Value>)? {
         do {
             return try await self.makeRemoteReader(file: file)
         } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
