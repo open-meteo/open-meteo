@@ -85,7 +85,7 @@ struct ModelUpdateMetaJson: Codable {
             data_end_time: end.timeIntervalSince1970,
             update_interval_seconds: domain.updateIntervalSeconds
         )
-        let path = OmFileManagerReadable.meta(domain: domain.domainRegistry)
+        let path = ModelUpdateMetaJsonKey(domain: domain.domainRegistry)
         try path.createDirectory()
         let pathString = path.getFilePath()
         try meta.writeTo(path: pathString)
@@ -104,29 +104,16 @@ struct ModelUpdateMetaJson: Codable {
     }
 }
 
-struct ModelUpdateMetaJsonKey: OmFileManageable {
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, OmFileFormat.MmapFile>) async throws -> any OmFileRemoteManaged<ModelUpdateMetaJson> {
-        /// Fetch data directly from backend, not cached
-        guard let json = try await file.backend.getData(offset: 0, count: file.backend.count).readJSONDecodable(ModelUpdateMetaJson.self) else {
-            throw ForecastApiError.generic(message: "could not cast file to ModelUpdateMetaJson")
-        }
-        return OmFileRemoteManagedGeneric(fn: file, value: json)
-        
-    }
+struct ModelUpdateMetaJsonKey: OmFileManageableSimple {
+    typealias Value = ModelUpdateMetaJson
+    let domain: DomainRegistry
     
-    func makeLocalReader(file: FileHandle) async throws -> any OmFileLocalManaged<ModelUpdateMetaJson> {
-        guard let data = try file.readToEnd() else {
-            throw ForecastApiError.generic(message: "could not read file")
-        }
+    func readFrom(data: Data) throws -> ModelUpdateMetaJson {
         guard let json = try? JSONDecoder().decode(ModelUpdateMetaJson.self, from: data) else {
             throw ForecastApiError.generic(message: "could not cast file to ModelUpdateMetaJson")
         }
-        return OmFileLocalManagedGeneric(fn: file, value: json)
+        return json
     }
-    
-    typealias Value = ModelUpdateMetaJson
-    
-    let domain: DomainRegistry
     
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
         return 30
@@ -143,40 +130,3 @@ struct ModelUpdateMetaJsonKey: OmFileManageable {
         return "\(remoteDirectory)\(domain.rawValue)/static/meta.json"
     }
 }
-
-
-/// Intermediate structure to keep meta files open
-/*struct ModelUpdateMetaJsonAndFileHandle: GenericFileManagable {
-    let fn: FileHandle
-    let meta: ModelUpdateMetaJson
-
-    func wasDeleted() -> Bool {
-        fn.wasDeleted()
-    }
-
-    static func open(from: OmFileManagerReadable) throws -> ModelUpdateMetaJsonAndFileHandle? {
-        guard let fn = try? FileHandle.openFileReading(file: from.getFilePath()) else {
-            return nil
-        }
-        guard let data = try fn.readToEnd() else {
-            return nil
-        }
-        guard let json = try? JSONDecoder().decode(ModelUpdateMetaJson.self, from: data) else {
-            return nil
-        }
-        return .init(fn: fn, meta: json)
-    }
-}*/
-
-/// Cache access to metadata JSONs
-/*struct MetaFileManager {
-    public static let instance = GenericFileManager<ModelUpdateMetaJsonAndFileHandle>()
-
-    private init() {}
-
-    /// Get cached file or return nil, if the files does not exist
-    public static func get(_ file: OmFileManagerReadable) throws -> ModelUpdateMetaJson? {
-        try instance.get(file)?.meta
-    }
-}
-*/

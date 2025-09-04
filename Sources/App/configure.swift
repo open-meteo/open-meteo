@@ -227,11 +227,6 @@ public func configure(_ app: Application) throws {
         delay: .seconds(10),
         ApiKeyManager.update
     )
-    /*app.lifecycle.repeatedTask(
-        initialDelay: .seconds(0),
-        delay: .seconds(2),
-        MetaFileManager.instance.backgroundTask
-    )*/
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),

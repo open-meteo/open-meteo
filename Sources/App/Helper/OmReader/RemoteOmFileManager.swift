@@ -3,10 +3,12 @@ import Vapor
 
 /// Represents a "File" that could be read from local or remote
 protocol OmFileManageable: Sendable, Hashable {
-    associatedtype Value
+    associatedtype Value: Sendable
+    associatedtype Local: OmFileLocalManaged<Value>
+    associatedtype Remote: OmFileRemoteManaged<Value>
     
-    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> any OmFileRemoteManaged<Value>
-    func makeLocalReader(file: FileHandle) async throws -> any OmFileLocalManaged<Value>
+    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> Remote
+    func makeLocalReader(file: MmapFile) async throws -> Local
     func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int
     func getFilePath() -> String
     func getRemoteUrl() -> String?
@@ -22,24 +24,43 @@ protocol OmFileRemoteManaged<Value>: Sendable {
 /// An intermediate **local** file representation that can be cast to a final value
 protocol OmFileLocalManaged<Value>: Sendable {
     associatedtype Value
-    var fn: FileHandle { get }
+    var fn: MmapFile { get }
     func cast() -> Value
 }
 
-struct OmFileRemoteManagedGeneric<T: Sendable>: OmFileRemoteManaged {
-    let fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>
-    let value: T
+/// A simplified interface to simply cast `Data` into a value
+protocol OmFileManageableSimple: OmFileManageable {
+    func readFrom(data: Data) throws -> Value
+}
+
+extension OmFileManageableSimple {
+    func makeLocalReader(file: MmapFile) async throws -> OmFileLocalManagedSimple<Value> {
+        let data = Data(bytesNoCopy: UnsafeMutableRawPointer(mutating: file.data.baseAddress!), count: file.count, deallocator: .none)
+        return OmFileLocalManagedSimple(fn: file, value: try readFrom(data: data))
+    }
     
-    func cast() -> T {
+    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteManagedSimple<Value> {
+        let value = try await file.withData(offset: 0, count: file.count) { buffer in
+            try readFrom(data: buffer.data)
+        }
+        return OmFileRemoteManagedSimple(fn: file, value: value)
+    }
+}
+
+struct OmFileRemoteManagedSimple<Value: Sendable>: OmFileRemoteManaged {
+    let fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>
+    let value: Value
+    
+    func cast() -> Value {
         return value
     }
 }
 
-struct OmFileLocalManagedGeneric<T: Sendable>: OmFileLocalManaged {
-    let fn: FileHandle
-    let value: T
+struct OmFileLocalManagedSimple<Value: Sendable>: OmFileLocalManaged {
+    let fn: MmapFile
+    let value: Value
     
-    func cast() -> T {
+    func cast() -> Value {
         return value
     }
 }
@@ -203,7 +224,7 @@ fileprivate final actor RemoteOmFileManagerCache {
     nonisolated private func open<Key: OmFileManageable>(key: Key, client: HTTPClient, logger: Logger) async throws -> (value: OmFileLocalOrRemote?, lastValidated: Timestamp) {
         let localFile = key.getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
-            let file = try FileHandle.openFileReading(file: localFile)
+            let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
             do {
                 let reader = try await key.makeLocalReader(file: file)
                 return (.local(reader), .now())
@@ -325,7 +346,7 @@ fileprivate final actor RemoteOmFileManagerCache {
             }
             
             // Always check if local files got deleted or overwritten
-            if case .local(let local) = entry.value, local.fn.wasDeleted() {
+            if case .local(let local) = entry.value, local.fn.file.wasDeleted() {
                 statistics.localModified += 1
                 cache.removeValue(forKey: key)
                 continue
