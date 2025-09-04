@@ -48,7 +48,7 @@ final class RemoteOmFileManager: Sendable {
     public static let instance = RemoteOmFileManager()
     
     /// Isolate requests to files
-    let cache = RemoteOmFileManagerCache()
+    private let cache = RemoteOmFileManagerCache()
     
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
     func with<R, Key: OmFileManageable>(file: Key, client: HTTPClient, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
@@ -92,7 +92,7 @@ final class RemoteOmFileManager: Sendable {
     }
 }
 
-enum OmFileLocalOrRemote {
+fileprivate enum OmFileLocalOrRemote {
     case local(any OmFileLocalManaged)
     case remote(any OmFileRemoteManaged)
     
@@ -113,7 +113,7 @@ enum OmFileLocalOrRemote {
 }
 
 
-extension OmHttpReaderBackend {
+fileprivate extension OmHttpReaderBackend {
     /// Create a new remote reader and store in meta cache if the file is available
     static func makeRemoteReaderAndCacheMeta(client: HTTPClient, logger: Logger, url: String) async throws -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile>? {
         guard let reader = try await OmHttpReaderBackend(client: client, logger: logger, url: url) else {
@@ -121,7 +121,7 @@ extension OmHttpReaderBackend {
             return nil
         }
         try OmHttpMetaCache.set(url: url, state: .available(lastValidated: .now(), contentLength: reader.count, lastModified: reader.lastModifiedTimestamp, eTag: reader.eTag))
-        return reader.asBlockCached()
+        return OmReaderBlockCache(backend: reader, cache: OpenMeteo.dataBlockCache, cacheKey: reader.cacheKey)
     }
 }
 
@@ -134,7 +134,7 @@ extension OmFileReaderProtocol {
 /**
  KV cache, but a resource is resolved not in parallel
  */
-final actor RemoteOmFileManagerCache {
+fileprivate final actor RemoteOmFileManagerCache {
     typealias Key = AnyOmFileManageable
     typealias Value = OmFileLocalOrRemote?
     
@@ -234,7 +234,8 @@ final actor RemoteOmFileManagerCache {
             return (.remote(reader), lastValidated)
             
         case .available(let lastValidated, let count, let lastModified, let eTag):
-            let cached = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated).asBlockCached()
+            let reader = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated)
+            let cached = OmReaderBlockCache(backend: reader, cache: OpenMeteo.dataBlockCache, cacheKey: reader.cacheKey)
             let revalidateSeconds = key.revalidateEverySeconds(modificationTime: lastModified, now: now)
             if lastValidated >= now.subtract(seconds: revalidateSeconds) {
                 /// Reuse cached meta attributes
@@ -408,12 +409,6 @@ final actor RemoteOmFileManagerCache {
             }
             statistics.reset()
         }
-    }
-}
-
-extension OmHttpReaderBackend {
-    func asBlockCached() -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
-        return OmReaderBlockCache(backend: self, cache: OpenMeteo.dataBlockCache, cacheKey: self.cacheKey)
     }
 }
 
