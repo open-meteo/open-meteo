@@ -58,16 +58,30 @@ final class RemoteOmFileManager: Sendable {
     }
 }
 
+protocol OmFileRemoteManaged: Sendable {
+    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> { get }
+}
+
+protocol OmFileLocalManaged: Sendable {
+    var fn: FileHandle { get }
+}
+
 enum OmFileLocalOrRemote {
-    case local(OmFileReaderArray<MmapFile, Float>, timestamps: [Timestamp]?)
-    case remote(OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>, timestamps: [Timestamp]?)
+    case local(any OmFileLocalManaged)
+    case remote(any OmFileRemoteManaged)
     
     func toReader() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
         switch self {
-        case .local(let local, let timestamps):
-            return (local, timestamps)
-        case .remote(let remote, let timestamps):
-            return (remote, timestamps)
+        case .local(let file):
+            guard let reader = file as? OmFileLocalOmReader else {
+                fatalError("Not cast-able to OmFileLocalOmReader")
+            }
+            return (reader.reader, reader.timestamps)
+        case .remote(let file):
+            guard let reader = file as? OmFileRemoteOmReader else {
+                fatalError("Not cast-able to OmFileRemoteOmReader")
+            }
+            return (reader.reader, reader.timestamps)
         }
     }
 }
@@ -77,39 +91,15 @@ extension OmFileManagerReadable {
         let localFile = getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
             do {
-                let reader = try await OmFileReader(fn: try MmapFile(fn: try FileHandle.openFileReading(file: localFile), mode: .readOnly))
-                guard let arrayReader = reader.asArray(of: Float.self) else {
-                    return (nil, .now())
-                }
-                if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
-                    return (.local(arrayReader, timestamps: times), .now())
-                }
-                return (.local(arrayReader, timestamps: nil), .now())
-            } catch OmFileFormatSwiftError.notAnOpenMeteoFile {
-                print("[ ERROR ] Not an OpenMeteo file \(localFile)")
+                let file = try FileHandle.openFileReading(file: localFile)
+                let reader = try await self.makeLocalReader(file: file)
+                return (.local(reader), .now())
+            } catch {
+                logger.error("Cannot open file \(localFile), Error \(error)")
                 return (nil, .now())
             }
         }
-        let (reader, lastValidated) = try await self.makeOrCachedRemoteReader(client: client, logger: logger)
-        return (try await reader?.asRemoteReader(), lastValidated)
-    }
-}
-
-extension OmHttpReaderBackend {
-    /// Create a new remote reader and store in meta cache if the file is available
-    static func makeRemoteReaderAndCacheMeta(client: HTTPClient, logger: Logger, url: String) async throws -> OmHttpReaderBackend? {
-        guard let reader = try await OmHttpReaderBackend(client: client, logger: logger, url: url) else {
-            try OmHttpMetaCache.set(url: url, state: .missing(lastValidated: .now()))
-            return nil
-        }
-        try OmHttpMetaCache.set(url: url, state: .available(lastValidated: .now(), contentLength: reader.count, lastModified: reader.lastModifiedTimestamp, eTag: reader.eTag))
-        return reader
-    }
-}
-
-extension OmFileManagerReadable {
-    /// Create a new remote reader, getting meta attributes from cache
-    func makeOrCachedRemoteReader(client: HTTPClient, logger: Logger) async throws -> (OmHttpReaderBackend?, Timestamp) {
+        
         guard let remoteFile = self.getRemoteUrl() else {
             return (nil, .now())
         }
@@ -118,31 +108,51 @@ extension OmFileManagerReadable {
         switch OmHttpMetaCache.get(url: remoteFile) {
         case .missing(let lastValidated):
             let revalidateSeconds = self.revalidateEverySeconds(modificationTime: nil, now: now)
-            if lastValidated < now.subtract(seconds: revalidateSeconds) {
-                // need to revalidate
-                return (try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), .now())
+            if lastValidated >= now.subtract(seconds: revalidateSeconds) {
+                // safe to assume the file is still missing
+                return (nil, lastValidated)
             }
-            // safe to assume the file is still missing
-            return (nil, lastValidated)
+            // need to revalidate
+            guard let reader = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) else {
+                // file is still missing
+                return (nil, .now())
+            }
+            return try await (OmFileLocalOrRemote.remote(self.makeRemoteReader(file: reader)), lastValidated)
             
         case .available(let lastValidated, let count, let lastModified, let eTag):
-            let cached = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated)
+            let cached = OmHttpReaderBackend(client: client, logger: logger, url: remoteFile, count: count, lastModified: lastModified, eTag: eTag, lastValidated: lastValidated).asBlockCached()
             let revalidateSeconds = self.revalidateEverySeconds(modificationTime: lastModified, now: now)
-            if lastValidated < now.subtract(seconds: revalidateSeconds) {
-                // need to revalidate
-                let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile)
-                if new?.cacheKey != cached.cacheKey {
-                    let deletedBlocks = cached.asBlockCached().deleteCachedBlocks(olderThanSeconds: 60)
-                    logger.warning("OmFileManager: Opened stale file. New file version available. \(deletedBlocks) previously cached blocks have been deleted")
-                }
-                return (new, .now())
+            if lastValidated >= now.subtract(seconds: revalidateSeconds) {
+                /// Reuse cached meta attributes
+                return try await (.remote(self.makeRemoteReader(file: cached)), lastValidated)
             }
-            /// Reuse cached meta attributes
-            return (cached, lastValidated)
-            
+            // need to revalidate
+            guard let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) else {
+                return (nil, .now())
+            }
+            if new.cacheKey != cached.cacheKey {
+                let deletedBlocks = cached.deleteCachedBlocks(olderThanSeconds: 60)
+                logger.warning("OmFileManager: Opened stale file. New file version available. \(deletedBlocks) previously cached blocks have been deleted")
+            }
+            return try await (.remote(self.makeRemoteReader(file: new)), .now())
         case .none:
-            return (try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile), .now())
+            guard let file = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) else {
+                return (nil, .now())
+            }
+            return try await (.remote(self.makeRemoteReader(file: file)), .now())
         }
+    }
+}
+
+extension OmHttpReaderBackend {
+    /// Create a new remote reader and store in meta cache if the file is available
+    static func makeRemoteReaderAndCacheMeta(client: HTTPClient, logger: Logger, url: String) async throws -> OmReaderBlockCache<OmHttpReaderBackend, MmapFile>? {
+        guard let reader = try await OmHttpReaderBackend(client: client, logger: logger, url: url) else {
+            try OmHttpMetaCache.set(url: url, state: .missing(lastValidated: .now()))
+            return nil
+        }
+        try OmHttpMetaCache.set(url: url, state: .available(lastValidated: .now(), contentLength: reader.count, lastModified: reader.lastModifiedTimestamp, eTag: reader.eTag))
+        return reader.asBlockCached()
     }
 }
 
@@ -274,7 +284,7 @@ final actor RemoteOmFileManagerCache {
             }
             
             // Always check if local files got deleted or overwritten
-            if case .local(let local, _) = entry.value, local.fn.file.wasDeleted() {
+            if case .local(let local) = entry.value, local.fn.wasDeleted() {
                 statistics.localModified += 1
                 cache.removeValue(forKey: key)
                 continue
@@ -289,7 +299,7 @@ final actor RemoteOmFileManagerCache {
             
             if let remoteFile = key.getRemoteUrl() {
                 // Remote file is open
-                if case .remote(let old, _) = entry.value {
+                if case .remote(let old) = entry.value {
                     let revalidateSeconds = key.revalidateEverySeconds(modificationTime: old.fn.backend.lastModifiedTimestamp, now: now)
                     if old.fn.backend.lastValidated > entry.lastValidated {
                         /// Update meta cache to also reflect updates in `lastBackendFetchTimestamp`
@@ -304,15 +314,14 @@ final actor RemoteOmFileManagerCache {
                                 continue // do not update if the existing entry is the same
                             }
                             statistics.remoteModified += 1
-                            let blockCached = new.asBlockCached()
                             let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
                             logger.warning("OmFileManager: Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
                             if activeBlocks.count > 0 {
                                 let startPreload = DispatchTime.now()
-                                try await blockCached.preloadBlocks(blocks: activeBlocks)
+                                try await new.preloadBlocks(blocks: activeBlocks)
                                 logger.warning("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
                             }
-                            guard let reader = try await blockCached.asCachedReader()?.asRemoteReader() else {
+                            guard let reader = try await new.asCachedReader()?.asRemoteReader() else {
                                 entry.value = nil
                                 continue
                             }
@@ -331,7 +340,8 @@ final actor RemoteOmFileManagerCache {
                             logger.warning("OmFileManager: \(deletedBlocks) blocks have been deleted")
                         }
                     }
-                } else {
+                }
+                if entry.value == nil {
                     // Check if a remote file is now available on the remote server
                     let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
                     if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
@@ -339,11 +349,7 @@ final actor RemoteOmFileManagerCache {
                         statistics.remoteCheckedExist += 1
                         if let new = try await OmHttpReaderBackend.makeRemoteReaderAndCacheMeta(client: client, logger: logger, url: remoteFile) {
                             statistics.remoteModified += 1
-                            guard let reader = try await new.asRemoteReader() else {
-                                entry.value = nil
-                                continue
-                            }
-                            entry.value = reader
+                            entry.value = try await .remote(key.makeRemoteReader(file: new))
                         }
                     }
                 }
@@ -385,9 +391,9 @@ extension OmFileReader<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>> {
             return nil
         }
         if let times = try await self.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
-            return .remote(arrayReader, timestamps: times)
+            return .remote(OmFileRemoteOmReader(reader: arrayReader, timestamps: times))
         }
-        return .remote(arrayReader, timestamps: nil)
+        return .remote(OmFileRemoteOmReader(reader: arrayReader, timestamps: nil))
     }
 }
 

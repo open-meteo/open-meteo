@@ -18,6 +18,21 @@ enum OmFileManagerReadable: Hashable {
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
+    
+    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> any OmFileRemoteManaged {
+        fatalError()
+    }
+    
+    func makeLocalReader(file: FileHandle) async throws -> OmFileLocalManaged {
+        let reader = try await OmFileReader(fn: try MmapFile(fn: file, mode: .readOnly))
+        guard let arrayReader = reader.asArray(of: Float.self) else {
+            throw ForecastApiError.generic(message: "Om file does not contain float array")
+        }
+        if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+            return OmFileLocalOmReader(reader: arrayReader, timestamps: times)
+        }
+        return OmFileLocalOmReader(reader: arrayReader, timestamps: nil)
+    }
 
     /// Assemble the full file system path
     func getFilePath() -> String {
@@ -134,6 +149,24 @@ enum OmFileManagerReadable: Hashable {
     func exists() -> Bool {
         let file = getFilePath()
         return FileManager.default.fileExists(atPath: file)
+    }
+}
+
+struct OmFileRemoteOmReader: OmFileRemoteManaged {
+    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        reader.fn
+    }
+    
+    let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
+    let timestamps: [Timestamp]?
+}
+
+struct OmFileLocalOmReader: OmFileLocalManaged {
+    let reader: OmFileReaderArray<MmapFile, Float>
+    let timestamps: [Timestamp]?
+    
+    var fn: FileHandle {
+        reader.fn.file
     }
 }
 
