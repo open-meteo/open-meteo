@@ -1,7 +1,7 @@
 import Foundation
 import OmFileFormat
 
-enum ModelTimeVariable: String, GenericVariable {
+/*enum ModelTimeVariable: String, GenericVariable {
     case initialisation_time
     case modification_time
 
@@ -32,7 +32,7 @@ enum ModelTimeVariable: String, GenericVariable {
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
-}
+}*/
 
 /**
  TODO:
@@ -104,8 +104,49 @@ struct ModelUpdateMetaJson: Codable {
     }
 }
 
+struct ModelUpdateMetaJsonKey: OmFileManageable {
+    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, OmFileFormat.MmapFile>) async throws -> any OmFileRemoteManaged<ModelUpdateMetaJson> {
+        /// Fetch data directly from backend, not cached
+        guard let json = try await file.backend.getData(offset: 0, count: file.backend.count).readJSONDecodable(ModelUpdateMetaJson.self) else {
+            throw ForecastApiError.generic(message: "could not cast file to ModelUpdateMetaJson")
+        }
+        return OmFileRemoteManagedGeneric(fn: file, value: json)
+        
+    }
+    
+    func makeLocalReader(file: FileHandle) async throws -> any OmFileLocalManaged<ModelUpdateMetaJson> {
+        guard let data = try file.readToEnd() else {
+            throw ForecastApiError.generic(message: "could not read file")
+        }
+        guard let json = try? JSONDecoder().decode(ModelUpdateMetaJson.self, from: data) else {
+            throw ForecastApiError.generic(message: "could not cast file to ModelUpdateMetaJson")
+        }
+        return OmFileLocalManagedGeneric(fn: file, value: json)
+    }
+    
+    typealias Value = ModelUpdateMetaJson
+    
+    let domain: DomainRegistry
+    
+    func revalidateEverySeconds(modificationTime: Timestamp?, now: Timestamp) -> Int {
+        return 30
+    }
+    
+    func getFilePath() -> String {
+        return "\(OpenMeteo.dataDirectory)\(domain.rawValue)/static/meta.json"
+    }
+    
+    func getRemoteUrl() -> String? {
+        guard let remoteDirectory = OpenMeteo.remoteDataDirectory?.replacing("MODEL", with: domain.bucketName) else {
+            return nil
+        }
+        return "\(remoteDirectory)\(domain.rawValue)/static/meta.json"
+    }
+}
+
+
 /// Intermediate structure to keep meta files open
-struct ModelUpdateMetaJsonAndFileHandle: GenericFileManagable {
+/*struct ModelUpdateMetaJsonAndFileHandle: GenericFileManagable {
     let fn: FileHandle
     let meta: ModelUpdateMetaJson
 
@@ -125,10 +166,10 @@ struct ModelUpdateMetaJsonAndFileHandle: GenericFileManagable {
         }
         return .init(fn: fn, meta: json)
     }
-}
+}*/
 
 /// Cache access to metadata JSONs
-struct MetaFileManager {
+/*struct MetaFileManager {
     public static let instance = GenericFileManager<ModelUpdateMetaJsonAndFileHandle>()
 
     private init() {}
@@ -138,3 +179,4 @@ struct MetaFileManager {
         try instance.get(file)?.meta
     }
 }
+*/

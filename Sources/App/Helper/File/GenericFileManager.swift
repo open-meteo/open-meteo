@@ -6,7 +6,7 @@ protocol GenericFileManagable: Sendable {
     func wasDeleted() -> Bool
     static func open(from: OmFileManagerReadable) throws -> Self?
 }
-
+/*
 /// Cache file handles, background close checks
 /// If a file path is missing, this information is cached and checked in the background
 /// This could be later extended to use file system events
@@ -107,3 +107,4 @@ struct GenericFileManager<File: GenericFileManagable>: Sendable {
         }
     }
 }
+*/

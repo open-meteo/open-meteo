@@ -68,8 +68,13 @@ extension GenericDomain {
         }
     }
 
-    func getMetaJson() throws -> ModelUpdateMetaJson? {
-        return try MetaFileManager.get(OmFileManagerReadable.meta(domain: domainRegistry))
+    /// Meta JSON for time-series data
+    func getMetaJson(client: HTTPClient, logger: Logger) async throws -> ModelUpdateMetaJson? {
+        return try await RemoteOmFileManager.instance.get(
+            file: ModelUpdateMetaJsonKey(domain: self.domainRegistry),
+            client: client,
+            logger: logger
+        )
     }
 
     /// Filename of the surface elevation file

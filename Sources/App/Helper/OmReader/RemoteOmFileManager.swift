@@ -26,6 +26,25 @@ protocol OmFileLocalManaged<Value>: Sendable {
     func cast() -> Value
 }
 
+struct OmFileRemoteManagedGeneric<T: Sendable>: OmFileRemoteManaged {
+    let fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>
+    let value: T
+    
+    func cast() -> T {
+        return value
+    }
+}
+
+struct OmFileLocalManagedGeneric<T: Sendable>: OmFileLocalManaged {
+    let fn: FileHandle
+    let value: T
+    
+    func cast() -> T {
+        return value
+    }
+}
+
+
 /**
  Keep track of local and remote OM files. If a OM file is locally available, use it, otherwise check a remote http endpoint.
  
