@@ -175,15 +175,13 @@ struct S3DataController: RouteCollection {
             try request.applyS3Credentials()
             let response = try await req.application.dedicatedHttpClient.executeRetry(request, logger: req.logger)
             let r = Response(status: response.status, body: .init(asyncStream: { writer in
-                Task {
-                    do {
-                        for try await buffer in response.body {
-                            try await writer.write(.buffer(buffer))
-                        }
-                        try await writer.write(.end)
-                    } catch {
-                        try? await writer.write(.error(error))
+                do {
+                    for try await buffer in response.body {
+                        try await writer.write(.buffer(buffer))
                     }
+                    try await writer.write(.end)
+                } catch {
+                    try? await writer.write(.error(error))
                 }
             }))
             r.headers.contentType = response.headers.contentType

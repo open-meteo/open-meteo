@@ -291,6 +291,12 @@ public struct Timestamp: Hashable, Sendable {
     }
 }
 
+extension Date {
+    func toTimestamp() -> Timestamp {
+        return Timestamp(Int(self.timeIntervalSince1970))
+    }
+}
+
 extension Timestamp: Comparable {
     public static func < (lhs: Timestamp, rhs: Timestamp) -> Bool {
         lhs.timeIntervalSince1970 < rhs.timeIntervalSince1970
