@@ -205,22 +205,22 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             return []
         }
         if let past_days, past_days != 0 {
-            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.parameterNotAllowedWithStartEndRange(parameter: "past_days")
         }
         if let forecast_days, forecast_days != 0 {
-            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.parameterNotAllowedWithStartEndRange(parameter: "forecast_days")
         }
         if let past_hours, past_hours != 0 {
-            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.parameterNotAllowedWithStartEndRange(parameter: "past_hours")
         }
         if let forecast_hours, forecast_hours != 0 {
-            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.parameterNotAllowedWithStartEndRange(parameter: "forecast_hours")
         }
         if let past_minutely_15, past_minutely_15 != 0 {
-            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.parameterNotAllowedWithStartEndRange(parameter: "past_minutely_15")
         }
         if let forecast_minutely_15, forecast_minutely_15 != 0 {
-            throw ForecastApiError.pastDaysParameterNotAllowedWithStartEndRange
+            throw ForecastApiError.parameterNotAllowedWithStartEndRange(parameter: "forecast_minutely_15")
         }
         let count = max(max(dates.count, hourRange.count), minutely15Range.count)
         return (0..<count).map {
@@ -515,8 +515,7 @@ enum ForecastApiError: Error {
     case invalidTimezone
     case timezoneNotSupported
     case noDataAvailableForThisLocation
-    case pastDaysParameterNotAllowedWithStartEndRange
-    case forecastDaysParameterNotAllowedWithStartEndRange
+    case parameterNotAllowedWithStartEndRange(parameter: String)
     case latitudeAndLongitudeSameCount
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
@@ -550,14 +549,12 @@ extension ForecastApiError: AbortError {
             return "Invalid timezone"
         case .endDateMustBeLargerEqualsThanStartDate:
             return "End-date must be larger or equals than start-date"
-        case .dateOutOfRange(let paramater, let allowed):
-            return "Parameter '\(paramater)' is out of allowed range from \(allowed.lowerBound.iso8601_YYYY_MM_dd) to \(allowed.upperBound.add(-86400).iso8601_YYYY_MM_dd)"
+        case .dateOutOfRange(let parameter, let allowed):
+            return "Parameter '\(parameter)' is out of allowed range from \(allowed.lowerBound.iso8601_YYYY_MM_dd) to \(allowed.upperBound.add(-86400).iso8601_YYYY_MM_dd)"
         case .startAndEndDateMustBeSpecified:
             return "Both 'start_date' and 'end_date' must be set in the url"
-        case .pastDaysParameterNotAllowedWithStartEndRange:
-            return "Parameter 'past_days' is mutually exclusive with 'start_date' and 'end_date'"
-        case .forecastDaysParameterNotAllowedWithStartEndRange:
-            return "Parameter 'forecast_days' is mutually exclusive with 'start_date' and 'end_date'"
+        case .parameterNotAllowedWithStartEndRange(let parameter):
+            return "Parameter '\(parameter)' is mutually exclusive with 'start_date' and 'end_date'"
         case .timezoneNotSupported:
             return "This API does not yet support timezones"
         case .latitudeAndLongitudeSameCount:
