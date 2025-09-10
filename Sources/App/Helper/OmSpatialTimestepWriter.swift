@@ -14,9 +14,7 @@ import Foundation
  data_spatial/<domain>/<run>/<timestamp>_model-levels.om (only late icon runs)
  */
 
-extension OmFileWriterArrayFinalised: @retroactive @unchecked Sendable {
-    
-}
+
 
 /// Write multiple spatial oriented variables into one file per time-step
 actor OmSpatialTimestepWriter {
@@ -33,7 +31,7 @@ actor OmSpatialTimestepWriter {
     struct VariableWithOffset {
         let variable: GenericVariable
         let member: Int
-        let finalised: OmFileWriterArrayFinalised
+        let writer: OmFileWriterArray<Float, FileHandle>
         
         var omFileNameWithMember: String {
             return member > 0 ? "\(variable.omFileName.file)_member\(member.zeroPadded(len: 2))" : variable.omFileName.file
@@ -50,6 +48,12 @@ actor OmSpatialTimestepWriter {
         self.realm = realm
         self.storeOnDisk = storeOnDisk
         self.fn = nil
+    }
+    
+    
+    /// Check if a given variable and member is present
+    func contains<V: GenericVariable & Equatable>(variable: V, member: Int) -> Bool {
+        return self.variables.contains { $0.variable as? V == variable && $0.member == member }
     }
     
     /// Get existing writer or init new instance
@@ -104,7 +108,7 @@ actor OmSpatialTimestepWriter {
             add_offset: 0
         )
         try arrayWriter.writeData(array: data)
-        self.variables.append(VariableWithOffset(variable: variable, member: member, finalised: try arrayWriter.finalise()))
+        self.variables.append(VariableWithOffset(variable: variable, member: member, writer: arrayWriter))
     }
     
     /// Finalise the time step, update meta JSON and return all handles
@@ -125,7 +129,7 @@ actor OmSpatialTimestepWriter {
         //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
         let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
         let variablesOffset = try self.variables.map {
-            return try writer.write(array: $0.finalised, name: $0.omFileNameWithMember, children: [])
+            return try writer.write(array: $0.writer.finalise(), name: $0.omFileNameWithMember, children: [])
         }
         let root = try writer.writeNone(name: "", children: variablesOffset + [runTime, validTime, /*coordinates,*/ createdAt])
         try writer.writeTrailer(rootVariable: root)
@@ -137,7 +141,8 @@ actor OmSpatialTimestepWriter {
         let reader = try await OmFileReader(fn: try MmapFile(fn: fn))
         let time = self.time
         let dtSeconds = domain.dtSeconds
-        let handles = try await self.variables.enumerated().asyncMap { (i, variable) in
+        let variablesAndMember: [(variable: GenericVariable, member: Int)] = variables.map { ($0.variable, $0.member) }
+        let handles = try await variablesAndMember.enumerated().asyncMap { (i, variable) in
             guard let arrayReader = try await reader.getChild(UInt32(i))?.asArray(of: Float.self) else {
                 fatalError("Could not read variable \(variable.variable.omFileName.file) as Float array")
             }

@@ -396,7 +396,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 }
 
                 // Relative humidity missing in AIFS
-                if await !writer.variables.contains(where: {$0.variable as? EcmwfVariable == EcmwfVariable.relative_humidity_1000hPa && $0.member == member }) {
+                if await !writer.contains(variable: EcmwfVariable.relative_humidity_1000hPa, member: member) {
                     logger.info("Calculating relative humidity")
                     try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
                     try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
@@ -412,7 +412,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
                 }
 
-                if await !writer.variables.contains(where: {$0.variable as? EcmwfVariable == EcmwfVariable.cloud_cover && $0.member == member }) {
+                if await !writer.contains(variable: EcmwfVariable.cloud_cover, member: member) {
                     logger.info("Calculating cloud cover")
                     guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
                           let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
