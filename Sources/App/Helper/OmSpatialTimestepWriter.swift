@@ -128,8 +128,13 @@ actor OmSpatialTimestepWriter {
         let validTime =  try writer.write(value: time.timeIntervalSince1970, name: "valid_time", children: [])
         //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
         let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
-        let variablesOffset = try self.variables.map {
-            return try writer.write(array: $0.writer.finalise(), name: $0.omFileNameWithMember, children: [])
+        // Write LUTs of all variables
+        let writerFinalised = try self.variables.map {
+            try $0.writer.finalise()
+        }
+        // Write variable meta data
+        let variablesOffset = try zip(variables, writerFinalised).map {
+            return try writer.write(array: $0.1, name: $0.0.omFileNameWithMember, children: [])
         }
         let root = try writer.writeNone(name: "", children: variablesOffset + [runTime, validTime, /*coordinates,*/ createdAt])
         try writer.writeTrailer(rootVariable: root)
