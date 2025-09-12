@@ -239,11 +239,11 @@ final class Curl: Sendable {
                 i += 1
                 // 120 seconds timeout for each 16MB chunk
                 let deadLineChunk = chunkTimeOut.deadLine(attempt: i)
-                // Start the download and wait for the header
-                let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadLineChunk, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
-
                 // Retry failed file transfers after this point
                 do {
+                    // Start the download and wait for the header
+                    let response = try await self.initiateDownload(url: url, range: range, minSize: minSize, deadline: deadLineChunk, nConcurrent: 1, quiet: true, waitAfterLastModifiedBeforeDownload: nil)
+                
                     var buffer = ByteBuffer()
                     let contentLength = try response.contentLength()
                     // let tracker = TransferAmountTracker(logger: self.logger, totalSize: contentLength)
