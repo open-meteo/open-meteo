@@ -55,14 +55,14 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
         case .seas5_24hourly:
             return 24*3600
         case .seas5_monthly_upper_level:
-            return 31*24*3600
+            return .dtSecondsMonthly
         case .seas5_monthly:
-            return 31*24*3600
+            return .dtSecondsMonthly
         }
     }
     
     var updateIntervalSeconds: Int {
-        return 31*24*3600
+        return .dtSecondsMonthly
     }
     
     var hasYearlyFiles: Bool {

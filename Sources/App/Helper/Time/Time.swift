@@ -367,6 +367,9 @@ public struct TimerangeDt: Hashable, Sendable {
     public let dtSeconds: Int
 
     @inlinable public var count: Int {
+        if dtSeconds == .dtSecondsMonthly {
+            return Int(round(Float(range.upperBound.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+        }
         return (range.upperBound.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / dtSeconds
     }
 
@@ -392,11 +395,20 @@ public struct TimerangeDt: Hashable, Sendable {
 
     /// devide time by dtSeconds
     @inlinable public func toIndexTime() -> Range<Int> {
+        if dtSeconds == .dtSecondsMonthly {
+            // Round to get the closest month index
+            return Int(round(Float(range.lowerBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage)) ..< Int(round(Float(range.upperBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+        }
         return range.lowerBound.timeIntervalSince1970 / dtSeconds ..< range.upperBound.timeIntervalSince1970 / dtSeconds
     }
 
     @inlinable public func index(of: Timestamp) -> Int? {
-        let index = (of.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / dtSeconds
+        let index: Int
+        if dtSeconds == .dtSecondsMonthly {
+            index = Int(round(Float(of.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+        } else {
+            index = (of.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / dtSeconds
+        }
         return index < 0 || index >= count ? nil : index
     }
 
@@ -427,6 +439,20 @@ public struct TimerangeDt: Hashable, Sendable {
     /// Convert to a striable year month range
     @inlinable public func toYearMonth() -> Range<YearMonth> {
         return range.toYearMonth()
+    }
+}
+
+extension Int {
+    /// dtSeconds in a month with 31 days
+    public static var dtSecondsMonthly: Int {
+        return 31 * 24 * 60 * 60
+    }
+}
+
+extension Float {
+    /// Average dt seconds in a month. Used to analytically get the month index
+    public static var dtSecondsMonthlyAverage: Float {
+        return 365.25 * 24 * 3600 / 12
     }
 }
 
