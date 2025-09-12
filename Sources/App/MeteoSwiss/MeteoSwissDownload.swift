@@ -88,7 +88,7 @@ struct MeteoSwissDownload: AsyncCommand {
             }
             try elevationRemapped.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: false)
         }
-        let mapping: [Int] = try await OmFileReader.read(file: weightsFile)!
+        let mapping: [Int] = try await OmFileReader(mmapFile: weightsFile).expectArray(of: Int.self).read()
         //try Array2D(data: mapping.map(Float.init), nx: nx, ny: ny).writeNetcdf(filename: "\((domain.domainRegistryStatic ?? domain.domainRegistry ).directory)static/nn_weights.nc")
         
         let timestamps = (0...domain.forecastLength).map { run.add(hours: $0) }
@@ -348,15 +348,5 @@ extension OmFileWriter where FileHandle == Foundation.FileHandle {
         try fileWriter.writeTrailer(rootVariable: variable)
         try writeFn.close()
         try FileManager.default.moveItem(atPath: temporary, toPath: file)
-    }
-}
-
-extension OmFileReader where Backend == MmapFile {
-    static func read<D: OmFileArrayDataTypeProtocol>(file: String) async throws -> [D]? {
-        let readfile = try await OmFileReader(mmapFile: file)
-        guard let reader = readfile.asArray(of: D.self) else {
-            return nil
-        }
-        return try await reader.read(range: nil)
     }
 }

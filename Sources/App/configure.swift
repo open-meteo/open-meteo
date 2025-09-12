@@ -41,7 +41,7 @@ enum OpenMeteo {
     static let fileMetaCache: AtomicBlockCache<MmapFile> = { () -> AtomicBlockCache<MmapFile> in
         let cacheFile = Environment.get("CACHE_META_FILE") ?? "\(dataDirectory)/cache_file_meta.bin"
         let cacheSize = try! ByteSizeParser.parseSizeStringToBytes(Environment.get("CACHE_META_SIZE") ?? "1MB")
-        let blockSize = MemoryLayout<OmHttpMetaCache.Entry>.stride
+        let blockSize = MemoryLayout<HttpMetaCache.Entry>.stride
         let blockCount = cacheSize / (blockSize + 2 * MemoryLayout<Int64>.size)
         return try! AtomicBlockCache(file: cacheFile, blockSize: blockSize, blockCount: blockCount)
     }()
@@ -202,6 +202,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ExportCommand(), as: "export")
     app.asyncCommands.use(MergeYearlyCommand(), as: "merge-yearly")
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
+    app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
@@ -226,16 +227,11 @@ public func configure(_ app: Application) throws {
         delay: .seconds(10),
         ApiKeyManager.update
     )
-    app.lifecycle.repeatedTask(
-        initialDelay: .seconds(0),
-        delay: .seconds(2),
-        MetaFileManager.instance.backgroundTask
-    )
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
         delay: .seconds(10),
-        RemoteOmFileManager.instance.backgroundTask
+        RemoteFileManager.instance.backgroundTask
     )
 
     app.lifecycle.repeatedTask(

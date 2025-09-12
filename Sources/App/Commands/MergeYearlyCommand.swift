@@ -92,9 +92,7 @@ struct MergeYearlyCommand: AsyncCommand {
                 logger.info("Chunk file \(variable)/chunk_\(chunkIndex).om does not exist. Skipping.")
                 return nil
             }
-            guard let reader = try await OmFileReader(mmapFile: file).asArray(of: Float.self) else {
-                return nil
-            }
+            let reader = try await OmFileReader(mmapFile: file).expectArray(of: Float.self)
             let indexTime = chunkIndex * omFileLength ..< (chunkIndex + 1) * omFileLength
             return (reader, indexTime)
         }
@@ -174,9 +172,7 @@ struct MergeYearlyCommand: AsyncCommand {
         try writeFn.close()
 
         /// Read data again to ensure the written data matches exactly
-        guard let verify = try await OmFileReader(mmapFile: temporary).asArray(of: Float.self) else {
-            throw MergeYearlyError.couldNotReadData
-        }
+        let verify = try await OmFileReader(mmapFile: temporary).expectArray(of: Float.self)
         let progressVerify = TransferAmountTracker(logger: logger, totalSize: 4 * Int(dimensionsOut.reduce(1, *)), name: "Verify")
         for yStart in stride(from: 0, to: ny, by: UInt64.Stride(chunksOut[0])) {
             for xStart in stride(from: 0, to: nx, by: UInt64.Stride(chunksOut[1])) {

@@ -6,15 +6,15 @@ import OmFileFormat
 
 @Suite struct OmReaderTests {
     @Test func metaCache() throws {
-        #expect(MemoryLayout<OmHttpMetaCache.Entry>.stride == 72)
+        #expect(MemoryLayout<HttpMetaCache.Entry>.stride == 72)
         
-        let entry = try OmHttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasf")
+        let entry = try HttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasf")
         #expect(entry.eTag.string.count == 12)
         #expect(entry.lastModified.timeIntervalSince1970 == 252454)
         #expect(entry.lastValidated.timeIntervalSince1970 == 34598743)
         #expect(entry.eTag.string == "srgkjnsrgasf")
         
-        let entry48 = try OmHttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
+        let entry48 = try HttpMetaCache.Entry(contentLength: 1234, lastModified: Timestamp(252454), lastValidated: Timestamp(34598743), eTagString: "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
         #expect(entry48.eTag.string.count == 48)
         #expect(entry48.eTag.string == "srgkjnsrgasfwfjnwofegne3wognwkjndgwongpwiefngfog")
     }
@@ -23,7 +23,7 @@ import OmFileFormat
         try await withApp { app in
             let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
             let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!
-            let read = try await OmFileReader(fn: readFn).asArray(of: Float.self)!
+            let read = try await OmFileReader(fn: readFn).expectArray(of: Float.self)
             let value = try await read.read(range: [250..<251, 420..<421])
             #expect(value.first == 214)
         }
@@ -37,7 +37,7 @@ import OmFileFormat
         defer { try! FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
-        let read = try! await OmFileReader(fn: cacheFn).asArray(of: Float.self)!
+        let read = try! await OmFileReader(fn: cacheFn).expectArray(of: Float.self)
         let value = try await read.read(range: [250..<251, 420..<421])
         #expect(value.first == 214)
         
@@ -116,7 +116,7 @@ import OmFileFormat
         defer { try! FileManager.default.removeItem(atPath: file) }
         let cache = try AtomicBlockCache(file: file, blockSize: 65536, blockCount: 50)
         let cacheFn = OmReaderBlockCache(backend: readFn, cache: AtomicCacheCoordinator(cache: cache), cacheKey: readFn.cacheKey)
-        let read = try await OmFileReader(fn: cacheFn).asArray(of: Float.self, io_size_max: 4096)!
+        let read = try await OmFileReader(fn: cacheFn).expectArray(of: Float.self, io_size_max: 4096)
         let value = try await read.readConcurrent(range: [0..<257, 511..<513])
         #expect(value[123] == 1218)
 
@@ -125,7 +125,7 @@ import OmFileFormat
     }
 
     /*func testRemoteFileManager() async throws {
-        let value = try await RemoteOmFileManager.instance.with(file: .staticFile(domain: .dwd_icon_d2_eps, variable: "HSURF", chunk: nil), client: .shared, logger: .init(label: "")) { reader in
+        let value = try await RemoteFileManager.instance.with(file: .staticFile(domain: .dwd_icon_d2_eps, variable: "HSURF", chunk: nil), client: .shared, logger: .init(label: "")) { reader in
             try await reader.asArray(of: Float.self)!.read(range: [250..<251, 420..<421])
         }
         #expect(value?.first == 214)

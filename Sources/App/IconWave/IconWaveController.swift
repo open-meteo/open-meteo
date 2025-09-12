@@ -47,7 +47,7 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
                 MfWaveReader(reader: reader)
             }
             let waveModel: [(any GenericReaderProtocol)?]
-            if let update = try MfWaveDomain.mfwave.getMetaJson()?.lastRunAvailabilityTime, update <= Timestamp.now().subtract(hours: 26) {
+            if let update = try await MfWaveDomain.mfwave.getMetaJson(client: options.httpClient, logger: options.logger)?.lastRunAvailabilityTime, update <= Timestamp.now().subtract(hours: 26) {
                 // mf model outdated, use ECMWF
                 waveModel = [mfwave, try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
             } else {

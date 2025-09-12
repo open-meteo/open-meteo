@@ -79,7 +79,7 @@ struct DownloadCmaCommand: AsyncCommand {
                 /// Note make sure to set previous days to 0..<10 next time
                 for previousDay in 0..<10 {
                     let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
-                    let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                    let readFile = OmFileType.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                     guard let omRead = try readFile.openRead() else {
                         continue
                     }

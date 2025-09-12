@@ -154,11 +154,11 @@ struct GribArray2D {
             fatalError("Could not get gridType")
         }
         if gridType == "reduced_gg" {
-            guard let numberOfCodedValues = message.get(attribute: "numberOfCodedValues")?.toInt() else {
-                fatalError("Could not get numberOfCodedValues")
+            guard let numberOfDataPoints = message.get(attribute: "numberOfDataPoints")?.toInt() else {
+                fatalError("Could not get numberOfDataPoints")
             }
-            guard numberOfCodedValues == array.count else {
-                fatalError("GRIB dimensions (count=\(numberOfCodedValues)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
+            guard numberOfDataPoints == array.count else {
+                fatalError("GRIB dimensions (count=\(numberOfDataPoints)) do not match domain grid dimensions (nx=\(array.nx), ny=\(array.ny))")
             }
         } else {
             guard let nx = message.get(attribute: "Nx")?.toInt() else {
