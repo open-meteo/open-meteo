@@ -149,8 +149,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-distributed-tracing.git",
       "state" : {
-        "revision" : "b78796709d243d5438b36e74ce3c5ec2d2ece4d8",
-        "version" : "1.2.1"
+        "revision" : "149fa4cc7d54c513288108142e7af9ceaf8def8f",
+        "version" : "1.2.2"
       }
     },
     {
@@ -221,8 +221,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-ssl.git",
       "state" : {
-        "revision" : "385f5bd783ffbfff46b246a7db7be8e4f04c53bd",
-        "version" : "2.33.0"
+        "revision" : "737e550e607d82bf15bdfddf158ec61652ce836f",
+        "version" : "2.34.0"
       }
     },
     {

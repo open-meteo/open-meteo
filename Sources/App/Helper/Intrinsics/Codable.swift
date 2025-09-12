@@ -14,10 +14,13 @@ extension Encodable {
         let encoder = JSONEncoder()
         encoder.outputFormatting = .sortedKeys
         encoder.dateEncodingStrategy = .iso8601
-        let fn = try FileHandle.createNewFile(file: "\(path)~")
-        try fn.write(contentsOf: try encoder.encode(self))
+        let data = try encoder.encode(self)
+        
+        let fileTemp = "\(path)~"
+        let fn = try FileHandle.createNewFile(file: fileTemp, size: data.count, overwrite: true)
+        try fn.write(contentsOf: data)
         try fn.close()
-        try FileManager.default.moveFileOverwrite(from: "\(path)~", to: path)
+        try FileManager.default.moveFileOverwrite(from: fileTemp, to: path)
     }
 }
 
