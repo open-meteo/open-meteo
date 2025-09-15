@@ -115,7 +115,7 @@ struct UkmoDownload: AsyncCommand {
             for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
                 for previousDay in 1..<10 { // 0..<10}
                     let fileTime = TimerangeDt(start: Timestamp(timeChunk * nTimePerFile * domain.dtSeconds), nTime: nTimePerFile, dtSeconds: domain.dtSeconds)
-                    let readFile = OmFileManagerReadable.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
+                    let readFile = OmFileType.domainChunk(domain: domain.domainRegistry, variable: variable.omFileName.file, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                     guard let omRead = try readFile.openRead() else {
                         continue
                     }

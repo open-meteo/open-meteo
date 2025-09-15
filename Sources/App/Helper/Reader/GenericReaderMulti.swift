@@ -10,7 +10,7 @@ protocol MultiDomainMixerDomain: RawRepresentableString, GenericDomainProvider {
 
 /// Combine multiple independent weather models, that may not have given forecast variable
 struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainMixerDomain>: GenericReaderProvider {
-    private let reader: [any GenericReaderProtocol]
+    let reader: [any GenericReaderProtocol]
 
     let domain: Domain
 
@@ -52,7 +52,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         self.reader = [reader]
     }
 
-    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variable: RawRepresentableString, time: TimerangeDtAndSettings) async throws {
         for reader in reader {
             if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
                 break
@@ -60,18 +60,19 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         }
     }
 
-    func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variables: [RawRepresentableString], time: TimerangeDtAndSettings) async throws {
         for variable in variables {
             try await prefetchData(variable: variable, time: time)
         }
     }
 
-    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+    func get(variable: RawRepresentableString, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var data: [Float]?
         var unit: SiUnit?
-        if variable.requiresOffsetCorrectionForMixing {
+        let requiresOffsetCorrectionForMixing = variable.rawValue.starts(with: "soil_moisture_") || variable.rawValue == "snow_depth"
+        if requiresOffsetCorrectionForMixing {
             for r in reader.reversed() {
                 guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
                     continue

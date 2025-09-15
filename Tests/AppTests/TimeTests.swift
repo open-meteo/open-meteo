@@ -17,6 +17,22 @@ import Testing
         #expect(try Timestamp.from(yyyymmdd: "2021112323").format_YYYYMMddHH == "2021112323")
         #expect(try Timestamp.from(yyyymmdd: "20211123235958").iso8601_YYYY_MM_dd_HH_mm == "2021-11-23T23:59")
     }
+    
+    @Test func monthlyTime() {
+        let range = TimerangeDt(range: Timestamp(2022,1,1)..<Timestamp(2024,1,1), dtSeconds: .dtSecondsMonthly)
+        #expect(range.count == 24)
+        #expect(range.toIndexTime() == 624..<648)
+        #expect(range.index(of: Timestamp(2022,1,1)) == 0)
+        #expect(range.index(of: Timestamp(2023,1,1)) == 12)
+        #expect(range.index(of: Timestamp(2024,1,1)) == nil)
+        
+        let range2 = TimerangeDt(range: Timestamp(1971,1,1)..<Timestamp(2024,1,1), dtSeconds: .dtSecondsMonthly)
+        #expect(range2.count == 636)
+        #expect(range2.toIndexTime() == 12..<648)
+        #expect(range2.index(of: Timestamp(2022,1,1)) == 612)
+        #expect(range2.index(of: Timestamp(2023,1,1)) == 624)
+        #expect(range2.index(of: Timestamp(2024,1,1)) == nil)
+    }
 
     @Test func timeIteration() {
         let range = TimerangeDt(start: Timestamp(2022, 7, 1), nTime: 5, dtSeconds: 7200)

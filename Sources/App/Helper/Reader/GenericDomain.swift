@@ -54,30 +54,43 @@ extension GenericDomain {
         }
         switch type {
         case .soilType:
-            return try? await RemoteOmFileManager.instance.get(
-                file: .staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
+            return try? await RemoteFileManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "soil_type", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
         case .elevation:
-            return try? await RemoteOmFileManager.instance.get(
-                file: .staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
+            return try? await RemoteFileManager.instance.get(
+                file: OmFileType.staticFile(domain: domainRegistryStatic, variable: "HSURF", chunk: nil),
                 client: httpClient,
                 logger: logger
             )?.reader
         }
     }
 
-    func getMetaJson() throws -> ModelUpdateMetaJson? {
-        return try MetaFileManager.get(OmFileManagerReadable.meta(domain: domainRegistry))
+    /// Meta JSON for time-series data
+    func getMetaJson(client: HTTPClient, logger: Logger) async throws -> ModelUpdateMetaJson? {
+        return try await RemoteFileManager.instance.get(
+            file: ModelUpdateMetaFile(domain: self.domainRegistry),
+            client: client,
+            logger: logger
+        )
+    }
+    
+    func getLatestFullRun(client: HTTPClient, logger: Logger) async throws -> Timestamp? {
+        return try await RemoteFileManager.instance.get(
+            file: FullRunMetaFile.latest(self.domainRegistry),
+            client: client,
+            logger: logger
+        )?.reference_time.toTimestamp()
     }
 
     /// Filename of the surface elevation file
-    var surfaceElevationFileOm: OmFileManagerReadable {
+    var surfaceElevationFileOm: OmFileType {
         .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "HSURF", chunk: nil)
     }
 
-    var soilTypeFileOm: OmFileManagerReadable {
+    var soilTypeFileOm: OmFileType {
         .staticFile(domain: domainRegistryStatic ?? domainRegistry, variable: "soil_type", chunk: nil)
     }
 }

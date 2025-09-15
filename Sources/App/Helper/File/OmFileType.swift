@@ -4,20 +4,39 @@ import NIOConcurrencyHelpers
 import Vapor
 import NIO
 
-enum OmFileManagerType: String {
+enum OmFileSeriesType: String {
     case chunk
     case year
     case master
     case linear_bias_seasonal
 }
 
-enum OmFileManagerReadable: Hashable {
-    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileManagerType, chunk: Int?, ensembleMember: Int, previousDay: Int)
+enum OmFileType: Hashable, RemoteFileManageable {
+    typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?)
+    
+    case domainChunk(domain: DomainRegistry, variable: String, type: OmFileSeriesType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
-    case meta(domain: DomainRegistry)
     
     /// Full forecast run horizon per run per variable. `data_run/<model>/<run>/<variable>.om`
     case run(domain: DomainRegistry, variable: String, run: IsoDateTime)
+    
+    func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteOmReader {
+        let reader = try await OmFileReader(fn: file)
+        let arrayReader = try reader.expectArray(of: Float.self)
+        if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+            return OmFileRemoteOmReader(reader: arrayReader, timestamps: times)
+        }
+        return OmFileRemoteOmReader(reader: arrayReader, timestamps: nil)
+    }
+    
+    func makeLocalReader(file: MmapFile) async throws -> OmFileLocalOmReader {
+        let reader = try await OmFileReader(fn: file)
+        let arrayReader = try reader.expectArray(of: Float.self)
+        if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
+            return OmFileLocalOmReader(reader: arrayReader, timestamps: times)
+        }
+        return OmFileLocalOmReader(reader: arrayReader, timestamps: nil)
+    }
 
     /// Assemble the full file system path
     func getFilePath() -> String {
@@ -60,8 +79,6 @@ enum OmFileManagerReadable: Hashable {
             }
         case .staticFile(_, _, _):
             return 24*3600
-        case .meta(_):
-            return 24*3600
         case .run(_, _, _):
             return 24*3600
         }
@@ -79,8 +96,6 @@ enum OmFileManagerReadable: Hashable {
         case .domainChunk(let domain, _, _, _, _, _):
             return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
         case .staticFile(domain: let domain, _, _):
-            return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
-        case .meta(domain: let domain):
             return "\(remoteDirectory.replacing("MODEL", with: domain.bucketName))\(file)"
         }
     }
@@ -101,8 +116,6 @@ enum OmFileManagerReadable: Hashable {
                 return "\(domain.rawValue)/static/\(variable)_\(chunk).om"
             }
             return "\(domain.rawValue)/static/\(variable).om"
-        case .meta(let domain):
-            return "\(domain.rawValue)/static/meta.json"
         case .run(domain: let domain, variable: let variable, run: let run):
             return "\(domain.rawValue)/\(run.format_directoriesYYYYMMddhhmm)/\(variable).om"
         }
@@ -115,13 +128,14 @@ enum OmFileManagerReadable: Hashable {
             return OpenMeteo.dataDirectory
         case .staticFile(_, _, _):
             return OpenMeteo.dataDirectory
-        case .meta(_):
-            return OpenMeteo.dataDirectory
         case .run(_, _, _):
             return OpenMeteo.dataRunDirectory ?? OpenMeteo.dataDirectory
         }
     }
 
+}
+
+extension RemoteFileManageable {
     func createDirectory() throws {
         let file = getFilePath()
         guard let last = file.lastIndex(of: "/") else {
@@ -130,10 +144,36 @@ enum OmFileManagerReadable: Hashable {
         let path = "\(file[file.startIndex..<last])"
         try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
     }
-
+    
     func exists() -> Bool {
         let file = getFilePath()
         return FileManager.default.fileExists(atPath: file)
+    }
+}
+
+struct OmFileRemoteOmReader: RemoteFileRepresentable {
+    let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
+    let timestamps: [Timestamp]?
+    
+    var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
+        reader.fn
+    }
+    
+    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
+        return (reader, timestamps)
+    }
+}
+
+struct OmFileLocalOmReader: LocalFileRepresentable {
+    let reader: OmFileReaderArray<MmapFile, Float>
+    let timestamps: [Timestamp]?
+    
+    var fn: MmapFile {
+        reader.fn
+    }
+    
+    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
+        return (reader, timestamps)
     }
 }
 
