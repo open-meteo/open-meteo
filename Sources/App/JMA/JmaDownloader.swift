@@ -486,7 +486,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         return domainRegistry
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         return 0
     }
 

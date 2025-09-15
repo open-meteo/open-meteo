@@ -221,7 +221,7 @@ struct DownloadBomCommand: AsyncCommand {
 
         try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
             let inMemoryPrecipitation = VariablePerMemberStorage<BomVariable>()
-            for member in 0..<domain.ensembleMembers {
+            for member in 0..<domain.countEnsembleMember {
                 let base = "\(server)\(run.format_YYYYMMdd)/\(run.hh)00/"
                 let forecastFile = "\(domain.downloadDirectory)\(variable.name)_fc_\(member).nc"
                 let memberStr = ((run.hour % 12 == 6) ? (member + 17) : member).zeroPadded(len: 3)
@@ -257,7 +257,7 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
 
-        for member in (0..<domain.ensembleMembers) {
+        for member in (0..<domain.countEnsembleMember) {
             logger.info("Calculate weather codes and snow sum member_\(member)")
             try await zip(
                 zip(zip(
@@ -282,7 +282,7 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
 
-        for member in (0..<domain.ensembleMembers) {
+        for member in (0..<domain.countEnsembleMember) {
             logger.info("Calculate relative humidity member_\(member)")
             try await zip(
                 try iterateForecast(domain: domain, member: member, variable: "sfc_temp", run: run),
@@ -295,7 +295,7 @@ struct DownloadBomCommand: AsyncCommand {
             }
         }
 
-        for member in (0..<domain.ensembleMembers) {
+        for member in (0..<domain.countEnsembleMember) {
             logger.info("Calculate wind member_\(member)")
             try await zip(
                 try iterateForecast(domain: domain, member: member, variable: "uwnd10m", run: run),

@@ -27,6 +27,15 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
         }
     }
     
+    var countEnsembleMember: Int {
+        switch self {
+        case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly:
+            return 51
+        case .seas5_monthly, .seas5_monthly_upper_level:
+            return 1
+        }
+    }
+    
     var domainRegistry: DomainRegistry {
         switch self {
         case .seas5_6hourly:

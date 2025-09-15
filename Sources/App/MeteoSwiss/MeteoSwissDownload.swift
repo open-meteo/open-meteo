@@ -67,7 +67,7 @@ struct MeteoSwissDownload: AsyncCommand {
         let nx = grid.nx
         let ny = grid.ny
         let collection = domain.collection
-        let storeOnDisk = domain.ensembleMembers <= 1
+        let storeOnDisk = domain.countEnsembleMember <= 1
         
         let directory = (domain.domainRegistryStatic ?? domain.domainRegistry).directory
         try FileManager.default.createDirectory(atPath: "\(directory)static", withIntermediateDirectories: true)
@@ -106,7 +106,7 @@ struct MeteoSwissDownload: AsyncCommand {
             logger.info("Downloading hour \(hour)")
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
             
-            let writerProbabilities = domain.ensembleMembers > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
             
             try await variables.foreachConcurrent(nConcurrent: 4) { variable in
@@ -119,7 +119,7 @@ struct MeteoSwissDownload: AsyncCommand {
                     forecastPerturbed: false,
                     forecastHorizon: "P0DT\(hour.zeroPadded(len: 2))H00M00S"
                 )]
-                if domain.ensembleMembers > 1 {
+                if domain.countEnsembleMember > 1 {
                     urls.append(try await client.resolveMeteoSwissDownloadURL(
                         logger: logger,
                         collection: collection,

@@ -29,6 +29,9 @@ protocol GenericDomain: Sendable {
 
     /// The time length of each compressed time series file
     var omFileLength: Int { get }
+    
+    /// Number of ensemble members, including control. Default 1
+    var countEnsembleMember: Int { get }
 }
 
 extension GenericDomain {

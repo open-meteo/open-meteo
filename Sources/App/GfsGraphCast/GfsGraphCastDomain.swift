@@ -26,6 +26,10 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     var dtSeconds: Int {
         return 6 * 3600
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var updateIntervalSeconds: Int {
         return 6 * 3600

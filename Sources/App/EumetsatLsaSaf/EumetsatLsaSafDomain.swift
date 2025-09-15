@@ -29,6 +29,10 @@ enum EumetsatLsaSafDomain: String, GenericDomain, CaseIterable {
             return 15 * 60
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var grid: any Gridable {
         switch self {

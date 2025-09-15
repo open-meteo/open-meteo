@@ -39,6 +39,10 @@ struct Dem90: GenericDomain {
     var omFileLength: Int {
         return 0
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var updateIntervalSeconds: Int {
         return 0

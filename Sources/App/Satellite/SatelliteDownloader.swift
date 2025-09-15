@@ -200,6 +200,10 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
             return 3600 * 24
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var domainRegistry: DomainRegistry {
         switch self {

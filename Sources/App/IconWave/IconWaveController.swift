@@ -26,9 +26,9 @@ enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomai
     var countEnsembleMember: Int {
         switch self {
         case .ecmwf_wam025_ensemble:
-            return EcmwfDomain.wam025_ensemble.ensembleMembers
+            return EcmwfDomain.wam025_ensemble.countEnsembleMember
         case .ncep_gefswave025:
-            return GfsDomain.gfswave025_ens.ensembleMembers
+            return GfsDomain.gfswave025_ens.countEnsembleMember
         default:
             return 1
         }

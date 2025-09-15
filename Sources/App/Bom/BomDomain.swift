@@ -28,7 +28,7 @@ enum BomDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .access_global_ensemble:
             return 17 + 1

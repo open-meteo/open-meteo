@@ -41,4 +41,8 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
             return 6 * 24 * 2
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 }

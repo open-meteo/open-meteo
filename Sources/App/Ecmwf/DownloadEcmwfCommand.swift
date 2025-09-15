@@ -230,7 +230,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
             
-            let writerProbabilities = domain.ensembleMembers > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
 
             if variables.isEmpty {
@@ -364,7 +364,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         return
                     }
                     // Keep precip in memory for probability
-                    if domain.ensembleMembers > 1 && variable == .precipitation {
+                    if domain.countEnsembleMember > 1 && variable == .precipitation {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
@@ -387,7 +387,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
-            for member in 0..<domain.ensembleMembers {
+            for member in 0..<domain.countEnsembleMember {
                 /// calculate RH 2m from dewpoint. Only store RH on disk.
                 if let dewpoint = await inMemory.get(variable: .dew_point_2m, timestamp: timestamp, member: member)?.data,
                    let temperature = await inMemory.get(variable: .temperature_2m, timestamp: timestamp, member: member)?.data {

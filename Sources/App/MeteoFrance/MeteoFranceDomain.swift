@@ -38,6 +38,10 @@ enum MeteoFranceDomain: String, GenericDomain, CaseIterable {
     var hasYearlyFiles: Bool {
         return false
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var masterTimeRange: Range<Timestamp>? {
         return nil

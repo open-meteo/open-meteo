@@ -267,6 +267,15 @@ enum GloFasDomain: String, GenericDomain, CaseIterable {
             return .glofas_intermediate_v3
         }
     }
+    
+    var countEnsembleMember: Int {
+        switch self {
+        case .forecast, .forecastv3, .seasonal, .seasonalv3:
+            return 51
+        case .consolidated, .intermediate, .consolidatedv3, .intermediatev3:
+            return 1
+        }
+    }
 
     var domainRegistryStatic: DomainRegistry? {
         return nil

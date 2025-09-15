@@ -242,7 +242,7 @@ struct UkmoDownload: AsyncCommand {
         }
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
-        let isEnsemble = domain.ensembleMembers > 1
+        let isEnsemble = domain.countEnsembleMember > 1
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 

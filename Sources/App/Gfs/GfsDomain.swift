@@ -147,7 +147,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .gfs05_ens:
             return 30 + 1

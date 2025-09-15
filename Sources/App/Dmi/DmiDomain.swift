@@ -35,6 +35,10 @@ enum DmiDomain: String, GenericDomain, CaseIterable {
             )
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var domainRegistry: DomainRegistry {
         switch self {

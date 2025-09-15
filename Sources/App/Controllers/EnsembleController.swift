@@ -193,37 +193,37 @@ enum EnsembleMultiDomains: String, RawRepresentableString, CaseIterable, MultiDo
     var countEnsembleMember: Int {
         switch self {
         case .icon_seamless:
-            return IconDomains.iconEps.ensembleMembers
+            return IconDomains.iconEps.countEnsembleMember
         case .icon_global:
-            return IconDomains.iconEps.ensembleMembers
+            return IconDomains.iconEps.countEnsembleMember
         case .icon_eu:
-            return IconDomains.iconEuEps.ensembleMembers
+            return IconDomains.iconEuEps.countEnsembleMember
         case .icon_d2:
-            return IconDomains.iconD2Eps.ensembleMembers
+            return IconDomains.iconD2Eps.countEnsembleMember
         case .ecmwf_ifs04:
-            return EcmwfDomain.ifs04_ensemble.ensembleMembers
+            return EcmwfDomain.ifs04_ensemble.countEnsembleMember
         case .ecmwf_ifs025:
-            return EcmwfDomain.ifs025_ensemble.ensembleMembers
+            return EcmwfDomain.ifs025_ensemble.countEnsembleMember
         case .ecmwf_aifs025:
-            return EcmwfDomain.aifs025_ensemble.ensembleMembers
+            return EcmwfDomain.aifs025_ensemble.countEnsembleMember
         case .gfs025:
-            return GfsDomain.gfs025_ens.ensembleMembers
+            return GfsDomain.gfs025_ens.countEnsembleMember
         case .gfs05:
-            return GfsDomain.gfs05_ens.ensembleMembers
+            return GfsDomain.gfs05_ens.countEnsembleMember
         case .gfs_seamless:
-            return GfsDomain.gfs05_ens.ensembleMembers
+            return GfsDomain.gfs05_ens.countEnsembleMember
         case .gem_global:
-            return GemDomain.gem_global_ensemble.ensembleMembers
+            return GemDomain.gem_global_ensemble.countEnsembleMember
         case .bom_access_global_ensemble:
-            return BomDomain.access_global_ensemble.ensembleMembers
+            return BomDomain.access_global_ensemble.countEnsembleMember
         case .ukmo_global_ensemble_20km:
-            return UkmoDomain.global_ensemble_20km.ensembleMembers
+            return UkmoDomain.global_ensemble_20km.countEnsembleMember
         case .ukmo_uk_ensemble_2km:
-            return UkmoDomain.uk_ensemble_2km.ensembleMembers
+            return UkmoDomain.uk_ensemble_2km.countEnsembleMember
         case .meteoswiss_icon_ch1:
-            return MeteoSwissDomain.icon_ch1_ensemble.ensembleMembers
+            return MeteoSwissDomain.icon_ch1_ensemble.countEnsembleMember
         case .meteoswiss_icon_ch2:
-            return MeteoSwissDomain.icon_ch2_ensemble.ensembleMembers
+            return MeteoSwissDomain.icon_ch2_ensemble.countEnsembleMember
         }
     }
 

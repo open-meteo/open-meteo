@@ -126,7 +126,7 @@ struct DownloadIconCommand: AsyncCommand {
         let domainPrefix = "\(domain.rawValue)_\(domain.region)"
         let cdo = try await CdoHelper(domain: domain, logger: logger, curl: curl)
         let gridType = cdo.needsRemapping ? "icosahedral" : "regular-lat-lon"
-        let isEnsemble = domain.ensembleMembers > 1
+        let isEnsemble = domain.countEnsembleMember > 1
 
         // https://opendata.dwd.de/weather/nwp/icon/grib/00/t_2m/icon_global_icosahedral_single-level_2022070800_000_T_2M.grib2.bz2
         // https://opendata.dwd.de/weather/nwp/icon-eu/grib/00/t_2m/icon-eu_europe_regular-lat-lon_single-level_2022072000_000_T_2M.grib2.bz2
@@ -523,7 +523,7 @@ extension IconDomains {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .iconEps:
             return 40

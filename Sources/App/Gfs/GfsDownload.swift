@@ -204,7 +204,7 @@ struct GfsDownload: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         //let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
-        let isEnsemble = domain.ensembleMembers > 1
+        let isEnsemble = domain.countEnsembleMember > 1
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         
@@ -306,7 +306,7 @@ struct GfsDownload: AsyncCommand {
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
 
-            for member in 0..<domain.ensembleMembers {
+            for member in 0..<domain.countEnsembleMember {
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member, useAws: downloadFromAws)
                 

@@ -119,7 +119,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .gem_global:
             return 1

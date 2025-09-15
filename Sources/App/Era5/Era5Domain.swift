@@ -26,6 +26,10 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
             return 3600
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var isGlobal: Bool {
         self != .cerra

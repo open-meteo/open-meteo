@@ -90,7 +90,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .uk_deterministic_2km, .global_deterministic_10km:
             return 1

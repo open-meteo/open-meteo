@@ -52,7 +52,7 @@ enum NbmDomain: String, GenericDomain, CaseIterable {
         return t.with(hour: t.hour)
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         return 1
     }
 

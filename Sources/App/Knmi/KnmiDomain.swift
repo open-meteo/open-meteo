@@ -52,12 +52,9 @@ enum KnmiDomain: String, GenericDomain, CaseIterable {
         // 60 timesteps
         return 90
     }
-
-    var ensembleMembers: Int {
-        switch self {
-        case .harmonie_arome_europe, .harmonie_arome_netherlands:
-            return 1
-        }
+    
+    var countEnsembleMember: Int {
+        return 1
     }
 
     var updateIntervalSeconds: Int {

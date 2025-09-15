@@ -22,6 +22,10 @@ enum CmaDomain: String, GenericDomain, CaseIterable {
             return .cma_grapes_global
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry

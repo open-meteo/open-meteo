@@ -44,7 +44,7 @@ enum ItaliaMeteoArpaeDomain: String, GenericDomain, CaseIterable {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         return 1
     }
 

@@ -28,6 +28,10 @@ enum CamsDomain: String, GenericDomain, CaseIterable {
             return 14 * 24
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     /// Cams has delay of 8 hours
     var lastRun: Timestamp {

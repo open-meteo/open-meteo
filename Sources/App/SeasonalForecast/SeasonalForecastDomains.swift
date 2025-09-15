@@ -31,6 +31,10 @@ enum SeasonalForecastDomain: String, GenericDomain, CaseIterable {
             fatalError()
         }
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var domainRegistryStatic: DomainRegistry? {
         return domainRegistry

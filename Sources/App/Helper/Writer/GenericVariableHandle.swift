@@ -244,12 +244,15 @@ struct GenericVariableHandle: Sendable {
                 return
             }
             /// `timeMinMax.min.time` has issues with `skip`
-            /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hindcast data
+            /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hind-cast data
             let startTime = min(run ?? timeMin, timeMin)
             let time = TimerangeDt(range: startTime..<timeMax, dtSeconds: dtSeconds)
 
             let variable = handles[0].variable
-            let nMembers = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
+            /// Number of members in the current download. Might be lower than the actual domain member count. E.g. MeteoSwiss sometimes includes fewer members
+            let nMembersInVariables = (handles.max(by: { $0.member < $1.member })?.member ?? 0) + 1
+            /// nMembers might be set to 1 for variables like precipitation probability. Otherwise use `countEnsembleMember`
+            let nMembers = nMembersInVariables == 1 ? 1 : domain.countEnsembleMember
             let nMembersStr = nMembers > 1 ? " (\(nMembers) nMembers)" : ""
 
             let storePreviousForecast = variable.storePreviousForecast && nMembers <= 1
@@ -257,7 +260,7 @@ struct GenericVariableHandle: Sendable {
                 // No need to generate previous day forecast
                 continue
             }
-            /// If only one value is set, this could be the model initialisation or modifcation time
+            /// If only one value is set, this could be the model initialisation or modification time
             /// TODO: check if single value mode is still required
             // let isSingleValueVariable = readers.first?.reader.first?.fn.count == 1
 

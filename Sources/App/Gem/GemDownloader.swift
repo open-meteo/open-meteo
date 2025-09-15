@@ -142,7 +142,7 @@ struct GemDownload: AsyncCommand {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
-        let isEnsemble = domain.ensembleMembers > 1
+        let isEnsemble = domain.countEnsembleMember > 1
         
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 

@@ -121,7 +121,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         }
     }
     
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .icon_ch1:
             return 1

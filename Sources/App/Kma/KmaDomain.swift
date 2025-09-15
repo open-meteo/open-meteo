@@ -89,8 +89,8 @@ enum KmaDomain: String, GenericDomain, CaseIterable {
             return 48 + 24
         }
     }
-
-    var ensembleMembers: Int {
+    
+    var countEnsembleMember: Int {
         return 1
     }
 

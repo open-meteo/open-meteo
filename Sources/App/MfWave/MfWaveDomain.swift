@@ -15,6 +15,10 @@ enum MfWaveDomain: String, CaseIterable, GenericDomain {
     var masterTimeRange: Range<Timestamp>? {
         return nil
     }
+    
+    var countEnsembleMember: Int {
+        return 1
+    }
 
     var domainRegistry: DomainRegistry {
         switch self {

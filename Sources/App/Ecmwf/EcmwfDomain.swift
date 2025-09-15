@@ -109,7 +109,7 @@ enum EcmwfDomain: String, GenericDomain {
         }
     }
 
-    var ensembleMembers: Int {
+    var countEnsembleMember: Int {
         switch self {
         case .ifs04, .ifs025, .wam025:
             return 1
@@ -121,6 +121,6 @@ enum EcmwfDomain: String, GenericDomain {
     }
 
     var isEnsemble: Bool {
-        return ensembleMembers > 1
+        return countEnsembleMember > 1
     }
 }
