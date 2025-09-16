@@ -319,6 +319,9 @@ struct GenericVariableHandle: Sendable {
                 for reader in handles {
                     let dimensions = reader.reader.getDimensions()
                     let timeArrayIndex = time.index(of: reader.time.range.lowerBound)!
+                    guard memberRange.contains(UInt64(reader.member)) else {
+                        fatalError("Invalid reader.member \(reader.member) for range \(memberRange)")
+                    }
                     if dimensions.count == 3 {
                         /// Number of time steps in this file
                         let nt = dimensions[2]
