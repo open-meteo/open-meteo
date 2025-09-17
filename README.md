@@ -70,7 +70,7 @@ Apps:
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
-- [Meteo-Fly](https://www.meteo-fly.com) Small paragliding app with some nice visualizations
+- [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 
 Repositories:
 
