@@ -202,10 +202,16 @@ struct DownloadIconCommand: AsyncCommand {
                 if variable.skipHour(hour: hour, domain: domain, forDownload: false, run: run) {
                     return
                 }
-
-                // Contains more than 1 message for ensemble models
-                for (member, (message, array2d)) in messages.enumerated() {
+                
+                // Contains more than 1 message for ensemble models and 15 minutes data
+                for (message, array2d) in messages {
                     var array2d = array2d
+                    
+                    let member = (message.getLong(attribute: "perturbationNumber") ?? 1) - 1
+                    if try timestamp != message.getValidTimestamp() {
+                        // skip 15 minutely data, that does not match the correct timestamp
+                        continue
+                    }
 
                     // Scaling before compression with scalefactor
                     if let fma = variable.multiplyAdd {
