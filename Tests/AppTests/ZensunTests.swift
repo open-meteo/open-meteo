@@ -165,6 +165,26 @@ import Testing
         // It is not the same, but it is relatively close without any time shift
         #expect(arraysEqual(averaged, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 6.903125, 117.9211, 305.77502, 484.58722, 614.3561, 680.2455, 677.99414, 578.95483, 430.6342, 270.31412, 90.66743, 3.6926, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
     }
+    
+    @Test func solarInterpolationNegative() {
+        let samples = 4
+        // 7 watts at noon is completely unrealistic, but this case may trigger negative values
+        let directRadiation = [Float(0.0), 0.0, 0.0, 0.0, 0.0, 0.0, 7.0, 116.0, 305.0, 485.0, 615.0, 180.0, 7, 579.0, 428.0, 272.0, 87.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        let time = TimerangeDt(start: Timestamp(2022, 7, 31), nTime: 24, dtSeconds: 3600)
+        let dtNew = time.dtSeconds / samples
+        let timeNew = time.range.add(-time.dtSeconds + dtNew).range(dtSeconds: dtNew)
+        #expect(timeNew.range.lowerBound.iso8601_YYYY_MM_dd_HH_mm == "2022-07-30T23:15")
+        let interpolated = directRadiation.interpolateSolarBackwards(timeOld: time, timeNew: timeNew, latitude: -22.5, longitude: 17, scalefactor: 10000)
+
+        #expect(arraysEqual(interpolated, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 5.0003, 22.6122, 53.1376, 94.259, 138.9004, 185.3877, 233.0431, 281.4476, 330.5519, 378.0594, 423.2058, 465.9643, 509.0662, 561.2819, 607.3815, 625.6637, 590.578, 490.2144, 356.3862, 228.8483, 138.9229, 57.8111, 72.6886, 28.7999, 51.3999, 208.9345, 396.2716, 542.8802, 593.0821, 570.3606, 513.2369, 452.6649, 410.4361, 374.5105, 337.432, 295.9325, 248.6925, 199.1994, 151.0772, 107.102, 68.6961, 35.7946, 13.0862, 1.6842, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        
+        let time2 = TimerangeDt(start: Timestamp(2006, 5, 18), nTime: 24 * 2, dtSeconds: 1800)
+        let grid = RegularGrid(nx: 1, ny: 1, latMin: 52.25, lonMin: 21, dx: 1, dy: 1)
+        /// Artificial radiation drop just before and after missing values
+        var rad = [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 302.0, 10.1, Float.nan, .nan, .nan, .nan, .nan, .nan, 11.0, 44.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+        rad.interpolateInplaceSolarBackwards(time: time2, grid: grid, locationRange: 0..<1, missingValuesAreBackwardsAveraged: false)
+        #expect(arraysEqual(rad, [0.0, 0.0, 0.0, 1.0, 4.0, 23.0, 113.0, 190.0, 284.0, 287.0, 407.0, 568.0, 638.0, 691.0, 706.0, 738.0, 692.0, 559.0, 361.0, 380.0, 420.0, 700.0, 631.0, 659.0, 302.0, 10.1, 11.30978, 12.209529, 12.758652, 12.926316, 6.1488514, 10.5652075, 11.0, 44.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+    }
 
     @Test func solarGapfilling() {
         let time = TimerangeDt(start: Timestamp(2020, 12, 26, 0), nTime: 48, dtSeconds: 3600)

@@ -28,6 +28,12 @@ extension Array where Element == Float {
         let dt = time.dtSeconds
         let dtOld = timeLow.dtSeconds
         let tStart = timeLow.range.lowerBound.timeIntervalSince1970
+        
+        /// Make sure solar radiation does not exceed 95% extraterrestrial radiation.
+        let radLimit = Zensun.solarConstant * 0.95
+
+        /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
+        let radMinium = 5 / Zensun.solarConstant
 
         return time.enumerated().map { i, t in
             // time need to be shifted by dtOld/2 because those are averages over time
@@ -58,10 +64,10 @@ extension Array where Element == Float {
             let solC = solarLow[indexC]
             let solD = solarLow[indexD]
 
-            var ktA = solA <= 0.005 ? .nan : Swift.min(A / solA, 1100)
-            var ktB = solB <= 0.005 ? .nan : Swift.min(B / solB, 1100)
-            var ktC = solC <= 0.005 ? .nan : Swift.min(C / solC, 1100)
-            var ktD = solD <= 0.005 ? .nan : Swift.min(D / solD, 1100)
+            var ktA = solA <= radMinium ? .nan : Swift.min(A / solA, radLimit)
+            var ktB = solB <= radMinium ? .nan : Swift.min(B / solB, radLimit)
+            var ktC = solC <= radMinium ? .nan : Swift.min(C / solC, radLimit)
+            var ktD = solD <= radMinium ? .nan : Swift.min(D / solD, radLimit)
 
             if ktA.isNaN {
                 ktA = !ktB.isNaN ? ktB : !ktC.isNaN ? ktC : ktD
@@ -87,6 +93,11 @@ extension Array where Element == Float {
             let c = -ktA / 2.0 + ktC / 2.0
             let d = ktB
             let h = (a * fraction * fraction * fraction + b * fraction * fraction + c * fraction + d) * solar[i]
+            if h < 0 && B >= 0 && C >= 0 {
+                /// Derivatives may trigger negative radiation, if values drop to fast. Fallback to linear interpolation
+                let linear = (ktB * (1 - fraction) + ktC * fraction) * solar[i]
+                return roundf(linear * scalefactor) / scalefactor
+            }
             /// adjust it to scalefactor, otherwise interpolated values show more level of detail
             return roundf(h * scalefactor) / scalefactor
         }

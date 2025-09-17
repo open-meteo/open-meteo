@@ -7,7 +7,7 @@ import NIO
  Keep track of API keys and update a list of API keys from a file
  */
 public final actor ApiKeyManager {
-    public static var instance = ApiKeyManager()
+    public static let instance = ApiKeyManager()
 
     struct KeyAndLimit: Equatable {
         let key: String.SubSequence

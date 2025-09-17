@@ -25,7 +25,7 @@ final actor RateLimiter {
 
     private var minutelyPerIPv6 = [Int: Float]()
 
-    public static var instance = RateLimiter()
+    public static let instance = RateLimiter()
 
     private init() {}
 
