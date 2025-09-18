@@ -593,62 +593,98 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
  10FGA/10SIA/10UA/10VA/2DA/2TA/EVARA/EWSSARA/FALA/IEWSA/INSSA/LCCA/LICDA/LMLTA/LSPARA/MCPRA/MN2T24A/MSLA/MSRORA/MSSRORA/MX2T24A/NSSSARA/ROARA/RSNA/SDA/SFARA/SICA/SLHFARA/SOIARA/SSHFARA/SSRARA/SSRDARA/SSTA/STAL1/STAL2/STAL3/STAL4/STRARA/STRDARA/SUNDARA/SWVAL1/SWVAL2/SWVAL3/SWVAL4/TCCA/TCIWA/TCLWA/TCO3A/TCWVA/TPARA/TSRARA/TTRARA
  */
 enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
-    case temperature_2m_mean
-    case dew_point_2m_mean
-    case pressure_msl_mean
-    case sea_surface_temperature_mean
-    case wind_u_component_10m_mean
-    case wind_v_component_10m_mean
-    case snowfall_water_equivalent_mean
-    case precipitation_mean
-    case shortwave_radiation_mean
-    case cloud_cover_mean
-    case sunshine_duration_mean
-    case soil_temperature_0_to_7cm_mean
-    case soil_temperature_7_to_28cm_mean
-    case soil_temperature_28_to_100cm_mean
-    case soil_temperature_100_to_255cm_mean
-    case soil_moisture_0_to_7cm_mean
-    case soil_moisture_7_to_28cm_mean
-    case soil_moisture_28_to_100cm_mean
-    case soil_moisture_100_to_255cm_mean
-    case temperature_2m_max24h_mean
-    case temperature_2m_min24h_mean
-    case temperature_2m_mean24h_mean
+    case wind_gusts_10m_anomaly
     
+    case wind_speed_10m_mean
+    case wind_speed_10m_anomaly
+    
+    case albedo_mean
+    case albedo_anomaly
+    
+    case cloud_cover_low_mean
+    case cloud_cover_low_anomaly
+    
+    case showers_mean
+    case showers_anomaly
+    
+    case runoff_mean
+    case runoff_anomaly
+    
+    case snow_density_mean
+    case snow_density_anomaly
+    case snow_depth_mean
+    case snow_depth_anomaly
+    
+    case total_column_integrated_water_vapour_mean
+    case total_column_integrated_water_vapour_anomaly
+    
+    case temperature_2m_mean
     case temperature_2m_anomaly
+    
+    case dew_point_2m_mean
     case dew_point_2m_anomaly
+    
+    case pressure_msl_mean
     case pressure_msl_anomaly
+    
+    case sea_surface_temperature_mean
     case sea_surface_temperature_anomaly
+    
+    case wind_u_component_10m_mean
     case wind_u_component_10m_anomaly
+    
+    case wind_v_component_10m_mean
     case wind_v_component_10m_anomaly
+    
+    case snowfall_water_equivalent_mean
     case snowfall_water_equivalent_anomaly
+    
+    case precipitation_mean
     case precipitation_anomaly
+    
+    case shortwave_radiation_mean
     case shortwave_radiation_anomaly
+    
+    case cloud_cover_mean
     case cloud_cover_anomaly
+    
+    case sunshine_duration_mean
     case sunshine_duration_anomaly
+    
+    case soil_temperature_0_to_7cm_mean
     case soil_temperature_0_to_7cm_anomaly
+    case soil_temperature_7_to_28cm_mean
     case soil_temperature_7_to_28cm_anomaly
+    case soil_temperature_28_to_100cm_mean
     case soil_temperature_28_to_100cm_anomaly
+    case soil_temperature_100_to_255cm_mean
     case soil_temperature_100_to_255cm_anomaly
+    
+    case soil_moisture_0_to_7cm_mean
     case soil_moisture_0_to_7cm_anomaly
+    case soil_moisture_7_to_28cm_mean
     case soil_moisture_7_to_28cm_anomaly
+    
+    case soil_moisture_28_to_100cm_mean
     case soil_moisture_28_to_100cm_anomaly
+    
+    case soil_moisture_100_to_255cm_mean
     case soil_moisture_100_to_255cm_anomaly
+    
+    case temperature_2m_max24h_mean
     case temperature_2m_max24h_anomaly
+    case temperature_2m_min24h_mean
     case temperature_2m_min24h_anomaly
-    case temperature_2m_mean24h_anomaly
-
     
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return (1, -273.15)
-        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean, .temperature_2m_mean24h_mean:
+        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean:
             return (1, -273.15)
         case .temperature_2m_mean, .dew_point_2m_mean:
             return (1, -273.15)
-        case .pressure_msl_mean, .precipitation_anomaly:
+        case .pressure_msl_mean, .pressure_msl_anomaly:
             return (1 / 100, 0)
         //case .shortwave_radiation_mean:
         //    return (1 / 6*3600, 0)
@@ -671,7 +707,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return 20
         case .soil_moisture_0_to_7cm_mean, .soil_moisture_7_to_28cm_mean, .soil_moisture_28_to_100cm_mean, .soil_moisture_100_to_255cm_mean:
             return 1000
-        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean, .temperature_2m_mean24h_mean:
+        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean:
             return 20
         case .sunshine_duration_mean:
             return 1/60
@@ -698,7 +734,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return 200
         case .soil_moisture_0_to_7cm_anomaly, .soil_moisture_7_to_28cm_anomaly, .soil_moisture_28_to_100cm_anomaly, .soil_moisture_100_to_255cm_anomaly:
             return 10000
-        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly, .temperature_2m_mean24h_anomaly:
+        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly:
             return 200
         case .sunshine_duration_anomaly:
             return 10/60
@@ -720,6 +756,40 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return 10
         case .cloud_cover_anomaly:
             return 10
+        case .wind_gusts_10m_anomaly:
+            return 100
+        case .wind_speed_10m_mean:
+            return 10
+        case .wind_speed_10m_anomaly:
+            return 100
+        case .albedo_mean:
+            return 100
+        case .albedo_anomaly:
+            return 100
+        case .cloud_cover_low_mean:
+            return 1
+        case .cloud_cover_low_anomaly:
+            return 10
+        case .showers_mean:
+            return 10
+        case .showers_anomaly:
+            return 100
+        case .runoff_mean:
+            return 10
+        case .runoff_anomaly:
+            return 100
+        case .snow_density_mean:
+            return 10
+        case .snow_density_anomaly:
+            return 100
+        case .snow_depth_mean:
+            return 100
+        case .snow_depth_anomaly:
+            return 1000
+        case .total_column_integrated_water_vapour_mean:
+            return 10
+        case .total_column_integrated_water_vapour_anomaly:
+            return 100
         }
     }
     
@@ -734,7 +804,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .celsius
         case .soil_moisture_0_to_7cm_mean, .soil_moisture_7_to_28cm_mean, .soil_moisture_28_to_100cm_mean, .soil_moisture_100_to_255cm_mean:
             return .cubicMetrePerCubicMetre
-        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean, .temperature_2m_mean24h_mean:
+        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean:
             return .celsius
         case .sunshine_duration_mean:
             return .seconds
@@ -761,7 +831,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .kelvin
         case .soil_moisture_0_to_7cm_anomaly, .soil_moisture_7_to_28cm_anomaly, .soil_moisture_28_to_100cm_anomaly, .soil_moisture_100_to_255cm_anomaly:
             return .cubicMetrePerCubicMetre
-        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly, .temperature_2m_mean24h_anomaly:
+        case .temperature_2m_max24h_anomaly, .temperature_2m_min24h_anomaly:
             return .kelvin
         case .sunshine_duration_anomaly:
             return .seconds
@@ -783,6 +853,40 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .wattPerSquareMetre
         case .cloud_cover_anomaly:
             return .percentage
+        case .wind_gusts_10m_anomaly:
+            return .metrePerSecond
+        case .wind_speed_10m_mean:
+            return .metrePerSecond
+        case .wind_speed_10m_anomaly:
+            return .metrePerSecond
+        case .albedo_mean:
+            return .fraction
+        case .albedo_anomaly:
+            return .fraction
+        case .cloud_cover_low_mean:
+            return .percentage
+        case .cloud_cover_low_anomaly:
+            return .percentage
+        case .showers_mean:
+            return .millimetre
+        case .showers_anomaly:
+            return .millimetre
+        case .runoff_mean:
+            return .millimetre
+        case .runoff_anomaly:
+            return .millimetre
+        case .snow_density_mean:
+            return .kilogramPerSquareMetre
+        case .snow_density_anomaly:
+            return .kilogramPerSquareMetre
+        case .snow_depth_mean:
+            return .metre
+        case .snow_depth_anomaly:
+            return .metre
+        case .total_column_integrated_water_vapour_mean:
+            return .kilogramPerSquareMetre
+        case .total_column_integrated_water_vapour_anomaly:
+            return .kilogramPerSquareMetre
         }
     }
     
@@ -790,7 +894,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         switch self {
         case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return true
-        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean, .temperature_2m_mean24h_mean:
+        case .temperature_2m_max24h_mean, .temperature_2m_min24h_mean:
             return true
         case .temperature_2m_mean, .dew_point_2m_mean: return true
         default:
@@ -814,6 +918,36 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     
     static func from(shortName: String) -> Self? {
         switch shortName {
+        case "10fga":
+            return .wind_gusts_10m_anomaly
+        case "10si":
+            return .wind_speed_10m_mean
+        case "10sia":
+            return .wind_speed_10m_anomaly
+        case "fal":
+            return .albedo_mean
+        case "fala":
+            return .albedo_anomaly
+        case "lcc":
+            return .cloud_cover_low_mean
+        case "lcca":
+            return .cloud_cover_low_anomaly
+        case "cprate":
+            return .showers_mean
+        case "mcpra":
+            return .showers_anomaly
+        case "mrort":
+            return .runoff_mean
+        case "roara":
+            return .runoff_anomaly
+        case "rsn":
+            return .snow_density_mean
+        case "rsna":
+            return .snow_density_anomaly
+        case "sd":
+            return .snow_density_mean
+        case "sda":
+            return .snow_density_anomaly
         case "stl1":
             return .soil_temperature_0_to_7cm_mean
         case "stl2":
@@ -822,7 +956,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .soil_temperature_28_to_100cm_mean
         case "stl4":
             return .soil_temperature_100_to_255cm_mean
-        case "sund":
+        case "msdr":
             return .sunshine_duration_mean
         case "swvl1":
             return .soil_moisture_0_to_7cm_mean
@@ -842,37 +976,35 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .temperature_2m_mean
         case "msl":
             return .pressure_msl_mean
-        case "sf":
+        case "mtsfr":
             return .snowfall_water_equivalent_mean
-        case "ssrd":
+        case "msdsrf":
             return .shortwave_radiation_mean
         case "tcc":
             return .cloud_cover_mean
-        case "tp":
+        case "tprate":
             return .precipitation_mean
-        case "mean2t24":
-            return .temperature_2m_mean24h_mean
         case "mn2t24":
             return .temperature_2m_min24h_mean
         case "mx2t24":
             return .temperature_2m_max24h_mean
-        case "stl1a":
+        case "stal1":
             return .soil_temperature_0_to_7cm_anomaly
-        case "stl2a":
+        case "stal2":
             return .soil_temperature_7_to_28cm_anomaly
-        case "stl3a":
+        case "stal3":
             return .soil_temperature_28_to_100cm_anomaly
-        case "stl4a":
+        case "stal4":
             return .soil_temperature_100_to_255cm_anomaly
-        case "sunda":
+        case "sundara":
             return .sunshine_duration_anomaly
-        case "swvl1a":
+        case "swval1":
             return .soil_moisture_0_to_7cm_anomaly
-        case "swvl2a":
+        case "swval2":
             return .soil_moisture_7_to_28cm_anomaly
-        case "swvl3a":
+        case "swval3":
             return .soil_moisture_28_to_100cm_anomaly
-        case "swvl4a":
+        case "swval4":
             return .soil_moisture_100_to_255cm_anomaly
         case "10ua":
             return .wind_u_component_10m_anomaly
@@ -884,20 +1016,22 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .temperature_2m_anomaly
         case "msla":
             return .pressure_msl_anomaly
-        case "sfa":
+        case "sfara":
             return .snowfall_water_equivalent_anomaly
-        case "ssrda":
+        case "ssrdara":
             return .shortwave_radiation_anomaly
         case "tcca":
             return .cloud_cover_anomaly
-        case "tpa":
+        case "tpara":
             return .precipitation_anomaly
-        case "mean2t24a":
-            return .temperature_2m_mean24h_anomaly
         case "mn2t24a":
             return .temperature_2m_min24h_anomaly
         case "mx2t24a":
             return .temperature_2m_max24h_anomaly
+        case "tcwv":
+            return .total_column_integrated_water_vapour_mean
+        case "tcwva":
+            return .total_column_integrated_water_vapour_anomaly
         default:
             return nil
         }
