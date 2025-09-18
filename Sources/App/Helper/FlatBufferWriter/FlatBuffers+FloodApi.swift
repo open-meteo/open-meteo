@@ -31,9 +31,9 @@ extension GlofasDerivedVariable: FlatBuffersVariable {
 }
 
 extension GlofasDomainApi: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = EnsembleSurfaceVariable
+    typealias HourlyVariable = VariableAndPreviousDay
 
-    typealias HourlyPressureType = EnsemblePressureVariableType
+    typealias HourlyPressureType = ForecastPressureVariableType
 
     typealias HourlyHeightType = ForecastHeightVariableType
 

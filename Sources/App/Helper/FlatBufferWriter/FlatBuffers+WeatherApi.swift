@@ -799,6 +799,39 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .ncep_nam_conus:
             // TODO register
             return .ncepNbmConus
+        case .icon_seamless_eps:
+            return .iconSeamless
+        case .icon_global_eps:
+            return .iconGlobal
+        case .icon_eu_eps:
+            return .iconEu
+        case .icon_d2_eps:
+            return .iconD2
+        case .ecmwf_ifs025_ensemble:
+            return .ecmwfIfs025
+        case .gem_global_ensemble:
+            return .gemGlobal
+        case .ncep_gefs_seamless:
+            return .gfsSeamless
+        case .ncep_gefs025:
+            return .gfs025
+        case .ncep_gefs05, .gfs05:
+            return .gfs05
+        case .bom_access_global_ensemble:
+            return .bomAccessGlobalEnsemble
+        case .ukmo_global_ensemble_20km:
+            return .ukmoGlobalEnsemble20km
+        case .ukmo_uk_ensemble_2km:
+            // TODO register in SDK
+            return .ukmoGlobalEnsemble20km
+        case .ecmwf_aifs025_ensemble:
+            return .ecmwfAifs025
+        case .meteoswiss_icon_ch1_ensemble:
+            // todo register
+            return .iconD2
+        case .meteoswiss_icon_ch2_ensemble:
+            // todo register
+            return .iconD2
         }
     }
 }

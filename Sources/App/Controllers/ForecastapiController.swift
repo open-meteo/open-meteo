@@ -66,7 +66,10 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.getAndPost("flood", use: GloFasController().query)
         categoriesRoute.getAndPost("climate", use: CmipController().query)
         categoriesRoute.getAndPost("marine", use: IconWaveController().query)
-        categoriesRoute.getAndPost("ensemble", use: EnsembleApiController().query)
+        categoriesRoute.getAndPost("ensemble", use: WeatherApiController(
+            defaultModel: .ncep_gefs_seamless,
+            subdomain: "ensemble-api").query
+        )
     }
 }
 
@@ -76,13 +79,15 @@ struct WeatherApiController {
     let defaultModel: MultiDomains
     let subdomain: String
     let alias: [String]
+    let type: ApiType?
 
-    init(has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = []) {
+    init(has15minutely: Bool = true, hasCurrentWeather: Bool = true, defaultModel: MultiDomains, subdomain: String = "api", alias: [String] = [], type: ApiType? = nil) {
         self.has15minutely = has15minutely
         self.hasCurrentWeather = hasCurrentWeather
         self.defaultModel = defaultModel
         self.subdomain = subdomain
         self.alias = alias
+        self.type = type
     }
     
     enum ApiType {
@@ -95,6 +100,7 @@ struct WeatherApiController {
         case satellite
         case singleRunsApi
         case seasonal
+        case ensemble
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -124,7 +130,7 @@ struct WeatherApiController {
 
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter(subdomain, alias: alias) { host, params in
-            let type = ApiType.detect(host: host)
+            let type = type ?? ApiType.detect(host: host)
             let currentTime = Timestamp.now()
             let currentTimeHour0 = currentTime.with(hour: 0)
             
@@ -164,6 +170,10 @@ struct WeatherApiController {
                 forecastDaysMax = 217
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(2020, 1, 1)
+            case .ensemble:
+                forecastDaysMax = 36
+                forecastDayDefault = 7
+                historyStartDate = currentTimeHour0.subtract(days: 93)
             }
             let run = params.run
             switch type {
@@ -173,7 +183,7 @@ struct WeatherApiController {
                 guard run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite:
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble:
                 guard run == nil else {
                     throw ForecastApiError.parameterMostNotBeSet(name: "run")
                 }
@@ -182,7 +192,10 @@ struct WeatherApiController {
             let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
             let allowedRange = historyStartDate ..< currentTimeHour0.add(days: forecastDaysMax)
 
-            let domains = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
+            let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
+            // Translate domain names from Ensemble API for compatibility
+            let domains = type == .ensemble ? domainsParam.map{$0.remappedToEnsembleApi} : domainsParam
+            
             let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
             let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
             let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
@@ -395,6 +408,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gfs_seamless
     case gfs_mix
     case gfs_global
+    case gfs05
     case gfs025
     case gfs013
     case gfs_hrrr
@@ -517,6 +531,60 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case meteoswiss_icon_ch1
     case meteoswiss_icon_ch2
     case meteoswiss_icon_seamless
+    
+    case icon_seamless_eps
+    case icon_global_eps
+    case icon_eu_eps
+    case icon_d2_eps
+
+    case ecmwf_ifs025_ensemble
+    case ecmwf_aifs025_ensemble
+
+    case gem_global_ensemble
+
+    case bom_access_global_ensemble
+
+    case ncep_gefs_seamless
+    case ncep_gefs025
+    case ncep_gefs05
+
+    case ukmo_global_ensemble_20km
+    case ukmo_uk_ensemble_2km
+    
+    case meteoswiss_icon_ch1_ensemble
+    case meteoswiss_icon_ch2_ensemble
+    
+    /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
+    var remappedToEnsembleApi: Self {
+        switch self {
+        case .icon_seamless:
+            return .icon_seamless_eps
+        case .icon_global:
+            return .icon_global_eps
+        case .icon_eu:
+            return .icon_eu_eps
+        case .icon_d2:
+            return .icon_d2_eps
+        case .ecmwf_ifs025:
+            return .ecmwf_ifs025_ensemble
+        case .ecmwf_aifs025:
+            return .ecmwf_aifs025_ensemble
+        case .gem_global:
+            return .gem_global_ensemble
+        case .gfs_seamless:
+            return .ncep_gefs_seamless
+        case .gfs025:
+            return .ncep_gefs025
+        case .gfs05:
+            return .ncep_gefs05
+        case .meteoswiss_icon_ch1:
+            return .meteoswiss_icon_ch1_ensemble
+        case .meteoswiss_icon_ch2:
+            return .meteoswiss_icon_ch2_ensemble
+        default:
+            return self
+        }
+    }
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -805,6 +873,38 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let ch1: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let ch2: (any GenericReaderProtocol)? = try await MeteoSwissReader(domain: .icon_ch2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilitiesCh2, probabilitiesCh1, ch2, ch1].compactMap({ $0 })
+        case .icon_seamless_eps:
+            /// Note: ICON D2 EPS has been excluded, because it only provides 20 members and noticable different results compared to ICON EU EPS
+            /// See: https://github.com/open-meteo/open-meteo/issues/876
+            return try await IconMixer(domains: [.iconEps, .iconEuEps], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
+        case .icon_global_eps:
+            return try await IconReader(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .icon_eu_eps:
+            return try await IconReader(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .icon_d2_eps:
+            return try await IconReader(domain: .iconD2Eps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ecmwf_ifs025_ensemble:
+            return try await EcmwfReader(domain: .ifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ecmwf_aifs025_ensemble:
+            return try await EcmwfReader(domain: .aifs025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_gefs025:
+            return try await GfsReader(domains: [.gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gfs05, .ncep_gefs05:
+            return try await GfsReader(domains: [.gfs05_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_gefs_seamless:
+            return try await GfsReader(domains: [.gfs05_ens, .gfs025_ens], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gem_global_ensemble:
+            return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .bom_access_global_ensemble:
+            return try await BomReader(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ukmo_global_ensemble_20km:
+            return try await UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ukmo_uk_ensemble_2km:
+            return try await UkmoReader(domain: .uk_ensemble_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .meteoswiss_icon_ch1_ensemble:
+            return try await MeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .meteoswiss_icon_ch2_ensemble:
+            return try await MeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         }
     }
 
@@ -970,6 +1070,38 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return MeteoSwissDomain.icon_ch2
         case .meteoswiss_icon_seamless:
             return nil
+        case .gfs05:
+            return nil
+        case .icon_seamless_eps:
+            return nil
+        case .icon_global_eps:
+            return nil
+        case .icon_eu_eps:
+            return nil
+        case .icon_d2_eps:
+            return nil
+        case .ecmwf_ifs025_ensemble:
+            return nil
+        case .ecmwf_aifs025_ensemble:
+            return nil
+        case .gem_global_ensemble:
+            return nil
+        case .bom_access_global_ensemble:
+            return nil
+        case .ncep_gefs_seamless:
+            return nil
+        case .ncep_gefs025:
+            return nil
+        case .ncep_gefs05:
+            return nil
+        case .ukmo_global_ensemble_20km:
+            return nil
+        case .ukmo_uk_ensemble_2km:
+            return nil
+        case .meteoswiss_icon_ch1_ensemble:
+            return nil
+        case .meteoswiss_icon_ch2_ensemble:
+            return nil
         }
     }
 
@@ -1134,6 +1266,38 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await MeteoSwissReader(domain: .icon_ch2, gridpoint: gridpoint, options: options)
         case .meteoswiss_icon_seamless:
             return nil
+        case .gfs05:
+            return nil
+        case .icon_seamless_eps:
+            return nil
+        case .icon_global_eps:
+            return nil
+        case .icon_eu_eps:
+            return nil
+        case .icon_d2_eps:
+            return nil
+        case .ecmwf_ifs025_ensemble:
+            return nil
+        case .ecmwf_aifs025_ensemble:
+            return nil
+        case .gem_global_ensemble:
+            return nil
+        case .bom_access_global_ensemble:
+            return nil
+        case .ncep_gefs_seamless:
+            return nil
+        case .ncep_gefs025:
+            return nil
+        case .ncep_gefs05:
+            return nil
+        case .ukmo_global_ensemble_20km:
+            return nil
+        case .ukmo_uk_ensemble_2km:
+            return nil
+        case .meteoswiss_icon_ch1_ensemble:
+            return nil
+        case .meteoswiss_icon_ch2_ensemble:
+            return nil
         }
     }
 
@@ -1141,6 +1305,36 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         switch self {
         case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
             return 51
+        case .icon_seamless_eps:
+            return IconDomains.iconEps.countEnsembleMember
+        case .icon_global_eps:
+            return IconDomains.iconEps.countEnsembleMember
+        case .icon_eu_eps:
+            return IconDomains.iconEuEps.countEnsembleMember
+        case .icon_d2_eps:
+            return IconDomains.iconD2Eps.countEnsembleMember
+        case .ecmwf_ifs025_ensemble:
+            return EcmwfDomain.ifs025_ensemble.countEnsembleMember
+        case .ecmwf_aifs025_ensemble:
+            return EcmwfDomain.aifs025_ensemble.countEnsembleMember
+        case .ncep_gefs025:
+            return GfsDomain.gfs025_ens.countEnsembleMember
+        case .ncep_gefs05:
+            return GfsDomain.gfs05_ens.countEnsembleMember
+        case .ncep_gefs_seamless:
+            return GfsDomain.gfs05_ens.countEnsembleMember
+        case .gem_global_ensemble:
+            return GemDomain.gem_global_ensemble.countEnsembleMember
+        case .bom_access_global_ensemble:
+            return BomDomain.access_global_ensemble.countEnsembleMember
+        case .ukmo_global_ensemble_20km:
+            return UkmoDomain.global_ensemble_20km.countEnsembleMember
+        case .ukmo_uk_ensemble_2km:
+            return UkmoDomain.uk_ensemble_2km.countEnsembleMember
+        case .meteoswiss_icon_ch1_ensemble:
+            return MeteoSwissDomain.icon_ch1_ensemble.countEnsembleMember
+        case .meteoswiss_icon_ch2_ensemble:
+            return MeteoSwissDomain.icon_ch2_ensemble.countEnsembleMember
         default:
             return 1
         }

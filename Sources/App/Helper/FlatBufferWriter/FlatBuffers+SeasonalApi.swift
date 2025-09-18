@@ -82,7 +82,7 @@ extension DailyCfsVariable: FlatBuffersVariable {
 extension SeasonalForecastDomainApi: ModelFlatbufferSerialisable {
     typealias HourlyVariable = SeasonalForecastVariable
 
-    typealias HourlyPressureType = EnsemblePressureVariableType
+    typealias HourlyPressureType = ForecastPressureVariableType
 
     typealias HourlyHeightType = ForecastHeightVariableType
 
