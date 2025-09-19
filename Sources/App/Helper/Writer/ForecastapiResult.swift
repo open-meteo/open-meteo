@@ -25,32 +25,6 @@ extension ModelFlatbufferSerialisable {
     }
 }
 
-fileprivate struct ModelAndSection<Model: ModelFlatbufferSerialisable, Variable: RawRepresentableString> {
-    let model: Model
-    let section: () async throws -> ApiSection<Variable>
-
-    static func run(sections: [Self]) async throws -> ApiSectionString {
-        let run = try await sections.asyncCompactMap({ m in
-            let h = try await m.section()
-            return ApiSectionString(name: h.name, time: h.time, columns: h.columns.flatMap { c in
-                return c.variables.enumerated().map { member, data in
-                    let member = member + Model.memberOffset
-                    let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
-                    let variable = sections.count > 1 ? "\(variableAndMember)_\(m.model.rawValue)" : variableAndMember
-                    return ApiColumnString(variable: variable, unit: c.unit, data: data)
-                }
-            })
-        })
-        guard let first = run.first else {
-            throw ForecastApiError.noDataAvailableForThisLocation
-        }
-        guard !run.contains(where: { $0.time.dtSeconds != first.time.dtSeconds }) else {
-            throw ForecastApiError.cannotReturnModelsWithDifferentTimeIntervals
-        }
-        return ApiSectionString(name: first.name, time: first.time, columns: run.flatMap { $0.columns })
-    }
-}
-
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
     func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
@@ -92,52 +66,58 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
 
         func current() async throws -> ApiSectionSingle<String>? {
-            let run = results.compactMap({ m in m.current.map { (model: m.model, section: $0) } })
-            guard run.count > 0 else {
-                return nil
-            }
-            let sections = try await run.asyncCompactMap({ m in
-                let h = try await m.section()
+            let sections = try await results.asyncCompactMap({ perModel -> ApiSectionSingle<String>? in
+                guard let h = try await perModel.current?() else {
+                    return nil
+                }
                 return ApiSectionSingle<String>(name: h.name, time: h.time, dtSeconds: h.dtSeconds, columns: h.columns.map { c in
-                    let variable = run.count > 1 ? "\(c.variable.rawValue)_\(m.model.rawValue)" : c.variable.rawValue
+                    let variable = results.count > 1 ? "\(c.variable.rawValue)_\(perModel.model.rawValue)" : c.variable.rawValue
                     return ApiColumnSingle<String>(variable: variable, unit: c.unit, value: c.value)
                 })
             })
             guard let first = sections.first else {
-                throw ForecastApiError.noDataAvailableForThisLocation
+                return nil
             }
             return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: sections.flatMap { $0.columns })
         }
 
         /// Merge all hourly sections and prefix with the domain name if required
         func hourly() async throws -> ApiSectionString? {
-            let run = results.compactMap({ m in m.hourly.map { ModelAndSection(model: m.model, section: $0) } })
-            guard run.count > 0 else {
-                return nil
-            }
-            return try await ModelAndSection.run(sections: run)
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.hourly?() else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel.model : nil)
+            })
+            return try run.merge()
         }
 
         func daily() async throws -> ApiSectionString? {
-            let run = results.compactMap({ m in m.daily.map { ModelAndSection(model: m.model, section: $0) } })
-            guard run.count > 0 else {
-                return nil
-            }
-            return try await ModelAndSection.run(sections: run)
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.daily?() else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel.model : nil)
+            })
+            return try run.merge()
         }
         func sixHourly () async throws -> ApiSectionString? {
-            let run = results.compactMap({ m in m.sixHourly.map { ModelAndSection(model: m.model, section: $0) } })
-            guard run.count > 0 else {
-                return nil
-            }
-            return try await ModelAndSection.run(sections: run)
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.sixHourly?() else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel.model : nil)
+            })
+            return try run.merge()
         }
         func minutely15() async throws -> ApiSectionString? {
-            let run = results.compactMap({ m in m.minutely15.map { ModelAndSection(model: m.model, section: $0) } })
-            guard run.count > 0 else {
-                return nil
-            }
-            return try await ModelAndSection.run(sections: run)
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.minutely15?() else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel.model : nil)
+            })
+            return try run.merge()
         }
     }
 
@@ -343,6 +323,32 @@ struct ApiSectionSingle<Variable> {
     let dtSeconds: Int
     let columns: [ApiColumnSingle<Variable>]
 }
+
+extension ApiSection where Variable: RawRepresentableString {
+    func toApiSectionString<Model: RawRepresentableString>(memberOffset: Int, model: Model?) -> ApiSectionString {
+        return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
+            return c.variables.enumerated().map { member, data in
+                let member = member + memberOffset
+                let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
+                let variable = model.map { "\(variableAndMember)_\($0.rawValue)" } ?? variableAndMember
+                return ApiColumnString(variable: variable, unit: c.unit, data: data)
+            }
+        })
+    }
+}
+
+extension Array where Element == ApiSectionString {
+    func merge() throws -> ApiSectionString? {
+        guard let first = self.first else {
+            return nil
+        }
+        guard !self.contains(where: { $0.time.dtSeconds != first.time.dtSeconds }) else {
+            throw ForecastApiError.cannotReturnModelsWithDifferentTimeIntervals
+        }
+        return ApiSectionString(name: first.name, time: first.time, columns: self.flatMap { $0.columns })
+    }
+}
+
 
 enum ForecastResultFormat: String, Codable {
     case json
