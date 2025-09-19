@@ -88,66 +88,56 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
 
         func runAllSections() async throws -> [ApiSectionString] {
-            return [try await minutely15?(), try await hourly?(), try await sixHourly?(), try await daily?()].compactMap({ $0 })
+            return [try await minutely15(), try await hourly(), try await sixHourly(), try await daily()].compactMap({ $0 })
         }
 
-        var current: (() async throws -> ApiSectionSingle<String>)? {
+        func current() async throws -> ApiSectionSingle<String>? {
             let run = results.compactMap({ m in m.current.map { (model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
-            return {
-                let run = try await run.asyncCompactMap({ m in
-                    let h = try await m.section()
-                    return ApiSectionSingle<String>(name: h.name, time: h.time, dtSeconds: h.dtSeconds, columns: h.columns.map { c in
-                        let variable = run.count > 1 ? "\(c.variable.rawValue)_\(m.model.rawValue)" : c.variable.rawValue
-                        return ApiColumnSingle<String>(variable: variable, unit: c.unit, value: c.value)
-                    })
+            let sections = try await run.asyncCompactMap({ m in
+                let h = try await m.section()
+                return ApiSectionSingle<String>(name: h.name, time: h.time, dtSeconds: h.dtSeconds, columns: h.columns.map { c in
+                    let variable = run.count > 1 ? "\(c.variable.rawValue)_\(m.model.rawValue)" : c.variable.rawValue
+                    return ApiColumnSingle<String>(variable: variable, unit: c.unit, value: c.value)
                 })
-                guard let first = run.first else {
-                    throw ForecastApiError.noDataAvailableForThisLocation
-                }
-                return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: run.flatMap { $0.columns })
+            })
+            guard let first = sections.first else {
+                throw ForecastApiError.noDataAvailableForThisLocation
             }
+            return ApiSectionSingle<String>(name: first.name, time: first.time, dtSeconds: first.dtSeconds, columns: sections.flatMap { $0.columns })
         }
 
         /// Merge all hourly sections and prefix with the domain name if required
-        var hourly: (() async throws -> ApiSectionString)? {
+        func hourly() async throws -> ApiSectionString? {
             let run = results.compactMap({ m in m.hourly.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
-            return {
-                try await ModelAndSection.run(sections: run)
-            }
+            return try await ModelAndSection.run(sections: run)
         }
 
-        var daily: (() async throws -> ApiSectionString)? {
+        func daily() async throws -> ApiSectionString? {
             let run = results.compactMap({ m in m.daily.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
-            return {
-                try await ModelAndSection.run(sections: run)
-            }
+            return try await ModelAndSection.run(sections: run)
         }
-        var sixHourly: (() async throws -> ApiSectionString)? {
+        func sixHourly () async throws -> ApiSectionString? {
             let run = results.compactMap({ m in m.sixHourly.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
-            return {
-                try await ModelAndSection.run(sections: run)
-            }
+            return try await ModelAndSection.run(sections: run)
         }
-        var minutely15: (() async throws -> ApiSectionString)? {
+        func minutely15() async throws -> ApiSectionString? {
             let run = results.compactMap({ m in m.minutely15.map { ModelAndSection(model: m.model, section: $0) } })
             guard run.count > 0 else {
                 return nil
             }
-            return {
-                try await ModelAndSection.run(sections: run)
-            }
+            return try await ModelAndSection.run(sections: run)
         }
     }
 
