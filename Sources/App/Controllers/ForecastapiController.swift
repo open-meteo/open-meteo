@@ -377,6 +377,93 @@ struct WeatherApiController {
             return ForecastapiResult<MultiDomains>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
         }
     }
+    
+    
+    func query2(_ req: Request) async throws -> Response {
+        try await req.withApiParameter(subdomain, alias: alias) { host, params -> ForecastapiResult2 in
+            let type = type ?? ApiType.detect(host: host)
+            let currentTime = Timestamp.now()
+            let currentTimeHour0 = currentTime.with(hour: 0)
+            
+            let forecastDaysMax: Int
+            let forecastDayDefault: Int
+            let historyStartDate: Timestamp
+            switch type {
+            case .none:
+                forecastDaysMax = 217
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(1940, 1, 1)
+            case .forecast:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = currentTimeHour0.subtract(days: 93)
+            case .archive:
+                forecastDaysMax = 1
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(1940, 1, 1)
+            case .historicalForecast:
+                forecastDaysMax = 16
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(2016, 1, 1)
+            case .previousRuns:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2016, 1, 1)
+            case .satellite:
+                forecastDaysMax = 1
+                forecastDayDefault = 1
+                historyStartDate = Timestamp(1983, 1, 1)
+            case .singleRunsApi:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2023, 1, 1)
+            case .seasonal:
+                forecastDaysMax = 217
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2020, 1, 1)
+            case .ensemble:
+                forecastDaysMax = 36
+                forecastDayDefault = 7
+                historyStartDate = currentTimeHour0.subtract(days: 93)
+            }
+            let run = params.run
+            switch type {
+            case .none, .seasonal:
+                break
+            case .singleRunsApi:
+                guard run != nil else {
+                    throw ForecastApiError.parameterIsRequired(name: "run")
+                }
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble:
+                guard run == nil else {
+                    throw ForecastApiError.parameterMostNotBeSet(name: "run")
+                }
+            }
+            
+            let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
+            let allowedRange = historyStartDate ..< currentTimeHour0.add(days: forecastDaysMax)
+
+            let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
+            // Translate domain names from Ensemble API for compatibility
+            let domains = type == .ensemble ? domainsParam.map{$0.remappedToEnsembleApi} : domainsParam
+            
+            let paramsMinutely: [FlatBufferVariable]? = has15minutely ? try FlatBufferVariable.load(commaSeparatedOptional: params.minutely_15) : nil
+            //let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
+            let paramsCurrent: [FlatBufferVariable]? = try FlatBufferVariable.load(commaSeparatedOptional: params.current)
+            let paramsHourly: [FlatBufferVariable]? = try FlatBufferVariable.load(commaSeparatedOptional: params.hourly)
+            let paramsDaily: [FlatBufferVariable]? = try FlatBufferVariable.load(commaSeparatedOptional: params.daily)
+            let nParamsHourly = paramsHourly?.count ?? 0
+            let nParamsMinutely = paramsMinutely?.count ?? 0
+            let nParamsCurrent = paramsCurrent?.count ?? 0
+            let nParamsDaily = paramsDaily?.count ?? 0
+            let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember })
+            let options = try params.readerOptions(for: req)
+            
+            
+            
+            fatalError()
+        }
+    }
 }
 
 extension ForecastVariable {
