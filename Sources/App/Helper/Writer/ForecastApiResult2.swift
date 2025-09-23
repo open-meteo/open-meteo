@@ -7,7 +7,7 @@
 
 import Vapor
 
-protocol GenericReaderProtocolFB {
+/*protocol GenericReaderProtocolFB {
     //func cast(variable: FlatBufferVariable) -> Self.MixingVar?
     
     func get(variable: FlatBufferVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit?
@@ -262,3 +262,4 @@ struct ForecastapiResult2: ForecastapiResponder, @unchecked Sendable {
         })
     }
 }
+*/

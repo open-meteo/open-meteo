@@ -336,7 +336,7 @@ extension ApiSection where Variable: RawRepresentableString {
         })
     }
     
-    func toApiSectionString(memberOffset: Int, model: GenericDomainFB?) -> ApiSectionString {
+    /*func toApiSectionString(memberOffset: Int, model: GenericDomainFB?) -> ApiSectionString {
         return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
             return c.variables.enumerated().map { member, data in
                 let member = member + memberOffset
@@ -345,7 +345,7 @@ extension ApiSection where Variable: RawRepresentableString {
                 return ApiColumnString(variable: variable, unit: c.unit, data: data)
             }
         })
-    }
+    }*/
 }
 
 extension Array where Element == ApiSectionString {

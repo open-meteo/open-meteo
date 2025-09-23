@@ -190,7 +190,7 @@ extension ForecastapiResult.PerLocation {
 
 
 
-extension ForecastapiResult2 {
+/*extension ForecastapiResult2 {
     /**
      Stream a potentially very large resultset to the client. The JSON file could easily be 20 MB.
      Instead of generating a massive string in memory, we only allocate 18kb and flush every time the buffer exceeds 16kb.
@@ -352,3 +352,4 @@ extension ForecastapiResult2.PerLocation {
         b.buffer.writeString("}")
     }
 }
+*/

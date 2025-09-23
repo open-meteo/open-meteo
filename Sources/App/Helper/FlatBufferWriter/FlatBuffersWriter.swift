@@ -49,40 +49,7 @@ fileprivate extension FlatBuffers.ByteBuffer {
 }
 
 
-struct FlatBufferVariable: RawRepresentableString {
-    enum SurfaceOrPressure {
-        // altitude=0 is surface
-        case altitude(variable: openmeteo_sdk_Variable, altitude: Int16)
-        case pressure(variable: openmeteo_sdk_Variable, pressureLevel: Int16)
-        case depth(variable: openmeteo_sdk_Variable, depth: Int16)
-        case depthFromTo(variable: openmeteo_sdk_Variable, depth: Int16, depthTo: Int16)
-    }
-    
-    let variable: SurfaceOrPressure
-    let previousDay: Int16
-    let aggregation: openmeteo_sdk_Aggregation
-    
-    var variableSdk: openmeteo_sdk_Variable {
-        switch variable {
-        case .altitude(let variable, let altitude):
-            return variable
-        case .pressure(let variable, let pressureLevel):
-            return variable
-        case .depth(let variable, let depth):
-            return variable
-        case .depthFromTo(let variable, let depth, let depthTo):
-            return variable
-        }
-    }
-    
-    init?(rawValue: String) {
-        fatalError()
-    }
-    
-    var rawValue: String {
-        fatalError()
-    }
-}
+
 
 /// Encode meta data for flatbuffer variables
 struct FlatBufferVariableMeta {

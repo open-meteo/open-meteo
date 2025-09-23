@@ -12,6 +12,11 @@ import VaporTesting
         }
         return
     }*/
+    
+    @Test func parseFlatBufferVariable() throws {
+        let t2m = FlatBufferVariable(rawValue: "temperature_2m_minimum_previous_day4")
+        #expect(t2m == FlatBufferVariable(variable: .altitude(variable: .temperature, altitude: 2), previousDay: 4, aggregation: .minimum))
+    }
 
     @Test func timeSelection() throws {
         let current = Timestamp(2024, 02, 03, 12, 24)

@@ -379,7 +379,7 @@ struct WeatherApiController {
     }
     
     
-    func query2(_ req: Request) async throws -> Response {
+    /*func query2(_ req: Request) async throws -> Response {
         try await req.withApiParameter(subdomain, alias: alias) { host, params -> ForecastapiResult2 in
             let type = type ?? ApiType.detect(host: host)
             let currentTime = Timestamp.now()
@@ -463,7 +463,7 @@ struct WeatherApiController {
             
             fatalError()
         }
-    }
+    }*/
 }
 
 extension ForecastVariable {
