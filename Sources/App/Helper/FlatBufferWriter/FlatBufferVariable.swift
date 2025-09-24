@@ -1,7 +1,7 @@
 import OpenMeteoSdk
 
 
-
+/*
 struct VariableGeneric {
     enum Hourly {
         case surface(ForecastSurfaceVariable)
@@ -148,3 +148,4 @@ extension openmeteo_sdk_Variable {
         }
     }
 }
+*/

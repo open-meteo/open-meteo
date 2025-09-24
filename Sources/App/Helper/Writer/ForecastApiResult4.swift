@@ -11,8 +11,6 @@ import Vapor
 
 protocol ModelFlatbufferSerialisable4 {
     associatedtype HourlyVariable: FlatBuffersVariable
-    associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
-    associatedtype HourlyHeightType: FlatBuffersVariable, RawRepresentable, Equatable
     associatedtype DailyVariable: FlatBuffersVariable
 
     /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
@@ -28,12 +26,13 @@ protocol ModelFlatbufferSerialisable4 {
     /// Desired elevation from a DEM. Used in statistical downscaling
     var elevation: Float? { get }
 
-    func prefetch() async throws -> Void
-    func current() async throws -> ApiSectionSingle<ForecastapiResult4<Self>.SurfacePressureAndHeightVariable>?
-    func hourly() async throws -> ApiSection<ForecastapiResult4<Self>.SurfacePressureAndHeightVariable>?
-    func daily() async throws -> ApiSection<DailyVariable>?
-    func sixHourly() async throws -> ApiSection<ForecastapiResult4<Self>.SurfacePressureAndHeightVariable>?
-    func minutely15() async throws -> ApiSection<ForecastapiResult4<Self>.SurfacePressureAndHeightVariable>?
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws -> Void
+    
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>?
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>?
 }
 
 
@@ -62,11 +61,22 @@ struct ForecastapiResult4<Model: ModelFlatbufferSerialisable4>: ForecastapiRespo
 
     /// Number of variables times number of somains. Used to rate limiting
     let nVariablesTimesDomains: Int
+    
+    struct RequestVariables {
+        let currentVariables: [Model.HourlyVariable]?
+        let minutely15Variables: [Model.HourlyVariable]?
+        let hourlyVariables: [Model.HourlyVariable]?
+        let sixHourlyVariables: [Model.HourlyVariable]?
+        let dailyVariables: [Model.DailyVariable]?
+    }
+    let variables: RequestVariables
 
-    init(timeformat: Timeformat, results: [PerLocation], nVariablesTimesDomains: Int = 1) {
+
+    init(timeformat: Timeformat, results: [PerLocation], currentVariables: [Model.HourlyVariable]?, minutely15Variables: [Model.HourlyVariable]?, hourlyVariables: [Model.HourlyVariable]?, sixHourlyVariables: [Model.HourlyVariable]?, dailyVariables: [Model.DailyVariable]?, nVariablesTimesDomains: Int = 1) {
         self.timeformat = timeformat
         self.results = results
         self.nVariablesTimesDomains = nVariablesTimesDomains
+        self.variables = RequestVariables(currentVariables: currentVariables, minutely15Variables: minutely15Variables, hourlyVariables: hourlyVariables, sixHourlyVariables: sixHourlyVariables, dailyVariables: dailyVariables)
     }
 
     struct PerLocation {
@@ -79,13 +89,21 @@ struct ForecastapiResult4<Model: ModelFlatbufferSerialisable4>: ForecastapiRespo
             timezone.utcOffsetSeconds
         }
 
-        func runAllSections() async throws -> [ApiSectionString] {
-            return [try await minutely15(), try await hourly(), try await sixHourly(), try await daily()].compactMap({ $0 })
+        func runAllSections(minutely15Variables: [Model.HourlyVariable]?, hourlyVariables: [Model.HourlyVariable]?, sixHourlyVariables: [Model.HourlyVariable]?, dailyVariables: [Model.DailyVariable]?) async throws -> [ApiSectionString] {
+            return [
+                try await minutely15(variables: minutely15Variables),
+                try await hourly(variables: hourlyVariables),
+                try await sixHourly(variables: sixHourlyVariables),
+                try await daily(variables: dailyVariables)
+            ].compactMap({ $0 })
         }
 
-        func current() async throws -> ApiSectionSingle<String>? {
+        func current(variables: [Model.HourlyVariable]?) async throws -> ApiSectionSingle<String>? {
+            guard let variables else {
+                return nil
+            }
             let sections = try await results.asyncCompactMap({ perModel -> ApiSectionSingle<String>? in
-                guard let h = try await perModel.current() else {
+                guard let h = try await perModel.current(variables: variables) else {
                     return nil
                 }
                 return ApiSectionSingle<String>(name: h.name, time: h.time, dtSeconds: h.dtSeconds, columns: h.columns.map { c in
@@ -100,160 +118,78 @@ struct ForecastapiResult4<Model: ModelFlatbufferSerialisable4>: ForecastapiRespo
         }
 
         /// Merge all hourly sections and prefix with the domain name if required
-        func hourly() async throws -> ApiSectionString? {
-            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
-                guard let h = try await perModel.hourly() else {
-                    return nil
-                }
-                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
-            })
-            return try run.merge()
-        }
-
-        func daily() async throws -> ApiSectionString? {
-            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
-                guard let h = try await perModel.daily() else {
-                    return nil
-                }
-                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
-            })
-            return try run.merge()
-        }
-        func sixHourly () async throws -> ApiSectionString? {
-            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
-                guard let h = try await perModel.sixHourly() else {
-                    return nil
-                }
-                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
-            })
-            return try run.merge()
-        }
-        func minutely15() async throws -> ApiSectionString? {
-            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
-                guard let h = try await perModel.minutely15() else {
-                    return nil
-                }
-                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
-            })
-            return try run.merge()
-        }
-    }
-
-    /*struct PerModel {
-        let model: Model
-        let latitude: Float
-        let longitude: Float
-
-        /// Desired elevation from a DEM. Used in statistical downscaling
-        let elevation: Float?
-
-        let prefetch: (() async throws -> Void)
-        let current: (() async throws -> ApiSectionSingle<SurfacePressureAndHeightVariable>)?
-        let hourly: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let daily: (() async throws -> ApiSection<Model.DailyVariable>)?
-        let sixHourly: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-        let minutely15: (() async throws -> ApiSection<SurfacePressureAndHeightVariable>)?
-
-        /// e.g. `52.52N13.42E38m`
-        var formatedCoordinatesFilename: String {
-            let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
-            let ele = elevation.map { $0.isFinite ? String(format: "%.0fm", $0) : "" } ?? ""
-            return longitude < 0 ? String(format: "\(lat)%.2fW\(ele)", abs(longitude)) : String(format: "\(lat)%.2fE\(ele)", longitude)
-        }
-    }*/
-
-    struct PressureVariableAndLevel {
-        let variable: Model.HourlyPressureType
-        let level: Int
-
-        init(_ variable: Model.HourlyPressureType, _ level: Int) {
-            self.variable = variable
-            self.level = level
-        }
-    }
-
-    struct HeightVariableAndLevel {
-        let variable: Model.HourlyHeightType
-        let level: Int
-
-        init(_ variable: Model.HourlyHeightType, _ level: Int) {
-            self.variable = variable
-            self.level = level
-        }
-    }
-
-    /// Enum with surface and pressure variable
-    enum SurfacePressureAndHeightVariable: RawRepresentableString, FlatBuffersVariable {
-        init?(rawValue: String) {
-            fatalError()
-        }
-
-        var rawValue: String {
-            switch self {
-            case .surface(let v):
-                return v.rawValue
-            case .pressure(let v):
-                return "\(v.variable.rawValue)_\(v.level)hPa"
-            case .height(let v):
-                return "\(v.variable.rawValue)_\(v.level)m"
+        func hourly(variables: [Model.HourlyVariable]?) async throws -> ApiSectionString? {
+            guard let variables else {
+                return nil
             }
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.hourly(variables: variables) else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
+            })
+            return try run.merge()
         }
 
-        case surface(Model.HourlyVariable)
-        case pressure(PressureVariableAndLevel)
-        case height(HeightVariableAndLevel)
-
-        func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-            switch self {
-            case .surface(let hourlyVariable):
-                return hourlyVariable.getFlatBuffersMeta()
-            case .pressure(let pressureVariableAndLevel):
-                let meta = pressureVariableAndLevel.variable.getFlatBuffersMeta()
-                return FlatBufferVariableMeta(
-                    variable: meta.variable,
-                    aggregation: meta.aggregation,
-                    altitude: meta.altitude,
-                    pressureLevel: Int16(pressureVariableAndLevel.level),
-                    depth: meta.depth,
-                    depthTo: meta.depthTo
-                )
-            case .height(let heightVariableAndLevel):
-                let meta = heightVariableAndLevel.variable.getFlatBuffersMeta()
-                return FlatBufferVariableMeta(
-                    variable: meta.variable,
-                    aggregation: meta.aggregation,
-                    altitude: Int16(heightVariableAndLevel.level),
-                    depth: meta.depth,
-                    depthTo: meta.depthTo
-                )
+        func daily(variables: [Model.DailyVariable]?) async throws -> ApiSectionString? {
+            guard let variables else {
+                return nil
             }
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.daily(variables: variables) else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
+            })
+            return try run.merge()
+        }
+        func sixHourly(variables: [Model.HourlyVariable]?) async throws -> ApiSectionString? {
+            guard let variables else {
+                return nil
+            }
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.sixHourly(variables: variables) else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
+            })
+            return try run.merge()
+        }
+        func minutely15(variables: [Model.HourlyVariable]?) async throws -> ApiSectionString? {
+            guard let variables else {
+                return nil
+            }
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.minutely15(variables: variables) else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
+            })
+            return try run.merge()
         }
     }
 
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
-        //let loop = ForecastapiController.runLoop
-        //return try await loop.next() {
-            if format == .xlsx && results.count > 100 {
-                throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
+        if format == .xlsx && results.count > 100 {
+            throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
+        }
+        for location in results {
+            for model in location.results {
+                try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables)
             }
-            for location in results {
-                for model in location.results {
-                    try await model.prefetch()
-                }
-            }
-            switch format ?? .json {
-            case .json:
-                return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
-            case .xlsx:
-                return try await toXlsxResponse(timestamp: timestamp)
-            case .csv:
-                return try toCsvResponse(concurrencySlot: concurrencySlot)
-            case .flatbuffers:
-                return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
-            }
-        //}.get()
+        }
+        switch format ?? .json {
+        case .json:
+            return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
+        case .xlsx:
+            return try await toXlsxResponse(timestamp: timestamp)
+        case .csv:
+            return try toCsvResponse(concurrencySlot: concurrencySlot)
+        case .flatbuffers:
+            return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
+        }
     }
 
     /// Calculate excess weight of an API query. The following factors are considered:

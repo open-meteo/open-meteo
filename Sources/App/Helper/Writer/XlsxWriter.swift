@@ -92,19 +92,19 @@ extension ForecastapiResult4 {
             sheet.endRow()
         }
         for location in results {
-            try await location.current()?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            try await location.current(variables: variables.currentVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
         for location in results {
-            try await location.minutely15()?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            try await location.minutely15(variables: variables.minutely15Variables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
         for location in results {
-            try await location.hourly()?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            try await location.hourly(variables: variables.hourlyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
         for location in results {
-            try await location.sixHourly()?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            try await location.sixHourly(variables: variables.sixHourlyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
         for location in results {
-            try await location.daily()?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+            try await location.daily(variables: variables.dailyVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
 
         let data = sheet.write(timestamp: timestamp)

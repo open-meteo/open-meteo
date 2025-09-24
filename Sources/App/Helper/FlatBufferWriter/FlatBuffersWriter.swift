@@ -64,7 +64,7 @@ extension ForecastapiResult4 {
                 // try await b.flushIfRequired()
                 for location in results {
                     for model in location.results {
-                        try await model.writeToFlatbuffer(&fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
+                        try await model.writeToFlatbuffer(&fbb, variables: variables, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
                         b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
                         fbb.clear()
                         try await b.flushIfRequired()
@@ -222,13 +222,13 @@ extension ForecastapiResult.PerModel {
 }
 
 extension ModelFlatbufferSerialisable4 {
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult4<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
         let generationTimeStart = Date()
-        let hourly = await (try hourly()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
-        let minutely15 = await (try minutely15()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
-        let sixHourly = await (try sixHourly()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
-        let daily = await (try daily()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
-        let current = await (try current()).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
+        let hourly = await (try hourly(variables: variables.hourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let sixHourly = await (try sixHourly(variables: variables.sixHourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let daily = await (try daily(variables: variables.dailyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let current = await (try current(variables: variables.currentVariables)).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 
         let result = openmeteo_sdk_WeatherApiResponse.createWeatherApiResponse(

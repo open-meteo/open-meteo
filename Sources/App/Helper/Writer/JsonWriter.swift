@@ -214,7 +214,7 @@ extension ForecastapiResult4 {
                     if i != 0 {
                         b.buffer.writeString(",")
                     }
-                    try await location.streamJsonResponse(to: &b, timeformat: timeformat, fixedGenerationTime: fixedGenerationTime)
+                    try await location.streamJsonResponse(to: &b, timeformat: timeformat, variables: variables, fixedGenerationTime: fixedGenerationTime)
                 }
                 if isMultiPoint {
                     b.buffer.writeString("]")
@@ -229,13 +229,14 @@ extension ForecastapiResult4 {
 }
 
 extension ForecastapiResult4.PerLocation {
-    fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
+    fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, variables: ForecastapiResult4<Model>.RequestVariables, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {
             throw ForecastApiError.noDataAvailableForThisLocation
         }
-        let sections = try await runAllSections()
-        let current = try await first.current()
+        let sections = try await runAllSections(minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables)
+        let current = try await first.current(variables: variables.currentVariables)
+        
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
 
         b.buffer.writeString("""
