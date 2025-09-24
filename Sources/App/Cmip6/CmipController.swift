@@ -22,7 +22,7 @@ struct CmipController {
             let biasCorrection = !(params.disable_bias_correction ?? false)
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
-            let locations: [ForecastapiResult4<CmipDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<CmipDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -51,12 +51,12 @@ struct CmipController {
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
             // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
-            return ForecastapiResult4<CmipDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables / 24 / 5)
+            return ForecastapiResult<CmipDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables / 24 / 5)
         }
     }
 }
 
-struct CmipDomainsReader: ModelFlatbufferSerialisable4 {
+struct CmipDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = ForecastVariable
     
     typealias DailyVariable = Cmip6VariableOrDerivedPostBias

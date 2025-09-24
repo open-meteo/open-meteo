@@ -3,7 +3,7 @@ import FlatBuffers
 import Vapor
 import OpenMeteoSdk
 
-extension ForecastapiResult4 {
+extension ForecastapiResult {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
     /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
@@ -153,8 +153,8 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
     }
 }
 
-extension ModelFlatbufferSerialisable4 {
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult4<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
+extension ModelFlatbufferSerialisable {
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
         let generationTimeStart = Date()
         let hourly = await (try hourly(variables: variables.hourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()

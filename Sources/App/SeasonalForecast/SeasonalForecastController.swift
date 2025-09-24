@@ -162,7 +162,7 @@ struct SeasonalForecastController {
             let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, { $0 + $1.forecastDomain.nMembers })
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
-            let locations: [ForecastapiResult4<SeasonalDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<SeasonalDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -179,13 +179,13 @@ struct SeasonalForecastController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult4<SeasonalDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<SeasonalDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
 
-struct SeasonalDomainsReader: ModelFlatbufferSerialisable4 {
+struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = SeasonalForecastVariable
     
     typealias DailyVariable = DailyCfsVariable

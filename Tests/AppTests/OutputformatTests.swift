@@ -7,7 +7,7 @@ import VaporTesting
 import OpenMeteoSdk
 
 
-struct DummyDataProvider: ModelFlatbufferSerialisable4 {
+struct DummyDataProvider: ModelFlatbufferSerialisable {
     typealias HourlyVariable = ForecastVariable
     
     typealias DailyVariable = ForecastVariableDaily
@@ -92,16 +92,16 @@ struct DummyDataProvider: ModelFlatbufferSerialisable4 {
     /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
     /*@Test func apiWeight() {
 
-        let location20year = ForecastapiResult4<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
-        let result20year = ForecastapiResult4<MultiDomainsReader>(timeformat: .iso8601, results: [location20year])
+        let location20year = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
+        let result20year = ForecastapiResult<MultiDomainsReader>(timeformat: .iso8601, results: [location20year])
         // 20 year data, one location, one variable
         #expect(result20year.calculateQueryWeight(nVariablesModels: 1) == 54.79286)
         // 20 year data, one location, two variables
         #expect(result20year.calculateQueryWeight(nVariablesModels: 2) == 109.58572)
 
-        let location7day = ForecastapiResult4<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 3600), locationId: 0, results: [])
+        let location7day = ForecastapiResult<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 3600), locationId: 0, results: [])
 
-        let result7day = ForecastapiResult4<MultiDomains>(timeformat: .iso8601, results: [location7day])
+        let result7day = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location7day])
         // 7 day data, one location, one variable
         #expect(result7day.calculateQueryWeight(nVariablesModels: 1) == 1)
         // 7 day data, one location, two variables
@@ -111,9 +111,9 @@ struct DummyDataProvider: ModelFlatbufferSerialisable4 {
         // 7 day data, one location, 30 variables
         #expect(result7day.calculateQueryWeight(nVariablesModels: 30) == 3)
 
-        let location1month = ForecastapiResult4<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
+        let location1month = ForecastapiResult<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
 
-        let result1month = ForecastapiResult4<MultiDomainsReader>(timeformat: .iso8601, results: [location1month, location1month])
+        let result1month = ForecastapiResult<MultiDomainsReader>(timeformat: .iso8601, results: [location1month, location1month])
         // 1 month data, two locations, one variable
         #expect(result1month.calculateQueryWeight(nVariablesModels: 1) == 2.0)
         // 1 month data, two locations, two variables
@@ -150,10 +150,10 @@ struct DummyDataProvider: ModelFlatbufferSerialisable4 {
 
     @Test func formats() async throws {
         let res = DummyDataProvider()
-        let location1 = ForecastapiResult4<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 0, results: [res])
+        let location1 = ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 0, results: [res])
         let hourlyVars = [ForecastVariable.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))]
         let dailyVars = [ForecastVariableDaily.temperature_2m_mean, .windspeed_10m_mean]
-        let data = ForecastapiResult4<DummyDataProvider>(
+        let data = ForecastapiResult<DummyDataProvider>(
             timeformat: .iso8601,
             results: [location1],
             currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars
@@ -169,7 +169,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable4 {
             """)
 
 
-        let dataUnix = ForecastapiResult4<DummyDataProvider>(
+        let dataUnix = ForecastapiResult<DummyDataProvider>(
             timeformat: .unixtime,
             results: [location1],
             currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars
@@ -321,11 +321,11 @@ struct DummyDataProvider: ModelFlatbufferSerialisable4 {
         let res = DummyDataProvider()
         let hourlyVars = [ForecastVariable.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))]
         let dailyVars = [ForecastVariableDaily.temperature_2m_mean, .windspeed_10m_mean]
-        let location1 = ForecastapiResult4<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 0, results: [res])
-        let location2 = ForecastapiResult4<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 1, results: [res])
+        let location1 = ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 0, results: [res])
+        let location2 = ForecastapiResult<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 1, results: [res])
         
 
-        let data = ForecastapiResult4<DummyDataProvider>(timeformat: .iso8601, results: [location1, location2], currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars)
+        let data = ForecastapiResult<DummyDataProvider>(timeformat: .iso8601, results: [location1, location2], currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars)
 
         #expect(data.calculateQueryWeight(nVariablesModels: 2) == 2)
         #expect(data.calculateQueryWeight(nVariablesModels: 15) == 3)
@@ -336,7 +336,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable4 {
             [{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"iso8601","interval":"seconds","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather":{"time":"2022-07-12T02:15","interval":900,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}},{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","location_id":1,"current_weather_units":{"time":"iso8601","interval":"seconds","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather":{"time":"2022-07-12T02:15","interval":900,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}]
             """)
 
-        let dataUnix = ForecastapiResult4<DummyDataProvider>(timeformat: .unixtime, results: [location1, location2], currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars)
+        let dataUnix = ForecastapiResult<DummyDataProvider>(timeformat: .unixtime, results: [location1, location2], currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars)
 
         let jsonUnix = await drainString(try dataUnix.response(format: .json, fixedGenerationTime: 12))
         #expect(jsonUnix == """

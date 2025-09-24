@@ -55,7 +55,7 @@ struct CamsController {
 
             let prepared = try await CamsMixer.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
 
-            let locations: [ForecastapiResult4<CamsDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<CamsDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
@@ -64,7 +64,7 @@ struct CamsController {
                     guard let reader = try await readerAndDomain.reader() else {
                         return nil
                     }
-                    let domain = readerAndDomain.domain                    
+                    let domain = readerAndDomain.domain
                     return CamsDomainsReader(domain: domain, reader: reader, params: params, time: time, currentTime: currentTime)
                 }
                 guard !readers.isEmpty else {
@@ -72,13 +72,13 @@ struct CamsController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            return ForecastapiResult4<CamsDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: nil, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<CamsDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
 
-struct CamsDomainsReader: ModelFlatbufferSerialisable4 {
+struct CamsDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = CamsReader.MixingVar
     
     typealias DailyVariable = ForecastVariableDaily

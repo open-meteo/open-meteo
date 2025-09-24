@@ -1,5 +1,5 @@
 //
-//  ForecastApiResult4.swift
+//  ForecastapiResult.swift
 //  OpenMeteoApi
 //
 //  Created by Patrick Zippenfenig on 23.09.2025.
@@ -9,7 +9,7 @@ import OpenMeteoSdk
 import Vapor
 
 
-protocol ModelFlatbufferSerialisable4 {
+protocol ModelFlatbufferSerialisable {
     associatedtype HourlyVariable: FlatBuffersVariable
     associatedtype DailyVariable: FlatBuffersVariable
 
@@ -36,7 +36,7 @@ protocol ModelFlatbufferSerialisable4 {
 }
 
 
-extension ModelFlatbufferSerialisable4 {
+extension ModelFlatbufferSerialisable {
     static var memberOffset: Int {
         return 0
     }
@@ -50,7 +50,7 @@ extension ModelFlatbufferSerialisable4 {
 }
 
 /// Stores the API output for multiple locations
-struct ForecastapiResult4<Model: ModelFlatbufferSerialisable4>: ForecastapiResponder, @unchecked Sendable {
+struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiResponder, @unchecked Sendable {
     let timeformat: Timeformat
     /// per location, per model
     let results: [PerLocation]

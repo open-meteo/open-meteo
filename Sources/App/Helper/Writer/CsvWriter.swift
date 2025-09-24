@@ -2,7 +2,7 @@ import Foundation
 import Vapor
 
 
-extension ForecastapiResult4 {
+extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
         let response = Response(body: .init(asyncStream: { writer in

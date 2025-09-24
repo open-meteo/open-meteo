@@ -670,15 +670,7 @@ extension ForecastVariableDaily: FlatBuffersVariable {
     }
 }
 
-extension MultiDomains: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = VariableAndPreviousDay
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = ForecastVariableDaily
-
+extension MultiDomains {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .best_match:

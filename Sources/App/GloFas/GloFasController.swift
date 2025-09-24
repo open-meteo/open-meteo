@@ -105,7 +105,7 @@ struct GloFasController {
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
-            let locations: [ForecastapiResult4<GlofasDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<GlofasDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
@@ -122,12 +122,12 @@ struct GloFasController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult4<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
-struct GlofasDomainsReader: ModelFlatbufferSerialisable4 {
+struct GlofasDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = ForecastVariable
     
     typealias DailyVariable = GloFasVariableOrDerived

@@ -21,7 +21,7 @@ extension AsyncBodyStreamWriter {
     }
 }
 
-extension ForecastapiResult4 {
+extension ForecastapiResult {
     /**
      Stream a potentially very large resultset to the client. The JSON file could easily be 20 MB.
      Instead of generating a massive string in memory, we only allocate 18kb and flush every time the buffer exceeds 16kb.
@@ -61,8 +61,8 @@ extension ForecastapiResult4 {
     }
 }
 
-extension ForecastapiResult4.PerLocation {
-    fileprivate func streamJsonResponse(to b: inout BufferAndAsyncWriter, timeformat: Timeformat, variables: ForecastapiResult4<Model>.RequestVariables, fixedGenerationTime: Double?) async throws {
+extension ForecastapiResult.PerLocation {
+    fileprivate func streamJsonResponse(to b: inout BufferAndAsyncWriter, timeformat: Timeformat, variables: ForecastapiResult<Model>.RequestVariables, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {
             throw ForecastApiError.noDataAvailableForThisLocation

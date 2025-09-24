@@ -129,7 +129,7 @@ struct WeatherApiController {
     }
     
     func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter(subdomain, alias: alias) { host, params -> ForecastapiResult4<MultiDomainsReader> in
+        try await req.withApiParameter(subdomain, alias: alias) { host, params -> ForecastapiResult<MultiDomainsReader> in
             let type = type ?? ApiType.detect(host: host)
             let currentTime = Timestamp.now()
             let currentTimeHour0 = currentTime.with(hour: 0)
@@ -213,7 +213,7 @@ struct WeatherApiController {
 
             
             
-            let locations: [ForecastapiResult4<MultiDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
@@ -235,12 +235,12 @@ struct WeatherApiController {
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
             
-            return ForecastapiResult4(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
-struct MultiDomainsReader: ModelFlatbufferSerialisable4 {
+struct MultiDomainsReader: ModelFlatbufferSerialisable {
     typealias HourlyVariable = ForecastVariable
     
     typealias DailyVariable = ForecastVariableDaily

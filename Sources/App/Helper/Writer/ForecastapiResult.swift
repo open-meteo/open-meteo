@@ -7,24 +7,6 @@ protocol FlatBuffersVariable: RawRepresentableString {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta
 }
 
-protocol ModelFlatbufferSerialisable: RawRepresentableString, Sendable {
-    associatedtype HourlyVariable: FlatBuffersVariable
-    associatedtype HourlyPressureType: FlatBuffersVariable, RawRepresentable, Equatable
-    associatedtype HourlyHeightType: FlatBuffersVariable, RawRepresentable, Equatable
-    associatedtype DailyVariable: FlatBuffersVariable
-
-    /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
-    static var memberOffset: Int { get }
-
-    var flatBufferModel: openmeteo_sdk_Model { get }
-}
-
-extension ModelFlatbufferSerialisable {
-    static var memberOffset: Int {
-        return 0
-    }
-}
-
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
     func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
@@ -97,18 +79,7 @@ struct ApiSectionSingle<Variable> {
 }
 
 extension ApiSection where Variable: RawRepresentableString {
-    func toApiSectionString<Model: RawRepresentableString>(memberOffset: Int, model: Model?) -> ApiSectionString {
-        return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
-            return c.variables.enumerated().map { member, data in
-                let member = member + memberOffset
-                let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
-                let variable = model.map { "\(variableAndMember)_\($0.rawValue)" } ?? variableAndMember
-                return ApiColumnString(variable: variable, unit: c.unit, data: data)
-            }
-        })
-    }
-    
-    func toApiSectionString<Model: ModelFlatbufferSerialisable4>(memberOffset: Int, model: Model?) -> ApiSectionString {
+    func toApiSectionString<Model: ModelFlatbufferSerialisable>(memberOffset: Int, model: Model?) -> ApiSectionString {
         return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
             return c.variables.enumerated().map { member, data in
                 let member = member + memberOffset
@@ -118,32 +89,8 @@ extension ApiSection where Variable: RawRepresentableString {
             }
         })
     }
-    
-    /*func toApiSectionString(memberOffset: Int, model: GenericDomainFB?) -> ApiSectionString {
-        return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
-            return c.variables.enumerated().map { member, data in
-                let member = member + memberOffset
-                let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
-                let variable = model.map { "\(variableAndMember)_\($0.rawValue)" } ?? variableAndMember
-                return ApiColumnString(variable: variable, unit: c.unit, data: data)
-            }
-        })
-    }*/
+
 }
-
-/*extension ApiSection where Variable: FlatBuffersVariable2 {
-    func toApiSectionString<Model: RawRepresentableString>(memberOffset: Int, model: Model?) -> ApiSectionString {
-        return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
-            return c.variables.enumerated().map { member, data in
-                let member = member + memberOffset
-                let variableAndMember = member > 0 ? "\(c.variable.originalString)_member\(member.zeroPadded(len: 2))" : String(c.variable.originalString)
-                let variable = model.map { "\(variableAndMember)_\($0.rawValue)" } ?? variableAndMember
-                return ApiColumnString(variable: variable, unit: c.unit, data: data)
-            }
-        })
-    }
-}*/
-
 
 extension Array where Element == ApiSectionString {
     func merge() throws -> ApiSectionString? {
