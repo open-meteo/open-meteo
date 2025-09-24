@@ -1,27 +1,23 @@
 import Foundation
 import Vapor
 
-extension BodyStreamWriter {
+extension AsyncBodyStreamWriter {
     /// Execute async code and capture any errors. In case of error, print the error to the output stream
-    func submit(concurrencySlot: Int?, _ task: @Sendable @escaping () async throws -> Void) {
-        _ = eventLoop.makeFutureWithTask {
-            if let concurrencySlot {
-                try await apiConcurrencyLimiter.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
-            }
-            defer {
-                if let concurrencySlot {
-                    apiConcurrencyLimiter.release(slot: concurrencySlot)
-                }
-            }
-            try await task()
+    func submit(concurrencySlot: Int?, _ task: @escaping () async throws -> Void) async throws {
+        if let concurrencySlot {
+            try await apiConcurrencyLimiter.wait(slot: concurrencySlot, maxConcurrent: .max, maxConcurrentHard: .max)
         }
-            .flatMapError({ error in
-                return write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
-                    .flatMap({
-                        write(.end)
-                        //write(.error(error))
-                    })
-                })
+        defer {
+            if let concurrencySlot {
+                apiConcurrencyLimiter.release(slot: concurrencySlot)
+            }
+        }
+        do {
+            try await task()
+        } catch {
+            try await write(.buffer(.init(string: "Unexpected error while streaming data: \(error)")))
+            try await write(.end)
+        }
     }
 }
 
@@ -35,9 +31,9 @@ extension ForecastapiResult {
     func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
-                var b = BufferAndWriter(writer: writer)
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
+                var b = BufferAndAsyncWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1
                 if isMultiPoint {
@@ -66,7 +62,7 @@ extension ForecastapiResult {
 }
 
 extension ForecastapiResult.PerLocation {
-    fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
+    fileprivate func streamJsonResponse(to b: inout BufferAndAsyncWriter, timeformat: Timeformat, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {
             throw ForecastApiError.noDataAvailableForThisLocation
@@ -198,9 +194,9 @@ extension ForecastapiResult4 {
     func toJsonResponse(fixedGenerationTime: Double?, concurrencySlot: Int?) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
-                var b = BufferAndWriter(writer: writer)
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
+                var b = BufferAndAsyncWriter(writer: writer)
                 /// For multiple locations, create an array of results
                 let isMultiPoint = results.count > 1
                 if isMultiPoint {
@@ -229,7 +225,7 @@ extension ForecastapiResult4 {
 }
 
 extension ForecastapiResult4.PerLocation {
-    fileprivate func streamJsonResponse(to b: inout BufferAndWriter, timeformat: Timeformat, variables: ForecastapiResult4<Model>.RequestVariables, fixedGenerationTime: Double?) async throws {
+    fileprivate func streamJsonResponse(to b: inout BufferAndAsyncWriter, timeformat: Timeformat, variables: ForecastapiResult4<Model>.RequestVariables, fixedGenerationTime: Double?) async throws {
         let generationTimeStart = Date()
         guard let first = results.first else {
             throw ForecastApiError.noDataAvailableForThisLocation

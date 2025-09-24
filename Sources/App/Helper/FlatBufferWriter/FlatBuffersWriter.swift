@@ -10,13 +10,13 @@ extension ForecastapiResult {
     func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int? = nil) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
                 // TODO: Estimate initial buffer size
                 let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
                 var fbb = FlatBufferBuilder(initialSize: initialSize)
-                var b = BufferAndWriter(writer: writer)
+                var b = BufferAndAsyncWriter(writer: writer)
                 // if let first {
                 //    first.writeToFlatbuffer(&fbb)
                 //    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
@@ -48,13 +48,13 @@ extension ForecastapiResult4 {
     func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int? = nil) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
                 // TODO: Estimate initial buffer size
                 let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
                 var fbb = FlatBufferBuilder(initialSize: initialSize)
-                var b = BufferAndWriter(writer: writer)
+                var b = BufferAndAsyncWriter(writer: writer)
                 // if let first {
                 //    first.writeToFlatbuffer(&fbb)
                 //    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)

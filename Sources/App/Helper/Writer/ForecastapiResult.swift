@@ -394,11 +394,11 @@ enum ForecastResultFormat: String, Codable {
 }
 
 /// Simplify flush commands
-struct BufferAndWriter {
-    let writer: BodyStreamWriter
+struct BufferAndAsyncWriter{
+    let writer: any AsyncBodyStreamWriter
     var buffer: ByteBuffer
 
-    @inlinable init(writer: BodyStreamWriter) {
+    @inlinable init(writer: any AsyncBodyStreamWriter) {
         self.writer = writer
         self.buffer = ByteBufferAllocator().buffer(capacity: 4 * 1024)
     }
@@ -415,14 +415,12 @@ struct BufferAndWriter {
             return
         }
         let bufferCopy = buffer
-        let writer = writer
-        try await writer.eventLoop.flatSubmit { writer.write(.buffer(bufferCopy)) }.get()
+        try await writer.writeBuffer(bufferCopy)
         buffer.moveWriterIndex(to: 0)
     }
 
     @inlinable mutating func end() async throws {
-        let writer = writer
-        try await writer.eventLoop.flatSubmit { writer.write(.end) }.get()
+        try await writer.write(.end)
     }
 }
 

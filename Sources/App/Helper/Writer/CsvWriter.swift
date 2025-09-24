@@ -4,9 +4,9 @@ import Vapor
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
-                var b = BufferAndWriter(writer: writer)
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
+                var b = BufferAndAsyncWriter(writer: writer)
                 let multiLocation = results.count > 1
 
                 if results.count == 1, let location = results.first, let first = location.results.first {
@@ -52,9 +52,9 @@ extension ForecastapiResult {
 extension ForecastapiResult4 {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
-                var b = BufferAndWriter(writer: writer)
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
+                var b = BufferAndAsyncWriter(writer: writer)
                 let multiLocation = results.count > 1
 
                 if results.count == 1, let location = results.first, let first = location.results.first {
@@ -98,7 +98,7 @@ extension ForecastapiResult4 {
 }
 
 extension ApiSectionSingle {
-    fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
+    fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
             b.buffer.writeString("\n")
             if location_id != nil {
@@ -132,7 +132,7 @@ extension ApiSectionSingle {
 
 extension ApiSectionString {
     /// Write a single API section into the output buffer
-    fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
+    fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
             b.buffer.writeString("\n")
             if location_id != nil {
