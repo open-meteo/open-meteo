@@ -30,15 +30,7 @@ extension GlofasDerivedVariable: FlatBuffersVariable {
     }
 }
 
-extension GlofasDomainApi: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = VariableAndPreviousDay
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = GloFasVariableOrDerived
-
+extension GlofasDomainApi {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .best_match:

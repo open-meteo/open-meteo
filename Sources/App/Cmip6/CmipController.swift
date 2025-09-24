@@ -1,6 +1,7 @@
 import Foundation
 import OmFileFormat
 import Vapor
+import OpenMeteoSdk
 
 struct CmipController {
     func query(_ req: Request) async throws -> Response {
@@ -21,13 +22,13 @@ struct CmipController {
             let biasCorrection = !(params.disable_bias_correction ?? false)
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
-            let locations: [ForecastapiResult<Cmip6Domain>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult4<CmipDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 14, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
-                let readers: [ForecastapiResult<Cmip6Domain>.PerModel] = try await domains.asyncCompactMap { domain in
+                let readers: [CmipDomainsReader] = try await domains.asyncCompactMap { domain in
                     let reader: any Cmip6Readerable = try await {
                         if biasCorrection {
                             guard let reader = try await Cmip6BiasCorrectorEra5Seamless(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
@@ -42,30 +43,7 @@ struct CmipController {
                             return Cmip6ReaderPostBiasCorrected(reader: reader2, domain: domain)
                         }
                     }()
-                    return ForecastapiResult<Cmip6Domain>.PerModel(
-                        model: domain,
-                        latitude: reader.modelLat,
-                        longitude: reader.modelLon,
-                        elevation: reader.targetElevation,
-                        prefetch: {
-                            if let dailyVariables = paramsDaily {
-                                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
-                            }
-                        },
-                        current: nil,
-                        hourly: nil,
-                        daily: paramsDaily.map { paramsDaily in
-                            return {
-                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await paramsDaily.asyncMap { variable in
-                                    let d = try await reader.get(variable: variable, time: time.dailyRead.toSettings()).convertAndRound(params: params)
-                                    assert(time.dailyRead.count == d.data.count)
-                                    return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
-                                })
-                            }
-                        },
-                        sixHourly: nil,
-                        minutely15: nil
-                    )
+                    return CmipDomainsReader(domain: domain, reader: reader, params: params, time: time)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
@@ -73,10 +51,77 @@ struct CmipController {
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
             // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
-            return ForecastapiResult<Cmip6Domain>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables / 24 / 5)
+            return ForecastapiResult4<CmipDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables / 24 / 5)
         }
     }
 }
+
+struct CmipDomainsReader: ModelFlatbufferSerialisable4 {
+    typealias HourlyVariable = ForecastVariable
+    
+    typealias DailyVariable = Cmip6VariableOrDerivedPostBias
+    
+    let domain: Cmip6Domain
+    
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
+        domain.flatBufferModel
+    }
+    
+    var modelName: String {
+        domain.rawValue
+    }
+    
+    let reader: any Cmip6Readerable
+    
+    var latitude: Float {
+        reader.modelLat
+    }
+    
+    var longitude: Float {
+        reader.modelLon
+    }
+    
+    var elevation: Float? {
+        reader.targetElevation
+    }
+    
+    let params: ApiQueryParameter
+    let time: ForecastApiTimeRange
+    
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+        if let dailyVariables = dailyVariables {
+            try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
+        }
+    }
+
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<ForecastVariable>? {
+        return nil
+    }
+    
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+        return nil
+    }
+    
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncMap { variable in
+            let d = try await reader.get(variable: variable, time: time.dailyRead.toSettings()).convertAndRound(params: params)
+            assert(time.dailyRead.count == d.data.count)
+            return ApiColumn(variable: variable, unit: d.unit, variables: [.float(d.data)])
+        })
+    }
+    
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+        return nil
+    }
+    
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+        return nil
+    }
+}
+
 
 protocol Cmip6Readerable {
     func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) async throws

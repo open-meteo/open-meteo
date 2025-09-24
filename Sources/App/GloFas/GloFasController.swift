@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OpenMeteoSdk
 
 typealias GloFasVariableMember = GloFasVariable
 
@@ -104,63 +105,111 @@ struct GloFasController {
             let nVariables = (params.ensemble ? 51 : 1) * domains.count
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
-            let locations: [ForecastapiResult<GlofasDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult4<GlofasDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
-                let readers: [ForecastapiResult<GlofasDomainApi>.PerModel] = try await domains.asyncCompactMap { domain in
+                let readers: [GlofasDomainsReader] = try await domains.asyncCompactMap { domain in
                     guard let reader = try await domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .nearest, options: options) else {
                         return nil
                     }
-                    return ForecastapiResult<GlofasDomainApi>.PerModel(
-                        model: domain,
-                        latitude: reader.modelLat,
-                        longitude: reader.modelLon,
-                        elevation: reader.targetElevation,
-                        prefetch: {
-                            for param in paramsDaily {
-                                try await reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
-                            }
-                            if params.ensemble {
-                                for member in 1..<51 {
-                                    try await reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
-                                }
-                            }
-                        },
-                        current: nil,
-                        hourly: nil,
-                        daily: {
-                            return await ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try paramsDaily.asyncMap { variable in
-                                switch variable {
-                                case .raw:
-                                    let d = try await (params.ensemble ? (0..<51) : (0..<1)).asyncMap { member -> ApiArray in
-                                        let d = try await reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
-                                        assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
-                                        return ApiArray.float(d.data)
-                                    }
-                                    return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
-                                case .derived(let derived):
-                                    let d = try await reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
-                                    assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
-                                    return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
-                                }
-                            })
-                        },
-                        sixHourly: nil,
-                        minutely15: nil
-                    )
+                    return GlofasDomainsReader(domain: domain, reader: reader, params: params, time: time)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<GlofasDomainApi>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult4<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
         }
     }
 }
+
+struct GlofasDomainsReader: ModelFlatbufferSerialisable4 {
+    typealias HourlyVariable = ForecastVariable
+    
+    typealias DailyVariable = GloFasVariableOrDerived
+    
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
+        domain.flatBufferModel
+    }
+    
+    var modelName: String {
+        domain.rawValue
+    }
+    
+    let domain: GlofasDomainApi
+    
+    let reader: GloFasMixer
+    
+    var latitude: Float {
+        reader.modelLat
+    }
+    
+    var longitude: Float {
+        reader.modelLon
+    }
+    
+    var elevation: Float? {
+        reader.targetElevation
+    }
+    
+    let params: ApiQueryParameter
+    let time: ForecastApiTimeRange
+    
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+        if let dailyVariables {
+            for param in dailyVariables {
+                try await reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
+            }
+            if params.ensemble {
+                for member in 1..<51 {
+                    try await reader.prefetchData(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member))
+                }
+            }
+        }
+    }
+
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
+        return nil
+    }
+    
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        return await ApiSection<GloFasVariableOrDerived>(name: "daily", time: time.dailyDisplay, columns: try variables.asyncMap { variable in
+            switch variable {
+            case .raw:
+                let d = try await (params.ensemble ? (0..<51) : (0..<1)).asyncMap { member -> ApiArray in
+                    let d = try await reader.get(variable: .raw(.river_discharge), time: time.dailyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                    assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
+                    return ApiArray.float(d.data)
+                }
+                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: d)
+            case .derived(let derived):
+                let d = try await reader.get(variable: .derived(derived), time: time.dailyRead.toSettings()).convertAndRound(params: params)
+                assert(time.dailyRead.count == d.data.count, "days \(time.dailyRead.count), values \(d.data.count)")
+                return ApiColumn<GloFasVariableOrDerived>(variable: variable, unit: .cubicMetrePerSecond, variables: [.float(d.data)])
+            }
+        })
+    }
+    
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+}
+
 
 enum GlofasDomainApi: String, RawRepresentableString, CaseIterable, Sendable {
     case best_match

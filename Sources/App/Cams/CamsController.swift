@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OpenMeteoSdk
 
 extension CamsQuery.Domain: GenericDomainProvider {
     var genericDomain: (any GenericDomain)? {
@@ -54,67 +55,113 @@ struct CamsController {
 
             let prepared = try await CamsMixer.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
 
-            let locations: [ForecastapiResult<CamsQuery.Domain>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult4<CamsDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let timezone = prepared.timezone
                 let time = prepared.time
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
 
-                let readers: [ForecastapiResult<CamsQuery.Domain>.PerModel] = try await prepared.perModel.asyncCompactMap { readerAndDomain in
+                let readers: [CamsDomainsReader] = try await prepared.perModel.asyncCompactMap { readerAndDomain in
                     guard let reader = try await readerAndDomain.reader() else {
                         return nil
                     }
-                    let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-                    let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-                    let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-                    let domain = readerAndDomain.domain
-
-                    let hourlyFn: (() async throws -> ApiSection<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsHourly.map { variables in
-                        return {
-                            return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
-                                let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
-                                assert(timeHourlyRead.count == d.data.count)
-                                return .init(variable: .surface(variable), unit: d.unit, variables: [.float(d.data)])
-                            })
-                        }
-                    }
-
-                    let currentFn: (() async throws -> ApiSectionSingle<ForecastapiResult<CamsQuery.Domain>.SurfacePressureAndHeightVariable>)? = paramsCurrent.map { variables in
-                        return {
-                            return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
-                                let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
-                                return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
-                            })
-                        }
-                    }
-
-                    return ForecastapiResult<CamsQuery.Domain>.PerModel(
-                        model: domain,
-                        latitude: reader.modelLat,
-                        longitude: reader.modelLon,
-                        elevation: reader.targetElevation,
-                        prefetch: {
-                            if let paramsCurrent {
-                                try await reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
-                            }
-                            if let paramsHourly {
-                                try await reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings())
-                            }
-                        },
-                        current: currentFn,
-                        hourly: hourlyFn,
-                        daily: nil,
-                        sixHourly: nil,
-                        minutely15: nil
-                    )
+                    let domain = readerAndDomain.domain                    
+                    return CamsDomainsReader(domain: domain, reader: reader, params: params, time: time, currentTime: currentTime)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            return ForecastapiResult<CamsQuery.Domain>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult4<CamsDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: nil, nVariablesTimesDomains: nVariables)
         }
+    }
+}
+
+
+struct CamsDomainsReader: ModelFlatbufferSerialisable4 {
+    typealias HourlyVariable = CamsReader.MixingVar
+    
+    typealias DailyVariable = ForecastVariableDaily
+    
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
+        domain.flatBufferModel
+    }
+    
+    var modelName: String {
+        domain.rawValue
+    }
+    
+    let domain: CamsQuery.Domain
+    
+    let reader: CamsMixer
+    
+    var latitude: Float {
+        reader.modelLat
+    }
+    
+    var longitude: Float {
+        reader.modelLon
+    }
+    
+    var elevation: Float? {
+        reader.targetElevation
+    }
+    
+    let params: ApiQueryParameter
+    
+    let time: ForecastApiTimeRange
+    let currentTime: Timestamp
+    
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
+        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+        //let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+        
+        if let currentVariables {
+            try await reader.prefetchData(variables: currentVariables, time: currentTimeRange.toSettings())
+        }
+        if let hourlyVariables {
+            try await reader.prefetchData(variables: hourlyVariables, time: timeHourlyRead.toSettings())
+        }
+    }
+
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
+        return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
+            let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
+            return .init(variable: variable, unit: d.unit, value: d.data.first ?? .nan)
+        })
+    }
+    
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+        let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+        
+        return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
+            let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
+            assert(timeHourlyRead.count == d.data.count)
+            return .init(variable: variable, unit: d.unit, variables: [.float(d.data)])
+        })
+    }
+    
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
+        return nil
+    }
+    
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
     }
 }
 
@@ -306,7 +353,7 @@ struct CamsQuery {
 }
 
 extension CamsQuery {
-    enum Domain: String, Codable, Sendable {
+    enum Domain: String, Codable, Sendable, RawRepresentableString {
         case auto
         case cams_global
         case cams_europe

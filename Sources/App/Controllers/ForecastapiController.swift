@@ -313,7 +313,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable4 {
         }
     }
 
-    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<ForecastVariable>? {
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
         guard let variables else {
             return nil
         }
@@ -328,7 +328,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable4 {
         })
     }
     
-    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         guard let variables else {
             return nil
         }
@@ -356,7 +356,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable4 {
         })
     }
     
-    func daily(variables: [DailyVariable]?) async throws -> ApiSection<ForecastVariableDaily>? {
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
         guard let variables else {
             return nil
         }
@@ -404,11 +404,11 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable4 {
         })
     }
     
-    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         return nil
     }
     
-    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         guard let variables else {
             return nil
         }

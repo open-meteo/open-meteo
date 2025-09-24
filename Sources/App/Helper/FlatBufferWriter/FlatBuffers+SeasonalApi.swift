@@ -79,15 +79,7 @@ extension DailyCfsVariable: FlatBuffersVariable {
     }
 }
 
-extension SeasonalForecastDomainApi: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = SeasonalForecastVariable
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = DailyCfsVariable
-
+extension SeasonalForecastDomainApi {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .cfsv2:

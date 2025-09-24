@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OpenMeteoSdk
 
 typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
 
@@ -161,86 +162,134 @@ struct SeasonalForecastController {
             let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, { $0 + $1.forecastDomain.nMembers })
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
 
-            let locations: [ForecastapiResult<SeasonalForecastDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult4<SeasonalDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
-                let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
-                let timeSixHourlyDisplay = time.dailyDisplay.with(dtSeconds: 3600 * 6)
-
-                let readers: [ForecastapiResult<SeasonalForecastDomainApi>.PerModel] = try await domains.asyncCompactMap { domain in
+                let readers: [SeasonalDomainsReader] = try await domains.asyncCompactMap { domain in
                     guard let reader = try await SeasonalForecastReader(domain: domain.forecastDomain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
-                    let members = 1..<domain.forecastDomain.nMembers + 1
-                    return .init(
-                        model: domain,
-                        latitude: reader.modelLat,
-                        longitude: reader.modelLon,
-                        elevation: reader.targetElevation,
-                        prefetch: {
-                            if let paramsSixHourly {
-                                for varible in paramsSixHourly {
-                                    for member in members {
-                                        try await reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member))
-                                    }
-                                }
-                            }
-                            if let paramsDaily {
-                                for varible in paramsDaily {
-                                    for member in members {
-                                        try await reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member))
-                                    }
-                                }
-                            }
-                        },
-                        current: nil,
-                        hourly: nil,
-                        daily: paramsDaily.map { variables in
-                            return {
-                                return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
-                                    var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                                        let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMember: member))
-                                        unit = d.unit
-                                        assert(time.dailyRead.count == d.data.count)
-                                        return ApiArray.float(d.data)
-                                    }
-                                    guard allMembers.count > 0 else {
-                                        return nil
-                                    }
-                                    return ApiColumn<DailyCfsVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
-                                })
-                            }
-                        },
-                        sixHourly: paramsSixHourly.map { variables in
-                            return {
-                                return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
-                                    var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                                        let d = try await reader.get(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
-                                        unit = d.unit
-                                        assert(timeSixHourlyRead.count == d.data.count)
-                                        return ApiArray.float(d.data)
-                                    }
-                                    guard allMembers.count > 0 else {
-                                        return nil
-                                    }
-                                    return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
-                                })
-                            }
-                        },
-                        minutely15: nil
-                    )
+                    return SeasonalDomainsReader(domain: domain, reader: reader, params: params, time: time)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<SeasonalForecastDomainApi>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult4<SeasonalDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
         }
+    }
+}
+
+
+struct SeasonalDomainsReader: ModelFlatbufferSerialisable4 {
+    typealias HourlyVariable = SeasonalForecastVariable
+    
+    typealias DailyVariable = DailyCfsVariable
+    
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
+        domain.flatBufferModel
+    }
+    
+    var modelName: String {
+        domain.rawValue
+    }
+    
+    let domain: SeasonalForecastDomainApi
+    
+    let reader: SeasonalForecastReader
+    
+    var latitude: Float {
+        reader.modelLat
+    }
+    
+    var longitude: Float {
+        reader.modelLon
+    }
+    
+    var elevation: Float? {
+        reader.targetElevation
+    }
+    
+    let params: ApiQueryParameter
+    let time: ForecastApiTimeRange
+    
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+        let members = 0..<reader.domain.countEnsembleMember
+        let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
+        if let sixHourlyVariables {
+            for varible in sixHourlyVariables {
+                for member in members {
+                    try await reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member))
+                }
+            }
+        }
+        if let dailyVariables {
+            for varible in dailyVariables {
+                for member in members {
+                    try await reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member))
+                }
+            }
+        }
+    }
+
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
+        return nil
+    }
+    
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let members = 0..<reader.domain.countEnsembleMember
+        
+        return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+                let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMember: member))
+                unit = d.unit
+                assert(time.dailyRead.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return nil
+            }
+            return ApiColumn<DailyCfsVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
+    }
+    
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let members = 0..<reader.domain.countEnsembleMember
+        
+        let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
+        let timeSixHourlyDisplay = time.dailyDisplay.with(dtSeconds: 3600 * 6)
+        
+        return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+                let d = try await reader.get(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                unit = d.unit
+                assert(timeSixHourlyRead.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return nil
+            }
+            return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
+    }
+    
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
     }
 }

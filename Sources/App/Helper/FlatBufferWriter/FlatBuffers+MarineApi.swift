@@ -84,15 +84,7 @@ extension IconWaveVariableDaily: FlatBuffersVariable {
     }
 }
 
-extension IconWaveDomainApi: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = MarineVariable
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = IconWaveVariableDaily
-
+extension IconWaveDomainApi {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case.best_match:
