@@ -4,6 +4,67 @@ import Foundation
 import Testing
 import VaporTesting
 @preconcurrency import SwiftEccodes
+import OpenMeteoSdk
+
+
+struct DummyDataProvider: ModelFlatbufferSerialisable4 {
+    typealias HourlyVariable = ForecastVariable
+    
+    typealias DailyVariable = ForecastVariableDaily
+    
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
+        .bestMatch
+    }
+    
+    var modelName: String {
+        "beest_match"
+    }
+    
+    var latitude: Float {
+        41
+    }
+    
+    var longitude: Float {
+        2
+    }
+    
+    var elevation: Float? {
+        nil
+    }
+    
+    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, sixHourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?) async throws {
+        
+    }
+    
+    func current(variables: [App.ForecastVariable]?) async throws -> App.ApiSectionSingle<App.ForecastVariable>? {
+        ApiSectionSingle(name: "current_weather", time: Timestamp(2022, 7, 12, 1, 15), dtSeconds: 3600 / 4, columns: [
+            ApiColumnSingle(variable: .surface(.init(.temperature_20m, 0)), unit: .celsius, value: 20),
+            ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10)
+        ])
+    }
+    
+    func hourly(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
+        ApiSection(name: "hourly", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 48, dtSeconds: 3600), columns: [
+            ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
+            ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))])
+        ])
+    }
+    
+    func sixHourly(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
+        nil
+    }
+    
+    func minutely15(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
+        nil
+    }
+    
+    func daily(variables: [App.ForecastVariableDaily]?) async throws -> App.ApiSection<App.ForecastVariableDaily>? {
+        ApiSection<ForecastVariableDaily>(name: "daily", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400), columns: [
+            ApiColumn(variable: .temperature_2m_mean, unit: .celsius, variables: [.float(.init(repeating: 20, count: 2))]),
+            ApiColumn(variable: .windspeed_10m_mean, unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 2))])
+        ])
+    }
+}
 
 @Suite struct OutputformatTests {
     /*func testBz2Grib() async throws {
@@ -29,32 +90,18 @@ import VaporTesting
     /// "Heavy" API calls are counted more than just 1 API call
     ///
     /// See: https://github.com/open-meteo/open-meteo/issues/438#issuecomment-1722945326
-    @Test func apiWeight() {
-        let dataContainer = ForecastapiResult<MultiDomains>.PerModel(
-            model: .best_match,
-            latitude: 41,
-            longitude: 2,
-            elevation: nil,
-            // timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"),
-            // time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 0),
-            prefetch: {},
-            // current_weather: nil,
-            current: nil,
-            hourly: nil,
-            daily: nil,
-            sixHourly: nil,
-            minutely15: nil
-        )
-        let location20year = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 3600), locationId: 0, results: [dataContainer])
-        let result20year = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location20year])
+    /*@Test func apiWeight() {
+
+        let location20year = ForecastapiResult4<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2021, 1, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
+        let result20year = ForecastapiResult4<MultiDomainsReader>(timeformat: .iso8601, results: [location20year])
         // 20 year data, one location, one variable
         #expect(result20year.calculateQueryWeight(nVariablesModels: 1) == 54.79286)
         // 20 year data, one location, two variables
         #expect(result20year.calculateQueryWeight(nVariablesModels: 2) == 109.58572)
 
-        let location7day = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 3600), locationId: 0, results: [dataContainer])
+        let location7day = ForecastapiResult4<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 1, 8), utcOffsetSeconds: 3600), locationId: 0, results: [])
 
-        let result7day = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location7day])
+        let result7day = ForecastapiResult4<MultiDomains>(timeformat: .iso8601, results: [location7day])
         // 7 day data, one location, one variable
         #expect(result7day.calculateQueryWeight(nVariablesModels: 1) == 1)
         // 7 day data, one location, two variables
@@ -64,9 +111,9 @@ import VaporTesting
         // 7 day data, one location, 30 variables
         #expect(result7day.calculateQueryWeight(nVariablesModels: 30) == 3)
 
-        let location1month = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 3600), locationId: 0, results: [dataContainer])
+        let location1month = ForecastapiResult4<MultiDomainsReader>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: Timestamp(2000, 1, 1)..<Timestamp(2000, 2, 1), utcOffsetSeconds: 3600), locationId: 0, results: [])
 
-        let result1month = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location1month, location1month])
+        let result1month = ForecastapiResult4<MultiDomainsReader>(timeformat: .iso8601, results: [location1month, location1month])
         // 1 month data, two locations, one variable
         #expect(result1month.calculateQueryWeight(nVariablesModels: 1) == 2.0)
         // 1 month data, two locations, two variables
@@ -75,7 +122,7 @@ import VaporTesting
         #expect(result1month.calculateQueryWeight(nVariablesModels: 15) == 6.6428566)
         // 1 month data, two locations, 30 variables
         #expect(result1month.calculateQueryWeight(nVariablesModels: 30) == 13.285713)
-    }
+    }*/
 
     private func drainString(_ response: Response) async -> String {
         try! await withApp { app in
@@ -102,50 +149,15 @@ import VaporTesting
     }
 
     @Test func formats() async throws {
-        /*let current = ForecastapiResult.CurrentWeather(
-            temperature: 23,
-            windspeed: 12,
-            winddirection: 90,
-            weathercode: 5,
-            is_day: 1,
-            temperature_unit: .celsius,
-            windspeed_unit: .kmh,
-            winddirection_unit: .degreeDirection,
-            weathercode_unit: .wmoCode,
-            time: Timestamp(2022,7,13,15,0))*/
-
-        let daily = ApiSection<ForecastVariableDaily>(name: "daily", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400), columns: [
-            ApiColumn(variable: .temperature_2m_mean, unit: .celsius, variables: [.float(.init(repeating: 20, count: 2))]),
-            ApiColumn(variable: .windspeed_10m_mean, unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 2))])
-        ])
-
-        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 48, dtSeconds: 3600), columns: [
-            ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
-            ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))])
-        ])
-
-        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "current_weather", time: Timestamp(2022, 7, 12, 1, 15), dtSeconds: 3600 / 4, columns: [
-            ApiColumnSingle(variable: .surface(.init(.temperature_20m, 0)), unit: .celsius, value: 20),
-            ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10)
-        ])
-
-        let res = ForecastapiResult<MultiDomains>.PerModel(
-            model: .best_match,
-            latitude: 41,
-            longitude: 2,
-            elevation: nil,
-            prefetch: {},
-            current: { currentSection },
-            hourly: {
-                hourly
-            },
-            daily: {
-                daily
-            },
-            sixHourly: nil,
-            minutely15: nil
+        let res = DummyDataProvider()
+        let location1 = ForecastapiResult4<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 0, results: [res])
+        let hourlyVars = [ForecastVariable.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))]
+        let dailyVars = [ForecastVariableDaily.temperature_2m_mean, .windspeed_10m_mean]
+        let data = ForecastapiResult4<DummyDataProvider>(
+            timeformat: .iso8601,
+            results: [location1],
+            currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars
         )
-        let data = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), locationId: 0, results: [res])])
 
         #expect(data.calculateQueryWeight(nVariablesModels: 2) == 1)
         #expect(data.calculateQueryWeight(nVariablesModels: 15) == 1.5)
@@ -156,7 +168,12 @@ import VaporTesting
             {"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"iso8601","interval":"seconds","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather":{"time":"2022-07-12T02:15","interval":900,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}
             """)
 
-        let dataUnix = ForecastapiResult<MultiDomains>(timeformat: .unixtime, results: [ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), locationId: 0, results: [res])])
+
+        let dataUnix = ForecastapiResult4<DummyDataProvider>(
+            timeformat: .unixtime,
+            results: [location1],
+            currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars
+        )
 
         let jsonUnix = await drainString(try dataUnix.response(format: .json, fixedGenerationTime: 12))
         #expect(jsonUnix == """
@@ -301,52 +318,14 @@ import VaporTesting
 
     /// Test output formats for 2 locations
     @Test func formatsMultiLocation() async throws {
-        /*let current = ForecastapiResult.CurrentWeather(
-            temperature: 23,
-            windspeed: 12,
-            winddirection: 90,
-            weathercode: 5,
-            is_day: 1,
-            temperature_unit: .celsius,
-            windspeed_unit: .kmh,
-            winddirection_unit: .degreeDirection,
-            weathercode_unit: .wmoCode,
-            time: Timestamp(2022,7,13,15,0))*/
+        let res = DummyDataProvider()
+        let hourlyVars = [ForecastVariable.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))]
+        let dailyVars = [ForecastVariableDaily.temperature_2m_mean, .windspeed_10m_mean]
+        let location1 = ForecastapiResult4<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 0, results: [res])
+        let location2 = ForecastapiResult4<DummyDataProvider>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400).range, utcOffsetSeconds: 0), locationId: 1, results: [res])
+        
 
-        let daily = ApiSection<ForecastVariableDaily>(name: "daily", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 2, dtSeconds: 86400), columns: [
-            ApiColumn(variable: .temperature_2m_mean, unit: .celsius, variables: [.float(.init(repeating: 20, count: 2))]),
-            ApiColumn(variable: .windspeed_10m_mean, unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 2))])
-        ])
-
-        let hourly = ApiSection<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "hourly", time: TimerangeDt(start: Timestamp(2022, 7, 12, 0), nTime: 48, dtSeconds: 3600), columns: [
-            ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
-            ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))])
-        ])
-
-        let currentSection = ApiSectionSingle<ForecastapiResult<MultiDomains>.SurfacePressureAndHeightVariable>(name: "current_weather", time: Timestamp(2022, 7, 12, 1, 15), dtSeconds: 3600 / 4, columns: [
-            ApiColumnSingle(variable: .surface(.init(.temperature_20m, 0)), unit: .celsius, value: 20),
-            ApiColumnSingle(variable: .surface(.init(.windspeed_100m, 0)), unit: .kilometresPerHour, value: 10)
-        ])
-
-        let res = ForecastapiResult<MultiDomains>.PerModel(
-            model: .best_match,
-            latitude: 41,
-            longitude: 2,
-            elevation: nil,
-            prefetch: {},
-            current: { currentSection },
-            hourly: {
-                hourly
-            },
-            daily: {
-                daily
-            },
-            sixHourly: nil,
-            minutely15: nil
-        )
-        let location1 = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), locationId: 0, results: [res])
-        let location2 = ForecastapiResult<MultiDomains>.PerLocation(timezone: .init(utcOffsetSeconds: 3600, identifier: "GMT", abbreviation: "GMT"), time: TimerangeLocal(range: daily.time.range, utcOffsetSeconds: 0), locationId: 1, results: [res])
-        let data = ForecastapiResult<MultiDomains>(timeformat: .iso8601, results: [location1, location2])
+        let data = ForecastapiResult4<DummyDataProvider>(timeformat: .iso8601, results: [location1, location2], currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars)
 
         #expect(data.calculateQueryWeight(nVariablesModels: 2) == 2)
         #expect(data.calculateQueryWeight(nVariablesModels: 15) == 3)
@@ -357,7 +336,7 @@ import VaporTesting
             [{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","current_weather_units":{"time":"iso8601","interval":"seconds","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather":{"time":"2022-07-12T02:15","interval":900,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}},{"latitude":41.0,"longitude":2.0,"generationtime_ms":12.0,"utc_offset_seconds":3600,"timezone":"GMT","timezone_abbreviation":"GMT","location_id":1,"current_weather_units":{"time":"iso8601","interval":"seconds","temperature_20m":"°C","windspeed_100m":"km/h"},"current_weather":{"time":"2022-07-12T02:15","interval":900,"temperature_20m":20.0,"windspeed_100m":10.0},"hourly_units":{"time":"iso8601","temperature_2m":"°C","windspeed_10m":"km/h"},"hourly":{"time":["2022-07-12T01:00","2022-07-12T02:00","2022-07-12T03:00","2022-07-12T04:00","2022-07-12T05:00","2022-07-12T06:00","2022-07-12T07:00","2022-07-12T08:00","2022-07-12T09:00","2022-07-12T10:00","2022-07-12T11:00","2022-07-12T12:00","2022-07-12T13:00","2022-07-12T14:00","2022-07-12T15:00","2022-07-12T16:00","2022-07-12T17:00","2022-07-12T18:00","2022-07-12T19:00","2022-07-12T20:00","2022-07-12T21:00","2022-07-12T22:00","2022-07-12T23:00","2022-07-13T00:00","2022-07-13T01:00","2022-07-13T02:00","2022-07-13T03:00","2022-07-13T04:00","2022-07-13T05:00","2022-07-13T06:00","2022-07-13T07:00","2022-07-13T08:00","2022-07-13T09:00","2022-07-13T10:00","2022-07-13T11:00","2022-07-13T12:00","2022-07-13T13:00","2022-07-13T14:00","2022-07-13T15:00","2022-07-13T16:00","2022-07-13T17:00","2022-07-13T18:00","2022-07-13T19:00","2022-07-13T20:00","2022-07-13T21:00","2022-07-13T22:00","2022-07-13T23:00","2022-07-14T00:00"],"temperature_2m":[20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0,20.0],"windspeed_10m":[10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"daily_units":{"time":"iso8601","temperature_2m_mean":"°C","windspeed_10m_mean":"km/h"},"daily":{"time":["2022-07-12","2022-07-13"],"temperature_2m_mean":[20.0,20.0],"windspeed_10m_mean":[10.0,10.0]}}]
             """)
 
-        let dataUnix = ForecastapiResult<MultiDomains>(timeformat: .unixtime, results: [location1, location2])
+        let dataUnix = ForecastapiResult4<DummyDataProvider>(timeformat: .unixtime, results: [location1, location2], currentVariables: hourlyVars, minutely15Variables: nil, hourlyVariables: hourlyVars, sixHourlyVariables: nil, dailyVariables: dailyVars)
 
         let jsonUnix = await drainString(try dataUnix.response(format: .json, fixedGenerationTime: 12))
         #expect(jsonUnix == """

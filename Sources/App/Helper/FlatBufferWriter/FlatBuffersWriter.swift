@@ -3,44 +3,6 @@ import FlatBuffers
 import Vapor
 import OpenMeteoSdk
 
-extension ForecastapiResult {
-    /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
-    /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
-    /// Data is using `size prefixed` flatbuffers to allow streaming of multiple messages for multiple locations
-    func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int? = nil) throws -> Response {
-        // First excution outside stream, to capture potential errors better
-        // var first = try self.first?()
-        let response = Response(body: .init(asyncStream: { writer in
-            try await writer.submit(concurrencySlot: concurrencySlot) {
-                // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
-                // TODO: Estimate initial buffer size
-                let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
-                var fbb = FlatBufferBuilder(initialSize: initialSize)
-                var b = BufferAndAsyncWriter(writer: writer)
-                // if let first {
-                //    first.writeToFlatbuffer(&fbb)
-                //    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
-                //    fbb.clear()
-                // }
-                // first = nil
-                // try await b.flushIfRequired()
-                for location in results {
-                    for model in location.results {
-                        try await model.writeToFlatbuffer(&fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
-                        b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
-                        fbb.clear()
-                        try await b.flushIfRequired()
-                    }
-                }
-                try await b.flush()
-                try await b.end()
-            }
-        }))
-        response.headers.replaceOrAdd(name: .contentType, value: "application/octet-stream")
-        return response
-    }
-}
-
 extension ForecastapiResult4 {
     /// Convert data into a FlatBuffers scheme far fast binary encoding and transfer
     /// Each `ForecastapiResult` is converted indifuavually into an flatbuffer message -> very long time-VariableWithValues require a lot of memory
@@ -188,36 +150,6 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
             interval: Int32(dtSeconds),
             variablesVectorOffset: offsets
         )
-    }
-}
-
-extension ForecastapiResult.PerModel {
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
-        let generationTimeStart = Date()
-        let hourly = await (try hourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let minutely15 = await (try minutely15?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let sixHourly = await (try sixHourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let daily = await (try daily?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let current = await (try current?()).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
-        let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
-
-        let result = openmeteo_sdk_WeatherApiResponse.createWeatherApiResponse(
-            &fbb,
-            latitude: latitude,
-            longitude: longitude,
-            elevation: elevation ?? .nan,
-            generationTimeMilliseconds: Float32(generationTimeMs),
-            locationId: Int64(locationId),
-            model: model.flatBufferModel,
-            utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
-            timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),
-            timezoneAbbreviationOffset: timezone.abbreviation == "GMT" ? Offset() : fbb.create(string: timezone.abbreviation),
-            currentOffset: current,
-            dailyOffset: daily,
-            hourlyOffset: hourly,
-            minutely15Offset: minutely15, sixHourlyOffset: sixHourly
-        )
-        fbb.finish(offset: result, addPrefix: true)
     }
 }
 
