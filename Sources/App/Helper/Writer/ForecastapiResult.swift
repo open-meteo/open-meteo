@@ -336,6 +336,17 @@ extension ApiSection where Variable: RawRepresentableString {
         })
     }
     
+    func toApiSectionString<Model: ModelFlatbufferSerialisable4>(memberOffset: Int, model: Model?) -> ApiSectionString {
+        return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
+            return c.variables.enumerated().map { member, data in
+                let member = member + memberOffset
+                let variableAndMember = member > 0 ? "\(c.variable.rawValue)_member\(member.zeroPadded(len: 2))" : c.variable.rawValue
+                let variable = model.map { "\(variableAndMember)_\($0.modelName)" } ?? variableAndMember
+                return ApiColumnString(variable: variable, unit: c.unit, data: data)
+            }
+        })
+    }
+    
     /*func toApiSectionString(memberOffset: Int, model: GenericDomainFB?) -> ApiSectionString {
         return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
             return c.variables.enumerated().map { member, data in
@@ -347,6 +358,20 @@ extension ApiSection where Variable: RawRepresentableString {
         })
     }*/
 }
+
+/*extension ApiSection where Variable: FlatBuffersVariable2 {
+    func toApiSectionString<Model: RawRepresentableString>(memberOffset: Int, model: Model?) -> ApiSectionString {
+        return ApiSectionString(name: name, time: time, columns: columns.flatMap { c in
+            return c.variables.enumerated().map { member, data in
+                let member = member + memberOffset
+                let variableAndMember = member > 0 ? "\(c.variable.originalString)_member\(member.zeroPadded(len: 2))" : String(c.variable.originalString)
+                let variable = model.map { "\(variableAndMember)_\($0.rawValue)" } ?? variableAndMember
+                return ApiColumnString(variable: variable, unit: c.unit, data: data)
+            }
+        })
+    }
+}*/
+
 
 extension Array where Element == ApiSectionString {
     func merge() throws -> ApiSectionString? {

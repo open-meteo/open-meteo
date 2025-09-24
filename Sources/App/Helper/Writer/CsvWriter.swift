@@ -49,6 +49,54 @@ extension ForecastapiResult {
     }
 }
 
+extension ForecastapiResult4 {
+    /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
+    func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
+        let response = Response(body: .init(stream: { writer in
+            writer.submit(concurrencySlot: concurrencySlot) {
+                var b = BufferAndWriter(writer: writer)
+                let multiLocation = results.count > 1
+
+                if results.count == 1, let location = results.first, let first = location.results.first {
+                    b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
+                    let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                    b.buffer.writeString("\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                } else {
+                    b.buffer.writeString("location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
+                    for location in results {
+                        guard let first = location.results.first else {
+                            continue
+                        }
+                        let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                        b.buffer.writeString("\(location.locationId),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                    }
+                }
+                for location in results {
+                    try await location.current()?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                for location in results {
+                    try await location.minutely15()?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                for location in results {
+                    try await location.hourly()?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                for location in results {
+                    try await location.sixHourly()?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                for location in results {
+                    try await location.daily()?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                try await b.flush()
+                try await b.end()
+            }
+        }, count: -1))
+
+        response.headers.replaceOrAdd(name: .contentType, value: "text/csv; charset=utf-8")
+        response.headers.replaceOrAdd(name: .contentDisposition, value: "attachment; filename=\"open-meteo-\(results.first?.results.first?.formatedCoordinatesFilename ?? "").csv\"")
+        return response
+    }
+}
+
 extension ApiSectionSingle {
     fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
