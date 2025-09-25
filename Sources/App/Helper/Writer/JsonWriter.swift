@@ -67,7 +67,7 @@ extension ForecastapiResult.PerLocation {
         guard let first = results.first else {
             throw ForecastApiError.noDataAvailableForThisLocation
         }
-        let sections = try await runAllSections(minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables)
+        let sections = try await runAllSections(variables: variables)
         let current = try await first.current(variables: variables.currentVariables)
         
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)

@@ -162,7 +162,8 @@ extension ModelFlatbufferSerialisable {
         let daily = await (try daily(variables: variables.dailyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let current = await (try current(variables: variables.currentVariables)).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
-
+        // TODO support for monthly variables
+        
         let result = openmeteo_sdk_WeatherApiResponse.createWeatherApiResponse(
             &fbb,
             latitude: latitude,

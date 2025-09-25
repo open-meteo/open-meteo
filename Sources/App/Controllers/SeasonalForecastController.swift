@@ -179,13 +179,15 @@ struct SeasonalForecastController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<SeasonalDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<SeasonalDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
 
 struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
+    typealias MonthlyVariable = FlatBuffersVariableNone
+    
     typealias HourlyVariable = SeasonalForecastVariable
     
     typealias DailyVariable = DailyCfsVariable
@@ -217,7 +219,7 @@ struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let members = 0..<reader.domain.countEnsembleMember
         let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
         if let sixHourlyVariables {
@@ -290,6 +292,10 @@ struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
         return nil
     }
 }

@@ -122,15 +122,17 @@ struct GloFasController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
 struct GlofasDomainsReader: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = ForecastVariable
+    typealias HourlyVariable = FlatBuffersVariableNone
     
     typealias DailyVariable = GloFasVariableOrDerived
+    
+    typealias MonthlyVariable = FlatBuffersVariableNone
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
         domain.flatBufferModel
@@ -159,7 +161,7 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         if let dailyVariables {
             for param in dailyVariables {
                 try await reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
@@ -206,6 +208,10 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
         return nil
     }
 }

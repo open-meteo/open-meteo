@@ -8,10 +8,10 @@
 import OpenMeteoSdk
 import Vapor
 
-
 protocol ModelFlatbufferSerialisable {
     associatedtype HourlyVariable: FlatBuffersVariable
     associatedtype DailyVariable: FlatBuffersVariable
+    associatedtype MonthlyVariable: FlatBuffersVariable
 
     /// 0=all members start at control, 1=Members start at `member01` (Used in CFSv2)
     static var memberOffset: Int { get }
@@ -26,13 +26,28 @@ protocol ModelFlatbufferSerialisable {
     /// Desired elevation from a DEM. Used in statistical downscaling
     var elevation: Float? { get }
 
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws -> Void
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws -> Void
     
     func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>?
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
     func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
     func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>?
+    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>?
+}
+
+struct FlatBuffersVariableNone: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        return FlatBufferVariableMeta(variable: .undefined)
+    }
+    
+    init?(rawValue: String) {
+        return nil
+    }
+    
+    var rawValue: String {
+        return "undefined"
+    }
 }
 
 
@@ -68,15 +83,16 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         let hourlyVariables: [Model.HourlyVariable]?
         let sixHourlyVariables: [Model.HourlyVariable]?
         let dailyVariables: [Model.DailyVariable]?
+        let monthlyVariables: [Model.MonthlyVariable]?
     }
     let variables: RequestVariables
 
 
-    init(timeformat: Timeformat, results: [PerLocation], currentVariables: [Model.HourlyVariable]?, minutely15Variables: [Model.HourlyVariable]?, hourlyVariables: [Model.HourlyVariable]?, sixHourlyVariables: [Model.HourlyVariable]?, dailyVariables: [Model.DailyVariable]?, nVariablesTimesDomains: Int = 1) {
+    init(timeformat: Timeformat, results: [PerLocation], currentVariables: [Model.HourlyVariable]?, minutely15Variables: [Model.HourlyVariable]?, hourlyVariables: [Model.HourlyVariable]?, sixHourlyVariables: [Model.HourlyVariable]?, dailyVariables: [Model.DailyVariable]?, monthlyVariables: [Model.MonthlyVariable]?, nVariablesTimesDomains: Int = 1) {
         self.timeformat = timeformat
         self.results = results
         self.nVariablesTimesDomains = nVariablesTimesDomains
-        self.variables = RequestVariables(currentVariables: currentVariables, minutely15Variables: minutely15Variables, hourlyVariables: hourlyVariables, sixHourlyVariables: sixHourlyVariables, dailyVariables: dailyVariables)
+        self.variables = RequestVariables(currentVariables: currentVariables, minutely15Variables: minutely15Variables, hourlyVariables: hourlyVariables, sixHourlyVariables: sixHourlyVariables, dailyVariables: dailyVariables, monthlyVariables: monthlyVariables)
     }
 
     struct PerLocation {
@@ -89,12 +105,13 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             timezone.utcOffsetSeconds
         }
 
-        func runAllSections(minutely15Variables: [Model.HourlyVariable]?, hourlyVariables: [Model.HourlyVariable]?, sixHourlyVariables: [Model.HourlyVariable]?, dailyVariables: [Model.DailyVariable]?) async throws -> [ApiSectionString] {
+        func runAllSections(variables: RequestVariables) async throws -> [ApiSectionString] {
             return [
-                try await minutely15(variables: minutely15Variables),
-                try await hourly(variables: hourlyVariables),
-                try await sixHourly(variables: sixHourlyVariables),
-                try await daily(variables: dailyVariables)
+                try await minutely15(variables: variables.minutely15Variables),
+                try await hourly(variables: variables.hourlyVariables),
+                try await sixHourly(variables: variables.sixHourlyVariables),
+                try await daily(variables: variables.dailyVariables),
+                try await monthly(variables: variables.monthlyVariables),
             ].compactMap({ $0 })
         }
 
@@ -167,6 +184,19 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             })
             return try run.merge()
         }
+        
+        func monthly(variables: [Model.MonthlyVariable]?) async throws -> ApiSectionString? {
+            guard let variables else {
+                return nil
+            }
+            let run: [ApiSectionString] = try await results.asyncCompactMap({ perModel -> ApiSectionString? in
+                guard let h = try await perModel.monthly(variables: variables) else {
+                    return nil
+                }
+                return h.toApiSectionString(memberOffset: Model.memberOffset, model: results.count > 1 ? perModel : nil)
+            })
+            return try run.merge()
+        }
     }
 
     /// Output the given result set with a specified format
@@ -177,7 +207,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
         }
         for location in results {
             for model in location.results {
-                try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables)
+                try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables, monthlyVariables: variables.monthlyVariables)
             }
         }
         switch format ?? .json {

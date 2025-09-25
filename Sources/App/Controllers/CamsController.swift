@@ -72,16 +72,18 @@ struct CamsController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
             }
-            return ForecastapiResult<CamsDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: nil, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<CamsDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
 
 struct CamsDomainsReader: ModelFlatbufferSerialisable {
+    typealias MonthlyVariable = FlatBuffersVariableNone
+    
     typealias HourlyVariable = CamsReader.MixingVar
     
-    typealias DailyVariable = ForecastVariableDaily
+    typealias DailyVariable = FlatBuffersVariableNone
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
         domain.flatBufferModel
@@ -112,7 +114,7 @@ struct CamsDomainsReader: ModelFlatbufferSerialisable {
     let time: ForecastApiTimeRange
     let currentTime: Timestamp
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
         let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
@@ -161,6 +163,10 @@ struct CamsDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
         return nil
     }
 }

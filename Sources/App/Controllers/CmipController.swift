@@ -51,15 +51,17 @@ struct CmipController {
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
             // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
-            return ForecastapiResult<CmipDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, nVariablesTimesDomains: nVariables / 24 / 5)
+            return ForecastapiResult<CmipDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, monthlyVariables: nil, nVariablesTimesDomains: nVariables / 24 / 5)
         }
     }
 }
 
 struct CmipDomainsReader: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = ForecastVariable
+    typealias HourlyVariable = FlatBuffersVariableNone
     
     typealias DailyVariable = Cmip6VariableOrDerivedPostBias
+    
+    typealias MonthlyVariable = FlatBuffersVariableNone
     
     let domain: Cmip6Domain
     
@@ -88,17 +90,17 @@ struct CmipDomainsReader: ModelFlatbufferSerialisable {
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         if let dailyVariables = dailyVariables {
             try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings())
         }
     }
 
-    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<ForecastVariable>? {
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
         return nil
     }
     
-    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         return nil
     }
     
@@ -113,11 +115,15 @@ struct CmipDomainsReader: ModelFlatbufferSerialisable {
         })
     }
     
-    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         return nil
     }
     
-    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<ForecastVariable>? {
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         return nil
     }
 }
