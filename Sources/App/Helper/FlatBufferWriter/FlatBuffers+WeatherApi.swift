@@ -818,26 +818,20 @@ extension MultiDomains {
         case .italia_meteo_arpae_icon_2i:
             return .italiaMeteoArpaeIcon2i
         case .meteofrance_arome_france_hd_15min:
-            // TODO add 15min entry to SDK
-            return .meteofranceAromeFranceHd
+            return .meteofranceAromeFranceHd15min
         case .meteofrance_arome_france_15min:
-            // TODO add 15min entry to SDK
-            return .meteofranceAromeFranceHd
+            return .meteofranceAromeFrance15min
         case .meteoswiss_icon_ch1:
-            // TODO register
-            return .iconSeamless
+            return .meteoswissIconCh1
         case .meteoswiss_icon_ch2:
-            // TODO register
-            return .iconSeamless
+            return .meteoswissIconCh2
         case .meteoswiss_icon_seamless:
-            // TODO register
-            return .iconSeamless
+            return .meteoswissIconSeamless
         case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
             // TODO register
             return .ecmwfIfs
         case .ncep_nam_conus:
-            // TODO register
-            return .ncepNbmConus
+            return .ncepNamConus
         case .icon_seamless_eps:
             return .iconSeamless
         case .icon_global_eps:
@@ -861,16 +855,13 @@ extension MultiDomains {
         case .ukmo_global_ensemble_20km:
             return .ukmoGlobalEnsemble20km
         case .ukmo_uk_ensemble_2km:
-            // TODO register in SDK
-            return .ukmoGlobalEnsemble20km
+            return .ukmoUkEnsemble2km
         case .ecmwf_aifs025_ensemble:
             return .ecmwfAifs025
         case .meteoswiss_icon_ch1_ensemble:
-            // todo register
-            return .iconD2
+            return .meteoswissIconCh1Ensemble
         case .meteoswiss_icon_ch2_ensemble:
-            // todo register
-            return .iconD2
+            return .meteoswissIconCh2Ensemble
         }
     }
 }
