@@ -240,7 +240,7 @@ struct MfWaveReader: GenericReaderProtocol {
     func get(variable: MfWaveVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         let data = try await reader.get(variable: variable, time: time)
         switch variable {
-        case .wave_direction, .wind_wave_direction, .swell_wave_direction:
+        case .wave_direction, .wind_wave_direction, .swell_wave_direction, .secondary_swell_wave_direction:
             let direction = data.data.map {
                 ($0 + 180).truncatingRemainder(dividingBy: 360)
             }
