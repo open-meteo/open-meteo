@@ -103,9 +103,12 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             }
         }
         if let hourlyVariables {
+            let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+            let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+            let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
                 for member in members {
-                    try await readerHourly.prefetchData(variable: variable, time: time.hourlyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    try await readerHourly.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
                 }
             }
         }
@@ -134,13 +137,16 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         guard let variables else {
             return nil
         }
+        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+        let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
         let members = 0..<readerHourly.reader.domain.countEnsembleMember
-        return .init(name: "hourly", time: time.hourlyDisplay, columns: try await variables.asyncCompactMap { variable in
+        return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let d = try await readerHourly.get(variable: variable, time: time.hourlyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+                let d = try await readerHourly.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
                 unit = d.unit
-                assert(time.hourlyRead.count == d.data.count)
+                assert(timeHourlyRead.count == d.data.count)
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
