@@ -203,7 +203,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         let yearMonths = time.dailyRead.toYearMonth()
         let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
         let timeMonthlyRead = timeMonthlyDisplay
-        return ApiSection<MonthlyVariable>(name: "daily", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
+        return ApiSection<MonthlyVariable>(name: "monthly", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
             let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings()).convertAndRound(params: params)
             assert(timeMonthlyDisplay.count == d.data.count)
             return ApiColumn<MonthlyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
