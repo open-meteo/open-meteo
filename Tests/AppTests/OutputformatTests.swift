@@ -335,7 +335,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         #expect(xlsx == "6efa5ee262cef5073ef5fb27f05beb235db21db163eca31c4b4175b0c96d9b03")
 
         let flatbuffers = await drainData(try data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        #expect(flatbuffers == "a1dadac11cfff2adbc09ff15355c9fa87f2671f16477d77312ef60e916a7c683")
+        #expect(flatbuffers == "a46939dc99de3cd52a2ad4db9f22d34bb308fa37bbdbb0ffff860c6e6fa95715")
     }
 
     /// Test output formats for 2 locations

@@ -64,8 +64,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     typealias DailyVariable = VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
-        // TODO seas5 domain
-        .ecmwfIfs
+        .ecmwfSeas5
     }
     
     var modelName: String {
