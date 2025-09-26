@@ -107,10 +107,11 @@ extension ApiArray {
 extension ApiSection where Variable: FlatBuffersVariable {
     func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
         let offsets = fbb.createVector(ofOffsets: self.columns.flatMap { c -> [Offset] in
+            let meta = c.variable.getFlatBuffersMeta()
             return c.variables.enumerated().map { member, v in
                 let data = v.encodeFlatBuffers(&fbb)
                 let VariableWithValues = openmeteo_sdk_VariableWithValues.startVariableWithValues(&fbb)
-                c.variable.getFlatBuffersMeta().encodeToFlatBuffers(&fbb)
+                meta.encodeToFlatBuffers(&fbb)
                 openmeteo_sdk_VariableWithValues.add(unit: c.unit, &fbb)
                 if c.variables.count > 1 {
                     openmeteo_sdk_VariableWithValues.add(ensembleMember: Int16(member + memberOffset), &fbb)
