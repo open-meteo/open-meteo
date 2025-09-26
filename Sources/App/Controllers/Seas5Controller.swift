@@ -18,6 +18,7 @@ struct Seas5Controller {
             let domains = [SeasonalForecastDomainApi.cfsv2]
 
             let paramsSixHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.six_hourly)
+            let paramsHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
             let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
             let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + (paramsMonthly?.count ?? 0)) * domains.reduce(0, { $0 + $1.forecastDomain.nMembers })
@@ -49,7 +50,7 @@ struct Seas5Controller {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<Seas5Reader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<Seas5Reader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
         }
     }
 }
@@ -93,11 +94,18 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let members = 0..<readerHourly.reader.domain.countEnsembleMember
-        let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
         if let sixHourlyVariables {
+            let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
             for variable in sixHourlyVariables {
                 for member in members {
                     try await readerHourly.prefetchData(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMember: member, run: run))
+                }
+            }
+        }
+        if let hourlyVariables {
+            for variable in hourlyVariables {
+                for member in members {
+                    try await readerHourly.prefetchData(variable: variable, time: time.hourlyRead.toSettings(ensembleMember: member, run: run))
                 }
             }
         }
@@ -129,7 +137,6 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             return nil
         }
         let members = 0..<readerHourly.reader.domain.countEnsembleMember
-        
         return .init(name: "hourly", time: time.hourlyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
@@ -170,10 +177,8 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             return nil
         }
         let members = 0..<readerHourly.reader.domain.countEnsembleMember
-        
         let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
         let timeSixHourlyDisplay = time.dailyDisplay.with(dtSeconds: 3600 * 6)
-        
         return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in

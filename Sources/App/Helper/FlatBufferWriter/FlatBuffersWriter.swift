@@ -161,9 +161,9 @@ extension ModelFlatbufferSerialisable {
         let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let sixHourly = await (try sixHourly(variables: variables.sixHourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let daily = await (try daily(variables: variables.dailyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let monthly = await (try monthly(variables: variables.monthlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let current = await (try current(variables: variables.currentVariables)).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
-        // TODO support for monthly variables
         
         let result = openmeteo_sdk_WeatherApiResponse.createWeatherApiResponse(
             &fbb,
@@ -179,7 +179,9 @@ extension ModelFlatbufferSerialisable {
             currentOffset: current,
             dailyOffset: daily,
             hourlyOffset: hourly,
-            minutely15Offset: minutely15, sixHourlyOffset: sixHourly
+            minutely15Offset: minutely15,
+            sixHourlyOffset: sixHourly,
+            monthlyOffset: monthly
         )
         fbb.finish(offset: result, addPrefix: true)
     }

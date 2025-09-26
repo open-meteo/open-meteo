@@ -1,5 +1,5 @@
 {
-  "originHash" : "eeef6fde90d3d37111f8adfb2bc9569d8c9754d4a4e13fbb098d686dca1f5f85",
+  "originHash" : "ecb05f953ca927bdc8945b1a5f37c42498fb8cb70d04bf04e245f6bc4246d89c",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -77,8 +77,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "24f3c59cb7af4bdfe188758b7ea8669a7a037d29",
-        "version" : "1.21.0"
+        "revision" : "11162f0fcd7c44b816db728a56ab93e34ceb1f2b"
       }
     },
     {
