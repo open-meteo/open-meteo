@@ -40,7 +40,7 @@ struct Seas5Controller {
                     guard let readerDaily = try await EcmwfSeas5Controller24Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
-                    guard let readerMonthly = try await GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+                    guard let readerMonthly = try await EcmwfSeas5ControllerMonthly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
                     return Seas5Reader(readerHourly: readerHourly, readerDaily: readerDaily, readerMonthly: readerMonthly, params: params, time: time, run: run)
@@ -57,7 +57,7 @@ struct Seas5Controller {
 
 
 struct Seas5Reader: ModelFlatbufferSerialisable {
-    typealias MonthlyVariable = EcmwfSeasVariableMonthly
+    typealias MonthlyVariable = VariableOrDerived<EcmwfSeasVariableMonthly, EcmwfSeasVariableMonthlyDerived>
     
     typealias HourlyVariable = VariableOrDerived<EcmwfSeasVariableSingleLevel, EcmwfSeasVariableSingleLevelDerived>
     
@@ -73,7 +73,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         
     let readerHourly: EcmwfSeas5Controller6Hourly
     let readerDaily: EcmwfSeas5Controller24Hourly
-    let readerMonthly: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>
+    let readerMonthly: EcmwfSeas5ControllerMonthly
     
     var latitude: Float {
         readerHourly.modelLat
@@ -215,30 +215,267 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
 
 extension EcmwfSeasVariableMonthly: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        fatalError()
+        switch self {
+        case .wind_gusts_10m_anomaly:
+            return .init(variable: .windGusts, aggregation: .anomaly, altitude: 10)
+        case .wind_speed_10m_mean:
+            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+        case .wind_speed_10m_anomaly:
+            return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
+        case .albedo_mean:
+            return .init(variable: .albedo, aggregation: .mean)
+        case .albedo_anomaly:
+            return .init(variable: .albedo, aggregation: .anomaly)
+        case .cloud_cover_low_mean:
+            return .init(variable: .cloudCoverLow, aggregation: .mean)
+        case .cloud_cover_low_anomaly:
+            return .init(variable: .cloudCoverLow, aggregation: .anomaly)
+        case .showers_mean:
+            return .init(variable: .showers, aggregation: .mean)
+        case .showers_anomaly:
+            return .init(variable: .showers, aggregation: .anomaly)
+        case .runoff_mean:
+            return .init(variable: .runoff, aggregation: .mean)
+        case .runoff_anomaly:
+            return .init(variable: .runoff, aggregation: .anomaly)
+        case .snow_density_mean:
+            return .init(variable: .snowDensity, aggregation: .mean)
+        case .snow_density_anomaly:
+            return .init(variable: .snowDensity, aggregation: .anomaly)
+        case .snow_depth_mean:
+            return .init(variable: .snowDepth, aggregation: .mean)
+        case .snow_depth_anomaly:
+            // TODO check if water equivalent or actual height
+            return .init(variable: .snowDepth, aggregation: .anomaly)
+        case .total_column_integrated_water_vapour_mean:
+            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .mean)
+        case .total_column_integrated_water_vapour_anomaly:
+            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .anomaly)
+        case .temperature_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+        case .temperature_2m_anomaly:
+            return .init(variable: .temperature, aggregation: .anomaly, altitude: 2)
+        case .dew_point_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+        case .dew_point_2m_anomaly:
+            return .init(variable: .dewPoint, aggregation: .anomaly, altitude: 2)
+        case .pressure_msl_mean:
+            return .init(variable: .pressureMsl, aggregation: .mean)
+        case .pressure_msl_anomaly:
+            return .init(variable: .pressureMsl, aggregation: .anomaly)
+        case .sea_surface_temperature_mean:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
+        case .sea_surface_temperature_anomaly:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .anomaly)
+        case .wind_u_component_10m_mean:
+            return .init(variable: .windUComponent, aggregation: .mean, altitude: 10)
+        case .wind_u_component_10m_anomaly:
+            return .init(variable: .windUComponent, aggregation: .anomaly, altitude: 10)
+        case .wind_v_component_10m_mean:
+            return .init(variable: .windVComponent, aggregation: .mean, altitude: 10)
+        case .wind_v_component_10m_anomaly:
+            return .init(variable: .windVComponent, aggregation: .anomaly, altitude: 10)
+        case .snowfall_water_equivalent_mean:
+            return .init(variable: .snowfallWaterEquivalent, aggregation: .mean)
+        case .snowfall_water_equivalent_anomaly:
+            return .init(variable: .snowfallWaterEquivalent, aggregation: .anomaly)
+        case .precipitation_mean:
+            return .init(variable: .precipitation, aggregation: .mean)
+        case .precipitation_anomaly:
+            return .init(variable: .precipitation, aggregation: .anomaly)
+        case .shortwave_radiation_mean:
+            return .init(variable: .shortwaveRadiation, aggregation: .mean)
+        case .shortwave_radiation_anomaly:
+            return .init(variable: .shortwaveRadiation, aggregation: .anomaly)
+        case .cloud_cover_mean:
+            return .init(variable: .cloudCover, aggregation: .mean)
+        case .cloud_cover_anomaly:
+            return .init(variable: .cloudCover, aggregation: .anomaly)
+        case .sunshine_duration_mean:
+            return .init(variable: .sunshineDuration, aggregation: .mean)
+        case .sunshine_duration_anomaly:
+            return .init(variable: .sunshineDuration, aggregation: .anomaly)
+        case .soil_temperature_0_to_7cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_temperature_0_to_7cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
+        case .soil_temperature_7_to_28cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_temperature_7_to_28cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_temperature_28_to_100cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_temperature_100_to_255cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_moisture_0_to_7cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_moisture_7_to_28cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_moisture_28_to_100cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_moisture_100_to_255cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 100, depthTo: 255)
+        case .temperature_max24h_2m_mean:
+            return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
+        case .temperature_max24h_2m_anomaly:
+            return .init(variable: .temperatureMax24h, aggregation: .anomaly, altitude: 2)
+        case .temperature_min24h_2m_mean:
+            return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
+        case .temperature_min24h_2m_anomaly:
+            return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
+        }
     }
 }
 
 extension EcmwfSeasVariableSingleLevel: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        fatalError()
+        switch self {
+        case .temperature_2m:
+            return .init(variable: .temperature, altitude: 2)
+        case .dew_point_2m:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .pressure_msl:
+            return .init(variable: .pressureMsl)
+        case .sea_surface_temperature:
+            return .init(variable: .seaSurfaceTemperature)
+        case .wind_u_component_10m:
+            return .init(variable: .windUComponent, altitude: 10)
+        case .wind_v_component_10m:
+            return .init(variable: .windVComponent, altitude: 10)
+        case .snowfall_water_equivalent:
+            return .init(variable: .snowfallWaterEquivalent)
+        case .precipitation:
+            return .init(variable: .precipitation)
+        case .shortwave_radiation:
+            return .init(variable: .shortwaveRadiation)
+        case .soil_temperature_0_to_7cm:
+            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+        case .cloud_cover:
+            return .init(variable: .cloudCover)
+        }
     }
 }
 
 extension EcmwfSeasVariableSingleLevelDerived: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        fatalError()
+        switch self {
+        case .apparent_temperature:
+            return .init(variable: .apparentTemperature)
+        case .dewpoint_2m:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .relativehumidity_2m, .relative_humidity_2m:
+            return .init(variable: .relativeHumidity, altitude: 2)
+        case .windspeed_10m, .wind_speed_10m:
+            return .init(variable: .windSpeed, altitude: 10)
+        case .winddirection_10m, .wind_direction_10m:
+            return .init(variable: .windDirection, altitude: 10)
+        case .vapor_pressure_deficit, .vapour_pressure_deficit:
+            return .init(variable: .vapourPressureDeficit)
+        case .surface_pressure:
+            return .init(variable: .surfacePressure)
+        case .snowfall:
+            return .init(variable: .snowfall)
+        case .rain:
+            return .init(variable: .rain)
+        case .et0_fao_evapotranspiration:
+            return .init(variable: .et0FaoEvapotranspiration)
+        case .cloudcover:
+            return .init(variable: .cloudCover)
+        case .direct_normal_irradiance:
+            return .init(variable: .directNormalIrradiance)
+        case .weathercode, .weather_code:
+            return .init(variable: .weatherCode)
+        case .is_day:
+            return .init(variable: .isDay)
+        case .diffuse_radiation:
+            return .init(variable: .diffuseRadiation)
+        case .direct_radiation:
+            return .init(variable: .directRadiation)
+        case .terrestrial_radiation:
+            return .init(variable: .terrestrialRadiation)
+        case .terrestrial_radiation_instant:
+            return .init(variable: .terrestrialRadiationInstant)
+        case .shortwave_radiation_instant:
+            return .init(variable: .shortwaveRadiationInstant)
+        case .diffuse_radiation_instant:
+            return .init(variable: .diffuseRadiationInstant)
+        case .direct_radiation_instant:
+            return .init(variable: .directRadiationInstant)
+        case .direct_normal_irradiance_instant:
+            return .init(variable: .directNormalIrradianceInstant)
+        case .wet_bulb_temperature_2m:
+            return .init(variable: .wetBulbTemperature, altitude: 2)
+        case .global_tilted_irradiance:
+            return .init(variable: .globalTiltedIrradiance)
+        case .global_tilted_irradiance_instant:
+            return .init(variable: .globalTiltedIrradianceInstant)
+        }
     }
 }
 
 extension EcmwfSeasVariable24HourlySingleLevel: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        fatalError()
+        switch self {
+        case .soil_temperature_0_to_7cm:
+            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+        case .soil_temperature_7_to_28cm:
+            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm:
+            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm:
+            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm:
+            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm:
+            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm:
+            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm:
+            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
+        case .temperature_max24h_2m:
+            return .init(variable: .temperatureMax24h, altitude: 2)
+        case .temperature_min24h_2m:
+                return .init(variable: .temperatureMin24h, altitude: 2)
+        case .temperature_mean24h_2m:
+            return .init(variable: .temperatureMean24h, altitude: 2)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
+        }
     }
 }
 
 extension EcmwfSeasVariable24HourlySingleLevelDerived: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        fatalError()
+        switch self {
+        case .temperature_2m_max:
+            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
+        case .temperature_2m_min:
+            return .init(variable: .temperature, aggregation: .minimum, altitude: 2)
+        case .temperature_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+        }
+    }
+}
+
+extension EcmwfSeasVariableMonthlyDerived: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .snowfall_mean:
+            return .init(variable: .snowfall, aggregation: .mean)
+        case .snowfall_anomaly:
+            return .init(variable: .snowfall, aggregation: .anomaly)
+        }
     }
 }

@@ -48,11 +48,11 @@ struct EcmwfSeas5Controller24Hourly: GenericReaderDerivedSimple, GenericReaderPr
         let time24hAgo = time.with(time: time.time.add(-86400))
         switch derived {
         case .temperature_2m_max:
-            try await prefetchData(raw: .temperature_2m_max24h, time: time24hAgo)
+            try await prefetchData(raw: .temperature_max24h_2m, time: time24hAgo)
         case .temperature_2m_min:
-            try await prefetchData(raw: .temperature_2m_min24h, time: time24hAgo)
+            try await prefetchData(raw: .temperature_min24h_2m, time: time24hAgo)
         case .temperature_2m_mean:
-            try await prefetchData(raw: .temperature_2m_mean24h, time: time24hAgo)
+            try await prefetchData(raw: .temperature_mean24h_2m, time: time24hAgo)
         }
     }
 
@@ -69,11 +69,11 @@ struct EcmwfSeas5Controller24Hourly: GenericReaderDerivedSimple, GenericReaderPr
         let time24hAgo = time.with(time: time.time.add(-86400))
         switch derived {
         case .temperature_2m_max:
-            return try await get(raw: .temperature_2m_max24h, time: time24hAgo)
+            return try await get(raw: .temperature_max24h_2m, time: time24hAgo)
         case .temperature_2m_min:
-            return try await get(raw: .temperature_2m_min24h, time: time24hAgo)
+            return try await get(raw: .temperature_min24h_2m, time: time24hAgo)
         case .temperature_2m_mean:
-            return try await get(raw: .temperature_2m_mean24h, time: time24hAgo)
+            return try await get(raw: .temperature_mean24h_2m, time: time24hAgo)
         }
     }
 }
