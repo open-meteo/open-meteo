@@ -2,6 +2,8 @@ enum EcmwfSeasVariable24HourlySingleLevelDerived: String, RawRepresentableString
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
+    //case shortwave_radiation_sum
+    //case precipitation_sum
 
     var requiresOffsetCorrectionForMixing: Bool {
         return false
