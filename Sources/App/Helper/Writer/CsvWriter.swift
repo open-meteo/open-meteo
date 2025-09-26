@@ -103,7 +103,7 @@ extension ApiSectionString {
             b.buffer.writeString("\n")
         }
 
-        for (i, time) in time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: time.dtSeconds == 86400).enumerated() {
+        for (i, time) in time.iterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: time.dtSeconds >= 86400).enumerated() {
             if let location_id {
                 b.buffer.writeString("\(location_id),")
             }

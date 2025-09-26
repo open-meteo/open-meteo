@@ -224,10 +224,6 @@ struct WeatherApiController {
                     guard let reader: GenericReaderMulti = try await readerAndDomain.reader() else {
                         return nil
                     }
-                    let domain = readerAndDomain.domain
-                    // TODO option to set run to "latest"
-                    let run = run == nil && (domain == .ecmwf_seas5_6hourly || domain == .ecmwf_seas5_24hourly || domain == .ecmwf_seas5_seamless) ? IsoDateTime(timeIntervalSince1970: try await EcmwfSeasDomain.seas5_6hourly.getLatestFullRun(client: options.httpClient, logger: options.logger)?.timeIntervalSince1970 ?? Timestamp.now().subtract(days: 5).with(day: 1).timeIntervalSince1970) : run
-
                     return MultiDomainsReader(reader: reader, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime)
                 }
                 guard !readers.isEmpty else {
@@ -381,18 +377,9 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: reader.modelLat)
                 return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
             }
-            
-            // Check if there is a reader with 24h data directly
-            let reader24h = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: reader.domain, reader: reader.reader.filter({$0.modelDtSeconds == 24*3600}))
-            
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)
-                if let d = try await reader24h.get(variable: variable, time: timeRead) {
-                    unit = d.unit
-                    assert(time.dailyRead.count == d.data.count)
-                    return ApiArray.float(d.data)
-                }
                 guard let d = try await reader.getDaily(variable: variable, params: params, time: timeRead)?.convertAndRound(params: params) else {
                     return nil
                 }
@@ -522,10 +509,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ecmwf_ifs025
     case ecmwf_aifs025
     case ecmwf_aifs025_single
-    
-    case ecmwf_seas5_6hourly
-    case ecmwf_seas5_24hourly
-    case ecmwf_seas5_seamless
 
     case metno_nordic
 
@@ -788,15 +771,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await EcmwfReader(domain: .aifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_aifs025_single:
             return try await EcmwfReader(domain: .aifs025_single, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ecmwf_seas5_6hourly:
-            return try await EcmwfSeas5Controller6Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ecmwf_seas5_24hourly:
-            return try await EcmwfSeas5Controller24Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
-        case .ecmwf_seas5_seamless:
-            return [
-                try await EcmwfSeas5Controller6Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await EcmwfSeas5Controller24Hourly(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({$0})
         case .metno_nordic:
             return try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gem_seamless:
@@ -1063,12 +1037,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return CdsDomain.ecmwf_ifs_analysis_long_window
         case .ecmwf_ifs_long_window:
             return CdsDomain.ecmwf_ifs_long_window
-        case .ecmwf_seas5_6hourly:
-            return EcmwfSeasDomain.seas5_6hourly
-        case .ecmwf_seas5_24hourly:
-            return EcmwfSeasDomain.seas5_24hourly
-        case .ecmwf_seas5_seamless:
-            return nil
         case .arpae_cosmo_seamless:
             return nil
         case .arpae_cosmo_2i:
@@ -1206,12 +1174,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await EcmwfReader(domain: .ifs025, gridpoint: gridpoint, options: options)
         case .ecmwf_aifs025:
             return try await EcmwfReader(domain: .aifs025, gridpoint: gridpoint, options: options)
-        case .ecmwf_seas5_6hourly:
-            return try await EcmwfSeas5Controller6Hourly(gridpoint: gridpoint, options: options)
-        case .ecmwf_seas5_24hourly:
-            return try await EcmwfSeas5Controller24Hourly(gridpoint: gridpoint, options: options)
-        case .ecmwf_seas5_seamless:
-            return nil
         case .metno_nordic:
             return try await MetNoReader(domain: .nordic_pp, gridpoint: gridpoint, options: options)
         case .gem_global, .cmc_gem_gdps:
@@ -1352,8 +1314,6 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
 
     var countEnsembleMember: Int {
         switch self {
-        case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
-            return 51
         case .icon_seamless_eps:
             return IconDomains.iconEps.countEnsembleMember
         case .icon_global_eps:

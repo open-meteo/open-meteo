@@ -132,7 +132,7 @@ extension ForecastapiResult.PerLocation {
 
             // Write time axis
             var firstValue = true
-            for time in section.time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: section.time.dtSeconds == 86400) {
+            for time in section.time.iterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: section.time.dtSeconds >= 86400) {
                 if firstValue {
                     firstValue = false
                 } else {
@@ -166,7 +166,7 @@ extension ForecastapiResult.PerLocation {
                         try await b.flushIfRequired()
                     }
                 case .timestamp(let timestamps):
-                    for time in timestamps.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
+                    for time in timestamps.iterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
                         if firstValue {
                             firstValue = false
                         } else {
@@ -297,7 +297,7 @@ extension ForecastapiResult2.PerLocation {
 
             // Write time axis
             var firstValue = true
-            for time in section.time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: section.time.dtSeconds == 86400) {
+            for time in section.time.iterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: section.time.dtSeconds == 86400) {
                 if firstValue {
                     firstValue = false
                 } else {
@@ -331,7 +331,7 @@ extension ForecastapiResult2.PerLocation {
                         try await b.flushIfRequired()
                     }
                 case .timestamp(let timestamps):
-                    for time in timestamps.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
+                    for time in timestamps.iterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: true, onlyDate: false) {
                         if firstValue {
                             firstValue = false
                         } else {

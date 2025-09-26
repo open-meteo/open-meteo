@@ -160,15 +160,15 @@ extension Timestamp {
 
 extension Sequence where Element == Timestamp {
     /// includes quotes characters if `quotedString` is true
-    func itterateIso8601(utc_offset_seconds: Int, quotedString: Bool, onlyDate: Bool) -> AnySequence<String> {
+    func iterateIso8601(utc_offset_seconds: Int, quotedString: Bool, onlyDate: Bool) -> AnySequence<String> {
         return AnySequence<String> { () -> AnyIterator<String> in
-            var itterator = self.makeIterator()
+            var iterator = self.makeIterator()
             var t = tm()
             var dateCalculated = Int.min
 
             if onlyDate {
                 return AnyIterator<String> {
-                    guard let element = itterator.next()?.add(utc_offset_seconds) else {
+                    guard let element = iterator.next()?.add(utc_offset_seconds) else {
                         return nil
                     }
                     if quotedString {
@@ -179,7 +179,7 @@ extension Sequence where Element == Timestamp {
             }
 
             return AnyIterator<String> {
-                guard let element = itterator.next()?.add(utc_offset_seconds) else {
+                guard let element = iterator.next()?.add(utc_offset_seconds) else {
                     return nil
                 }
                 var time = element.timeIntervalSince1970
@@ -202,16 +202,16 @@ extension Sequence where Element == Timestamp {
         }
     }
 
-    /// Optimised time itteration function
-    func itterate(format: Timeformat, utc_offset_seconds: Int, quotedString: Bool, onlyDate: Bool) -> AnySequence<String> {
+    /// Optimised time iteration function
+    func iterate(format: Timeformat, utc_offset_seconds: Int, quotedString: Bool, onlyDate: Bool) -> AnySequence<String> {
         switch format {
         case .iso8601:
-            return itterateIso8601(utc_offset_seconds: utc_offset_seconds, quotedString: quotedString, onlyDate: onlyDate)
+            return iterateIso8601(utc_offset_seconds: utc_offset_seconds, quotedString: quotedString, onlyDate: onlyDate)
         case .unixtime:
             return AnySequence<String> { () -> AnyIterator<String> in
-                var itterator = self.makeIterator()
+                var iterator = self.makeIterator()
                 return AnyIterator<String> {
-                    guard let element = itterator.next() else {
+                    guard let element = iterator.next() else {
                         return nil
                     }
                     return "\(element.timeIntervalSince1970)"

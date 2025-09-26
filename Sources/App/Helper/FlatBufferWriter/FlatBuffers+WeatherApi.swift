@@ -827,9 +827,6 @@ extension MultiDomains {
             return .meteoswissIconCh2
         case .meteoswiss_icon_seamless:
             return .meteoswissIconSeamless
-        case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
-            // TODO register
-            return .ecmwfIfs
         case .ncep_nam_conus:
             return .ncepNamConus
         case .icon_seamless_eps:

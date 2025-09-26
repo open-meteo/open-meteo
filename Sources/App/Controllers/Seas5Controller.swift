@@ -109,14 +109,12 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             }
         }
         if let monthlyVariables {
-            // TODO align monthly time to actual month
-            let timeMonthly = time.dailyRead.with(dtSeconds: .dtSecondsMonthly)
-            
-            time.dailyRead.range.lowerBound.with(hour: 0).with(day: 1)
-            
+            let yearMonths = time.dailyRead.toYearMonth()
+            let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+            let timeMonthlyRead = timeMonthlyDisplay
             for variable in monthlyVariables {
                 for member in members {
-                    try await readerMonthly.prefetchData(variable: variable, time: timeMonthly.toSettings(ensembleMember: member))
+                    try await readerMonthly.prefetchData(variable: variable, time: timeMonthlyRead.toSettings(ensembleMember: member))
                 }
             }
         }
@@ -127,7 +125,24 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     }
     
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        return try await sixHourly(variables: variables)
+        guard let variables else {
+            return nil
+        }
+        let members = 0..<readerHourly.reader.domain.countEnsembleMember
+        
+        return .init(name: "hourly", time: time.hourlyDisplay, columns: try await variables.asyncCompactMap { variable in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+                let d = try await readerHourly.get(variable: variable, time: time.hourlyRead.toSettings(ensembleMember: member, run: run)).convertAndRound(params: params)
+                unit = d.unit
+                assert(time.hourlyRead.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return nil
+            }
+            return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
     }
     
     func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
@@ -182,11 +197,12 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         guard let variables else {
             return nil
         }
-        let timeRead = time.dailyRead.with(dtSeconds: .dtSecondsMonthly)
-        let timeDisplay = time.dailyDisplay.with(dtSeconds: .dtSecondsMonthly)
-        return ApiSection<MonthlyVariable>(name: "daily", time: timeDisplay, columns: try await variables.asyncCompactMap { variable in
-            let d = try await readerMonthly.get(variable: variable, time: timeRead.toSettings()).convertAndRound(params: params)
-            assert(timeRead.count == d.data.count)
+        let yearMonths = time.dailyRead.toYearMonth()
+        let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+        let timeMonthlyRead = timeMonthlyDisplay
+        return ApiSection<MonthlyVariable>(name: "daily", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
+            let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings()).convertAndRound(params: params)
+            assert(timeMonthlyDisplay.count == d.data.count)
             return ApiColumn<MonthlyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
         })
     }
