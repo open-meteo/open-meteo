@@ -206,6 +206,19 @@ extension SurfacePressureAndHeightVariable: RawRepresentableString where Pressur
     }
 }
 
+extension SurfacePressureAndHeightVariable: FlatBuffersVariable where Pressure: FlatBuffersVariable, Surface: FlatBuffersVariable, Height: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .surface(let surface):
+            return surface.getFlatBuffersMeta()
+        case .pressure(let pressure):
+            return pressure.getFlatBuffersMeta()
+        case .height(let height):
+            return height.getFlatBuffersMeta()
+        }
+    }
+}
+
 extension SurfacePressureAndHeightVariable: Hashable, Equatable where Pressure: Hashable, Surface: Hashable, Height: Hashable {
 }
 

@@ -1,4 +1,4 @@
-import Foundation
+/*import Foundation
 import Vapor
 
 /**
@@ -512,3 +512,4 @@ enum EnsembleVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     }
 }
 
+*/

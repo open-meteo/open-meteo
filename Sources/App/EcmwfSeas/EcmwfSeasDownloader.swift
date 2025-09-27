@@ -87,7 +87,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
-                    let time = attributes.timestamp
+                    /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
+                    let time = domain.dtSeconds >= .dtSecondsMonthly ? run.toYearMonth().advanced(by: month).timestamp : attributes.timestamp
                     var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                     let member = message.getLong(attribute: "perturbationNumber") ?? 0
                     

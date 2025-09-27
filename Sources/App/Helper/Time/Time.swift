@@ -289,6 +289,15 @@ public struct Timestamp: Hashable, Sendable {
     func toDate() -> Date {
         return Date(timeIntervalSince1970: TimeInterval(timeIntervalSince1970))
     }
+    
+    /// Assuming a month has an average length, return the number of months from 1970 onwards
+    @inlinable public var monthIntervalSince1970Average: Int {
+        return Int(round(Float(timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+    }
+    
+    func toYearMonth() -> YearMonth {
+        return YearMonth(timestamp: self)
+    }
 }
 
 extension Date {
@@ -368,7 +377,7 @@ public struct TimerangeDt: Hashable, Sendable {
 
     @inlinable public var count: Int {
         if dtSeconds == .dtSecondsMonthly {
-            return Int(round(Float(range.upperBound.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+            return range.upperBound.monthIntervalSince1970Average - range.lowerBound.monthIntervalSince1970Average
         }
         return (range.upperBound.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / dtSeconds
     }
@@ -393,11 +402,11 @@ public struct TimerangeDt: Hashable, Sendable {
         self.dtSeconds = dtSeconds
     }
 
-    /// devide time by dtSeconds
+    /// divide time by dtSeconds
     @inlinable public func toIndexTime() -> Range<Int> {
         if dtSeconds == .dtSecondsMonthly {
             // Round to get the closest month index
-            return Int(round(Float(range.lowerBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage)) ..< Int(round(Float(range.upperBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+            return range.lowerBound.monthIntervalSince1970Average ..< range.upperBound.monthIntervalSince1970Average
         }
         return range.lowerBound.timeIntervalSince1970 / dtSeconds ..< range.upperBound.timeIntervalSince1970 / dtSeconds
     }
@@ -405,7 +414,7 @@ public struct TimerangeDt: Hashable, Sendable {
     @inlinable public func index(of: Timestamp) -> Int? {
         let index: Int
         if dtSeconds == .dtSecondsMonthly {
-            index = Int(round(Float(of.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / Float.dtSecondsMonthlyAverage))
+            index = of.monthIntervalSince1970Average - range.lowerBound.monthIntervalSince1970Average
         } else {
             index = (of.timeIntervalSince1970 - range.lowerBound.timeIntervalSince1970) / dtSeconds
         }
@@ -457,8 +466,30 @@ extension Float {
 }
 
 extension TimerangeDt: Sequence {
-    public func makeIterator() -> StrideToIterator<Timestamp> {
-        range.stride(dtSeconds: dtSeconds).makeIterator()
+    public func makeIterator() -> AnyIterator<Timestamp> {
+        if dtSeconds == .dtSecondsMonthly {
+            let range = range.toYearMonth()
+            var timestamp = range.lowerBound
+            return AnyIterator<Timestamp> { () -> (Timestamp)? in
+                if timestamp >= range.upperBound {
+                    return nil
+                }
+                defer {
+                    timestamp = timestamp.advanced(by: 1)
+                }
+                return timestamp.timestamp
+            }
+        }
+        var timestamp = range.lowerBound
+        return AnyIterator<Timestamp> { () -> (Timestamp)? in
+            if timestamp >= range.upperBound {
+                return nil
+            }
+            defer {
+                timestamp = timestamp.add(dtSeconds)
+            }
+            return timestamp
+        }
     }
 }
 

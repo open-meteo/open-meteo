@@ -402,6 +402,7 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
     }
 }
 
+// remove
 extension ForecastPressureVariableType: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -425,6 +426,7 @@ extension ForecastPressureVariableType: FlatBuffersVariable {
     }
 }
 
+// remove
 extension ForecastHeightVariableType: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -445,6 +447,51 @@ extension ForecastHeightVariableType: FlatBuffersVariable {
         }
     }
 }
+
+extension ForecastPressureVariable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch variable {
+        case .temperature:
+            return .init(variable: .temperature, pressureLevel: Int16(level))
+        case .geopotential_height:
+            return .init(variable: .geopotentialHeight, pressureLevel: Int16(level))
+        case .relativehumidity, .relative_humidity:
+            return .init(variable: .relativeHumidity, pressureLevel: Int16(level))
+        case .windspeed, .wind_speed:
+            return .init(variable: .windSpeed, pressureLevel: Int16(level))
+        case .winddirection, .wind_direction:
+            return .init(variable: .windDirection, pressureLevel: Int16(level))
+        case .dewpoint, .dew_point:
+            return .init(variable: .dewPoint, pressureLevel: Int16(level))
+        case .cloudcover, .cloud_cover:
+            return .init(variable: .cloudCover, pressureLevel: Int16(level))
+        case .vertical_velocity:
+            return .init(variable: .verticalVelocity, pressureLevel: Int16(level))
+        }
+    }
+}
+
+extension ForecastHeightVariable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch variable {
+        case .temperature:
+            return .init(variable: .temperature, altitude: Int16(level))
+        case .relativehumidity, .relative_humidity:
+            return .init(variable: .relativeHumidity, altitude: Int16(level))
+        case .windspeed, .wind_speed:
+            return .init(variable: .windSpeed, altitude: Int16(level))
+        case .winddirection, .wind_direction:
+            return .init(variable: .windDirection, altitude: Int16(level))
+        case .dewpoint, .dew_point:
+            return .init(variable: .dewPoint, altitude: Int16(level))
+        case .cloudcover, .cloud_cover:
+            return .init(variable: .cloudCover, altitude: Int16(level))
+        case .vertical_velocity:
+            return .init(variable: .verticalVelocity, altitude: Int16(level))
+        }
+    }
+}
+
 
 extension ForecastVariableDaily: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
@@ -603,35 +650,11 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .snowDepth, aggregation: .mean)
         case .snow_depth_max:
             return .init(variable: .snowDepth, aggregation: .maximum)
-        case .soil_temperature_0_to_7cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm:
-            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm:
-            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm:
-            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
         }
     }
 }
 
-extension MultiDomains: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = VariableAndPreviousDay
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = ForecastVariableDaily
-
+extension MultiDomains {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .best_match:
@@ -779,26 +802,47 @@ extension MultiDomains: ModelFlatbufferSerialisable {
         case .italia_meteo_arpae_icon_2i:
             return .italiaMeteoArpaeIcon2i
         case .meteofrance_arome_france_hd_15min:
-            // TODO add 15min entry to SDK
-            return .meteofranceAromeFranceHd
+            return .meteofranceAromeFranceHd15min
         case .meteofrance_arome_france_15min:
-            // TODO add 15min entry to SDK
-            return .meteofranceAromeFranceHd
+            return .meteofranceAromeFrance15min
         case .meteoswiss_icon_ch1:
-            // TODO register
-            return .iconSeamless
+            return .meteoswissIconCh1
         case .meteoswiss_icon_ch2:
-            // TODO register
-            return .iconSeamless
+            return .meteoswissIconCh2
         case .meteoswiss_icon_seamless:
-            // TODO register
-            return .iconSeamless
-        case .ecmwf_seas5_6hourly, .ecmwf_seas5_24hourly, .ecmwf_seas5_seamless:
-            // TODO register
-            return .ecmwfIfs
+            return .meteoswissIconSeamless
         case .ncep_nam_conus:
-            // TODO register
-            return .ncepNbmConus
+            return .ncepNamConus
+        case .icon_seamless_eps:
+            return .iconSeamless
+        case .icon_global_eps:
+            return .iconGlobal
+        case .icon_eu_eps:
+            return .iconEu
+        case .icon_d2_eps:
+            return .iconD2
+        case .ecmwf_ifs025_ensemble:
+            return .ecmwfIfs025
+        case .gem_global_ensemble:
+            return .gemGlobal
+        case .ncep_gefs_seamless:
+            return .gfsSeamless
+        case .ncep_gefs025:
+            return .gfs025
+        case .ncep_gefs05, .gfs05:
+            return .gfs05
+        case .bom_access_global_ensemble:
+            return .bomAccessGlobalEnsemble
+        case .ukmo_global_ensemble_20km:
+            return .ukmoGlobalEnsemble20km
+        case .ukmo_uk_ensemble_2km:
+            return .ukmoUkEnsemble2km
+        case .ecmwf_aifs025_ensemble:
+            return .ecmwfAifs025
+        case .meteoswiss_icon_ch1_ensemble:
+            return .meteoswissIconCh1Ensemble
+        case .meteoswiss_icon_ch2_ensemble:
+            return .meteoswissIconCh2Ensemble
         }
     }
 }

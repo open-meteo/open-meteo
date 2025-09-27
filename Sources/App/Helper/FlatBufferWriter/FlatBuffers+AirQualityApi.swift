@@ -104,15 +104,7 @@ extension CamsVariableDerived: FlatBuffersVariable {
     }
 }
 
-extension CamsQuery.Domain: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = CamsReader.MixingVar
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = ForecastVariableDaily
-
+extension CamsQuery.Domain {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .auto:

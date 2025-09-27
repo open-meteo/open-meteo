@@ -109,15 +109,7 @@ extension Cmip6VariableDerivedBiasCorrected: FlatBuffersVariable {
     }
 }
 
-extension Cmip6Domain: ModelFlatbufferSerialisable {
-    typealias HourlyVariable = EnsembleSurfaceVariable
-
-    typealias HourlyPressureType = ForecastPressureVariableType
-
-    typealias HourlyHeightType = ForecastHeightVariableType
-
-    typealias DailyVariable = Cmip6VariableOrDerivedPostBias
-
+extension Cmip6Domain {
     var flatBufferModel: openmeteo_sdk_Model {
         switch self {
         case .CMCC_CM2_VHR4:

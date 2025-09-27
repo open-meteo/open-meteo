@@ -32,7 +32,7 @@ enum EcmwfSeasVariableSingleLevelDerived: String, RawRepresentableString, Generi
     case direct_normal_irradiance_instant
     case wet_bulb_temperature_2m
     
-    case sunshine_duration
+    //case sunshine_duration
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
 
@@ -140,8 +140,8 @@ struct EcmwfSeas5Controller6Hourly: GenericReaderDerivedSimple, GenericReaderPro
             try await prefetchData(raw: .temperature_2m, time: time)
         case .dewpoint_2m:
             try await prefetchData(raw: .dew_point_2m, time: time)
-        case .sunshine_duration:
-            try await prefetchData(raw: .shortwave_radiation, time: time)
+        //case .sunshine_duration:
+         //   try await prefetchData(raw: .shortwave_radiation, time: time)
         }
     }
 
@@ -268,10 +268,10 @@ struct EcmwfSeas5Controller6Hourly: GenericReaderDerivedSimple, GenericReaderPro
             return DataAndUnit(zip(temperature.data, rh).map(Meteorology.wetBulbTemperature), temperature.unit)
         case .dewpoint_2m:
             return try await get(raw: .dew_point_2m, time: time)
-        case .sunshine_duration:
+        /*case .sunshine_duration:
             let directRadiation = try await get(derived: .direct_radiation, time: time)
             let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-            return DataAndUnit(duration, .seconds)
+            return DataAndUnit(duration, .seconds)*/
         case .global_tilted_irradiance:
             let directRadiation = try await get(derived: .direct_radiation, time: time).data
             let ghi = try await get(raw: .shortwave_radiation, time: time).data
