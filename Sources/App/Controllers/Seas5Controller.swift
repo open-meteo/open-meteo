@@ -43,7 +43,7 @@ struct Seas5Controller {
                     guard let readerMonthly = try await EcmwfSeas5ControllerMonthly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
-                    return Seas5Reader(readerHourly: readerHourly, readerDaily: readerDaily, readerMonthly: readerMonthly, params: params, time: time, run: run)
+                    return Seas5Reader(readerHourly: readerHourly, readerDaily: readerDaily, readerMonthly: readerMonthly, params: params, time: time, timezone: timezone, run: run)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
@@ -89,6 +89,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
+    let timezone: TimezoneWithOffset
     let run: IsoDateTime
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
@@ -165,8 +166,25 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             return nil
         }
         let members = 0..<readerDaily.reader.domain.countEnsembleMember
+        var riseSet: (rise: [Timestamp], set: [Timestamp])?
         return ApiSection<DailyVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
+            if case .derived(let variable) = variable {
+                if variable == .sunrise || variable == .sunset {
+                    // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
+                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerHourly.modelLat, lon: readerHourly.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                    riseSet = times
+                    if variable == .sunset {
+                        return ApiColumn(variable: .derived(.sunset), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
+                    } else {
+                        return ApiColumn(variable: .derived(.sunrise), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
+                    }
+                }
+                if variable == .daylight_duration {
+                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerHourly.modelLat)
+                    return ApiColumn(variable: .derived(.daylight_duration), unit: .seconds, variables: [.float(duration)])
+                }
+            }
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let d: DataAndUnit
                 switch variable {

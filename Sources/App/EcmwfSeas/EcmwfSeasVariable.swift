@@ -191,7 +191,7 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
 /// 24 hourly variables in O320 grid
 /// STL1/STL2/STL3/STL4/SUND/SWVL1/SWVL2/SWVL3/SWVL4
 /// MEAN2T24/MN2T24/MX2T24
-enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable {
+enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable {
     case soil_temperature_0_to_7cm
     case soil_temperature_7_to_28cm
     case soil_temperature_28_to_100cm
