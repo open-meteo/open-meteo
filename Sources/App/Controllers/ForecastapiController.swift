@@ -1805,16 +1805,6 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case wet_bulb_temperature_2m_max
     case wet_bulb_temperature_2m_mean
     case wet_bulb_temperature_2m_min
-    
-    // Instant values for seasonal forecast
-    case soil_temperature_0_to_7cm
-    case soil_temperature_7_to_28cm
-    case soil_temperature_28_to_100cm
-    case soil_temperature_100_to_255cm
-    case soil_moisture_0_to_7cm
-    case soil_moisture_7_to_28cm
-    case soil_moisture_28_to_100cm
-    case soil_moisture_100_to_255cm
 
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
@@ -1972,10 +1962,6 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .mean(.surface(.init(.snow_depth, 0)))
         case .snow_depth_max:
             return .max(.surface(.init(.snow_depth, 0)))
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm,  .soil_temperature_100_to_255cm:
-            return .none
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
-            return .none
         }
     }
 }

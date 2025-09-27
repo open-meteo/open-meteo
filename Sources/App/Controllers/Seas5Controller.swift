@@ -37,7 +37,6 @@ struct Seas5Controller {
                     guard let readerHourly = try await EcmwfSeas5Controller6Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
-                    // TODO aggregate 6h data to daily
                     guard let readerDaily = try await EcmwfSeas5Controller24Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
@@ -62,7 +61,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     
     typealias HourlyVariable = VariableOrDerived<EcmwfSeasVariableSingleLevel, EcmwfSeasVariableSingleLevelDerived>
     
-    typealias DailyVariable = VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>
+    typealias DailyVariable = VariableOrDerived<VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>, EcmwfSeasVariableDailyComputed>
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
         .ecmwfSeas5
@@ -105,7 +104,6 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         if let hourlyVariables {
             let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
             let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-            let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
                 for member in members {
                     try await readerHourly.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
@@ -115,7 +113,13 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         if let dailyVariables {
             for variable in dailyVariables {
                 for member in members {
-                    try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    switch variable {
+                    case .derived(let variable):
+                        try await readerHourly.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    case .raw(let variable):
+                        try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    }
+                    
                 }
             }
         }
@@ -164,7 +168,13 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         return ApiSection<DailyVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let d = try await readerDaily.get(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+                let d: DataAndUnit
+                switch variable {
+                case .derived(let variable):
+                    d = try await readerHourly.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                case .raw(let variable):
+                    d = try await readerDaily.get(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+                }
                 unit = d.unit
                 assert(time.dailyRead.count == d.data.count)
                 return ApiArray.float(d.data)

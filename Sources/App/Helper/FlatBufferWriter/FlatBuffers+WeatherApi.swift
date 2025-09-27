@@ -650,22 +650,6 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .snowDepth, aggregation: .mean)
         case .snow_depth_max:
             return .init(variable: .snowDepth, aggregation: .maximum)
-        case .soil_temperature_0_to_7cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm:
-            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm:
-            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm:
-            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
         }
     }
 }
