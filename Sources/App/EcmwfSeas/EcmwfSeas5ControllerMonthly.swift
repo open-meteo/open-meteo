@@ -1,6 +1,8 @@
 enum EcmwfSeasVariableMonthlyDerived: String, RawRepresentableString, GenericVariableMixable {
     case snowfall_mean
     case snowfall_anomaly
+    case snow_depth_mean
+    case snow_depth_anomaly
 
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -49,6 +51,12 @@ struct EcmwfSeas5ControllerMonthly: GenericReaderDerivedSimple, GenericReaderPro
             try await prefetchData(raw: .snowfall_water_equivalent_mean, time: time)
         case .snowfall_anomaly:
             try await prefetchData(raw: .snowfall_water_equivalent_anomaly, time: time)
+        case .snow_depth_mean:
+            try await prefetchData(raw: .snow_density_mean, time: time)
+            try await prefetchData(raw: .snow_depth_water_equivalent_mean, time: time)
+        case .snow_depth_anomaly:
+            try await prefetchData(raw: .snow_density_mean, time: time)
+            try await prefetchData(raw: .snow_depth_water_equivalent_anomaly, time: time)
         }
     }
 
@@ -69,6 +77,15 @@ struct EcmwfSeas5ControllerMonthly: GenericReaderDerivedSimple, GenericReaderPro
         case .snowfall_anomaly:
             let data = try await get(raw: .snowfall_water_equivalent_anomaly, time: time)
             return  DataAndUnit(data.data.map{$0 * 0.7}, .centimetre)
+        case .snow_depth_mean:
+            // water equivalent in millimetre, density in kg/m3
+            let water = try await get(raw: .snow_depth_water_equivalent_mean, time: time)
+            let density = try await get(raw: .snow_density_mean, time: time)
+            return DataAndUnit(zip(water.data, density.data).map({$0/$1}), .metre)
+        case .snow_depth_anomaly:
+            let water = try await get(raw: .snow_depth_water_equivalent_anomaly, time: time)
+            let density = try await get(raw: .snow_density_mean, time: time)
+            return DataAndUnit(zip(water.data, density.data).map({$0/$1}), .metre)
         }
     }
 }

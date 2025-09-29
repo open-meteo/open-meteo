@@ -275,11 +275,10 @@ extension EcmwfSeasVariableMonthly: FlatBuffersVariable {
             return .init(variable: .snowDensity, aggregation: .mean)
         case .snow_density_anomaly:
             return .init(variable: .snowDensity, aggregation: .anomaly)
-        case .snow_depth_mean:
-            return .init(variable: .snowDepth, aggregation: .mean)
-        case .snow_depth_anomaly:
-            // TODO check if water equivalent or actual height
-            return .init(variable: .snowDepth, aggregation: .anomaly)
+        case .snow_depth_water_equivalent_mean:
+            return .init(variable: .snowDepthWaterEquivalent, aggregation: .mean)
+        case .snow_depth_water_equivalent_anomaly:
+            return .init(variable: .snowDepthWaterEquivalent, aggregation: .anomaly)
         case .total_column_integrated_water_vapour_mean:
             return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .mean)
         case .total_column_integrated_water_vapour_anomaly:
@@ -509,6 +508,10 @@ extension EcmwfSeasVariableMonthlyDerived: FlatBuffersVariable {
             return .init(variable: .snowfall, aggregation: .mean)
         case .snowfall_anomaly:
             return .init(variable: .snowfall, aggregation: .anomaly)
+        case .snow_depth_mean:
+            return .init(variable: .snowDepth, aggregation: .mean)
+        case .snow_depth_anomaly:
+            return .init(variable: .snowDepth, aggregation: .anomaly)
         }
     }
 }

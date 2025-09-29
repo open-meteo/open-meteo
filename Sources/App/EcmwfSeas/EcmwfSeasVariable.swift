@@ -1,5 +1,5 @@
 protocol EcmwfSeasVariable: GenericVariable, Hashable {
-    var multiplyAdd: (multiply: Float, add: Float)? { get }
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var isAccumulated: Bool { get }
 }
 
@@ -154,7 +154,7 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
         }
     }
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m, .dew_point_2m, .soil_temperature_0_to_7cm:
             return (1, -273.15)
@@ -248,7 +248,7 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
         }
     }
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
             return (1, -273.15)
@@ -398,7 +398,7 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
         return false
     }
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .temperature_1000hPa, .temperature_850hPa, .temperature_500hPa:
             return (1, -273.15)
@@ -478,8 +478,6 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
 }
 
 /**
- TODO correct mapping for monthly means with anomalies
- 
  10 metre U wind component (10u)
  10 metre V wind component (10v)
  10 metre wind speed (10si)
@@ -612,8 +610,8 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     
     case snow_density_mean
     case snow_density_anomaly
-    case snow_depth_mean
-    case snow_depth_anomaly
+    case snow_depth_water_equivalent_mean
+    case snow_depth_water_equivalent_anomaly
     
     case total_column_integrated_water_vapour_mean
     case total_column_integrated_water_vapour_anomaly
@@ -676,7 +674,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     case temperature_min24h_2m_mean
     case temperature_min24h_2m_anomaly
     
-    var multiplyAdd: (multiply: Float, add: Float)? {
+    func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return (1, -273.15)
@@ -686,6 +684,17 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return (1, -273.15)
         case .pressure_msl_mean, .pressure_msl_anomaly:
             return (1 / 100, 0)
+        case .cloud_cover_mean, .cloud_cover_low_mean, .cloud_cover_anomaly, .cloud_cover_low_anomaly:
+            return (100, 0)
+        case .sunshine_duration_mean, .sunshine_duration_anomaly:
+            return (Float(dtSeconds),0)
+        case .snow_depth_water_equivalent_mean, .snow_depth_water_equivalent_anomaly:
+            return (1000, 0) // metre to millimetre
+        case .shortwave_radiation_mean, .shortwave_radiation_anomaly:
+            return ((Float(dtSeconds)/1000000), 0)
+        case .precipitation_mean, .precipitation_anomaly, .showers_mean, .showers_anomaly, .snowfall_water_equivalent_mean, .snowfall_water_equivalent_anomaly, .runoff_mean, .runoff_anomaly:
+            // Metre per second rate to mm per month
+            return (Float(dtSeconds*1000), 0)
         //case .shortwave_radiation_mean:
         //    return (1 / 6*3600, 0)
         default:
@@ -710,6 +719,8 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case .temperature_max24h_2m_mean, .temperature_min24h_2m_mean:
             return 20
         case .sunshine_duration_mean:
+            return 1/3600
+        case .sunshine_duration_anomaly:
             return 1/60
         case .temperature_2m_mean:
             return 20
@@ -726,42 +737,35 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case .precipitation_mean:
             return 10
         case .shortwave_radiation_mean:
-            return 1
+            return 10
         case .cloud_cover_mean:
-            return 1
-            
+            return 10
         case .soil_temperature_0_to_7cm_anomaly, .soil_temperature_7_to_28cm_anomaly, .soil_temperature_28_to_100cm_anomaly, .soil_temperature_100_to_255cm_anomaly:
-            return 200
+            return 20
         case .soil_moisture_0_to_7cm_anomaly, .soil_moisture_7_to_28cm_anomaly, .soil_moisture_28_to_100cm_anomaly, .soil_moisture_100_to_255cm_anomaly:
-            return 10000
-        case .temperature_max24h_2m_anomaly, .temperature_min24h_2m_anomaly:
-            return 200
-        case .sunshine_duration_anomaly:
-            return 10/60
-        case .temperature_2m_anomaly:
-            return 200
-        case .dew_point_2m_anomaly:
-            return 200
+            return 1000
+        case .temperature_max24h_2m_anomaly, .temperature_min24h_2m_anomaly, .temperature_2m_anomaly, .dew_point_2m_anomaly:
+            return 20
         case .pressure_msl_anomaly:
-            return 100
+            return 10
         case .sea_surface_temperature_anomaly:
-            return 200
+            return 20
         case .wind_u_component_10m_anomaly, .wind_v_component_10m_anomaly:
-            return 100
+            return 10
         case .snowfall_water_equivalent_anomaly:
-            return 100
+            return 10
         case .precipitation_anomaly:
-            return 100
+            return 10
         case .shortwave_radiation_anomaly:
-            return 10
+            return 1
         case .cloud_cover_anomaly:
-            return 10
+            return 1
         case .wind_gusts_10m_anomaly:
-            return 100
+            return 10
         case .wind_speed_10m_mean:
             return 10
         case .wind_speed_10m_anomaly:
-            return 100
+            return 10
         case .albedo_mean:
             return 100
         case .albedo_anomaly:
@@ -769,27 +773,27 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case .cloud_cover_low_mean:
             return 1
         case .cloud_cover_low_anomaly:
-            return 10
+            return 1
         case .showers_mean:
             return 10
         case .showers_anomaly:
-            return 100
+            return 10
         case .runoff_mean:
             return 10
         case .runoff_anomaly:
-            return 100
+            return 10
         case .snow_density_mean:
             return 10
         case .snow_density_anomaly:
-            return 100
-        case .snow_depth_mean:
-            return 100
-        case .snow_depth_anomaly:
-            return 1000
+            return 10
+        case .snow_depth_water_equivalent_mean:
+            return 1 // 1 mm water = 0.7 cm snow resolution
+        case .snow_depth_water_equivalent_anomaly:
+            return 1
         case .total_column_integrated_water_vapour_mean:
             return 10
         case .total_column_integrated_water_vapour_anomaly:
-            return 100
+            return 10
         }
     }
     
@@ -823,7 +827,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case .precipitation_mean:
             return .millimetre
         case .shortwave_radiation_mean:
-            return .wattPerSquareMetre
+            return .megajoulePerSquareMetre
         case .cloud_cover_mean:
             return .percentage
         case .soil_temperature_0_to_7cm_anomaly, .soil_temperature_7_to_28cm_anomaly, .soil_temperature_28_to_100cm_anomaly, .soil_temperature_100_to_255cm_anomaly:
@@ -849,7 +853,7 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case .precipitation_anomaly:
             return .millimetre
         case .shortwave_radiation_anomaly:
-            return .wattPerSquareMetre
+            return .megajoulePerSquareMetre
         case .cloud_cover_anomaly:
             return .percentage
         case .wind_gusts_10m_anomaly:
@@ -875,13 +879,13 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case .runoff_anomaly:
             return .millimetre
         case .snow_density_mean:
-            return .kilogramPerSquareMetre
+            return .kilogramPerCubicMetre
         case .snow_density_anomaly:
-            return .kilogramPerSquareMetre
-        case .snow_depth_mean:
-            return .metre
-        case .snow_depth_anomaly:
-            return .metre
+            return .kilogramPerCubicMetre
+        case .snow_depth_water_equivalent_mean:
+            return .millimetre
+        case .snow_depth_water_equivalent_anomaly:
+            return .millimetre
         case .total_column_integrated_water_vapour_mean:
             return .kilogramPerSquareMetre
         case .total_column_integrated_water_vapour_anomaly:
@@ -944,9 +948,9 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
         case "rsna":
             return .snow_density_anomaly
         case "sd":
-            return .snow_density_mean
+            return .snow_depth_water_equivalent_mean
         case "sda":
-            return .snow_density_anomaly
+            return .snow_depth_water_equivalent_anomaly
         case "stl1":
             return .soil_temperature_0_to_7cm_mean
         case "stl2":
