@@ -70,10 +70,14 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let runMonth = run.toComponents().month
         let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
+        let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
 
         let deaverager = GribDeaverager()
         for month in 0...6 {
+            let monthTimestamp = run.toYearMonth().advanced(by: month).timestamp
             let monthToDownload = (runMonth + month - 1) % 12 + 1
+            /// dtSeconds with the correct value for the corresponding month
+            let dtSecondActual = isMonthly ? run.toYearMonth().advanced(by: month+1).timestamp.timeIntervalSince1970 - monthTimestamp.timeIntervalSince1970 : domain.dtSeconds
             for package in domain.downloadPackages {
                 if package == 1 && month == 6 {
                     continue
@@ -87,7 +91,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
-                    let time = attributes.timestamp
+                    /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
+                    let time = isMonthly ? monthTimestamp : attributes.timestamp
                     var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                     let member = message.getLong(attribute: "perturbationNumber") ?? 0
                     
@@ -108,7 +113,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
                         return
                     }
-                    if let fma = variable.multiplyAdd {
+                    if let fma = variable.multiplyAdd(dtSeconds: dtSecondActual) {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
                     if variable.isAccumulated {
@@ -128,12 +133,12 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                                 continue
                             }
                             let count = await inMemoryAccumulated.data.count
-                            logger.debug("Writing accumulated variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            logger.info("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
-                    logger.debug("Processing variable \(variable) member \(member) timestamp \(time.format_YYYYMMddHH)")
+                    logger.info("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
                     // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }

@@ -185,7 +185,6 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(EumetsatSarahDownload(), as: "download-eumetsat-sarah")
     app.asyncCommands.use(EumetsatLsaSafDownload(), as: "download-eumetsat-lsa-saf")
     app.asyncCommands.use(JaxaHimawariDownload(), as: "download-jaxa-himawari")
-    app.asyncCommands.use(SeasonalForecastDownload(), as: "download-seasonal-forecast")
     app.asyncCommands.use(ItaliaMeteoArpaeDownload(), as: "download-italia-meteo-arpae")
     app.asyncCommands.use(GfsDownload(), as: "download-gfs")
     app.asyncCommands.use(GfsGraphCastDownload(), as: "download-gfs-graphcast")

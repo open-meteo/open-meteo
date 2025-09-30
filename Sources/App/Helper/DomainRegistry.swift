@@ -291,7 +291,7 @@ enum DomainRegistry: String, CaseIterable {
         case .jma_msm:
             return JmaDomain.msm
         case .ncep_cfsv2:
-            return SeasonalForecastDomain.ncep
+            return nil
         case .metno_nordic_pp:
             return MetNoDomain.nordic_pp
         case .nasa_imerg_daily:

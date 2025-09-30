@@ -10,13 +10,13 @@ extension ForecastapiResult {
     func toFlatbuffersResponse(fixedGenerationTime: Double?, concurrencySlot: Int? = nil) throws -> Response {
         // First excution outside stream, to capture potential errors better
         // var first = try self.first?()
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
                 // TODO: Zero-copy for flatbuffer to NIO bytebuffer conversion. Probably writing an optimised flatbuffer encoder would be better.
                 // TODO: Estimate initial buffer size
                 let initialSize = Int32(4096) // Int32(((first?.estimatedFlatbufferSize ?? 4096)/4096+1)*4096)
                 var fbb = FlatBufferBuilder(initialSize: initialSize)
-                var b = BufferAndWriter(writer: writer)
+                var b = BufferAndAsyncWriter(writer: writer)
                 // if let first {
                 //    first.writeToFlatbuffer(&fbb)
                 //    b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
@@ -26,7 +26,7 @@ extension ForecastapiResult {
                 // try await b.flushIfRequired()
                 for location in results {
                     for model in location.results {
-                        try await model.writeToFlatbuffer(&fbb, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
+                        try await model.writeToFlatbuffer(&fbb, variables: variables, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
                         b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
                         fbb.clear()
                         try await b.flushIfRequired()
@@ -47,6 +47,9 @@ fileprivate extension FlatBuffers.ByteBuffer {
         .init(start: memory.advanced(by: self.capacity - Int(self.size)), count: Int(size))
     }
 }
+
+
+
 
 /// Encode meta data for flatbuffer variables
 struct FlatBufferVariableMeta {
@@ -101,13 +104,14 @@ extension ApiArray {
     }
 }
 
-extension ApiSection where Variable: FlatBuffersVariable {
-    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
-        let offsets = fbb.createVector(ofOffsets: self.columns.flatMap { c -> [Offset] in
+extension ApiColumn where Variable: FlatBuffersVariable {
+    static func encodeFlatBuffers(_ columns: [Self], _ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        fbb.createVector(ofOffsets: columns.flatMap { c -> [Offset] in
+            let meta = c.variable.getFlatBuffersMeta()
             return c.variables.enumerated().map { member, v in
                 let data = v.encodeFlatBuffers(&fbb)
                 let VariableWithValues = openmeteo_sdk_VariableWithValues.startVariableWithValues(&fbb)
-                c.variable.getFlatBuffersMeta().encodeToFlatBuffers(&fbb)
+                meta.encodeToFlatBuffers(&fbb)
                 openmeteo_sdk_VariableWithValues.add(unit: c.unit, &fbb)
                 if c.variables.count > 1 {
                     openmeteo_sdk_VariableWithValues.add(ensembleMember: Int16(member + memberOffset), &fbb)
@@ -121,11 +125,30 @@ extension ApiSection where Variable: FlatBuffersVariable {
                 return openmeteo_sdk_VariableWithValues.endVariableWithValues(&fbb, start: VariableWithValues)
             }
         })
+    }
+}
+
+
+extension ApiSection where Variable: FlatBuffersVariable {
+    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        let offsets = ApiColumn.encodeFlatBuffers(columns, &fbb, memberOffset: memberOffset)
         return openmeteo_sdk_VariablesWithTime.createVariablesWithTime(
             &fbb,
             time: Int64(time.range.lowerBound.timeIntervalSince1970),
             timeEnd: Int64(time.range.upperBound.timeIntervalSince1970),
             interval: Int32(time.dtSeconds),
+            variablesVectorOffset: offsets
+        )
+    }
+    
+    func encodeMonthlyFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        let offsets = ApiColumn.encodeFlatBuffers(columns, &fbb, memberOffset: memberOffset)
+        let yearMonth = time.range.lowerBound.toYearMonth()
+        return openmeteo_sdk_VariablesWithMonth.createVariablesWithMonth(
+            &fbb,
+            year: Int16(yearMonth.year),
+            month: Int8(yearMonth.month),
+            count: Int32(time.count),
             variablesVectorOffset: offsets
         )
     }
@@ -150,16 +173,20 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
     }
 }
 
-extension ForecastapiResult.PerModel {
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
+extension ModelFlatbufferSerialisable {
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
+        guard variables.sixHourlyVariables == nil else {
+            throw ForecastApiError.generic(message: "&six_hourly= variables are not supported for &format=flatbuffers and will be removed entirely in the future")
+        }
+        
         let generationTimeStart = Date()
-        let hourly = await (try hourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let minutely15 = await (try minutely15?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let sixHourly = await (try sixHourly?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let daily = await (try daily?()).map { $0.encodeFlatBuffers(&fbb, memberOffset: Model.memberOffset) } ?? Offset()
-        let current = await (try current?()).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
+        let hourly = await (try hourly(variables: variables.hourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let daily = await (try daily(variables: variables.dailyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let monthly = await (try monthly(variables: variables.monthlyVariables)).map { $0.encodeMonthlyFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let current = await (try current(variables: variables.currentVariables)).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
-
+        
         let result = openmeteo_sdk_WeatherApiResponse.createWeatherApiResponse(
             &fbb,
             latitude: latitude,
@@ -167,14 +194,15 @@ extension ForecastapiResult.PerModel {
             elevation: elevation ?? .nan,
             generationTimeMilliseconds: Float32(generationTimeMs),
             locationId: Int64(locationId),
-            model: model.flatBufferModel,
+            model: self.flatBufferModel,
             utcOffsetSeconds: Int32(timezone.utcOffsetSeconds),
             timezoneOffset: timezone.identifier == "GMT" ? Offset() : fbb.create(string: timezone.identifier),
             timezoneAbbreviationOffset: timezone.abbreviation == "GMT" ? Offset() : fbb.create(string: timezone.abbreviation),
             currentOffset: current,
             dailyOffset: daily,
             hourlyOffset: hourly,
-            minutely15Offset: minutely15, sixHourlyOffset: sixHourly
+            minutely15Offset: minutely15,
+            monthlyOffset: monthly
         )
         fbb.finish(offset: result, addPrefix: true)
     }

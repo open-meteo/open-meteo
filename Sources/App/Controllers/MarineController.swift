@@ -1,5 +1,6 @@
 import Foundation
 import Vapor
+import OpenMeteoSdk
 
 enum IconWaveDomainApi: String, CaseIterable, RawRepresentableString, MultiDomainMixerDomain, Sendable {
     var genericDomain: (any GenericDomain)? {
@@ -142,120 +143,176 @@ struct IconWaveController {
             let nVariables = ((paramsHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + nParamsMinutely) * domains.reduce(0, { $0 + $1.countEnsembleMember })
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
             
-            let locations: [ForecastapiResult<IconWaveDomainApi>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<MarineDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
                 let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 7, forecastDaysMax: 16, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92, forecastDaysMinutely15Default: 7)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600), nTime: 1, dtSeconds: 3600)
 
-                let readers: [ForecastapiResult<IconWaveDomainApi>.PerModel] = try await domains.asyncCompactMap { domain in
+                let readers: [MarineDomainsReader] = try await domains.asyncCompactMap { domain in
                     guard let reader = try await GenericReaderMulti<MarineVariable, IconWaveDomainApi>(domain: domain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: .nan, mode: params.cell_selection ?? .sea, options: options) else {
                         return nil
                     }
-                    let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-                    let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-                    let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-
-                    return .init(
-                        model: domain,
-                        latitude: reader.modelLat,
-                        longitude: reader.modelLon,
-                        elevation: reader.targetElevation,
-                        prefetch: {
-                            if let paramsHourly {
-                                for member in 0..<reader.domain.countEnsembleMember {
-                                    try await reader.prefetchData(variables: paramsHourly, time: timeHourlyRead.toSettings(ensembleMember: member))
-                                }
-                            }
-                            if let paramsCurrent {
-                                try await reader.prefetchData(variables: paramsCurrent, time: currentTimeRange.toSettings())
-                            }
-                            if let paramsDaily {
-                                for member in 0..<reader.domain.countEnsembleMember {
-                                    try await reader.prefetchData(variables: paramsDaily, time: time.dailyRead.toSettings(ensembleMember: member))
-                                }
-                            }
-                        },
-                        current: paramsCurrent.map { variables in
-                            return {
-                                return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncCompactMap { variable in
-                                    guard let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
-                                        return nil
-                                    }
-                                    return .init(variable: .surface(variable), unit: d.unit, value: d.data.first ?? .nan)
-                                })
-                            }
-                        },
-                        hourly: paramsHourly.map { variables in
-                            return {
-                                return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
-                                    var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
-                                        guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                            return nil
-                                        }
-                                        unit = d.unit
-                                        assert(timeHourlyRead.count == d.data.count)
-                                        return ApiArray.float(d.data)
-                                    }
-                                    guard allMembers.count > 0 else {
-                                        return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
-                                    }
-                                    return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
-                                })
-                            }
-                        },
-                        daily: paramsDaily.map { paramsDaily in
-                            return {
-                                return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await paramsDaily.asyncMap { variable -> ApiColumn<IconWaveVariableDaily> in
-                                    var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member -> ApiArray? in
-                                        guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                            return nil
-                                        }
-                                        unit = d.unit
-                                        assert(time.dailyRead.count == d.data.count)
-                                        return ApiArray.float(d.data)
-                                    }
-                                    guard allMembers.count > 0 else {
-                                        return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: reader.domain.countEnsembleMember))
-                                    }
-                                    return ApiColumn<IconWaveVariableDaily>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
-                                })
-                            }
-                        },
-                        sixHourly: nil,
-                        minutely15: paramsMinutely.map { variables in
-                            return {
-                                return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
-                                    var unit: SiUnit?
-                                    let allMembers: [ApiArray] = try await (0..<reader.domain.countEnsembleMember).asyncCompactMap { member in
-                                        guard let d = try await reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
-                                            return nil
-                                        }
-                                        unit = d.unit
-                                        assert(time.minutely15.count == d.data.count)
-                                        return ApiArray.float(d.data)
-                                    }
-                                    guard allMembers.count > 0 else {
-                                        return ApiColumn(variable: .surface(variable), unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
-                                    }
-                                    return .init(variable: .surface(variable), unit: unit ?? .undefined, variables: allMembers)
-                                })
-                            }
-                        }
-                    )
+                    return MarineDomainsReader(reader: reader, params: params, time: time, currentTime: currentTime)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<IconWaveDomainApi>(timeformat: params.timeformatOrDefault, results: locations, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<MarineDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
+
+struct MarineDomainsReader: ModelFlatbufferSerialisable {
+    typealias HourlyVariable = MarineVariable
+    
+    typealias DailyVariable = IconWaveVariableDaily
+    
+    typealias MonthlyVariable = FlatBuffersVariableNone
+    
+    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
+        reader.domain.flatBufferModel
+    }
+    
+    var modelName: String {
+        reader.domain.rawValue
+    }
+    
+    let reader: GenericReaderMulti<MarineVariable, IconWaveDomainApi>
+    
+    var latitude: Float {
+        reader.modelLat
+    }
+    
+    var longitude: Float {
+        reader.modelLon
+    }
+    
+    var elevation: Float? {
+        reader.targetElevation
+    }
+    
+    let params: ApiQueryParameter
+    
+    let time: ForecastApiTimeRange
+    let currentTime: Timestamp
+    
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
+        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+        let members = 0..<reader.domain.countEnsembleMember
+        
+        if let hourlyVariables {
+            for member in members {
+                try await reader.prefetchData(variables: hourlyVariables, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
+            }
+        }
+        if let currentVariables {
+            try await reader.prefetchData(variables: currentVariables, time: currentTimeRange.toSettings())
+        }
+        if let dailyVariables {
+            for member in members {
+                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
+            }
+        }
+    }
+
+    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
+        return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncCompactMap { variable in
+            guard let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings())?.convertAndRound(params: params) else {
+                return nil
+            }
+            return .init(variable: variable, unit: d.unit, value: d.data.first ?? .nan)
+        })
+    }
+    
+    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+        let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+        let members = 0..<reader.domain.countEnsembleMember
+        
+        return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+                guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                    return nil
+                }
+                unit = d.unit
+                assert(timeHourlyRead.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
+            }
+            return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
+    }
+    
+    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let members = 0..<reader.domain.countEnsembleMember
+        
+        return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncMap { variable -> ApiColumn<IconWaveVariableDaily> in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member -> ApiArray? in
+                guard let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                    return nil
+                }
+                unit = d.unit
+                assert(time.dailyRead.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: reader.domain.countEnsembleMember))
+            }
+            return ApiColumn<IconWaveVariableDaily>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
+    }
+    
+    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        return nil
+    }
+    
+    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let members = 0..<reader.domain.countEnsembleMember
+        return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+                guard let d = try await reader.get(variable: variable, time: time.minutely15.toSettings(ensembleMemberLevel: member))?.convertAndRound(params: params) else {
+                    return nil
+                }
+                unit = d.unit
+                assert(time.minutely15.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
+            }
+            return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
+    }
+    
+    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
+        return nil
+    }
+}
+
 
 typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
 

@@ -1,12 +1,13 @@
 import Foundation
 import Vapor
 
+
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
     func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
-        let response = Response(body: .init(stream: { writer in
-            writer.submit(concurrencySlot: concurrencySlot) {
-                var b = BufferAndWriter(writer: writer)
+        let response = Response(body: .init(asyncStream: { writer in
+            try await writer.submit(concurrencySlot: concurrencySlot) {
+                var b = BufferAndAsyncWriter(writer: writer)
                 let multiLocation = results.count > 1
 
                 if results.count == 1, let location = results.first, let first = location.results.first {
@@ -24,19 +25,22 @@ extension ForecastapiResult {
                     }
                 }
                 for location in results {
-                    try await location.current?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    try await location.current(variables: variables.currentVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {
-                    try await location.minutely15?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    try await location.minutely15(variables: variables.minutely15Variables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {
-                    try await location.hourly?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    try await location.hourly(variables: variables.hourlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {
-                    try await location.sixHourly?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    try await location.sixHourly(variables: variables.sixHourlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {
-                    try await location.daily?().writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                    try await location.daily(variables: variables.dailyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
+                }
+                for location in results {
+                    try await location.monthly(variables: variables.monthlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 try await b.flush()
                 try await b.end()
@@ -50,7 +54,7 @@ extension ForecastapiResult {
 }
 
 extension ApiSectionSingle {
-    fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
+    fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
             b.buffer.writeString("\n")
             if location_id != nil {
@@ -84,7 +88,7 @@ extension ApiSectionSingle {
 
 extension ApiSectionString {
     /// Write a single API section into the output buffer
-    fileprivate func writeCsv(into b: inout BufferAndWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
+    fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
             b.buffer.writeString("\n")
             if location_id != nil {
@@ -99,7 +103,7 @@ extension ApiSectionString {
             b.buffer.writeString("\n")
         }
 
-        for (i, time) in time.itterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: time.dtSeconds == 86400).enumerated() {
+        for (i, time) in time.iterate(format: timeformat, utc_offset_seconds: utc_offset_seconds, quotedString: false, onlyDate: time.dtSeconds >= 86400).enumerated() {
             if let location_id {
                 b.buffer.writeString("\(location_id),")
             }
