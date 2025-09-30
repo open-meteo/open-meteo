@@ -367,6 +367,26 @@ extension EcmwfSeasVariableMonthly: FlatBuffersVariable {
             return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
         case .temperature_min24h_2m_anomaly:
             return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
+        case .longwave_radiation_mean:
+            return .init(variable: .longwaveRadiation, aggregation: .mean)
+        case .longwave_radiation_anomaly:
+            return .init(variable: .longwaveRadiation, aggregation: .anomaly)
+        case .sea_ice_cover_mean:
+            return .init(variable: .seaIceCover, aggregation: .mean)
+        case .sea_ice_cover_anomaly:
+            return .init(variable: .seaIceCover, aggregation: .anomaly)
+        case .latent_heat_flux_mean:
+            return .init(variable: .latentHeatFlux, aggregation: .mean)
+        case .latent_heat_flux_anomaly:
+            return .init(variable: .latentHeatFlux, aggregation: .anomaly)
+        case .sensible_heat_flux_mean:
+            return .init(variable: .sensibleHeatFlux, aggregation: .mean)
+        case .sensible_heat_flux_anomaly:
+            return .init(variable: .sensibleHeatFlux, aggregation: .anomaly)
+        case .evapotranspiration_mean:
+            return .init(variable: .evapotranspiration, aggregation: .mean)
+        case .evapotranspiration_anomaly:
+            return .init(variable: .evapotranspiration, aggregation: .anomaly)
         }
     }
 }

@@ -643,6 +643,9 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     case shortwave_radiation_mean
     case shortwave_radiation_anomaly
     
+    case longwave_radiation_mean
+    case longwave_radiation_anomaly
+    
     case cloud_cover_mean
     case cloud_cover_anomaly
     
@@ -674,6 +677,18 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     case temperature_min24h_2m_mean
     case temperature_min24h_2m_anomaly
     
+    case sea_ice_cover_mean
+    case sea_ice_cover_anomaly
+    
+    case latent_heat_flux_mean
+    case latent_heat_flux_anomaly
+    
+    case sensible_heat_flux_mean
+    case sensible_heat_flux_anomaly
+    
+    case evapotranspiration_mean
+    case evapotranspiration_anomaly
+    
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
         case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
@@ -690,9 +705,9 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return (Float(dtSeconds),0)
         case .snow_depth_water_equivalent_mean, .snow_depth_water_equivalent_anomaly:
             return (1000, 0) // metre to millimetre
-        case .shortwave_radiation_mean, .shortwave_radiation_anomaly:
+        case .shortwave_radiation_mean, .shortwave_radiation_anomaly, .longwave_radiation_mean, .longwave_radiation_anomaly, .latent_heat_flux_mean, .latent_heat_flux_anomaly, .sensible_heat_flux_mean, .sensible_heat_flux_anomaly:
             return ((Float(dtSeconds)/1000000), 0)
-        case .precipitation_mean, .precipitation_anomaly, .showers_mean, .showers_anomaly, .snowfall_water_equivalent_mean, .snowfall_water_equivalent_anomaly, .runoff_mean, .runoff_anomaly:
+        case .precipitation_mean, .precipitation_anomaly, .showers_mean, .showers_anomaly, .snowfall_water_equivalent_mean, .snowfall_water_equivalent_anomaly, .runoff_mean, .runoff_anomaly, .evapotranspiration_mean, .evapotranspiration_anomaly:
             // Metre per second rate to mm per month
             return (Float(dtSeconds*1000), 0)
         //case .shortwave_radiation_mean:
@@ -734,9 +749,9 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return 10
         case .snowfall_water_equivalent_mean:
             return 10
-        case .precipitation_mean:
+        case .precipitation_mean, .evapotranspiration_mean, .evapotranspiration_anomaly:
             return 10
-        case .shortwave_radiation_mean:
+        case .shortwave_radiation_mean, .longwave_radiation_mean, .longwave_radiation_anomaly, .latent_heat_flux_mean, .latent_heat_flux_anomaly, .sensible_heat_flux_mean, .sensible_heat_flux_anomaly:
             return 10
         case .cloud_cover_mean:
             return 10
@@ -794,6 +809,8 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return 10
         case .total_column_integrated_water_vapour_anomaly:
             return 10
+        case .sea_ice_cover_mean, .sea_ice_cover_anomaly:
+            return 100
         }
     }
     
@@ -890,6 +907,14 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .kilogramPerSquareMetre
         case .total_column_integrated_water_vapour_anomaly:
             return .kilogramPerSquareMetre
+        case .longwave_radiation_mean, .longwave_radiation_anomaly:
+            return .megajoulePerSquareMetre
+        case .sea_ice_cover_mean, .sea_ice_cover_anomaly:
+            return .fraction
+        case .latent_heat_flux_mean, .latent_heat_flux_anomaly, .sensible_heat_flux_mean, .sensible_heat_flux_anomaly:
+            return .megajoulePerSquareMetre
+        case .evapotranspiration_mean, .evapotranspiration_anomaly:
+            return .millimetre
         }
     }
     
@@ -1035,6 +1060,26 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .total_column_integrated_water_vapour_mean
         case "tcwva":
             return .total_column_integrated_water_vapour_anomaly
+        case "ci":
+            return .sea_ice_cover_mean
+        case "sica":
+            return .sea_ice_cover_anomaly
+        case "erate":
+            return .evapotranspiration_mean
+        case "evara":
+            return .evapotranspiration_anomaly
+        case "mslhfl":
+            return .latent_heat_flux_mean
+        case "slhfara":
+            return .latent_heat_flux_anomaly
+        case "msshfl":
+            return .sensible_heat_flux_mean
+        case "sshfara":
+            return .sensible_heat_flux_anomaly
+        case "msdtrf":
+            return .longwave_radiation_mean
+        case "strdara":
+            return .longwave_radiation_anomaly
         default:
             return nil
         }
