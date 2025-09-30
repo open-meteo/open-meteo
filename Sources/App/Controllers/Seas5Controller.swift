@@ -6,7 +6,7 @@ struct Seas5Controller {
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter("seasonal-api") { _, params in
             let currentTime = Timestamp.now()
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
+            let allowedRange = Timestamp(2024, 1, 1) ..< currentTime.add(86400 * 400)
             let logger = req.logger
             let httpClient = req.application.http.client.shared
 
@@ -15,13 +15,17 @@ struct Seas5Controller {
                 throw ForecastApiError.generic(message: "Bounding box not supported")
             }
             /// Will be configurable by API later
-            let domains = [SeasonalForecastDomainApi.cfsv2]
+            let domains = [EcmwfSeasDomain.seas5_6hourly]
 
             let paramsSixHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.six_hourly)
             let paramsHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
             let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
-            let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0) + (paramsMonthly?.count ?? 0)) * domains.reduce(0, { $0 + $1.forecastDomain.nMembers })
+            let nMember = 51
+            let nVariables6Hourly = (paramsSixHourly?.count ?? 0) * nMember / 6
+            let nVariablesDaily = (paramsDaily?.count ?? 0) * nMember / 24
+            /// adjusted to 6hourly and 24h aggregations
+            let nVariables = nVariables6Hourly + nVariablesDaily + (paramsMonthly?.count ?? 0)
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
             
             let runCurrent = (IsoDateTime(timeIntervalSince1970: try await EcmwfSeasDomain.seas5_6hourly.getLatestFullRun(client: options.httpClient, logger: options.logger)?.timeIntervalSince1970 ?? Timestamp.now().subtract(days: 5).with(day: 1).timeIntervalSince1970))
@@ -30,7 +34,7 @@ struct Seas5Controller {
             let locations: [ForecastapiResult<Seas5Reader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
-                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 183, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
                 let readers: [Seas5Reader] = try await domains.asyncCompactMap { domain -> Seas5Reader? in
@@ -103,7 +107,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             }
         }
         if let hourlyVariables {
-            let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+            let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? readerHourly.modelDtSeconds
             let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
                 for member in members {
@@ -142,7 +146,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         guard let variables else {
             return nil
         }
-        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+        let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? readerHourly.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
         let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
         let members = 0..<readerHourly.reader.domain.countEnsembleMember
