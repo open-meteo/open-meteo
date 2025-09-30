@@ -26,7 +26,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     case cloud_cover_high
     case showers
     case visibility
-    case surface_roughness
+    case roughness_length
     case snow_depth_water_equivalent
     case direct_radiation
     case albedo
@@ -84,7 +84,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .convective_inhibition: return 1
         case .precipitation_type: return 1
         case .visibility: return 0.05 // 50 meter
-        case .surface_roughness: return 1 // CHECK SCALE
+        case .roughness_length: return 1 // CHECK SCALE
         case .albedo: return 1
         case .k_index: return 100
         }
@@ -154,7 +154,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .backwards
         case .visibility:
             return .linear
-        case .surface_roughness:
+        case .roughness_length:
             return .linear
         case .albedo:
             return .linear
@@ -257,7 +257,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .convective_inhibition: return .joulePerKilogram
         case .precipitation_type: return .dimensionless
         case .visibility: return .metre
-        case .surface_roughness: return .metre
+        case .roughness_length: return .metre
         case .albedo: return .percentage
         case .k_index: return .dimensionless
         }
@@ -326,7 +326,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "cp"
         case .visibility:
             return "vis"
-        case .surface_roughness:
+        case .roughness_length:
             return "fsr"
         case .snow_depth_water_equivalent:
             return "sd"
