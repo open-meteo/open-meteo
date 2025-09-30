@@ -446,6 +446,86 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
                 return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature[i], windspeed10mMeterPerSecond: windspeed[i], dewpointCelsius: dewpoint[i], shortwaveRadiationWatts: swrad[i], elevation: reader.targetElevation, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
             }
             return DataAndUnit(et0, .millimetre)
+        case .sunshine_duration:
+            let directRadiation = try await get(derived: .direct_radiation, time: time)
+            let duration = Zensun.calculateBackwardsSunshineDuration(directRadiation: directRadiation.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+            return DataAndUnit(duration, .seconds)
+        case .soil_moisture_0_to_100cm:
+            let sm0_7 = try await get(raw: .soil_moisture_0_to_7cm, time: time)
+            let sm7_28 = try await get(raw: .soil_moisture_7_to_28cm, time: time).data
+            let sm28_100 = try await get(raw: .soil_moisture_28_to_100cm, time: time).data
+            return DataAndUnit(zip(sm0_7.data, zip(sm7_28, sm28_100)).map({
+                let (sm0_7, (sm7_28, sm28_100)) = $0
+                return sm0_7 * 0.07 + sm7_28 * (0.28 - 0.07) + sm28_100 * (1 - 0.28)
+            }), sm0_7.unit)
+        case .soil_temperature_0_to_100cm:
+            let st0_7 = try await get(raw: .soil_temperature_0_to_7cm, time: time)
+            let st7_28 = try await get(raw: .soil_temperature_7_to_28cm, time: time).data
+            let st28_100 = try await get(raw: .soil_temperature_28_to_100cm, time: time).data
+            return DataAndUnit(zip(st0_7.data, zip(st7_28, st28_100)).map({
+                let (st0_7, (st7_28, st28_100)) = $0
+                return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
+            }), st0_7.unit)
+        case .growing_degree_days_base_0_limit_50:
+            let base: Float = 0
+            let limit: Float = 50
+            let t2m = try await get(raw: .temperature_2m, time: time).data
+            return DataAndUnit(t2m.map({ t2m in
+                max(min(t2m, limit) - base, 0) / 24
+            }), .gddCelsius)
+        case .leaf_wetness_probability:
+            let temperature = try await get(raw: .temperature_2m, time: time).data
+            let dewpoint = try await get(raw: .dew_point_2m, time: time).data
+            let precipitation = try await get(raw: .precipitation, time: time).data
+            return DataAndUnit(zip(zip(temperature, dewpoint), precipitation).map( {
+                let ((temperature, dewpoint), precipitation) = $0
+                return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
+            }), .percentage)
+        case .soil_moisture_index_0_to_7cm:
+            guard let soilType = try await self.getStatic(type: .soilType) else {
+                throw ForecastApiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
+            }
+            let soilMoisture = try await get(raw: .soil_moisture_0_to_7cm, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .soil_moisture_index_7_to_28cm:
+            guard let soilType = try await self.getStatic(type: .soilType) else {
+                throw ForecastApiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
+            }
+            let soilMoisture = try await get(raw: .soil_moisture_7_to_28cm, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .soil_moisture_index_28_to_100cm:
+            guard let soilType = try await self.getStatic(type: .soilType) else {
+                throw ForecastApiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
+            }
+            let soilMoisture = try await get(raw: .soil_moisture_28_to_100cm, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .soil_moisture_index_100_to_255cm:
+            guard let soilType = try await self.getStatic(type: .soilType) else {
+                throw ForecastApiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
+            }
+            let soilMoisture = try await get(raw: .soil_moisture_100_to_255cm, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .soil_moisture_index_0_to_100cm:
+            guard let soilType = try await self.getStatic(type: .soilType) else {
+                throw ForecastApiError.generic(message: "Could not read soil type")
+            }
+            guard let type = SoilTypeEra5(rawValue: Int(soilType)) else {
+                return DataAndUnit([Float](repeating: .nan, count: time.time.count), .fraction)
+            }
+            let soilMoisture = try await get(derived: .soil_moisture_0_to_100cm, time: time)
+            return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
         }
     }
 
@@ -671,7 +751,7 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(derived: .relativehumidity_2m, time: time)
             try await prefetchData(raw: .temperature_2m, time: time)
         case .wet_bulb_temperature_2m:
-            try await prefetchData(raw: .relative_humidity_1000hPa, time: time)
+            try await prefetchData(raw: .relative_humidity_2m, time: time)
             try await prefetchData(raw: .temperature_2m, time: time)
         case .cloudcover:
             try await prefetchData(raw: .cloud_cover, time: time)
@@ -686,6 +766,32 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .temperature_2m, time: time)
             try await prefetchData(raw: .relative_humidity_2m, time: time)
             try await prefetchData(derived: .wind_speed_10m, time: time)
+        case .soil_moisture_0_to_100cm:
+            try await prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
+            try await prefetchData(raw: .soil_moisture_7_to_28cm, time: time)
+            try await prefetchData(raw: .soil_moisture_28_to_100cm, time: time)
+        case .soil_temperature_0_to_100cm:
+            try await prefetchData(raw: .soil_temperature_0_to_7cm, time: time)
+            try await prefetchData(raw: .soil_temperature_7_to_28cm, time: time)
+            try await prefetchData(raw: .soil_temperature_28_to_100cm, time: time)
+        case .growing_degree_days_base_0_limit_50:
+            try await prefetchData(raw: .temperature_2m, time: time)
+        case .leaf_wetness_probability:
+            try await prefetchData(raw: .precipitation, time: time)
+            try await prefetchData(raw: .dew_point_2m, time: time)
+            try await prefetchData(raw: .temperature_2m, time: time)
+        case .soil_moisture_index_0_to_7cm:
+            try await prefetchData(raw: .soil_moisture_0_to_7cm, time: time)
+        case .soil_moisture_index_7_to_28cm:
+            try await prefetchData(raw: .soil_moisture_7_to_28cm, time: time)
+        case .soil_moisture_index_28_to_100cm:
+            try await prefetchData(raw: .soil_moisture_28_to_100cm, time: time)
+        case .soil_moisture_index_100_to_255cm:
+            try await prefetchData(raw: .soil_moisture_100_to_255cm, time: time)
+        case .soil_moisture_index_0_to_100cm:
+            try await prefetchData(derived: .soil_moisture_0_to_100cm, time: time)
+        case .sunshine_duration:
+            try await prefetchData(derived: .direct_radiation, time: time)
         }
     }
 }

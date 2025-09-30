@@ -868,6 +868,17 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case shortwave_radiation_instant
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
+    
+    case sunshine_duration
+    case soil_moisture_0_to_100cm
+    case soil_temperature_0_to_100cm
+    case growing_degree_days_base_0_limit_50
+    case leaf_wetness_probability
+    case soil_moisture_index_0_to_7cm
+    case soil_moisture_index_7_to_28cm
+    case soil_moisture_index_28_to_100cm
+    case soil_moisture_index_100_to_255cm
+    case soil_moisture_index_0_to_100cm
 
     var requiresOffsetCorrectionForMixing: Bool {
         return false

@@ -264,6 +264,17 @@ public struct Timestamp: Hashable, Sendable {
         let hour = Int(t.tm_hour)
         return "\(year)\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))\(hour.zeroPadded(len: 2))\(minute.zeroPadded(len: 2))"
     }
+    
+    /// With format `MMddHH` for ECMWF ECPDS
+    var format_MMddHH: String {
+        var time = timeIntervalSince1970
+        var t = tm()
+        gmtime_r(&time, &t)
+        let month = Int(t.tm_mon + 1)
+        let day = Int(t.tm_mday)
+        let hour = Int(t.tm_hour)
+        return "\(month.zeroPadded(len: 2))\(day.zeroPadded(len: 2))\(hour.zeroPadded(len: 2))"
+    }
 
     // Return hour string as 2 character
     var hh: String {
