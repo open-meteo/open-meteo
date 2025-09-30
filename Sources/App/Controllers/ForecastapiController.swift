@@ -63,7 +63,6 @@ public struct ForecastapiController: RouteCollection {
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
         categoriesRoute.getAndPost("seasonal", use: SeasonalForecastController().query)
-        categoriesRoute.getAndPost("seas5", use: Seas5Controller().query)
         categoriesRoute.getAndPost("flood", use: GloFasController().query)
         categoriesRoute.getAndPost("climate", use: CmipController().query)
         categoriesRoute.getAndPost("marine", use: IconWaveController().query)

@@ -1,152 +1,12 @@
-import Foundation
 import Vapor
 import OpenMeteoSdk
 
-typealias SeasonalForecastVariable = VariableOrDerived<CfsVariable, CfsVariableDerived>
 
-typealias SeasonalForecastReader = GenericReader<SeasonalForecastDomain, CfsVariable>
-
-enum SeasonalForecastDomainApi: String, RawRepresentableString, CaseIterable, Sendable {
-    case cfsv2
-
-    var forecastDomain: SeasonalForecastDomain {
-        switch self {
-        case .cfsv2:
-            return .ncep
-        }
-    }
-}
-
-enum CfsVariableDerived: String, RawRepresentableString {
-    case windspeed_10m
-    case winddirection_10m
-    case wind_speed_10m
-    case wind_direction_10m
-    case cloudcover
-    case relativehumidity_2m
-}
-
-enum DailyCfsVariable: String, RawRepresentableString {
-    case temperature_2m_max
-    case temperature_2m_min
-    case precipitation_sum
-    // case rain_sum
-    case showers_sum
-    case shortwave_radiation_sum
-    case windspeed_10m_max
-    case winddirection_10m_dominant
-    case wind_speed_10m_max
-    case wind_direction_10m_dominant
-    case precipitation_hours
-}
-
-extension SeasonalForecastReader {
-    func prefetchData(variable: SeasonalForecastVariable, time: TimerangeDtAndSettings) async throws {
-        switch variable {
-        case .raw(let variable):
-            try await prefetchData(variable: variable, time: time)
-        case .derived(let variable):
-            switch variable {
-            case .windspeed_10m, .wind_speed_10m, .winddirection_10m, .wind_direction_10m:
-                try await prefetchData(variable: .wind_u_component_10m, time: time)
-                try await prefetchData(variable: .wind_v_component_10m, time: time)
-            case .cloudcover:
-                try await prefetchData(variable: .cloud_cover, time: time)
-            case .relativehumidity_2m:
-                try await prefetchData(variable: .relative_humidity_2m, time: time)
-            }
-        }
-    }
-
-    func get(variable: SeasonalForecastVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        switch variable {
-        case .raw(let variable):
-            return try await get(variable: variable, time: time)
-        case .derived(let variable):
-            switch variable {
-            case .windspeed_10m, .wind_speed_10m:
-                let u = try await get(variable: .wind_u_component_10m, time: time)
-                let v = try await get(variable: .wind_v_component_10m, time: time)
-                let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-                return DataAndUnit(speed, u.unit)
-            case .winddirection_10m, .wind_direction_10m:
-                let u = try await get(variable: .wind_u_component_10m, time: time)
-                let v = try await get(variable: .wind_v_component_10m, time: time)
-                let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
-                return DataAndUnit(direction, .degreeDirection)
-            case .cloudcover:
-                return try await get(variable: .cloud_cover, time: time)
-            case .relativehumidity_2m:
-                return try await get(variable: .relative_humidity_2m, time: time)
-            }
-        }
-    }
-
-    func prefetchData(variable: DailyCfsVariable, time timeDaily: TimerangeDtAndSettings) async throws {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
-        switch variable {
-        case .temperature_2m_max:
-            try await prefetchData(variable: CfsVariable.temperature_2m_max, time: time)
-        case .temperature_2m_min:
-            try await prefetchData(variable: CfsVariable.temperature_2m_min, time: time)
-        case .precipitation_sum:
-            try await prefetchData(variable: .precipitation, time: time)
-        case .showers_sum:
-            try await prefetchData(variable: .showers, time: time)
-        case .shortwave_radiation_sum:
-            try await prefetchData(variable: .shortwave_radiation, time: time)
-        case .windspeed_10m_max, .wind_speed_10m_max, .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            try await prefetchData(variable: .wind_u_component_10m, time: time)
-            try await prefetchData(variable: .wind_v_component_10m, time: time)
-        case .precipitation_hours:
-            try await prefetchData(variable: .precipitation, time: time)
-        }
-    }
-
-    func getDaily(variable: DailyCfsVariable, params: ApiQueryParameter, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        let time = timeDaily.with(dtSeconds: modelDtSeconds)
-        switch variable {
-        case .temperature_2m_max:
-            let data = try await get(variable: .temperature_2m_max, time: time).convertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 4), data.unit)
-        case .temperature_2m_min:
-            let data = try await get(variable: .temperature_2m_min, time: time).convertAndRound(params: params)
-            return DataAndUnit(data.data.min(by: 4), data.unit)
-        case .precipitation_sum:
-            let data = try await get(variable: .precipitation, time: time).convertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 4), data.unit)
-        case .showers_sum:
-            let data = try await get(variable: .showers, time: time).convertAndRound(params: params)
-            return DataAndUnit(data.data.sum(by: 4), data.unit)
-        case .shortwave_radiation_sum:
-            let data = try await get(variable: .shortwave_radiation, time: time).convertAndRound(params: params)
-            // for 6h data
-            return DataAndUnit(data.data.sum(by: 4).map({ $0 * 0.0036 * 6 }).round(digits: 2), .megajoulePerSquareMetre)
-        case .windspeed_10m_max, .wind_speed_10m_max:
-            let data = try await get(variable: .derived(.windspeed_10m), time: time).convertAndRound(params: params)
-            return DataAndUnit(data.data.max(by: 4), data.unit)
-        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            let u = try await get(variable: .wind_u_component_10m, time: time).data.sum(by: 4)
-            let v = try await get(variable: .wind_v_component_10m, time: time).data.sum(by: 4)
-            let direction = Meteorology.windirectionFast(u: u, v: v)
-            return DataAndUnit(direction, .degreeDirection)
-        case .precipitation_hours:
-            let data = try await get(variable: .precipitation, time: time).convertAndRound(params: params)
-            return DataAndUnit(data.data.map({ $0 > 0.001 ? 1 : 0 }).sum(by: 4), .hours)
-        }
-    }
-}
-
-/**
- TODO:
- - integrate more providers
- - more daily data
- */
 struct SeasonalForecastController {
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter("seasonal-api") { _, params in
             let currentTime = Timestamp.now()
-            let allowedRange = Timestamp(2022, 6, 8) ..< currentTime.add(86400 * 400)
+            let allowedRange = Timestamp(2024, 1, 1) ..< currentTime.add(86400 * 400)
             let logger = req.logger
             let httpClient = req.application.http.client.shared
 
@@ -155,85 +15,125 @@ struct SeasonalForecastController {
                 throw ForecastApiError.generic(message: "Bounding box not supported")
             }
             /// Will be configurable by API later
-            let domains = [SeasonalForecastDomainApi.cfsv2]
+            let domains = [EcmwfSeasDomain.seas5_6hourly]
 
-            let paramsSixHourly = try SeasonalForecastVariable.load(commaSeparatedOptional: params.six_hourly)
-            let paramsDaily = try DailyCfsVariable.load(commaSeparatedOptional: params.daily)
-            let nVariables = ((paramsSixHourly?.count ?? 0) + (paramsDaily?.count ?? 0)) * domains.reduce(0, { $0 + $1.forecastDomain.nMembers })
+            let paramsSixHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.six_hourly)
+            let paramsHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.hourly)
+            let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
+            let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
+            let nMember = 51
+            let nVariables6Hourly = (paramsSixHourly?.count ?? 0) * nMember / 6
+            let nVariablesDaily = (paramsDaily?.count ?? 0) * nMember / 24
+            /// adjusted to 6hourly and 24h aggregations
+            let nVariables = nVariables6Hourly + nVariablesDaily + (paramsMonthly?.count ?? 0)
             let options = try params.readerOptions(logger: logger, httpClient: httpClient)
+            
+            let runCurrent = (IsoDateTime(timeIntervalSince1970: try await EcmwfSeasDomain.seas5_6hourly.getLatestFullRun(client: options.httpClient, logger: options.logger)?.timeIntervalSince1970 ?? Timestamp.now().subtract(days: 5).with(day: 1).timeIntervalSince1970))
+            let run = params.run ?? runCurrent
 
-            let locations: [ForecastapiResult<SeasonalDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
+            let locations: [ForecastapiResult<Seas5Reader>.PerLocation] = try await prepared.asyncMap { prepared in
                 let coordinates = prepared.coordinate
                 let timezone = prepared.timezone
-                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 92, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
+                let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: 183, forecastDaysMax: 366, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: 92)
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
-                let readers: [SeasonalDomainsReader] = try await domains.asyncCompactMap { domain in
-                    guard let reader = try await SeasonalForecastReader(domain: domain.forecastDomain, lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+                let readers: [Seas5Reader] = try await domains.asyncCompactMap { domain -> Seas5Reader? in
+                    guard let readerHourly = try await EcmwfSeas5Controller6Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
                         return nil
                     }
-                    return SeasonalDomainsReader(domain: domain, reader: reader, params: params, time: time)
+                    guard let readerDaily = try await EcmwfSeas5Controller24Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+                        return nil
+                    }
+                    guard let readerMonthly = try await EcmwfSeas5ControllerMonthly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+                        return nil
+                    }
+                    return Seas5Reader(readerHourly: readerHourly, readerDaily: readerDaily, readerMonthly: readerMonthly, params: params, time: time, timezone: timezone, run: run)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<SeasonalDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<Seas5Reader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
         }
     }
 }
 
 
-struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
-    typealias MonthlyVariable = FlatBuffersVariableNone
+struct Seas5Reader: ModelFlatbufferSerialisable {
+    typealias MonthlyVariable = VariableOrDerived<EcmwfSeasVariableMonthly, EcmwfSeasVariableMonthlyDerived>
     
-    typealias HourlyVariable = SeasonalForecastVariable
+    typealias HourlyVariable = VariableOrDerived<EcmwfSeasVariableSingleLevel, EcmwfSeasVariableSingleLevelDerived>
     
-    typealias DailyVariable = DailyCfsVariable
+    typealias DailyVariable = VariableOrDerived<VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>, EcmwfSeasVariableDailyComputed>
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
-        domain.flatBufferModel
+        .ecmwfSeas5
     }
     
     var modelName: String {
-        domain.rawValue
+        "seas5"
     }
-    
-    let domain: SeasonalForecastDomainApi
-    
-    let reader: SeasonalForecastReader
+        
+    let readerHourly: EcmwfSeas5Controller6Hourly
+    let readerDaily: EcmwfSeas5Controller24Hourly
+    let readerMonthly: EcmwfSeas5ControllerMonthly
     
     var latitude: Float {
-        reader.modelLat
+        readerHourly.modelLat
     }
     
     var longitude: Float {
-        reader.modelLon
+        readerHourly.modelLon
     }
     
     var elevation: Float? {
-        reader.targetElevation
+        readerHourly.targetElevation
     }
     
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
+    let timezone: TimezoneWithOffset
+    let run: IsoDateTime
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
-        let members = 0..<reader.domain.countEnsembleMember
-        let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
+        let members = 0..<readerHourly.reader.domain.countEnsembleMember
         if let sixHourlyVariables {
-            for varible in sixHourlyVariables {
+            let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
+            for variable in sixHourlyVariables {
                 for member in members {
-                    try await reader.prefetchData(variable: varible, time: time.dailyRead.toSettings(ensembleMember: member))
+                    try await readerHourly.prefetchData(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
+                }
+            }
+        }
+        if let hourlyVariables {
+            let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? readerHourly.modelDtSeconds
+            let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+            for variable in hourlyVariables {
+                for member in members {
+                    try await readerHourly.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
                 }
             }
         }
         if let dailyVariables {
-            for varible in dailyVariables {
+            for variable in dailyVariables {
                 for member in members {
-                    try await reader.prefetchData(variable: varible, time: timeSixHourlyRead.toSettings(ensembleMember: member))
+                    switch variable {
+                    case .derived(let variable):
+                        try await readerHourly.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    case .raw(let variable):
+                        try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    }
+                    
                 }
+            }
+        }
+        if let monthlyVariables {
+            let yearMonths = time.dailyRead.toYearMonth()
+            let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+            let timeMonthlyRead = timeMonthlyDisplay
+            for variable in monthlyVariables {
+                try await readerMonthly.prefetchData(variable: variable, time: timeMonthlyRead.toSettings())
             }
         }
     }
@@ -243,19 +143,60 @@ struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        return nil
+        guard let variables else {
+            return nil
+        }
+        let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? readerHourly.modelDtSeconds
+        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
+        let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
+        let members = 0..<readerHourly.reader.domain.countEnsembleMember
+        return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
+            var unit: SiUnit?
+            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+                let d = try await readerHourly.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+                unit = d.unit
+                assert(timeHourlyRead.count == d.data.count)
+                return ApiArray.float(d.data)
+            }
+            guard allMembers.count > 0 else {
+                return nil
+            }
+            return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+        })
     }
     
     func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
         guard let variables else {
             return nil
         }
-        let members = 0..<reader.domain.countEnsembleMember
-        
-        return ApiSection<DailyCfsVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
+        let members = 0..<readerDaily.reader.domain.countEnsembleMember
+        var riseSet: (rise: [Timestamp], set: [Timestamp])?
+        return ApiSection<DailyVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
+            if case .derived(let variable) = variable {
+                if variable == .sunrise || variable == .sunset {
+                    // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
+                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerHourly.modelLat, lon: readerHourly.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                    riseSet = times
+                    if variable == .sunset {
+                        return ApiColumn(variable: .derived(.sunset), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
+                    } else {
+                        return ApiColumn(variable: .derived(.sunrise), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
+                    }
+                }
+                if variable == .daylight_duration {
+                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerHourly.modelLat)
+                    return ApiColumn(variable: .derived(.daylight_duration), unit: .seconds, variables: [.float(duration)])
+                }
+            }
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let d = try await reader.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMember: member))
+                let d: DataAndUnit
+                switch variable {
+                case .derived(let variable):
+                    d = try await readerHourly.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                case .raw(let variable):
+                    d = try await readerDaily.get(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+                }
                 unit = d.unit
                 assert(time.dailyRead.count == d.data.count)
                 return ApiArray.float(d.data)
@@ -263,7 +204,7 @@ struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
             guard allMembers.count > 0 else {
                 return nil
             }
-            return ApiColumn<DailyCfsVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+            return ApiColumn<DailyVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
     }
     
@@ -271,15 +212,13 @@ struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
         guard let variables else {
             return nil
         }
-        let members = 0..<reader.domain.countEnsembleMember
-        
+        let members = 0..<readerHourly.reader.domain.countEnsembleMember
         let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
         let timeSixHourlyDisplay = time.dailyDisplay.with(dtSeconds: 3600 * 6)
-        
         return .init(name: "six_hourly", time: timeSixHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let d = try await reader.get(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMember: member)).convertAndRound(params: params)
+                let d = try await readerHourly.get(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
                 unit = d.unit
                 assert(timeSixHourlyRead.count == d.data.count)
                 return ApiArray.float(d.data)
@@ -296,6 +235,307 @@ struct SeasonalDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
-        return nil
+        guard let variables else {
+            return nil
+        }
+        let yearMonths = time.dailyRead.toYearMonth()
+        let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+        let timeMonthlyRead = timeMonthlyDisplay
+        return ApiSection<MonthlyVariable>(name: "monthly", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
+            let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings()).convertAndRound(params: params)
+            assert(timeMonthlyDisplay.count == d.data.count)
+            return ApiColumn<MonthlyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
+        })
+    }
+}
+
+
+extension EcmwfSeasVariableMonthly: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .wind_gusts_10m_anomaly:
+            return .init(variable: .windGusts, aggregation: .anomaly, altitude: 10)
+        case .wind_speed_10m_mean:
+            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+        case .wind_speed_10m_anomaly:
+            return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
+        case .albedo_mean:
+            return .init(variable: .albedo, aggregation: .mean)
+        case .albedo_anomaly:
+            return .init(variable: .albedo, aggregation: .anomaly)
+        case .cloud_cover_low_mean:
+            return .init(variable: .cloudCoverLow, aggregation: .mean)
+        case .cloud_cover_low_anomaly:
+            return .init(variable: .cloudCoverLow, aggregation: .anomaly)
+        case .showers_mean:
+            return .init(variable: .showers, aggregation: .mean)
+        case .showers_anomaly:
+            return .init(variable: .showers, aggregation: .anomaly)
+        case .runoff_mean:
+            return .init(variable: .runoff, aggregation: .mean)
+        case .runoff_anomaly:
+            return .init(variable: .runoff, aggregation: .anomaly)
+        case .snow_density_mean:
+            return .init(variable: .snowDensity, aggregation: .mean)
+        case .snow_density_anomaly:
+            return .init(variable: .snowDensity, aggregation: .anomaly)
+        case .snow_depth_water_equivalent_mean:
+            return .init(variable: .snowDepthWaterEquivalent, aggregation: .mean)
+        case .snow_depth_water_equivalent_anomaly:
+            return .init(variable: .snowDepthWaterEquivalent, aggregation: .anomaly)
+        case .total_column_integrated_water_vapour_mean:
+            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .mean)
+        case .total_column_integrated_water_vapour_anomaly:
+            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .anomaly)
+        case .temperature_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+        case .temperature_2m_anomaly:
+            return .init(variable: .temperature, aggregation: .anomaly, altitude: 2)
+        case .dew_point_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+        case .dew_point_2m_anomaly:
+            return .init(variable: .dewPoint, aggregation: .anomaly, altitude: 2)
+        case .pressure_msl_mean:
+            return .init(variable: .pressureMsl, aggregation: .mean)
+        case .pressure_msl_anomaly:
+            return .init(variable: .pressureMsl, aggregation: .anomaly)
+        case .sea_surface_temperature_mean:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
+        case .sea_surface_temperature_anomaly:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .anomaly)
+        case .wind_u_component_10m_mean:
+            return .init(variable: .windUComponent, aggregation: .mean, altitude: 10)
+        case .wind_u_component_10m_anomaly:
+            return .init(variable: .windUComponent, aggregation: .anomaly, altitude: 10)
+        case .wind_v_component_10m_mean:
+            return .init(variable: .windVComponent, aggregation: .mean, altitude: 10)
+        case .wind_v_component_10m_anomaly:
+            return .init(variable: .windVComponent, aggregation: .anomaly, altitude: 10)
+        case .snowfall_water_equivalent_mean:
+            return .init(variable: .snowfallWaterEquivalent, aggregation: .mean)
+        case .snowfall_water_equivalent_anomaly:
+            return .init(variable: .snowfallWaterEquivalent, aggregation: .anomaly)
+        case .precipitation_mean:
+            return .init(variable: .precipitation, aggregation: .mean)
+        case .precipitation_anomaly:
+            return .init(variable: .precipitation, aggregation: .anomaly)
+        case .shortwave_radiation_mean:
+            return .init(variable: .shortwaveRadiation, aggregation: .mean)
+        case .shortwave_radiation_anomaly:
+            return .init(variable: .shortwaveRadiation, aggregation: .anomaly)
+        case .cloud_cover_mean:
+            return .init(variable: .cloudCover, aggregation: .mean)
+        case .cloud_cover_anomaly:
+            return .init(variable: .cloudCover, aggregation: .anomaly)
+        case .sunshine_duration_mean:
+            return .init(variable: .sunshineDuration, aggregation: .mean)
+        case .sunshine_duration_anomaly:
+            return .init(variable: .sunshineDuration, aggregation: .anomaly)
+        case .soil_temperature_0_to_7cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_temperature_0_to_7cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
+        case .soil_temperature_7_to_28cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_temperature_7_to_28cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_temperature_28_to_100cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_temperature_100_to_255cm_anomaly:
+            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_moisture_0_to_7cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_moisture_7_to_28cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_moisture_28_to_100cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_moisture_100_to_255cm_anomaly:
+            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 100, depthTo: 255)
+        case .temperature_max24h_2m_mean:
+            return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
+        case .temperature_max24h_2m_anomaly:
+            return .init(variable: .temperatureMax24h, aggregation: .anomaly, altitude: 2)
+        case .temperature_min24h_2m_mean:
+            return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
+        case .temperature_min24h_2m_anomaly:
+            return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
+        case .longwave_radiation_mean:
+            return .init(variable: .longwaveRadiation, aggregation: .mean)
+        case .longwave_radiation_anomaly:
+            return .init(variable: .longwaveRadiation, aggregation: .anomaly)
+        case .sea_ice_cover_mean:
+            return .init(variable: .seaIceCover, aggregation: .mean)
+        case .sea_ice_cover_anomaly:
+            return .init(variable: .seaIceCover, aggregation: .anomaly)
+        case .latent_heat_flux_mean:
+            return .init(variable: .latentHeatFlux, aggregation: .mean)
+        case .latent_heat_flux_anomaly:
+            return .init(variable: .latentHeatFlux, aggregation: .anomaly)
+        case .sensible_heat_flux_mean:
+            return .init(variable: .sensibleHeatFlux, aggregation: .mean)
+        case .sensible_heat_flux_anomaly:
+            return .init(variable: .sensibleHeatFlux, aggregation: .anomaly)
+        case .evapotranspiration_mean:
+            return .init(variable: .evapotranspiration, aggregation: .mean)
+        case .evapotranspiration_anomaly:
+            return .init(variable: .evapotranspiration, aggregation: .anomaly)
+        }
+    }
+}
+
+extension EcmwfSeasVariableSingleLevel: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .temperature_2m:
+            return .init(variable: .temperature, altitude: 2)
+        case .dew_point_2m:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .pressure_msl:
+            return .init(variable: .pressureMsl)
+        case .sea_surface_temperature:
+            return .init(variable: .seaSurfaceTemperature)
+        case .wind_u_component_10m:
+            return .init(variable: .windUComponent, altitude: 10)
+        case .wind_v_component_10m:
+            return .init(variable: .windVComponent, altitude: 10)
+        case .snowfall_water_equivalent:
+            return .init(variable: .snowfallWaterEquivalent)
+        case .precipitation:
+            return .init(variable: .precipitation)
+        case .shortwave_radiation:
+            return .init(variable: .shortwaveRadiation)
+        case .soil_temperature_0_to_7cm:
+            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+        case .cloud_cover:
+            return .init(variable: .cloudCover)
+        }
+    }
+}
+
+extension EcmwfSeasVariableSingleLevelDerived: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .apparent_temperature:
+            return .init(variable: .apparentTemperature)
+        case .dewpoint_2m:
+            return .init(variable: .dewPoint, altitude: 2)
+        case .relativehumidity_2m, .relative_humidity_2m:
+            return .init(variable: .relativeHumidity, altitude: 2)
+        case .windspeed_10m, .wind_speed_10m:
+            return .init(variable: .windSpeed, altitude: 10)
+        case .winddirection_10m, .wind_direction_10m:
+            return .init(variable: .windDirection, altitude: 10)
+        case .vapor_pressure_deficit, .vapour_pressure_deficit:
+            return .init(variable: .vapourPressureDeficit)
+        case .surface_pressure:
+            return .init(variable: .surfacePressure)
+        case .snowfall:
+            return .init(variable: .snowfall)
+        case .rain:
+            return .init(variable: .rain)
+        case .et0_fao_evapotranspiration:
+            return .init(variable: .et0FaoEvapotranspiration)
+        case .cloudcover:
+            return .init(variable: .cloudCover)
+        case .direct_normal_irradiance:
+            return .init(variable: .directNormalIrradiance)
+        case .weathercode, .weather_code:
+            return .init(variable: .weatherCode)
+        case .is_day:
+            return .init(variable: .isDay)
+        case .diffuse_radiation:
+            return .init(variable: .diffuseRadiation)
+        case .direct_radiation:
+            return .init(variable: .directRadiation)
+        case .terrestrial_radiation:
+            return .init(variable: .terrestrialRadiation)
+        case .terrestrial_radiation_instant:
+            return .init(variable: .terrestrialRadiationInstant)
+        case .shortwave_radiation_instant:
+            return .init(variable: .shortwaveRadiationInstant)
+        case .diffuse_radiation_instant:
+            return .init(variable: .diffuseRadiationInstant)
+        case .direct_radiation_instant:
+            return .init(variable: .directRadiationInstant)
+        case .direct_normal_irradiance_instant:
+            return .init(variable: .directNormalIrradianceInstant)
+        case .wet_bulb_temperature_2m:
+            return .init(variable: .wetBulbTemperature, altitude: 2)
+        case .global_tilted_irradiance:
+            return .init(variable: .globalTiltedIrradiance)
+        case .global_tilted_irradiance_instant:
+            return .init(variable: .globalTiltedIrradianceInstant)
+        }
+    }
+}
+
+extension EcmwfSeasVariable24HourlySingleLevel: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .soil_temperature_0_to_7cm:
+            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+        case .soil_temperature_7_to_28cm:
+            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm:
+            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm:
+            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm:
+            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm:
+            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm:
+            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm:
+            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
+        case .temperature_max24h_2m:
+            return .init(variable: .temperatureMax24h, altitude: 2)
+        case .temperature_min24h_2m:
+                return .init(variable: .temperatureMin24h, altitude: 2)
+        case .temperature_mean24h_2m:
+            return .init(variable: .temperatureMean24h, altitude: 2)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
+        }
+    }
+}
+
+extension EcmwfSeasVariable24HourlySingleLevelDerived: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .temperature_2m_max:
+            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
+        case .temperature_2m_min:
+            return .init(variable: .temperature, aggregation: .minimum, altitude: 2)
+        case .temperature_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+        }
+    }
+}
+
+extension EcmwfSeasVariableMonthlyDerived: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        switch self {
+        case .snowfall_mean:
+            return .init(variable: .snowfall, aggregation: .mean)
+        case .snowfall_anomaly:
+            return .init(variable: .snowfall, aggregation: .anomaly)
+        case .snow_depth_mean:
+            return .init(variable: .snowDepth, aggregation: .mean)
+        case .snow_depth_anomaly:
+            return .init(variable: .snowDepth, aggregation: .anomaly)
+        }
     }
 }

@@ -207,7 +207,7 @@ struct MarineDomainsReader: ModelFlatbufferSerialisable {
         
         if let hourlyVariables {
             for member in members {
-                try await reader.prefetchData(variables: hourlyVariables, time: timeHourlyRead.toSettings(ensembleMember: member))
+                try await reader.prefetchData(variables: hourlyVariables, time: timeHourlyRead.toSettings(ensembleMemberLevel: member))
             }
         }
         if let currentVariables {
@@ -215,7 +215,7 @@ struct MarineDomainsReader: ModelFlatbufferSerialisable {
         }
         if let dailyVariables {
             for member in members {
-                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings(ensembleMember: member))
+                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings(ensembleMemberLevel: member))
             }
         }
     }
