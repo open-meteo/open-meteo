@@ -794,7 +794,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .cerra, .copernicus_cerra:
             return try await CerraReader(domain: .cerra, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs:
-            return [try await Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+            //return [try await Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+            let ifsHres: (any GenericReaderProtocol)? = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [ifsHres].compactMap({ $0 })
         case .cma_grapes_global:
             return try await CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global:
@@ -1568,6 +1570,9 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case ice_pellets_probability
     case snowfall_probability
     case albedo
+    case k_index
+    case roughness_length
+    case potential_evapotranspiration
 
     case wind_speed_10m_spread
     case wind_speed_100m_spread
