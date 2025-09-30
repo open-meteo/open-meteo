@@ -12,15 +12,23 @@ enum EcmwfEcdpsIfsVariableDerived: String, GenericVariableMixable {
     case windspeed_10m
     case windspeed_100m
     case windspeed_200m
+    case windspeed_120m
+    case windspeed_180m
     case wind_speed_10m
     case wind_speed_100m
     case wind_speed_200m
+    case wind_speed_120m
+    case wind_speed_180m
     case wind_direction_10m
     case wind_direction_100m
     case wind_direction_200m
+    case wind_direction_120m
+    case wind_direction_180m
     case winddirection_10m
     case winddirection_100m
     case winddirection_200m
+    case winddirection_120m
+    case winddirection_180m
     case soil_temperature_0_7cm
     case soil_temperature_0_10cm
     case soil_temperature_0_to_10cm
@@ -118,17 +126,29 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             let u = try await get(raw: .wind_u_component_100m, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
+        case .windspeed_120m, .wind_speed_120m:
+            let v = try await get(raw: .wind_v_component_100m, time: time)
+            let u = try await get(raw: .wind_u_component_100m, time: time)
+            let factor = Meteorology.scaleWindFactor(from: 100, to: 120)
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed).map({$0 * factor})
+            return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_200m, .windspeed_200m:
             let v = try await get(raw: .wind_v_component_200m, time: time)
             let u = try await get(raw: .wind_u_component_200m, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
-        case .wind_direction_100m, .winddirection_100m:
+        case .windspeed_180m, .wind_speed_180m:
+            let v = try await get(raw: .wind_v_component_200m, time: time)
+            let u = try await get(raw: .wind_u_component_200m, time: time)
+            let factor = Meteorology.scaleWindFactor(from: 200, to: 180)
+            let speed = zip(u.data, v.data).map(Meteorology.windspeed).map({$0 * factor})
+            return DataAndUnit(speed, .metrePerSecond)
+        case .wind_direction_100m, .winddirection_100m, .wind_direction_120m, .winddirection_120m:
             let v = try await get(raw: .wind_v_component_100m, time: time)
             let u = try await get(raw: .wind_u_component_100m, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
             return DataAndUnit(direction, .degreeDirection)
-        case .wind_direction_200m, .winddirection_200m:
+        case .wind_direction_200m, .winddirection_200m, .wind_direction_180m, .winddirection_180m:
             let v = try await get(raw: .wind_v_component_200m, time: time)
             let u = try await get(raw: .wind_u_component_200m, time: time)
             let direction = Meteorology.windirectionFast(u: u.data, v: v.data)
@@ -352,10 +372,10 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
         case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation:
             try await prefetchData(raw: .shortwave_radiation, time: time)
             try await prefetchData(raw: .direct_radiation, time: time)
-        case .windspeed_100m, .wind_speed_100m, .winddirection_100m, .wind_direction_100m:
+        case .windspeed_100m, .wind_speed_100m, .winddirection_100m, .wind_direction_100m, .windspeed_120m, .wind_speed_120m, .winddirection_120m, .wind_direction_120m:
             try await prefetchData(raw: .wind_u_component_100m, time: time)
             try await prefetchData(raw: .wind_v_component_100m, time: time)
-        case .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m:
+        case .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m, .windspeed_180m, .wind_speed_180m, .winddirection_180m, .wind_direction_180m:
             try await prefetchData(raw: .wind_u_component_200m, time: time)
             try await prefetchData(raw: .wind_v_component_200m, time: time)
         case .windspeed_10m, .wind_speed_10m, .wind_direction_10m, .winddirection_10m:

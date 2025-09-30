@@ -271,7 +271,17 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     }
 
     var storePreviousForecast: Bool {
-        return false
+        switch self {
+        case .temperature_2m, .dew_point_2m: return true
+        case .precipitation, .showers, .snowfall_water_equivalent: return true
+        case .pressure_msl: return true
+        case .cloud_cover: return true
+        case .shortwave_radiation, .direct_radiation: return true
+        case .wind_v_component_10m, .wind_u_component_10m: return true
+        case .wind_v_component_100m, .wind_u_component_100m: return true
+        case .wind_v_component_200m, .wind_u_component_200m: return true
+        default: return false
+        }
     }
     
     var gribCode: String {
