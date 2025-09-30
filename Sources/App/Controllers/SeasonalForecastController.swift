@@ -22,7 +22,7 @@ struct SeasonalForecastController {
             let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
             let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
             let nMember = 51
-            let nVariables6Hourly = (paramsSixHourly?.count ?? 0) * nMember / 6
+            let nVariables6Hourly = ((paramsHourly?.count ?? 0) + (paramsSixHourly?.count ?? 0)) * nMember / 6
             let nVariablesDaily = (paramsDaily?.count ?? 0) * nMember / 24
             /// adjusted to 6hourly and 24h aggregations
             let nVariables = nVariables6Hourly + nVariablesDaily + (paramsMonthly?.count ?? 0)

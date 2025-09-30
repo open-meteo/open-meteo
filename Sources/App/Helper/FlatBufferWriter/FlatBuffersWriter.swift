@@ -104,9 +104,9 @@ extension ApiArray {
     }
 }
 
-extension ApiSection where Variable: FlatBuffersVariable {
-    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
-        let offsets = fbb.createVector(ofOffsets: self.columns.flatMap { c -> [Offset] in
+extension ApiColumn where Variable: FlatBuffersVariable {
+    static func encodeFlatBuffers(_ columns: [Self], _ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        fbb.createVector(ofOffsets: columns.flatMap { c -> [Offset] in
             let meta = c.variable.getFlatBuffersMeta()
             return c.variables.enumerated().map { member, v in
                 let data = v.encodeFlatBuffers(&fbb)
@@ -125,11 +125,30 @@ extension ApiSection where Variable: FlatBuffersVariable {
                 return openmeteo_sdk_VariableWithValues.endVariableWithValues(&fbb, start: VariableWithValues)
             }
         })
+    }
+}
+
+
+extension ApiSection where Variable: FlatBuffersVariable {
+    func encodeFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        let offsets = ApiColumn.encodeFlatBuffers(columns, &fbb, memberOffset: memberOffset)
         return openmeteo_sdk_VariablesWithTime.createVariablesWithTime(
             &fbb,
             time: Int64(time.range.lowerBound.timeIntervalSince1970),
             timeEnd: Int64(time.range.upperBound.timeIntervalSince1970),
             interval: Int32(time.dtSeconds),
+            variablesVectorOffset: offsets
+        )
+    }
+    
+    func encodeMonthlyFlatBuffers(_ fbb: inout FlatBufferBuilder, memberOffset: Int) -> Offset {
+        let offsets = ApiColumn.encodeFlatBuffers(columns, &fbb, memberOffset: memberOffset)
+        let yearMonth = time.range.lowerBound.toYearMonth()
+        return openmeteo_sdk_VariablesWithMonth.createVariablesWithMonth(
+            &fbb,
+            year: Int16(yearMonth.year),
+            month: Int8(yearMonth.month),
+            count: Int32(time.count),
             variablesVectorOffset: offsets
         )
     }
@@ -156,12 +175,15 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
 
 extension ModelFlatbufferSerialisable {
     func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
+        guard variables.sixHourlyVariables == nil else {
+            throw ForecastApiError.generic(message: "&six_hourly= variables are not supported for &format=flatbuffers and will be removed entirely in the future")
+        }
+        
         let generationTimeStart = Date()
         let hourly = await (try hourly(variables: variables.hourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
-        let sixHourly = await (try sixHourly(variables: variables.sixHourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let daily = await (try daily(variables: variables.dailyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
-        let monthly = await (try monthly(variables: variables.monthlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let monthly = await (try monthly(variables: variables.monthlyVariables)).map { $0.encodeMonthlyFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let current = await (try current(variables: variables.currentVariables)).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
@@ -180,7 +202,6 @@ extension ModelFlatbufferSerialisable {
             dailyOffset: daily,
             hourlyOffset: hourly,
             minutely15Offset: minutely15,
-            sixHourlyOffset: sixHourly,
             monthlyOffset: monthly
         )
         fbb.finish(offset: result, addPrefix: true)
