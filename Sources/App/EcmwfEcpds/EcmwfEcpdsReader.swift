@@ -119,8 +119,8 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_speed_200m, .windspeed_200m:
-            let v = try await get(raw: .wind_v_component_100m, time: time)
-            let u = try await get(raw: .wind_u_component_100m, time: time)
+            let v = try await get(raw: .wind_v_component_200m, time: time)
+            let u = try await get(raw: .wind_u_component_200m, time: time)
             let speed = zip(u.data, v.data).map(Meteorology.windspeed)
             return DataAndUnit(speed, .metrePerSecond)
         case .wind_direction_100m, .winddirection_100m:
@@ -356,12 +356,9 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .wind_u_component_100m, time: time)
             try await prefetchData(raw: .wind_v_component_100m, time: time)
         case .windspeed_200m, .wind_speed_200m, .winddirection_200m, .wind_direction_200m:
-            try await prefetchData(raw: .wind_u_component_100m, time: time)
-            try await prefetchData(raw: .wind_v_component_100m, time: time)
-        case .windspeed_10m, .wind_speed_10m:
-            try await prefetchData(raw: .wind_u_component_10m, time: time)
-            try await prefetchData(raw: .wind_v_component_10m, time: time)
-        case .wind_direction_10m, .winddirection_10m:
+            try await prefetchData(raw: .wind_u_component_200m, time: time)
+            try await prefetchData(raw: .wind_v_component_200m, time: time)
+        case .windspeed_10m, .wind_speed_10m, .wind_direction_10m, .winddirection_10m:
             try await prefetchData(raw: .wind_u_component_10m, time: time)
             try await prefetchData(raw: .wind_v_component_10m, time: time)
         case .soil_temperature_0_to_10cm, .soil_temperature_0_10cm, .soil_temperature_0_7cm:

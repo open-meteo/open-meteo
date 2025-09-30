@@ -448,6 +448,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
         switch self {
         case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
             return (1, -273.15)
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            return (100, 0)
         case .pressure_msl:
             return (1 / 100, 0)
         case .albedo:

@@ -174,7 +174,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                 
                 guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode == shortName}) else {
-                    logger.debug("Could not map variable \(shortName)")
+                    logger.warning("Could not map variable \(shortName)")
                     return
                 }
                 

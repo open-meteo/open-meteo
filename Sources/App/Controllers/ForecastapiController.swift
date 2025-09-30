@@ -1570,6 +1570,9 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case ice_pellets_probability
     case snowfall_probability
     case albedo
+    case k_index
+    case surface_roughness
+    case potential_evapotranspiration
 
     case wind_speed_10m_spread
     case wind_speed_100m_spread
