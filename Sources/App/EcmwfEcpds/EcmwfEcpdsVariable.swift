@@ -1,6 +1,6 @@
 
 
-enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAssociated {
+enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     case wind_u_component_10m
     case wind_v_component_10m
     case wind_u_component_100m
@@ -62,7 +62,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
         case .wind_gusts_10m: return 10
         case .dew_point_2m: return 20
         case .temperature_2m, .temperature_2m_max, .temperature_2m_min, .surface_temperature: return 20
-        case .pressure_msl: return 0.1
+        case .pressure_msl: return 0.1 // stored in pascal for historical reasons
         case .snowfall_water_equivalent: return 10
         case .soil_temperature_0_to_7cm: return 20
         case .soil_temperature_7_to_28cm: return 20
@@ -95,7 +95,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
         case .temperature_2m, .surface_temperature:
             return .hermite(bounds: nil)
         case .temperature_2m_max, .temperature_2m_min:
-            return .linear
+            return .backwards
         case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_200m, .wind_v_component_200m:
             return .hermite(bounds: nil)
         case .wind_gusts_10m:
@@ -163,7 +163,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
         }
     }
 
-    var marsGribCode: String {
+    /*var marsGribCode: String {
         switch self {
         case .temperature_2m:
             return "167.128"
@@ -224,7 +224,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
         default:
             fatalError("Not supported")
         }
-    }
+    }*/
 
     var unit: SiUnit {
         switch self {
@@ -361,85 +361,6 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
         }
     }
 
-    static func fromGrib(attributes: GribAttributes) -> Self? {
-        /**
-         1            ecmf         surface      0            20250910     138          fc           100v         grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           100u         grid_simple  reduced_gg
-         2            ecmf         mostUnstableParcel  0            20250910     138          fc           mucape       grid_ccsds   reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           pev          grid_simple  reduced_gg
-         2            ecmf         mostUnstableParcel  0            20250910     138          fc           mucin        grid_ccsds   reduced_gg
-         2            ecmf         surface      0            20250910     138          fc           ptype        grid_ccsds   reduced_gg
-         1            ecmf         depthBelowLandLayer  0            20250910     138          fc           swvl1        grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           skt          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           tcc          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           cp           grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           200v         grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  100          20250910     138          fc           swvl4        grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           vis          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           hcc          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           fsr          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           2t           grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           sd           grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           fdir         grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           200u         grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  28           20250910     138          fc           swvl3        grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           msl          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           fal          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     135-138      fc           10fg         grid_simple  reduced_gg
-         2            ecmf         surface      0            20250910     138          fc           kx           grid_ccsds   reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           sf           grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           ro           grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  28           20250910     138          fc           stl3         grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  0            20250910     138          fc           stl1         grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           10v          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           mcc          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           ssrd         grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           tp           grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  7            20250910     138          fc           stl2         grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  100          20250910     138          fc           stl4         grid_simple  reduced_gg
-         1            ecmf         depthBelowLandLayer  7            20250910     138          fc           swvl2        grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     135-138      fc           mn2t         grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           10u          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           2d           grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           lcc          grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     135-138      fc           mx2t         grid_simple  reduced_gg
-         1            ecmf         surface      0            20250910     138          fc           tcwv         grid_simple  reduced_gg
-         */
-
-        switch attributes.shortName {
-        case "2t": return .temperature_2m
-        case "tcc": return .cloud_cover
-        case "lcc": return .cloud_cover_low
-        case "mcc": return .cloud_cover_mid
-        case "hcc": return .cloud_cover_high
-        case "msl": return .pressure_msl
-        case "sf": return .snowfall_water_equivalent
-        case "ssrd": return .shortwave_radiation
-        case "tp": return .precipitation
-        case "tidirswrf", "fdir": return .direct_radiation
-        case "100u": return .wind_u_component_100m
-        case "100v": return .wind_v_component_100m
-        case "10u": return .wind_u_component_10m
-        case "10v": return .wind_v_component_10m
-        case "10fg", "gust", "i10fg": return .wind_gusts_10m
-        case "2d": return .dew_point_2m
-        case "stl1": return .soil_temperature_0_to_7cm
-        case "stl2": return .soil_temperature_7_to_28cm
-        case "stl3": return .soil_temperature_28_to_100cm
-        case "stl4": return .soil_temperature_100_to_255cm
-        case "swvl1": return .soil_moisture_0_to_7cm
-        case "swvl2": return .soil_moisture_7_to_28cm
-        case "swvl3": return .soil_moisture_28_to_100cm
-        case "swvl4": return .soil_moisture_100_to_255cm
-        //case "blh": return .boundary_layer_height
-        case "tcwv": return .total_column_integrated_water_vapour
-        case "sd": return .snow_depth_water_equivalent
-        //case "sst": return .sea_surface_temperature
-        default:
-            return nil
-        }
-    }
-
     var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
@@ -450,12 +371,12 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable, GribMessageAs
             return (1, -273.15)
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             return (100, 0)
-        case .pressure_msl:
-            return (1 / 100, 0)
+       // case .pressure_msl: // for historical backwards compatibility reasons, pressure is stored in pascal
+            //return (1 / 100, 0)
         case .albedo:
-            return (1 / 100, 0)
-        case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
-            return (1000, 0) // meters to millimeter
+            return (100, 0)
+        case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth_water_equivalent:
+            return (1000, 0) // meters to millimetre
         case .shortwave_radiation, .direct_radiation:
             return (1 / Float(dtSeconds), 0) // joules to watt
         default:

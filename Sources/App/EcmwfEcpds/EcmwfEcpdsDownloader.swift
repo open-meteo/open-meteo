@@ -179,8 +179,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 }
                 
                 //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
+                let isMax = [EcmwfEcdpsIfsVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min].contains(variable)
+                let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
                 /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
-                if [EcmwfEcdpsIfsVariable.wind_gusts_10m, .temperature_2m_max, .temperature_2m_min, .shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable) && hour == 0 {
+                if (isAccumulated || isMax) && hour == 0 {
                     return
                 }
                 
@@ -190,9 +192,13 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 grib2d.array.flipLatitude()
                 
                 // Deaccumulate precipitation
-                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
-                    return
+                if isAccumulated {
+                    // grib attributes for `stepType` are set wrongly to `instant`
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(hour)", grib2d: &grib2d) else {
+                        return
+                    }
                 }
+
                 
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
@@ -212,7 +218,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                 }*/
                 
-                logger.info("Processing \(variable) member=\(member) unit=\(unit) timestep=\(timestamp.format_YYYYMMddHH)")
+                logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
 
