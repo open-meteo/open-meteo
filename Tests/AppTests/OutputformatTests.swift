@@ -335,7 +335,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         #expect(xlsx == "6efa5ee262cef5073ef5fb27f05beb235db21db163eca31c4b4175b0c96d9b03")
 
         let flatbuffers = await drainData(try data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        #expect(flatbuffers == "a46939dc99de3cd52a2ad4db9f22d34bb308fa37bbdbb0ffff860c6e6fa95715")
+        #expect(flatbuffers == "319106d7379e730b1f83dcf4e86a79cb25f1dbf25518a402aacfe0efcb2c1039")
     }
 
     /// Test output formats for 2 locations
@@ -607,7 +607,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         #expect(xlsx == "6e30672c1461d2b1c4196f860e311cb742957392acd66c0e63b76f9c0656d3ce")
 
         let flatbuffers = await drainData(try data.response(format: .flatbuffers, fixedGenerationTime: 12)).sha256
-        #expect(flatbuffers == "377aab51cfe40a60c5457cd14b8d18294b3348325dda7ccebb0c110310283cc4")
+        #expect(flatbuffers == "3b7d3373403f4ccf5f0cb530ec486d80518fd8f784c055df3383c667cb2378ff")
     }
 
     @Test func xlsxWriter() throws {
