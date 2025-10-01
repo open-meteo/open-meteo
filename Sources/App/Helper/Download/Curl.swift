@@ -133,32 +133,28 @@ final class Curl: Sendable {
                 logger.info("Downloading file \(url)")
             }
         }
-
-        let request = try {
-            var request = HTTPClientRequest(url: url)
-            request.method = method
-            if let user = user, let password = password {
-                if url.contains(".your-objectstorage.com") {
-                    let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
-                    try signer.sign(request: &request, body: nil)
-                } else {
-                    request.setBasicAuth(username: user, password: password)
-                }
-            }
-            if let range = range {
-                request.headers.add(name: "range", value: "bytes=\(range)")
-            }
-            request.headers.add(contentsOf: self.headers)
-            request.headers.add(contentsOf: headers)
-            return request
-        }()
-
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
 
         var i = 0
         while true {
             i += 1
             do {
+                var request = HTTPClientRequest(url: url)
+                request.method = method
+                if let user = user, let password = password {
+                    // Request need to be signed in the retry loop because the signature expires after 15 minutes
+                    if url.contains(".your-objectstorage.com") {
+                        let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+                        try signer.sign(request: &request, body: nil)
+                    } else {
+                        request.setBasicAuth(username: user, password: password)
+                    }
+                }
+                if let range = range {
+                    request.headers.add(name: "range", value: "bytes=\(range)")
+                }
+                request.headers.add(contentsOf: self.headers)
+                request.headers.add(contentsOf: headers)
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     // await print(try response.body.collect(upTo: 10000000).readStringImmutable())
