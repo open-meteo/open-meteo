@@ -164,7 +164,7 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
             return (100, 0)
         case .shortwave_radiation:
             return (1 / (6*3600), 0)
-        case .precipitation:
+        case .precipitation, .snowfall_water_equivalent:
             return (1000, 0) // meters to millimeter
         default:
             return nil

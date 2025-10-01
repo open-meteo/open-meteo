@@ -45,7 +45,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     
     //case sea_surface_temperature
     //case boundary_layer_height
-    //case snow_density
+    case snow_density
 
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
@@ -87,6 +87,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .roughness_length: return 1 // CHECK SCALE
         case .albedo: return 1
         case .k_index: return 100
+        case .snow_density: return 10
         }
     }
 
@@ -160,6 +161,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .linear
         case .k_index:
             return .linear
+        case .snow_density:
+            return .hermite(bounds: nil)
         }
     }
 
@@ -260,6 +263,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .roughness_length: return .metre
         case .albedo: return .percentage
         case .k_index: return .dimensionless
+        case .snow_density: return .kilogramPerCubicMetre
         }
     }
 
@@ -368,6 +372,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "tp"
         case .total_column_integrated_water_vapour:
             return "tcwv"
+        case .snow_density:
+            return "rsn"
         }
     }
 
