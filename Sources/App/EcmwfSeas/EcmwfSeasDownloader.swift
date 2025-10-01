@@ -127,8 +127,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
         let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
         
-        // TODO need model elevation!!
-        
         let deaverager = GribDeaverager()
         for month in 0...6 {
             let monthTimestamp = run.toYearMonth().advanced(by: month).timestamp
