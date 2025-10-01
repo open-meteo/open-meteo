@@ -123,7 +123,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
             /*if !(v.variable == .T_SO || v.variable == .W_SO) {
                 continue
             }*/
-            let url = "https://mmeteohub.agenziaitaliameteo.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
+            let url = "https://meteohub.agenziaitaliameteo.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
             let deaverager = GribDeaverager()
             for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                 let attributes = try message.getAttributes()
