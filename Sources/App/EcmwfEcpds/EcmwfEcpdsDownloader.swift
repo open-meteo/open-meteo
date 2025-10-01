@@ -130,7 +130,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     /// Download ECMWF ifs open data
     func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, variables: [EcmwfEcdpsIfsVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.http1Client, retryUnauthorized: false)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryUnauthorized: false)
         Process.alarm(seconds: 4 * 3600)
         defer { Process.alarm(seconds: 0) }
 
