@@ -72,11 +72,11 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         let runString = run.format_YYYYMMddHH
 
         let grid = domain.grid
-        let urlLand = "https://meteohub.mistralportal.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/FR_LAND/icon_2I_\(runString)_surface-0.grib"
+        let urlLand = "https://meteohub.agenziaitaliameteo.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/FR_LAND/icon_2I_\(runString)_surface-0.grib"
         /// fraction 0=sea, 1=land
         let landmask = try await curl.downloadGrib(url: urlLand, bzip2Decode: false)[0].to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
 
-        let urlElevation = "https://meteohub.mistralportal.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/HSURF/icon_2I_\(runString)_surface-0.grib"
+        let urlElevation = "https://meteohub.agenziaitaliameteo.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/HSURF/icon_2I_\(runString)_surface-0.grib"
         var elevation = try await curl.downloadGrib(url: urlElevation, bzip2Decode: false)[0].to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
 
         for i in elevation.array.data.indices {
@@ -123,7 +123,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
             /*if !(v.variable == .T_SO || v.variable == .W_SO) {
                 continue
             }*/
-            let url = "https://meteohub.mistralportal.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
+            let url = "https://mmeteohub.agenziaitaliameteo.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
             let deaverager = GribDeaverager()
             for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                 let attributes = try message.getAttributes()
