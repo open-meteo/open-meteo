@@ -52,7 +52,18 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     }
     
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .seas5_6hourly:
+            return .ecmwf_seas5_6hourly
+        case .seas5_12hourly:
+            return .ecmwf_seas5_12hourly
+        case .seas5_24hourly:
+            return .ecmwf_seas5_6hourly
+        case .seas5_monthly_upper_level:
+            return .ecmwf_seas5_12hourly
+        case .seas5_monthly:
+            return .ecmwf_seas5_6hourly
+        }
     }
     
     var dtSeconds: Int {
