@@ -1426,6 +1426,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case shortwave_radiation_instant
     case showers
     case skin_temperature
+    case snow_density
     case snow_depth
     case snow_depth_water_equivalent
     case snow_height
@@ -1658,6 +1659,8 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
     case wind_speed
     case winddirection
     case wind_direction
+    case wind_u_component
+    case wind_v_component
     case dewpoint
     case dew_point
     case cloudcover
@@ -1687,6 +1690,8 @@ enum ForecastHeightVariableType: String, GenericVariableMixable {
     case wind_speed
     case winddirection
     case wind_direction
+    case wind_u_component
+    case wind_v_component
     case dewpoint
     case dew_point
     case cloudcover
