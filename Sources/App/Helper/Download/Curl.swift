@@ -73,12 +73,6 @@ final class Curl: Sendable {
         self.retryUnauthorized = retryUnauthorized
     }
 
-    deinit {
-        // after downloads completed, memory might be a mess
-        // trim it, before starting to convert data
-        chelper_malloc_trim()
-    }
-
     public func printStatistics() async {
         await totalBytesTransfered.printStatistics(logger: logger)
     }

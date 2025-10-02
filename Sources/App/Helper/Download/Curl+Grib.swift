@@ -33,13 +33,11 @@ extension Curl {
                     for try await m in response.body.tracker(tracker).sha256verify(checksum).decompressBzip2().decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
-                        chelper_malloc_trim()
                     }
                 } else {
                     for try await m in response.body.tracker(tracker).sha256verify(checksum).decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
-                        chelper_malloc_trim()
                     }
                 }
                 let trackerTransfered = await tracker.transfered
