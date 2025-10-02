@@ -98,9 +98,9 @@ Notes:
 30 1,4,7,10,13,16,19,22  * * * /usr/local/bin/openmeteo-api download icon-d2-eps --only-variables temperature_850hPa,temperature_500hPa,geopotential_height_850hPa,geopotential_height_500hPa > ~/log/icon-d2-eps_upper.log 2>&1 || cat ~/log/icon-d2-eps_upper.log
 
 # ECMWF
-45 7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
+35 7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs04_ensemble > ~/log/ifs04_ensemble.log 2>&1 || cat ~/log/ifs04_ensemble.log
-45 7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs025_ensemble --concurrent 4 > ~/log/ifs025_ensemble.log 2>&1 || cat ~/log/ifs025_ensemble.log
+35 7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs025_ensemble --concurrent 4 > ~/log/ifs025_ensemble.log 2>&1 || cat ~/log/ifs025_ensemble.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --domain ifs025_ensemble --concurrent 4 > ~/log/ifs025_ensemble.log 2>&1 || cat ~/log/ifs025_ensemble.log
 
 # GEM
@@ -146,9 +146,9 @@ Note:
 30 0 * * * /usr/local/bin/openmeteo-api download-era5 era5_ocean --only-variables wave_height,wave_direction,wave_period --cdskey xxxxxx-xxxx-xxx... > ~/log/era5_ocean.log 2>&1 || cat ~/log/era5_ocean.log
 
 # ECMWF WAM
-45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025 > ~/log/ecmwf_wam025.log 2>&1 || cat ~/log/ecmwf_wam025.log
+35  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025 > ~/log/ecmwf_wam025.log 2>&1 || cat ~/log/ecmwf_wam025.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025 > ~/log/ecmwf_wam025.log 2>&1 || cat ~/log/ecmwf_wam025.log
-45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025_ens > ~/log/ecmwf_wam025_ens.log 2>&1 || cat ~/log/ecmwf_wam025_ens.log
+35  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025_ens > ~/log/ecmwf_wam025_ens.log 2>&1 || cat ~/log/ecmwf_wam025_ens.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain wam025_ens > ~/log/ecmwf_wam025_ens.log 2>&1 || cat ~/log/ecmwf_wam025_ens.log
 
 # MeteoFrance
