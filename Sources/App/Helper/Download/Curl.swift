@@ -88,12 +88,14 @@ final class Curl: Sendable {
         let deadline = deadline ?? self.deadline
         
         if _url.starts(with: "file://") {
-            guard let data = try FileHandle(forReadingAtPath: String(_url.dropFirst(7)))?.readToEnd() else {
-                fatalError("Could not read file \(_url.dropFirst(7))")
-            }
+            let path = FilePath(String(_url.dropFirst(7)))
+            let handle = try await FileSystem.shared.openFile(forReadingAt: path)
+            let size = Int(try await handle.info().size)
             var headers = HTTPHeaders()
-            headers.add(name: "content-length", value: "\(data.count)")
-            return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
+            headers.add(name: "content-length", value: "\(size)")
+            return HTTPClientResponse(status: .ok, headers: headers, body: .stream(handle.readChunks().finalizer {
+                try await handle.close()
+            }))
         }
 
         // Ensure sufficient wait time using head requests
