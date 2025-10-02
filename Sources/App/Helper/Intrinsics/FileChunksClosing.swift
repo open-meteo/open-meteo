@@ -1,7 +1,7 @@
 import NIOFileSystem
 import NIOCore
 
-struct FileChunksClosing: AsyncSequence, Sendable {
+struct FileChunksClosing: AsyncSequence {
     let handle: ReadFileHandle
     let chunkLength: ByteCount
     
