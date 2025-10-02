@@ -426,7 +426,7 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
         case .lightning_potential:
             return .linear
         case .wind_gusts_10m:
-            return .linear
+            return .hermite(bounds: 0...10e9)
         case .snowfall_height:
             return .linear
         case .freezing_level_height:

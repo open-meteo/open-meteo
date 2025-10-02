@@ -100,7 +100,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_200m, .wind_v_component_200m:
             return .hermite(bounds: nil)
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .dew_point_2m:
             return .hermite(bounds: nil)
         case .cloud_cover:

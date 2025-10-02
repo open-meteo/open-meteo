@@ -122,7 +122,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .wind_speed_10m, .wind_speed_50m, .wind_speed_100m, .wind_speed_200m, .wind_speed_300m:
-            return .hermite(bounds: 0...1000)
+            return .hermite(bounds: 0...10e9)
         case .rain, .precipitation:
             return .backwards_sum
         case .snowfall_water_equivalent:
@@ -130,7 +130,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .snow_depth_water_equivalent:
             return .linear
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation:
             return .solar_backwards_averaged
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
@@ -240,7 +240,7 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
         case .temperature:
             return .hermite(bounds: nil)
         case .wind_speed:
-            return .hermite(bounds: 0...1000)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction:
             return .linearDegrees
         case .geopotential_height:

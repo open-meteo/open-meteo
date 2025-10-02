@@ -148,7 +148,7 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .precipitation:
             return .backwards_sum
         case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return .linearDegrees
         case .surface_temperature:
@@ -174,7 +174,7 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
         case .showers:
             return .backwards_sum
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
         case .visibility:
