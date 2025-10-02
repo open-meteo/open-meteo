@@ -188,12 +188,12 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                                 continue
                             }
                             let count = await inMemoryAccumulated.data.count
-                            logger.info("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
-                    logger.info("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
+                    logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
                     // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }

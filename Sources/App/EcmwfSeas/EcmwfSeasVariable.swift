@@ -327,7 +327,7 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     }
 }
 
-/// Only available as 6-hourly data in N160 grid
+/// Only available as 12-hourly data in N160 grid
 /// Model levels 85/87/89 https://confluence.ecmwf.int/display/UDOC/L91+model+level+definitions
 /// 85=309.04m, 87=167.39m, 89=67.88m
 enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
