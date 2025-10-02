@@ -3,7 +3,7 @@ import Vapor
 import AsyncHTTPClient
 import CHelper
 import NIOCore
-import _NIOFileSystem
+import NIOFileSystem
 
 enum CurlError: Error {
     // case noGribMessagesMatch
@@ -93,9 +93,7 @@ final class Curl: Sendable {
             let size = Int(try await handle.info().size)
             var headers = HTTPHeaders()
             headers.add(name: "content-length", value: "\(size)")
-            return HTTPClientResponse(status: .ok, headers: headers, body: .stream(handle.readChunks().finalizer {
-                try await handle.close()
-            }))
+            return HTTPClientResponse(status: .ok, headers: headers, body: .stream(handle.readChunksAndClose()))
         }
 
         // Ensure sufficient wait time using head requests

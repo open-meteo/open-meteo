@@ -1,5 +1,5 @@
 // Wraps an AsyncSequence and executes a finalizer when the sequence finishes.
-struct AsyncSequenceWithFinalizer<Base: AsyncSequence>: AsyncSequence, Sendable where Base: Sendable {
+/*struct AsyncSequenceWithFinalizer<Base: AsyncSequence>: AsyncSequence, Sendable where Base: Sendable {
     typealias Element = Base.Element
     typealias AsyncIterator = Iterator
 
@@ -14,15 +14,11 @@ struct AsyncSequenceWithFinalizer<Base: AsyncSequence>: AsyncSequence, Sendable 
     struct Iterator: AsyncIteratorProtocol {
         var baseIterator: Base.AsyncIterator
         let finalizer: @Sendable () async throws -> Void
-        var didFinish = false
 
         mutating func next() async throws -> Base.Element? {
-            if didFinish { return nil }
-
             if let element = try await baseIterator.next() {
                 return element
             } else {
-                didFinish = true
                 try await finalizer()
                 return nil
             }
@@ -40,3 +36,4 @@ extension AsyncSequence where Self: Sendable {
         return AsyncSequenceWithFinalizer(base: self, finalizer: finalizer)
     }
 }
+*/
