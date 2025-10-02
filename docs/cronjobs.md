@@ -39,11 +39,9 @@ This document lists all required cronjobs to download data. However, downloading
 0 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gfs-graphcast graphcast025 --concurrent 4 > ~/log/graphcast025.log  2>&1 || cat ~/log/graphcast025.log
 
 # ECMWF
-45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
-0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 > ~/log/ecmwf.log 2>&1 || cat ~/log/ecmwf.log
-45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain ifs025 > ~/log/ecmwf025.log 2>&1 || cat ~/log/ecmwf025.log
+35  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain ifs025 > ~/log/ecmwf025.log 2>&1 || cat ~/log/ecmwf025.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain ifs025 > ~/log/ecmwf025.log 2>&1 || cat ~/log/ecmwf025.log
-45  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain aifs025 > ~/log/ecmwfa025.log 2>&1 || cat ~/log/ecmwfa025.log
+35  7,19 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain aifs025 > ~/log/ecmwfa025.log 2>&1 || cat ~/log/ecmwfa025.log
 0  1,13 * * * /usr/local/bin/openmeteo-api download-ecmwf --concurrent 4 --domain aifs025 > ~/log/ecmwfa025.log 2>&1 || cat ~/log/ecmwfa025.log
 
 # UK Met Office
