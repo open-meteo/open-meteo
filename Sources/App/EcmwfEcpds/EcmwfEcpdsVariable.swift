@@ -27,7 +27,9 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     case showers
     case visibility
     case roughness_length
-    case snow_depth_water_equivalent
+    
+    /// Snow depth is retrieved as snow water equivalent and converted using snow density to the actual depth
+    case snow_depth
     case direct_radiation
     case albedo
     case temperature_2m
@@ -75,7 +77,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .soil_moisture_7_to_28cm: return 1000
         case .soil_moisture_28_to_100cm: return 1000
         case .soil_moisture_100_to_255cm: return 1000
-        case .snow_depth_water_equivalent: return 10
+        case .snow_depth: return 100
         //case .boundary_layer_height: return 0.2 // 5m resolution
         case .total_column_integrated_water_vapour: return 10
         //case .sea_surface_temperature: return 20
@@ -115,7 +117,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .hermite(bounds: nil)
         case .snowfall_water_equivalent:
             return .backwards_sum
-        case .snow_depth_water_equivalent:
+        case .snow_depth:
             return .linear
         case .soil_temperature_0_to_7cm:
             return .hermite(bounds: nil)
@@ -251,7 +253,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .soil_moisture_7_to_28cm: return .cubicMetrePerCubicMetre
         case .soil_moisture_28_to_100cm: return .cubicMetrePerCubicMetre
         case .soil_moisture_100_to_255cm: return .cubicMetrePerCubicMetre
-        case .snow_depth_water_equivalent: return .millimetre
+        case .snow_depth: return .metre
         //case .boundary_layer_height: return .metre
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         //case .sea_surface_temperature: return .celsius
@@ -342,7 +344,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "vis"
         case .roughness_length:
             return "fsr"
-        case .snow_depth_water_equivalent:
+        case .snow_depth:
             return "sd"
         case .direct_radiation:
             return "fdir"
@@ -391,7 +393,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             //return (1 / 100, 0)
         case .albedo:
             return (100, 0)
-        case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth_water_equivalent:
+        case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth:
             return (1000, 0) // meters to millimetre
         case .shortwave_radiation, .direct_radiation:
             return (1 / Float(dtSeconds), 0) // joules to watt

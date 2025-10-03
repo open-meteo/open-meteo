@@ -156,7 +156,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             if variables.isEmpty {
                 return []
             }
-            //let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
+            let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
             let file = hour == 0 ? 11 : 1
             let prefix = run.hour % 12 == 0 ? "D" : "S"
             let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3))"
@@ -204,6 +204,15 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
+                if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {
+                    await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    try await inMemory.calculateSnowDepth(density: .snow_density, waterEquivalent: .snow_depth, outVariable: EcmwfEcdpsIfsVariable.snow_depth, writer: writer)
+                    if variable == .snow_depth {
+                        return
+                    }
                 }
 
                 /*if variable == .temperature_2m {
