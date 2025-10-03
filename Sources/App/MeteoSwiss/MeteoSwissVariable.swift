@@ -123,11 +123,11 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .wind_u_component_10m, .wind_v_component_10m:
-            return .hermite(bounds: 0...1000)
+            return .hermite(bounds: nil)
         case .precipitation:
             return .backwards_sum
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation, .direct_radiation:
             return .hermite(bounds: 0...10e9)
         case .freezing_level_height:
@@ -331,7 +331,7 @@ struct MeteoSwissPressureVariable: PressureVariableRespresentable, MeteoSwissVar
         case .temperature:
             return .hermite(bounds: nil)
         case .wind_speed:
-            return .hermite(bounds: 0...1000)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction:
             return .linearDegrees
         case .geopotential_height:
@@ -440,7 +440,7 @@ struct MeteoSwissHeightVariable: HeightVariableRespresentable, MeteoSwissVariabl
         case .temperature:
             return .hermite(bounds: nil)
         case .wind_u_component, .wind_v_component:
-            return .hermite(bounds: 0...1000)
+            return .hermite(bounds: nil)
         case .pressure:
             return .hermite(bounds: 0...100)
         }

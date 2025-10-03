@@ -361,15 +361,15 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .temperature_2m:
             return .hermite(bounds: nil)
         case .wind_speed_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction_10m:
             return .linearDegrees
         case .wind_speed_100m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction_100m:
             return .linearDegrees
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .cloud_cover_low:

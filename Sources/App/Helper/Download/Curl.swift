@@ -3,7 +3,7 @@ import Vapor
 import AsyncHTTPClient
 import CHelper
 import NIOCore
-import _NIOFileSystem
+import NIOFileSystem
 
 enum CurlError: Error {
     // case noGribMessagesMatch
@@ -73,12 +73,6 @@ final class Curl: Sendable {
         self.retryUnauthorized = retryUnauthorized
     }
 
-    deinit {
-        // after downloads completed, memory might be a mess
-        // trim it, before starting to convert data
-        chelper_malloc_trim()
-    }
-
     public func printStatistics() async {
         await totalBytesTransfered.printStatistics(logger: logger)
     }
@@ -88,12 +82,12 @@ final class Curl: Sendable {
         let deadline = deadline ?? self.deadline
         
         if _url.starts(with: "file://") {
-            guard let data = try FileHandle(forReadingAtPath: String(_url.dropFirst(7)))?.readToEnd() else {
-                fatalError("Could not read file \(_url.dropFirst(7))")
-            }
+            let path = FilePath(String(_url.dropFirst(7)))
+            let handle = try await FileSystem.shared.openFile(forReadingAt: path)
+            let size = Int(try await handle.info().size)
             var headers = HTTPHeaders()
-            headers.add(name: "content-length", value: "\(data.count)")
-            return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
+            headers.add(name: "content-length", value: "\(size)")
+            return HTTPClientResponse(status: .ok, headers: headers, body: .stream(handle.readChunksAndClose()))
         }
 
         // Ensure sufficient wait time using head requests
@@ -133,32 +127,28 @@ final class Curl: Sendable {
                 logger.info("Downloading file \(url)")
             }
         }
-
-        let request = try {
-            var request = HTTPClientRequest(url: url)
-            request.method = method
-            if let user = user, let password = password {
-                if url.contains(".your-objectstorage.com") {
-                    let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
-                    try signer.sign(request: &request, body: nil)
-                } else {
-                    request.setBasicAuth(username: user, password: password)
-                }
-            }
-            if let range = range {
-                request.headers.add(name: "range", value: "bytes=\(range)")
-            }
-            request.headers.add(contentsOf: self.headers)
-            request.headers.add(contentsOf: headers)
-            return request
-        }()
-
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
 
         var i = 0
         while true {
             i += 1
             do {
+                var request = HTTPClientRequest(url: url)
+                request.method = method
+                if let user = user, let password = password {
+                    // Request need to be signed in the retry loop because the signature expires after 15 minutes
+                    if url.contains(".your-objectstorage.com") {
+                        let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
+                        try signer.sign(request: &request, body: nil)
+                    } else {
+                        request.setBasicAuth(username: user, password: password)
+                    }
+                }
+                if let range = range {
+                    request.headers.add(name: "range", value: "bytes=\(range)")
+                }
+                request.headers.add(contentsOf: self.headers)
+                request.headers.add(contentsOf: headers)
                 let response = try await client.execute(request, timeout: .seconds(Int64(readTimeout)))
                 if response.status != .ok && response.status != .partialContent {
                     // await print(try response.body.collect(upTo: 10000000).readStringImmutable())

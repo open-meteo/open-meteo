@@ -104,7 +104,7 @@ enum KmaSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .snowfall_water_equivalent, .snowfall_water_equivalent_convective: // , .snow_depth_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
         case .cape:

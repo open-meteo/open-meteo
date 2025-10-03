@@ -364,9 +364,9 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case .relative_humidity_2m_mean:
             return .hermite(bounds: 0...100)
         case .wind_speed_10m_mean:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .wind_speed_10m_max:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .soil_moisture_0_to_10cm_mean:
             return .hermite(bounds: nil)
         case .shortwave_radiation_sum:

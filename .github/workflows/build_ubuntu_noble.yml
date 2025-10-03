@@ -12,7 +12,7 @@ env:
 jobs:
   linux:
     runs-on: ubuntu-24.04
-    container: ghcr.io/open-meteo/docker-container-build:latest
+    container: ghcr.io/open-meteo/docker-container-build-noble:latest
     name: Linux
     steps:
     - name: Get Swift Version

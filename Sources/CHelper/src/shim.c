@@ -49,7 +49,7 @@ void windirectionFast(const size_t num_points, const float* ys, const float* xs,
 }
 
 
-#include <stdio.h>
+/*#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -85,7 +85,7 @@ void display_mallinfo2(void) {
    printf("Total free space (fordblks):           %zu\n", mi.fordblks);
    printf("Topmost releasable block (keepcost):   %zu\n", mi.keepcost);
 }
-#endif
+#endif*/
 
 
 

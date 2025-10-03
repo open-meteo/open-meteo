@@ -303,7 +303,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         case .weather_code:
             return .backwards
         case .wind_speed_10m:
-            return .hermite(bounds: 0...10e6)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction_10m:
             return .linearDegrees
         case .soil_temperature_0cm:
@@ -337,7 +337,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         case .lightning_potential:
             return .linear
         case .wind_gusts_10m:
-            return .linear
+            return .hermite(bounds: 0...10e9)
         case .snowfall_height:
             return .linear
         case .freezing_level_height:
@@ -460,7 +460,7 @@ struct ItaliaMeteoArpaePressureVariable: PressureVariableRespresentable, Generic
         case .temperature:
             return .hermite(bounds: nil)
         case .wind_speed:
-            return .hermite(bounds: 0...10e6)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction:
             return .linearDegrees
         case .geopotential_height:

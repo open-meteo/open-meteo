@@ -154,7 +154,8 @@ fileprivate final actor RemoteFileManagerCache {
     var statistics: Statistics = .init()
     
     /// On cache miss, create a new reader
-    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
+    /// If `forceNew` is set, do not use cached meta data
+    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
         let localFile = key.getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
             let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
@@ -171,8 +172,8 @@ fileprivate final actor RemoteFileManagerCache {
             return (nil, .now())
         }
         let now = Timestamp.now()
-                
-        switch HttpMetaCache.get(url: remoteFile) {
+        let cachedFileMeta = forceNew ? HttpMetaCache.State.missing(lastValidated: Timestamp(0)) : HttpMetaCache.get(url: remoteFile)
+        switch cachedFileMeta {
         case .missing(let lastValidated):
             let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
             if lastValidated >= now.subtract(seconds: revalidateSeconds) {
@@ -221,7 +222,7 @@ fileprivate final actor RemoteFileManagerCache {
             // Value not cached or needs to be refreshed
             cache[key] = .running([])
             do {
-                let (data, lastValidated) = try await open(key: key.key, client: client, logger: logger)
+                let (data, lastValidated) = try await open(key: key.key, client: client, logger: logger, forceNew: forceNew)
                 guard case .running(let queued) = cache.updateValue(.cached(.init(value: data, lastValidated: lastValidated)), forKey: key) else {
                     fatalError("State was not .running()")
                 }

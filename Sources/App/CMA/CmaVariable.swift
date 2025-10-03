@@ -243,7 +243,7 @@ enum CmaSurfaceVariable: String, CaseIterable, GenericVariableMixable, CmaVariab
         case .showers:
             return .backwards_sum
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation:
             return .solar_backwards_averaged
         case .cape:

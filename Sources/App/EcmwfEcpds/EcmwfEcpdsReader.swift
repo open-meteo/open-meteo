@@ -69,6 +69,8 @@ enum EcmwfEcdpsIfsVariableDerived: String, GenericVariableMixable {
     case soil_moisture_index_28_to_100cm
     case soil_moisture_index_100_to_255cm
     case soil_moisture_index_0_to_100cm
+    
+    case snow_depth_water_equivalent
 
     var requiresOffsetCorrectionForMixing: Bool {
         return false
@@ -179,7 +181,8 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             let precipitation = try await get(raw: .precipitation, time: time)
             let snow = try await get(raw: .snowfall_water_equivalent, time: time).data
             let showers = try await get(raw: .showers, time: time).data
-            return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map { max($0 - $1.0 - $1.1, 0) }, .millimetre)
+            // Showers may be 0 before october 2025
+            return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map { max($0 - $1.0 - ($1.1.isNaN ? 0 : $1.1), 0) }, .millimetre)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .soil_temperature_0cm, .skin_temperature:
@@ -351,6 +354,12 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             }
             let soilMoisture = try await get(derived: .soil_moisture_0_to_100cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .snow_depth_water_equivalent:
+            // snow depth in metre
+            // water equivalent in millimetre, density in kg/m3
+            let depth = try await get(raw: .snow_depth, time: time)
+            let density = try await get(raw: .snow_density, time: time)
+            return DataAndUnit(zip(depth.data, density.data).map({$0*$1}), .millimetre)
         }
     }
 
@@ -458,6 +467,9 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(derived: .soil_moisture_0_to_100cm, time: time)
         case .sunshine_duration:
             try await prefetchData(raw: .direct_radiation, time: time)
+        case .snow_depth_water_equivalent:
+            try await prefetchData(raw: .snow_density, time: time)
+            try await prefetchData(raw: .snow_depth, time: time)
         }
     }
 }

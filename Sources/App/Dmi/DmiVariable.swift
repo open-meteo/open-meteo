@@ -135,7 +135,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .snowfall_water_equivalent: // , .snow_depth_water_equivalent:
             return .backwards_sum
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .shortwave_radiation, .direct_radiation:
             return .solar_backwards_averaged
         case .temperature_50m, .temperature_100m, .temperature_150m, .temperature_250m:

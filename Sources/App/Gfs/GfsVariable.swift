@@ -230,7 +230,7 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .categorical_freezing_rain:
             return .backwards
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .freezing_level_height:
             return .linear
         case .shortwave_radiation:

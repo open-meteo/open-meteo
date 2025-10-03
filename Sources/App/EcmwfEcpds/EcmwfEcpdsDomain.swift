@@ -5,7 +5,7 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     func getDownloadForecastSteps(run: Int) -> [Int] {
         switch run {
         case 0, 12: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3)) + Array(stride(from: 150, through: 360, by: 6))
-        case 6, 18: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3)) + Array(stride(from: 150, through: 240, by: 6))
+        case 6, 18: return Array(stride(from: 0, through: 90, by: 1)) +  Array(stride(from: 93, through: 144, by: 3))
         default: fatalError("Invalid run")
         }
     }

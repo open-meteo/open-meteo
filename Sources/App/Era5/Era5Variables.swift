@@ -187,7 +187,9 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return .hermite(bounds: nil)
         case .wind_v_component_10m, .wind_v_component_10m_spread:
             return .hermite(bounds: nil)
-        case .wind_gusts_10m, .wind_gusts_10m_spread:
+        case .wind_gusts_10m:
+            return .hermite(bounds: 0...10e9)
+        case .wind_gusts_10m_spread:
             return .hermite(bounds: nil)
         case .dew_point_2m, .dew_point_2m_spread:
             return .hermite(bounds: nil)
