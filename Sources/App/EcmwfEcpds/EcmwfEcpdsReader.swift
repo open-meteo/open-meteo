@@ -181,7 +181,8 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             let precipitation = try await get(raw: .precipitation, time: time)
             let snow = try await get(raw: .snowfall_water_equivalent, time: time).data
             let showers = try await get(raw: .showers, time: time).data
-            return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map { max($0 - $1.0 - $1.1, 0) }, .millimetre)
+            // Showers may be 0 before october 2025
+            return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map { max($0 - $1.0 - ($1.1.isNaN ? 0 : $1.1), 0) }, .millimetre)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
         case .soil_temperature_0cm, .skin_temperature:
