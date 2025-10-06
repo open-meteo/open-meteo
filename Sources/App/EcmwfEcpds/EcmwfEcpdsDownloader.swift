@@ -159,9 +159,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
             let file = hour == 0 ? 11 : 1
             let prefix = run.hour % 12 == 0 ? "D" : "S"
-            let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3))"
+            let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3)).bz2"
             
-            try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
+            try await curl.downloadGrib(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName"),
                       let unit = message.get(attribute: "units"),
                       let stepRange = message.get(attribute: "stepRange"),
