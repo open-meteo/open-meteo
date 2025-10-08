@@ -208,7 +208,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
     func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil) async throws -> Response {
-        if case .xlsx(_) = format, results.count > 100 {
+        if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
         for location in results {

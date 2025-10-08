@@ -59,7 +59,9 @@ extension ForecastapiResult {
 extension ApiSectionSingle {
     fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
-            b.buffer.writeString("\n")
+            if b.buffer.writerIndex != 0 {
+                b.buffer.writeString("\n")
+            }
             if location_id != nil {
                 b.buffer.writeString("location_id,time")
             } else {
@@ -93,7 +95,9 @@ extension ApiSectionString {
     /// Write a single API section into the output buffer
     fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
-            b.buffer.writeString("\n")
+            if b.buffer.writerIndex != 0 {
+                b.buffer.writeString("\n")
+            }
             if location_id != nil {
                 b.buffer.writeString("location_id,time")
             } else {
