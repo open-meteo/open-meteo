@@ -129,13 +129,13 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     var formatWithOptions: ForecastResultFormatWithOptions {
         switch format {
         case .none, .json:
-            return .json
+            return .json()
         case .xlsx:
-            return .xlsx(location_information ?? .section)
+            return .xlsx(locationInformation: location_information ?? .section)
         case .csv:
-            return .csv(location_information ?? .section)
+            return .csv(locationInformation: location_information ?? .section)
         case .flatbuffers:
-            return .flatbuffers
+            return .flatbuffers()
         }
     }
 

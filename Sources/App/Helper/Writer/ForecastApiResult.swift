@@ -9,7 +9,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
-    func response(format: ForecastResultFormatWithOptions?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?) async throws -> Response
 
     var numberOfLocations: Int { get }
 }
@@ -207,7 +207,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormatWithOptions?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil) async throws -> Response {
         if case .xlsx(_) = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
@@ -216,24 +216,24 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
                 try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables, monthlyVariables: variables.monthlyVariables)
             }
         }
-        switch format ?? .json {
-        case .json:
+        switch format ?? .json() {
+        case .json(let fixedGenerationTime):
             return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
-        case .xlsx(let options):
-            switch options {
+        case .xlsx(let timestamp, let locationInformation):
+            switch locationInformation {
             case .omit:
                 return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: false)
             case .section:
                 return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: true)
             }
-        case .csv(let options):
-            switch options {
+        case .csv(let locationInformation):
+            switch locationInformation {
                 case .omit:
                     return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false)
                 case .section:
                     return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true)
             }
-        case .flatbuffers:
+        case .flatbuffers(let fixedGenerationTime):
             return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
         }
     }
@@ -361,10 +361,13 @@ enum ForecastResultFormat: String, Codable {
 }
 
 enum ForecastResultFormatWithOptions {
-    case json
-    case xlsx(_ options: OutputLocationInformation)
-    case csv(_ options: OutputLocationInformation)
-    case flatbuffers
+    /// fixedGenerationTime is used to overwrite dynamic fields in unit tests
+    case json(fixedGenerationTime: Double? = nil)
+    /// timestamp is used to overwrite dynamic fields in unit tests
+    case xlsx(timestamp: Timestamp = .now(), locationInformation: OutputLocationInformation = .section)
+    case csv(locationInformation: OutputLocationInformation = .section)
+    /// fixedGenerationTime is used to overwrite dynamic fields in unit tests
+    case flatbuffers(fixedGenerationTime: Double? = nil)
 }
 
 /// Simplify flush commands
