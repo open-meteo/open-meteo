@@ -68,8 +68,10 @@ extension ForecastapiResult {
 extension ApiSectionString {
     fileprivate func writeXlsx(into sheet: XlsxWriter, utc_offset_seconds: Int, location_id: Int?) throws {
         if location_id == nil || location_id == 0 {
-            sheet.startRow()
-            sheet.endRow()
+            if !sheet.isFirstRow {
+                sheet.startRow()
+                sheet.endRow()
+            }
             sheet.startRow()
             if location_id != nil {
                 sheet.write("location_id")
@@ -103,8 +105,10 @@ extension ApiSectionString {
 extension ApiSectionSingle {
     fileprivate func writeXlsx(into sheet: XlsxWriter, utc_offset_seconds: Int, location_id: Int?) throws {
         if location_id == nil || location_id == 0 {
-            sheet.startRow()
-            sheet.endRow()
+            if !sheet.isFirstRow {
+                sheet.startRow()
+                sheet.endRow()
+            }
             sheet.startRow()
             if location_id != nil {
                 sheet.write("location_id")
