@@ -41,7 +41,7 @@ fileprivate struct DemResponder: ForecastapiResponder {
         return Float(nVariablesModels ?? latitude.count)
     }
 
-    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response {
+    func response(format: ForecastResultFormatWithOptions?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response {
         let elevation = try await zip(latitude, longitude).asyncMap { latitude, longitude in
             try await Dem90.read(lat: latitude, lon: longitude, logger: logger, httpClient: httpClient)
         }

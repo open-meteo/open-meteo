@@ -37,6 +37,12 @@ enum ApiTemporalResolution: String, Codable {
     }
 }
 
+enum OutputLocationInformation: String, Codable {
+    case section
+    case omit
+    // case for_each_data_row
+}
+
 /// All API parameter that are accepted and decoded via GET
 struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let latitude: [Float]
@@ -76,6 +82,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let initial_minutely_15: Int?
 
     let format: ForecastResultFormat?
+    let location_information: OutputLocationInformation?
+
     let models: [String]?
     let cell_selection: GridSelectionMode?
 
@@ -100,7 +108,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let start_date: [IsoDate]
     /// included end date `2022-06-01`
     let end_date: [IsoDate]
-    
+
     /// Select an individual run. Format `2022-02-01T00:00`
     let run: IsoDateTime?
 
@@ -116,6 +124,19 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     var timeformatOrDefault: Timeformat {
         return timeformat ?? .iso8601
+    }
+
+    var formatWithOptions: ForecastResultFormatWithOptions {
+        switch format {
+        case .none, .json:
+            return .json
+        case .xlsx:
+            return .xlsx(location_information ?? .section)
+        case .csv:
+            return .csv(location_information ?? .section)
+        case .flatbuffers:
+            return .flatbuffers
+        }
     }
 
     init(from decoder: Decoder) throws {
@@ -148,6 +169,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         initial_hours = try c.decodeIfPresent(Int.self, forKey: .initial_hours)
         initial_minutely_15 = try c.decodeIfPresent(Int.self, forKey: .initial_minutely_15)
         format = try c.decodeIfPresent(ForecastResultFormat.self, forKey: .format)
+        location_information = try c.decodeIfPresent(OutputLocationInformation.self, forKey: .location_information)
         models = try c.decodeIfPresent([String].self, forKey: .models)
         cell_selection = try c.decodeIfPresent(GridSelectionMode.self, forKey: .cell_selection)
         apikey = try c.decodeIfPresent(String.self, forKey: .apikey)
@@ -166,7 +188,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         end_hour = try c.decodeIfPresent([String].self, forKey: .end_hour).map(IsoDateTime.load) ?? []
         start_minutely_15 = try c.decodeIfPresent([String].self, forKey: .start_minutely_15).map(IsoDateTime.load) ?? []
         end_minutely_15 = try c.decodeIfPresent([String].self, forKey: .end_minutely_15).map(IsoDateTime.load) ?? []
-        
+
         if run != nil {
             guard start_date.isEmpty else {
                 throw ForecastApiError.parameterMostNotBeSet(name: "start_date")
@@ -383,18 +405,18 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         let actualUtcOffset = timezone.utcOffsetSeconds
         /// Align data to nearest hour -> E.g. timezones in india may have 15 minutes offsets
         let utcOffset = (actualUtcOffset / 3600) * 3600
-        
+
         // If a single run is selected, start time-range from run
         if let run {
             let current = run.toTimestamp()
             let daily = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_days ?? forecastDaysDefault, initialStep: 0, dtSeconds: 86400)
-            
+
             let defaultForecastHours = (forecast_days ?? forecastDaysDefault)*24
             let hourly = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_hours ?? defaultForecastHours, initialStep: run.hour, dtSeconds: 3600)
-            
+
             let defaultForecastMinutely15 = (forecast_hours ?? defaultForecastHours)*4
             let minutely_15 = Self.forecastTimeRange2(currentTime: current, utcOffset: utcOffset, pastSteps: 0, forecastSteps: forecast_minutely_15 ?? defaultForecastMinutely15, initialStep: run.hour*4, dtSeconds: 900)
-            
+
             return ForecastApiTimeRange(
                 dailyDisplay: daily.add(-1 * actualUtcOffset),
                 dailyRead: daily.add(-1 * utcOffset),

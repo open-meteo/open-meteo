@@ -12,7 +12,7 @@ public final actor ApiKeyManager {
     struct KeyAndLimit: Equatable {
         let key: String.SubSequence
         let limit: Int
-        
+
         static func readApiKeys(path: String) -> [KeyAndLimit] {
             return (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: ",").sorted().map {
                 let parts = $0.split(separator: ";")
@@ -115,7 +115,7 @@ extension Request {
         guard let host = headers[.host].first(where: { $0.contains("open-meteo.com") }) else {
             // localhost or not an openmeteo host
             let params = try parseApiParams()
-            return try await fn(nil, params).response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: nil)
+            return try await fn(nil, params).response(format: params.formatWithOptions, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: nil)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: { host.starts(with: $0) }) == true || isDevNode
@@ -147,7 +147,7 @@ extension Request {
                 throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-            let response = try await responder.response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: slot)
+            let response = try await responder.response(format: params.formatWithOptions, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: slot)
             await RateLimiter.instance.increment(address: address, count: weight)
             return response
         }
@@ -175,7 +175,7 @@ extension Request {
             throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
         }
         let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-        let response = try await responder.response(format: params.format, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: slot)
+        let response = try await responder.response(format: params.formatWithOptions, timestamp: .now(), fixedGenerationTime: nil, concurrencySlot: slot)
         await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         return response
     }

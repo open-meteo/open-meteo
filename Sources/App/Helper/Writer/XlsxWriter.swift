@@ -3,38 +3,41 @@ import Vapor
 
 
 extension ForecastapiResult {
-    func toXlsxResponse(timestamp: Timestamp) async throws -> Response {
+    func toXlsxResponse(timestamp: Timestamp, withLocationHeader: Bool = true) async throws -> Response {
         let multiLocation = results.count > 1
 
         let sheet = try XlsxWriter()
-        sheet.startRow()
-        if multiLocation {
-            sheet.write("location_id")
-        }
-        sheet.write("latitude")
-        sheet.write("longitude")
-        sheet.write("elevation")
-        sheet.write("utc_offset_seconds")
-        sheet.write("timezone")
-        sheet.write("timezone_abbreviation")
-        sheet.endRow()
-
-        for location in results {
+        if withLocationHeader {
             sheet.startRow()
-            guard let first = location.results.first else {
-                continue
-            }
             if multiLocation {
-                sheet.write(location.locationId)
+                sheet.write("location_id")
             }
-            sheet.write(first.latitude, significantDigits: 4)
-            sheet.write(first.longitude, significantDigits: 4)
-            sheet.write(first.elevation ?? .nan, significantDigits: 0)
-            sheet.write(location.utc_offset_seconds)
-            sheet.write(location.timezone.identifier)
-            sheet.write(location.timezone.abbreviation)
+            sheet.write("latitude")
+            sheet.write("longitude")
+            sheet.write("elevation")
+            sheet.write("utc_offset_seconds")
+            sheet.write("timezone")
+            sheet.write("timezone_abbreviation")
             sheet.endRow()
+
+            for location in results {
+                sheet.startRow()
+                guard let first = location.results.first else {
+                    continue
+                }
+                if multiLocation {
+                    sheet.write(location.locationId)
+                }
+                sheet.write(first.latitude, significantDigits: 4)
+                sheet.write(first.longitude, significantDigits: 4)
+                sheet.write(first.elevation ?? .nan, significantDigits: 0)
+                sheet.write(location.utc_offset_seconds)
+                sheet.write(location.timezone.identifier)
+                sheet.write(location.timezone.abbreviation)
+                sheet.endRow()
+            }
         }
+
         for location in results {
             try await location.current(variables: variables.currentVariables)?.writeXlsx(into: sheet, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
         }
