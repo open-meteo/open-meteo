@@ -46,7 +46,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     case total_column_integrated_water_vapour
     
     //case sea_surface_temperature
-    //case boundary_layer_height
+    case boundary_layer_height
     case snow_density
 
     var omFileName: (file: String, level: Int) {
@@ -78,7 +78,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .soil_moisture_28_to_100cm: return 1000
         case .soil_moisture_100_to_255cm: return 1000
         case .snow_depth: return 100
-        //case .boundary_layer_height: return 0.2 // 5m resolution
+        case .boundary_layer_height: return 0.2 // 5m resolution
         case .total_column_integrated_water_vapour: return 10
         //case .sea_surface_temperature: return 20
         case .cape: return 0.1
@@ -141,8 +141,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .backwards_sum
         case .direct_radiation:
             return .solar_backwards_averaged
-        //case .boundary_layer_height:
-        //    return .hermite(bounds: 0...10e9)
+        case .boundary_layer_height:
+            return .hermite(bounds: 0...10e9)
         case .total_column_integrated_water_vapour:
             return .hermite(bounds: nil)
         //case .sea_surface_temperature:
@@ -254,7 +254,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .soil_moisture_28_to_100cm: return .cubicMetrePerCubicMetre
         case .soil_moisture_100_to_255cm: return .cubicMetrePerCubicMetre
         case .snow_depth: return .metre
-        //case .boundary_layer_height: return .metre
+        case .boundary_layer_height: return .metre
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         //case .sea_surface_temperature: return .celsius
         case .cape: return .joulePerKilogram
@@ -376,6 +376,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "tcwv"
         case .snow_density:
             return "rsn"
+        case .boundary_layer_height:
+            return "blh"
         }
     }
 
