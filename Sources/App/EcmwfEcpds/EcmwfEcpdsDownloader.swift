@@ -130,8 +130,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     /// Download ECMWF ifs open data
     func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, variables: [EcmwfEcdpsIfsVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryUnauthorized: false)
-        Process.alarm(seconds: 4 * 3600)
+        // Note 2025-10-08 0z: The delivery for the last forecast hours took more than 4 hours caused by a retry.
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6, retryUnauthorized: false)
+        Process.alarm(seconds: 6 * 3600 + 600)
         defer { Process.alarm(seconds: 0) }
 
         var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
