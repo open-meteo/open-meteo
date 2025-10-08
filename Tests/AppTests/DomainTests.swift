@@ -19,17 +19,13 @@ import Testing
         #expect(slice.yRange == 4..<6)
         #expect(slice.xRange == 7..<9)
         #expect(slice.map { $0 } == [47, 48, 57, 58])
-
+        
         /// Cams Europe grid uses negative dy
         let grid2 = RegularGrid(nx: 700, ny: 420, latMin: 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
         let slice2 = grid2.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.15..<48.5, longitude: 5.0..<11))!
         #expect(slice2.yRange == 234..<268)
         #expect(slice2.xRange == 300..<360)
         #expect(slice2.count == 2040)
-    }
-
-    @Test func gaussianGridSelection() {
-
     }
 
     @Test func gaussianGridSlice() {
