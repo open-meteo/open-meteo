@@ -82,7 +82,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let initial_minutely_15: Int?
 
     let format: ForecastResultFormat?
-    let location_information: OutputLocationInformation?
+    let location_information: OutputLocationInformation
 
     let models: [String]?
     let cell_selection: GridSelectionMode?
@@ -131,9 +131,9 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         case .none, .json:
             return .json()
         case .xlsx:
-            return .xlsx(locationInformation: location_information ?? .section)
+            return .xlsx(locationInformation: location_information)
         case .csv:
-            return .csv(locationInformation: location_information ?? .section)
+            return .csv(locationInformation: location_information)
         case .flatbuffers:
             return .flatbuffers()
         }
@@ -169,7 +169,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         initial_hours = try c.decodeIfPresent(Int.self, forKey: .initial_hours)
         initial_minutely_15 = try c.decodeIfPresent(Int.self, forKey: .initial_minutely_15)
         format = try c.decodeIfPresent(ForecastResultFormat.self, forKey: .format)
-        location_information = try c.decodeIfPresent(OutputLocationInformation.self, forKey: .location_information)
+        location_information = try c.decodeIfPresent(OutputLocationInformation.self, forKey: .location_information) ?? .section
         models = try c.decodeIfPresent([String].self, forKey: .models)
         cell_selection = try c.decodeIfPresent(GridSelectionMode.self, forKey: .cell_selection)
         apikey = try c.decodeIfPresent(String.self, forKey: .apikey)
@@ -179,7 +179,6 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         domains = try c.decodeIfPresent(CamsQuery.Domain.self, forKey: .domains)
         run = try c.decodeIfPresent(IsoDateTime.self, forKey: .run)
 
-        // Provide a default value if missing:
         bounding_box = try (try? c.decodeIfPresent([Float].self, forKey: .bounding_box)) ?? Float.load(commaSeparatedOptional: c.decodeIfPresent([String].self, forKey: .bounding_box)) ?? []
         ensemble = try c.decodeIfPresent(Bool.self, forKey: .ensemble) ?? false
         start_date = try c.decodeIfPresent([String].self, forKey: .start_date).map(IsoDate.load) ?? []
