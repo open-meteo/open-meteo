@@ -7,6 +7,8 @@ import NIOCore
 public final class XlsxWriter {
     let sheet_xml: GzipStream
 
+    private(set) var isFirstRow: Bool = true
+
     static var workbook_xml: ByteBuffer {
         let workbook_xml = try! GzipStream(level: 6, chunkCapacity: 512)
         workbook_xml.write("""
@@ -62,6 +64,7 @@ public final class XlsxWriter {
 
     public func startRow() {
         sheet_xml.write("<row>")
+        isFirstRow = false
     }
 
     public func endRow() {

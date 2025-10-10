@@ -4,26 +4,29 @@ import Vapor
 
 extension ForecastapiResult {
     /// Streaming CSV format. Once 3kb of text is accumulated, flush to next handler -> response compressor
-    func toCsvResponse(concurrencySlot: Int? = nil) throws -> Response {
+    func toCsvResponse(concurrencySlot: Int? = nil, withLocationHeader: Bool = true) throws -> Response {
         let response = Response(body: .init(asyncStream: { writer in
             try await writer.submit(concurrencySlot: concurrencySlot) {
                 var b = BufferAndAsyncWriter(writer: writer)
                 let multiLocation = results.count > 1
 
-                if results.count == 1, let location = results.first, let first = location.results.first {
-                    b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                    let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                    b.buffer.writeString("\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
-                } else {
-                    b.buffer.writeString("location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
-                    for location in results {
-                        guard let first = location.results.first else {
-                            continue
-                        }
+                if withLocationHeader {
+                    if !multiLocation, let location = results.first, let first = location.results.first {
+                        b.buffer.writeString("latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
                         let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
-                        b.buffer.writeString("\(location.locationId),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                        b.buffer.writeString("\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                    } else {
+                        b.buffer.writeString("location_id,latitude,longitude,elevation,utc_offset_seconds,timezone,timezone_abbreviation\n")
+                        for location in results {
+                            guard let first = location.results.first else {
+                                continue
+                            }
+                            let elevation = first.elevation.map({ $0.isFinite ? "\($0)" : "NaN" }) ?? "NaN"
+                            b.buffer.writeString("\(location.locationId),\(first.latitude),\(first.longitude),\(elevation),\(location.utc_offset_seconds),\(location.timezone.identifier),\(location.timezone.abbreviation)\n")
+                        }
                     }
                 }
+
                 for location in results {
                     try await location.current(variables: variables.currentVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
@@ -56,7 +59,9 @@ extension ForecastapiResult {
 extension ApiSectionSingle {
     fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
-            b.buffer.writeString("\n")
+            if b.buffer.writerIndex != 0 {
+                b.buffer.writeString("\n")
+            }
             if location_id != nil {
                 b.buffer.writeString("location_id,time")
             } else {
@@ -90,7 +95,9 @@ extension ApiSectionString {
     /// Write a single API section into the output buffer
     fileprivate func writeCsv(into b: inout BufferAndAsyncWriter, timeformat: Timeformat, utc_offset_seconds: Int, location_id: Int?) async throws {
         if location_id == nil || location_id == 0 {
-            b.buffer.writeString("\n")
+            if b.buffer.writerIndex != 0 {
+                b.buffer.writeString("\n")
+            }
             if location_id != nil {
                 b.buffer.writeString("location_id,time")
             } else {
