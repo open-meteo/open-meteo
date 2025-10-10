@@ -130,8 +130,9 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     /// Download ECMWF ifs open data
     func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, variables: [EcmwfEcdpsIfsVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.http1Client, retryUnauthorized: false)
-        Process.alarm(seconds: 4 * 3600)
+        // Note 2025-10-08 0z: The delivery for the last forecast hours took more than 4 hours caused by a retry.
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6, retryUnauthorized: false)
+        Process.alarm(seconds: 6 * 3600 + 600)
         defer { Process.alarm(seconds: 0) }
 
         var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
@@ -156,12 +157,12 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             if variables.isEmpty {
                 return []
             }
-            //let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
+            let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
             let file = hour == 0 ? 11 : 1
             let prefix = run.hour % 12 == 0 ? "D" : "S"
-            let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3))"
+            let url = "\(server)D1\(prefix)\(run.format_MMddHH)00\(timestamp.format_MMddHH)\(file.zeroPadded(len: 3)).bz2"
             
-            try await curl.downloadGrib(url: url, bzip2Decode: false, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
+            try await curl.downloadGrib(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName"),
                       let unit = message.get(attribute: "units"),
                       let stepRange = message.get(attribute: "stepRange"),
@@ -204,6 +205,15 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 // Scaling before compression with scalefactor
                 if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
+                
+                // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
+                if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {
+                    await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    try await inMemory.calculateSnowDepth(density: .snow_density, waterEquivalent: .snow_depth, outVariable: EcmwfEcdpsIfsVariable.snow_depth, writer: writer)
+                    if variable == .snow_depth {
+                        return
+                    }
                 }
 
                 /*if variable == .temperature_2m {

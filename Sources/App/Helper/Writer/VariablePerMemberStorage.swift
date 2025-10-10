@@ -239,4 +239,14 @@ extension VariablePerMemberStorage {
             try await writer.write(member: t2m.key.member, variable: outVariable, data: rh)
         }
     }
+    
+    /// Calculate snow depth from snow depth water equivalent and snow density. Removes both after use.
+    /// Expects water equivalent in mm
+    /// Density in kg/m3
+    nonisolated func calculateSnowDepth(density: V, waterEquivalent: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        while let (density, water, member) = await getTwoRemoving(first: density, second: waterEquivalent, timestamp: writer.time) {
+            let height = zip(water.data, density.data).map(/)
+            try await writer.write(member: member, variable: outVariable, data: height)
+        }
+    }
 }

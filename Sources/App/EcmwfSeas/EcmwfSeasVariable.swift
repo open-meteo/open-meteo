@@ -164,7 +164,7 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
             return (100, 0)
         case .shortwave_radiation:
             return (1 / (6*3600), 0)
-        case .precipitation:
+        case .precipitation, .snowfall_water_equivalent:
             return (1000, 0) // meters to millimeter
         default:
             return nil
@@ -327,7 +327,7 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     }
 }
 
-/// Only available as 6-hourly data in N160 grid
+/// Only available as 12-hourly data in N160 grid
 /// Model levels 85/87/89 https://confluence.ecmwf.int/display/UDOC/L91+model+level+definitions
 /// 85=309.04m, 87=167.39m, 89=67.88m
 enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {

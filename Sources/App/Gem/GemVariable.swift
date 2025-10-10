@@ -333,11 +333,11 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction_10m, .wind_direction_40m, .wind_direction_80m, .wind_direction_120m:
             return .linearDegrees
         case .wind_gusts_10m:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .showers:
             return .backwards_sum
         case .snowfall_water_equivalent:
@@ -507,7 +507,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         case .relative_humidity:
             return .hermite(bounds: 0...100)
         case .wind_speed:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .wind_direction:
             return .linearDegrees
         case .geopotential_height:

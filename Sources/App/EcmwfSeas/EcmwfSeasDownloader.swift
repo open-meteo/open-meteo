@@ -24,6 +24,12 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
+        
+        @Option(name: "apikey", short: "k", help: "API key for ECMWF API")
+        var apikey: String?
+
+        @Option(name: "email", help: "Email for the ECMWF API service")
+        var email: String?
     }
 
     var help: String {
@@ -51,10 +57,59 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         case .seas5_monthly, .seas5_monthly_upper_level:
             generateTimeSeries = true
         }
-        
+        try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
         logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: generateTimeSeries)
+    }
+    
+    func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool) async throws {
+        let logger = application.logger
+        if FileManager.default.fileExists(atPath: domain.surfaceElevationFileOm.getFilePath()) {
+            return
+        }
+        try domain.surfaceElevationFileOm.createDirectory()
+
+        let downloadDir = domain.downloadDirectory
+        try FileManager.default.createDirectory(atPath: downloadDir, withIntermediateDirectories: true)
+        let tempDownloadGribFile = "\(downloadDir)elevation.grib"
+
+        if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
+            logger.info("Downloading elevation and sea mask")
+            switch domain {
+            case .seas5_6hourly:
+                guard let email else {
+                    fatalError("email required")
+                }
+                guard let apikey else {
+                    fatalError("password required")
+                }
+                struct Query: Encodable {
+                    let `class` = "od"
+                    let date = "2025-09-01"
+                    let expver = 1
+                    let levtype = "sfc"
+                    let method = 1
+                    let number = 0
+                    let origin = "ecmf"
+                    let param = ["129.128", "172.128"]
+                    let step = 0
+                    let stream = "mmsf"
+                    let system = 5
+                    let time = "00:00:00"
+                    let type = "fc"
+                }
+                let client = application.makeNewHttpClient(redirectConfiguration: .disallow)
+                let curl = Curl(logger: logger, client: client, deadLineHours: 99999)
+                try await curl.downloadEcmwfApi(query: Query(), email: email, apikey: apikey, destinationFile: tempDownloadGribFile)
+                try await client.shutdown()
+            default:
+                return
+            }
+        }
+
+        try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile], createNetCdf: createNetCdf)
+        try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
 
     func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
@@ -71,7 +126,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
         let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
-
+        
         let deaverager = GribDeaverager()
         for month in 0...6 {
             let monthTimestamp = run.toYearMonth().advanced(by: month).timestamp
@@ -133,12 +188,12 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                                 continue
                             }
                             let count = await inMemoryAccumulated.data.count
-                            logger.info("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
-                    logger.info("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
+                    logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
                     // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }

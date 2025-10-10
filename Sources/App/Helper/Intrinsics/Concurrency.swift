@@ -141,6 +141,25 @@ extension Sequence where Element: Sendable, Self: Sendable {
             }
         }
     }
+    
+    
+    /// Execute a closure for each element sequentially and return a new value
+    /// Returns an `AsyncStream` to process in a pipeline
+    /*func mapStream<T: Sendable>(
+        _ body: @escaping (Element) throws -> T
+    ) -> AsyncThrowingStream<T, Error> {
+        return AsyncThrowingStream<T, Error> { continuation in
+            do {
+                for (index, element) in self.enumerated() {
+                    let result = try body(element)
+                    continuation.yield(result)
+                }
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+    }*/
 }
 
 extension AsyncSequence {

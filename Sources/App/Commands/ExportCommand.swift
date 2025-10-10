@@ -459,9 +459,9 @@ struct ExportCommand: AsyncCommand {
         }*/
 
         // Loop over locations, read and write
-        guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
+        /*guard let elevationFile = await genericDomain.getStaticFile(type: .elevation, httpClient: client, logger: logger) else {
             fatalError("Could not read elevation file for domain \(domain)")
-        }
+        }*/
         do {
             let stream = points.chunks(ofCount: concurrentChunksLength).map({Array($0)}).mapStream(nConcurrent: concurrent) { points in
                 return try await points.asyncMap { (gridpoint, elevation) in
