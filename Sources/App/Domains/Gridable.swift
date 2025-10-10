@@ -24,6 +24,7 @@ public struct GridPoint2DFraction {
 enum ElevationOrSea {
     case noData
     case sea
+    case landWithoutElevation
     case elevation(Float)
 
     var isSea: Bool {
@@ -52,6 +53,8 @@ enum ElevationOrSea {
             return 0
         case .elevation(let float):
             return float
+        case .landWithoutElevation:
+            return .nan
         }
     }
 }
@@ -92,7 +95,7 @@ extension Gridable {
         }
         if elevation >= 9999 {
             // land, but no data
-            return .noData
+            return .landWithoutElevation
         }
         return .elevation(elevation)
     }
@@ -110,7 +113,7 @@ extension Gridable {
         }
         if elevation >= 9000 {
             // land, but no data
-            return .noData
+            return .landWithoutElevation
         }
         return .elevation(elevation)
     }
@@ -236,7 +239,7 @@ extension Gridable {
         }
         if elevationSurrounding[minPos] >= 9999 {
             /// 9999 marks land points in satellite datasets
-            return (gridpoint, .noData)
+            return (gridpoint, .landWithoutElevation)
         }
         return (gridpoint, .elevation(elevationSurrounding[minPos]))
     }
