@@ -9,7 +9,7 @@ protocol FlatBuffersVariable: RawRepresentableString {
 
 protocol ForecastapiResponder {
     func calculateQueryWeight(nVariablesModels: Int?) -> Float
-    func response(format: ForecastResultFormat?, timestamp: Timestamp, fixedGenerationTime: Double?, concurrencySlot: Int?) async throws -> Response
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int?) async throws -> Response
 
     var numberOfLocations: Int { get }
 }
@@ -24,8 +24,8 @@ protocol ModelFlatbufferSerialisable {
 
     var flatBufferModel: openmeteo_sdk_Model { get }
     var modelName: String {get}
-    
-    
+
+
     var latitude: Float { get }
     var longitude: Float { get }
 
@@ -33,7 +33,7 @@ protocol ModelFlatbufferSerialisable {
     var elevation: Float? { get }
 
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws -> Void
-    
+
     func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>?
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
     func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>?
@@ -46,11 +46,11 @@ struct FlatBuffersVariableNone: FlatBuffersVariable {
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         return FlatBufferVariableMeta(variable: .undefined)
     }
-    
+
     init?(rawValue: String) {
         return nil
     }
-    
+
     var rawValue: String {
         return "undefined"
     }
@@ -61,7 +61,7 @@ extension ModelFlatbufferSerialisable {
     static var memberOffset: Int {
         return 0
     }
-    
+
     /// e.g. `52.52N13.42E38m`
     var formatedCoordinatesFilename: String {
         let lat = latitude < 0 ? String(format: "%.2fS", abs(latitude)) : String(format: "%.2fN", latitude)
@@ -82,7 +82,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 
     /// Number of variables times number of somains. Used to rate limiting
     let nVariablesTimesDomains: Int
-    
+
     struct RequestVariables {
         let currentVariables: [Model.HourlyVariable]?
         let minutely15Variables: [Model.HourlyVariable]?
@@ -190,7 +190,7 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
             })
             return try run.merge()
         }
-        
+
         func monthly(variables: [Model.MonthlyVariable]?) async throws -> ApiSectionString? {
             guard let variables else {
                 return nil
@@ -207,8 +207,8 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
 
     /// Output the given result set with a specified format
     /// timestamp and fixedGenerationTime are used to overwrite dynamic fields in unit tests
-    func response(format: ForecastResultFormat?, timestamp: Timestamp = .now(), fixedGenerationTime: Double? = nil, concurrencySlot: Int? = nil) async throws -> Response {
-        if format == .xlsx && results.count > 100 {
+    func response(format: ForecastResultFormatWithOptions?, concurrencySlot: Int? = nil) async throws -> Response {
+        if case .xlsx = format, results.count > 100 {
             throw ForecastApiError.generic(message: "XLSX supports only up to 100 locations")
         }
         for location in results {
@@ -216,14 +216,24 @@ struct ForecastapiResult<Model: ModelFlatbufferSerialisable>: ForecastapiRespond
                 try await model.prefetch(currentVariables: variables.currentVariables, minutely15Variables: variables.minutely15Variables, hourlyVariables: variables.hourlyVariables, sixHourlyVariables: variables.sixHourlyVariables, dailyVariables: variables.dailyVariables, monthlyVariables: variables.monthlyVariables)
             }
         }
-        switch format ?? .json {
-        case .json:
+        switch format ?? .json() {
+        case .json(let fixedGenerationTime):
             return try toJsonResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
-        case .xlsx:
-            return try await toXlsxResponse(timestamp: timestamp)
-        case .csv:
-            return try toCsvResponse(concurrencySlot: concurrencySlot)
-        case .flatbuffers:
+        case .xlsx(let timestamp, let locationInformation):
+            switch locationInformation {
+            case .omit:
+                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: false)
+            case .section:
+                return try await toXlsxResponse(timestamp: timestamp, withLocationHeader: true)
+            }
+        case .csv(let locationInformation):
+            switch locationInformation {
+                case .omit:
+                    return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: false)
+                case .section:
+                    return try toCsvResponse(concurrencySlot: concurrencySlot, withLocationHeader: true)
+            }
+        case .flatbuffers(let fixedGenerationTime):
             return try toFlatbuffersResponse(fixedGenerationTime: fixedGenerationTime, concurrencySlot: concurrencySlot)
         }
     }
@@ -342,12 +352,22 @@ extension Array where Element == ApiSectionString {
     }
 }
 
-
 enum ForecastResultFormat: String, Codable {
     case json
     case xlsx
     case csv
     case flatbuffers
+
+}
+
+enum ForecastResultFormatWithOptions {
+    /// fixedGenerationTime is used to overwrite dynamic fields in unit tests
+    case json(fixedGenerationTime: Double? = nil)
+    /// timestamp is used to overwrite dynamic fields in unit tests
+    case xlsx(timestamp: Timestamp = .now(), locationInformation: OutputLocationInformation = .section)
+    case csv(locationInformation: OutputLocationInformation = .section)
+    /// fixedGenerationTime is used to overwrite dynamic fields in unit tests
+    case flatbuffers(fixedGenerationTime: Double? = nil)
 }
 
 /// Simplify flush commands
