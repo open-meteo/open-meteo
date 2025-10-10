@@ -41,7 +41,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         let domain = try EcmwfSeasDomain.load(rawValue: signature.domain)
 
-        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? Timestamp.now().with(day: 1)
+        let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
         let logger = context.application.logger
 
@@ -59,7 +59,13 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         }
         try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
         logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        let handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles: [GenericVariableHandle]
+        switch domain {
+        case .ec46_6hourly, .ec46_weekly:
+            handles = try await downloadEC46(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        case .seas5_6hourly, .seas5_monthly, .seas5_12hourly, .seas5_24hourly, .seas5_monthly_upper_level:
+            handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        }
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: generateTimeSeries)
     }
     
@@ -110,6 +116,84 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [tempDownloadGribFile], createNetCdf: createNetCdf)
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
+    }
+    
+    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        let logger = application.logger
+
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
+        Process.alarm(seconds: 12 * 3600)
+        defer { Process.alarm(seconds: 0) }
+
+        let nx = domain.grid.nx
+        let ny = domain.grid.ny
+        
+        let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
+        //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
+        
+        let deaverager = GribDeaverager()
+        for day in 0..<3 {
+            let dayTimestamp = run.add(days: day)
+            /// ope_e1_ifs-subs_od_eefo_cf_20251008T000000Z_20251008_d01.bz2
+            let urls = ["cf","pf"].map({"\(server)ope_e1_ifs-subs_od_eefo_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
+            
+            for url in urls {
+                /// Single GRIB files contains multiple time-steps in mixed order
+                let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableAny>()
+                
+                // Download and process concurrently
+                try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
+                    let attributes = try message.getAttributes()
+                    /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
+                    let time = attributes.timestamp
+                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
+                    let member = message.getLong(attribute: "perturbationNumber") ?? 0
+                    
+                    let variable: (any EcmwfSeasVariable)?
+                    switch domain {
+                    case .ec46_6hourly:
+                        variable = EcmwfEC46Variable6Hourly.from(shortName: attributes.shortName)
+                    case .ec46_weekly:
+                        fatalError()
+                    default:
+                        fatalError()
+                    }
+                    guard let variable else {
+                        logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
+                        return
+                    }
+                    if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
+                        array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                    }
+                    if variable.isAccumulated {
+                        if run == time {
+                            logger.debug("Skipping accumulated variable as forecast hour 0")
+                            return
+                        }
+                        // Collect all accumulated variables and process them as soon as they are in sequential order
+                        await inMemoryAccumulated.set(variable: .init(variable: variable), timestamp: time, member: member, data: array2d.array)
+                        while true {
+                            let step = (await deaverager.lastStep(variable, member) ?? 0) + domain.dtHours
+                            let time = run.add(hours: step)
+                            guard var data = await inMemoryAccumulated.remove(variable: EcmwfSeasVariableAny(variable: variable), timestamp: time, member: member) else {
+                                break
+                            }
+                            guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(step)", array2d: &data) else {
+                                continue
+                            }
+                            let count = await inMemoryAccumulated.data.count
+                            logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            try await writer.write(time: time, member: member, variable: variable, data: data.data)
+                        }
+                        return
+                    }
+                    logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
+                    try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
+                }
+            }
+        }
+        return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
     }
 
     func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
@@ -244,6 +328,17 @@ extension EcmwfSeasDomain {
             return 51
         case .seas5_12hourly, .seas5_monthly_upper_level, .ec46_weekly:
             return 11
+        }
+    }
+    
+    var lastRun: Timestamp {
+        switch self {
+        case .ec46_weekly,.ec46_6hourly:
+            // Delay of 20 hours, one update per day
+            let t = Timestamp.now()
+            return t.add(hours: -19).with(hour: 0)
+        default:
+            return Timestamp.now().with(day: 1)
         }
     }
 }
