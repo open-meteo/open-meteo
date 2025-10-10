@@ -54,7 +54,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         switch domain {
         case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly:
             generateTimeSeries = false
-        case .seas5_monthly, .seas5_monthly_upper_level:
+        case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly, .ec46_6hourly:
             generateTimeSeries = true
         }
         try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
@@ -163,6 +163,10 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         variable = nil
                     case .seas5_monthly:
                         variable = EcmwfSeasVariableMonthly.from(shortName: attributes.shortName)
+                    case .ec46_6hourly:
+                        fatalError()
+                    case .ec46_weekly:
+                        fatalError()
                     }
                     guard let variable else {
                         logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
@@ -226,15 +230,19 @@ extension EcmwfSeasDomain {
             return [6, 8]
         case .seas5_monthly:
             return [5, 7]
+        case .ec46_6hourly:
+            return []
+        case .ec46_weekly:
+            return []
         }
     }
     
     var ensembleMembers: Int {
         // Note: model levels = 11 member, pressure levels full 51
         switch self {
-        case .seas5_6hourly, .seas5_24hourly, .seas5_monthly:
+        case .seas5_6hourly, .seas5_24hourly, .seas5_monthly, .ec46_6hourly:
             return 51
-        case .seas5_12hourly, .seas5_monthly_upper_level:
+        case .seas5_12hourly, .seas5_monthly_upper_level, .ec46_weekly:
             return 11
         }
     }

@@ -91,6 +91,8 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_seas5_24hourly
     case ecmwf_seas5_monthly_upper_level
     case ecmwf_seas5_monthly
+    case ecmwf_ec46_6hourly
+    case ecmwf_ec46_weekly
 
     case jma_msm
     case jma_gsm
@@ -288,6 +290,10 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfSeasDomain.seas5_monthly_upper_level
         case .ecmwf_seas5_monthly:
             return EcmwfSeasDomain.seas5_monthly
+        case .ecmwf_ec46_6hourly:
+            return EcmwfSeasDomain.ec46_6hourly
+        case .ecmwf_ec46_weekly:
+            return EcmwfSeasDomain.ec46_weekly
         case .jma_msm:
             return JmaDomain.msm
         case .ncep_cfsv2:

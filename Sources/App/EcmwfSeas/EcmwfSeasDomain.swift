@@ -17,10 +17,14 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     /// O320 single levels
     case seas5_monthly
     
+    case ec46_6hourly
+    
+    case ec46_weekly
+    
     
     var grid: any Gridable {
         switch self {
-        case .seas5_6hourly, .seas5_24hourly, .seas5_monthly:
+        case .seas5_6hourly, .seas5_24hourly, .seas5_monthly, .ec46_6hourly, .ec46_weekly:
             return GaussianGrid(type: .o320)
         case .seas5_12hourly, .seas5_monthly_upper_level:
             return GaussianGrid(type: .n160)
@@ -29,9 +33,9 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     
     var countEnsembleMember: Int {
         switch self {
-        case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly:
+        case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly, .ec46_6hourly:
             return 51
-        case .seas5_monthly, .seas5_monthly_upper_level:
+        case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly:
             return 1
         }
     }
@@ -48,12 +52,16 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
             return .ecmwf_seas5_monthly_upper_level
         case .seas5_monthly:
             return .ecmwf_seas5_monthly
+        case .ec46_6hourly:
+            return .ecmwf_ec46_6hourly
+        case .ec46_weekly:
+            return .ecmwf_ec46_weekly
         }
     }
     
     var domainRegistryStatic: DomainRegistry? {
         switch self {
-        case .seas5_6hourly:
+        case .seas5_6hourly, .ec46_6hourly, .ec46_weekly:
             return .ecmwf_seas5_6hourly
         case .seas5_12hourly:
             return .ecmwf_seas5_12hourly
@@ -68,7 +76,7 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     
     var dtSeconds: Int {
         switch self {
-        case .seas5_6hourly:
+        case .seas5_6hourly, .ec46_6hourly:
             return 6*3600
         case .seas5_12hourly:
             return 12*3600
@@ -78,11 +86,18 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
             return .dtSecondsMonthly
         case .seas5_monthly:
             return .dtSecondsMonthly
+        case .ec46_weekly:
+            return 7*24*3600
         }
     }
     
     var updateIntervalSeconds: Int {
-        return .dtSecondsMonthly
+        switch self {
+        case .ec46_weekly, .ec46_6hourly:
+            return 24*3600
+        default:
+            return .dtSecondsMonthly
+        }
     }
     
     var hasYearlyFiles: Bool {
@@ -94,6 +109,11 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     }
     
     var omFileLength: Int {
-        return 200
+        switch self {
+        case .ec46_6hourly:
+            return 46*24 / 6 // 184
+        default:
+            return 200
+        }
     }
 }
