@@ -22,7 +22,7 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     }
 
     var hasYearlyFiles: Bool {
-        return false
+        return true
     }
 
     var masterTimeRange: Range<Timestamp>? {
