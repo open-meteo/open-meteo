@@ -255,6 +255,15 @@ struct DownloadEcmwfCommand: AsyncCommand {
             for url in urls {
                 try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
                     return variables.contains(where: { variable in
+                        if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
+                            return true
+                        }
+                        if (entry.param == "max_2t" || entry.param == "mn2t3" || entry.param == "mn2t6") && variable == .temperature_2m_max {
+                            return true
+                        }
+                        if (entry.param == "min_2t" || entry.param == "mx2t3" || entry.param == "mx2t6") && variable == .temperature_2m_min {
+                            return true
+                        }
                         if let level = entry.level {
                             // entry is a pressure level variable
                             if variable.gribName == "gh" && variable.level == level && entry.param == "z" {
@@ -278,6 +287,15 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     
                     guard let variable = variables.first(where: { variable in
                         if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
+                            return true
+                        }
+                        if shortName == "max_i10fg" && variable == .wind_gusts_10m {
+                            return true
+                        }
+                        if shortName == "max_2t" && variable == .temperature_2m_max {
+                            return true
+                        }
+                        if shortName == "min_2t" && variable == .temperature_2m_min {
                             return true
                         }
                         if let level = variable.level {
@@ -408,39 +426,51 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     try await calcRh(rh: .relative_humidity_300hPa, q: .specific_humidity_300hPa, t: .temperature_300hPa, member: member, hpa: 300)
                     try await calcRh(rh: .relative_humidity_250hPa, q: .specific_humidity_250hPa, t: .temperature_250hPa, member: member, hpa: 250)
                     try await calcRh(rh: .relative_humidity_200hPa, q: .specific_humidity_200hPa, t: .temperature_200hPa, member: member, hpa: 200)
+                    try await calcRh(rh: .relative_humidity_150hPa, q: .specific_humidity_150hPa, t: .temperature_150hPa, member: member, hpa: 150)
                     try await calcRh(rh: .relative_humidity_100hPa, q: .specific_humidity_100hPa, t: .temperature_100hPa, member: member, hpa: 100)
                     try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
                 }
 
                 if await !writer.contains(variable: EcmwfVariable.cloud_cover, member: member) {
                     logger.info("Calculating cloud cover")
+                    // 2025-10-13: added 100/150/600/400 hPa levels
                     guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
                           let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
                           let rh850 = await inMemory.get(variable: .relative_humidity_850hPa, timestamp: timestamp, member: member)?.data,
                           let rh700 = await inMemory.get(variable: .relative_humidity_700hPa, timestamp: timestamp, member: member)?.data,
+                          let rh600 = await inMemory.get(variable: .relative_humidity_600hPa, timestamp: timestamp, member: member)?.data,
                           let rh500 = await inMemory.get(variable: .relative_humidity_500hPa, timestamp: timestamp, member: member)?.data,
+                          let rh400 = await inMemory.get(variable: .relative_humidity_400hPa, timestamp: timestamp, member: member)?.data,
                           let rh300 = await inMemory.get(variable: .relative_humidity_300hPa, timestamp: timestamp, member: member)?.data,
                           let rh250 = await inMemory.get(variable: .relative_humidity_250hPa, timestamp: timestamp, member: member)?.data,
                           let rh200 = await inMemory.get(variable: .relative_humidity_200hPa, timestamp: timestamp, member: member)?.data,
+                          let rh150 = await inMemory.get(variable: .relative_humidity_150hPa, timestamp: timestamp, member: member)?.data,
+                          let rh100 = await inMemory.get(variable: .relative_humidity_100hPa, timestamp: timestamp, member: member)?.data,
                           let rh50 = await inMemory.get(variable: .relative_humidity_50hPa, timestamp: timestamp, member: member)?.data else {
                         logger.warning("Pressure level relative humidity unavailable")
                         continue
                     }
-
+                    /// low clouds (surface - 3km): 1000/925/850
                     let cloudcoverLow = zip(rh1000, zip(rh925, rh850)).map {
                         return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 1000),
                                    max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 925),
                                        Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 850)))
                     }
-                    let cloudcoverMid = zip(rh700, zip(rh500, rh300)).map {
-                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 700),
+                    /// mid clouds (3 km - 8km): 700/600/500/400
+                    let cloudcoverMid = zip(zip(rh700, rh600), zip(rh500, rh400)).map {
+                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 700),
+                            max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 600),
                                    max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 500),
-                                       Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 300)))
+                                       Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 400))))
                     }
-                    let cloudcoverHigh = zip(rh250, zip(rh200, rh50)).map {
-                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 250),
-                                   max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 200),
-                                       Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 50)))
+                    /// high clouds (>8 km): 300/250/200/150/100/50
+                    let cloudcoverHigh = zip(zip(rh300, rh250), zip(zip(rh200, rh150), zip(rh100, rh50))).map {
+                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 300),
+                                max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 250),
+                                    max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.0, pressureHPa: 200),
+                                        max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.1, pressureHPa: 150),
+                                            max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.0, pressureHPa: 100),
+                                                Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.1, pressureHPa: 50))))))
                     }
                     let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
                     
