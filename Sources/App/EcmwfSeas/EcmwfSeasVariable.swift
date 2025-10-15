@@ -156,7 +156,7 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
     
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
-        case .temperature_2m, .dew_point_2m, .soil_temperature_0_to_7cm:
+        case .temperature_2m, .dew_point_2m, .soil_temperature_0_to_7cm, .sea_surface_temperature:
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)
