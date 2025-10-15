@@ -41,6 +41,11 @@ extension NbmSurfaceVariable: NbmVariableDownloadable {
             return ":WDIR:10 m above ground:\(timestep) hour fcst:"
         case .wind_direction_80m:
             return ":WDIR:80 m above ground:\(timestep) hour fcst:"
+        case .snowfall_water_equivalent:
+            // This is liquid ratio which is converted to snowfall water equivalent while downloading
+            return ":SNOWLR:surface:\(timestep) hour fcst:"
+        case .snowfall_height:
+            return ":SNOWLVL:0 m above mean sea level:\(timestep) hour fcst:"
         case .snowfall:
             if timestep > 36 {
                 return relTime % 6 != 0 ? nil : ":ASNOW:surface:\(timestep - 6)-\(timestep) hour acc fcst:"

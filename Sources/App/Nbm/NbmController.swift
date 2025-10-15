@@ -238,9 +238,9 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 }
                 return DataAndUnit(et0, .millimetre)
             case .rain:
-                let snow_fall = try await get(raw: .surface(.snowfall), time: time).data
+                let snow_fall = try await get(raw: .surface(.snowfall_water_equivalent), time: time).data
                 let precipitation = try await get(raw: .surface(.precipitation), time: time).data
-                let rain = zip(precipitation, snow_fall).map({ $0 - $1 / 0.7 })
+                let rain = zip(precipitation, snow_fall).map({ $0 - $1 })
                 return DataAndUnit(rain, .millimetre)
             case .terrestrial_radiation:
                 let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
