@@ -123,11 +123,17 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
             /*if !(v.variable == .T_SO || v.variable == .W_SO) {
                 continue
             }*/
+            var processedTimestamps = [Timestamp]()
             let url = "https://meteohub.agenziaitaliameteo.it/nwp/ICON-2I_SURFACE_PRESSURE_LEVELS/\(runString)/\(v.variable)/icon_2I_\(runString)_\(v.level).grib"
             let deaverager = GribDeaverager()
             for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
                 let attributes = try message.getAttributes()
                 let time = attributes.timestamp
+                guard processedTimestamps.contains(time) == false else {
+                    logger.debug("skipping already processed timestamp \(time.iso8601_YYYY_MM_dd_HH_mm), variable \(v.variable), level \(v.level)")
+                    continue
+                }
+                processedTimestamps.append(time)
                 let member = 0
                 var array2d = try message.to2D(nx: grid.nx, ny: grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                 switch v.variable {
@@ -146,13 +152,14 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                     continue
                 }
                 if v.variable.keepInMemory {
+                    //print("keep in memory \(v), \(time.iso8601_YYYY_MM_dd_HH_mm), \(member)")
                     await inMemory.set(variable: v, timestamp: attributes.timestamp, member: member, data: array2d.array)
                 }
 
                 /// Calculate 10m wind
                 if v.variable == .V_10M {
                     guard let uWind = await inMemory.remove(.init(variable: .init(variable: .U_10M, level: v.level), timestamp: time, member: member)) else {
-                        fatalError("U_10M must be loaded before \(v.variable)")
+                        fatalError("U_10M must be loaded before \(v.variable), level \(v.level), time \(time.iso8601_YYYY_MM_dd_HH_mm)")
                     }
                     let vWind = array2d.array
                     let speed = zip(uWind.data, vWind.data).map(Meteorology.windspeed)
@@ -164,7 +171,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                 /// Calculate pressure level wind
                 if v.variable == .V {
                     guard let uWind = await inMemory.remove(.init(variable: .init(variable: .U, level: v.level), timestamp: time, member: member)) else {
-                        fatalError("U wind must be loaded before \(v.variable)")
+                        fatalError("U wind must be loaded before \(v.variable), level \(v.level), time \(time.iso8601_YYYY_MM_dd_HH_mm)")
                     }
                     let vWind = array2d.array
                     let speed = zip(uWind.data, vWind.data).map(Meteorology.windspeed)
