@@ -35,7 +35,7 @@ enum JaxaHimawariDomain: String, GenericDomain, CaseIterable {
         case .himawari_10min:
             return RegularGrid(nx: 2401, ny: 2401, latMin: -60, lonMin: 80, dx: 0.05, dy: 0.05)
         case .mtg_fci_10min:
-            return RegularGrid(nx: 2801, ny: 2401, latMin: -60, lonMin: -60, dx: 0.05, dy: 0.05)
+            return RegularGrid(nx: 2801, ny: 2401, latMin: -60, lonMin: -70, dx: 0.05, dy: 0.05)
         }
         
     }
