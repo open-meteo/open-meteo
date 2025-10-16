@@ -552,6 +552,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case eumetsat_lsa_saf_msg
     case eumetsat_lsa_saf_iodc
     case jma_jaxa_himawari
+    case jma_jaxa_mtg_fci
 
     case kma_seamless
     case kma_gdps
@@ -859,6 +860,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .jma_jaxa_himawari:
             let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({ $0 })
+        case .jma_jaxa_mtg_fci:
+            let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.mtg_fci_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [sat].compactMap({ $0 })
         case .eumetsat_lsa_saf_msg:
             let sat = try await EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({ $0 })
@@ -1081,6 +1085,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return EumetsatLsaSafDomain.iodc
         case .jma_jaxa_himawari:
             return JaxaHimawariDomain.himawari_10min
+        case .jma_jaxa_mtg_fci:
+            return JaxaHimawariDomain.mtg_fci_10min
         case .kma_seamless:
             return nil
         case .kma_gdps:
@@ -1271,6 +1277,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await EumetsatLsaSafReader(domain: .iodc, gridpoint: gridpoint, options: options)
         case .jma_jaxa_himawari:
             return try await JaxaHimawariReader(domain: .himawari_10min, gridpoint: gridpoint, options: options)
+        case .jma_jaxa_mtg_fci:
+            return try await JaxaHimawariReader(domain: .mtg_fci_10min, gridpoint: gridpoint, options: options)
         case .kma_seamless:
             return nil
         case .kma_gdps:
