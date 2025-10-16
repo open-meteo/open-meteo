@@ -127,6 +127,7 @@ enum DomainRegistry: String, CaseIterable {
 
     case eumetsat_sarah3_30min
     case jma_jaxa_himawari_10min
+    case jma_jaxa_himawari_70e_10min
     case jma_jaxa_mtg_fci_10min
     case eumetsat_lsa_saf_msg_15min
     case eumetsat_lsa_saf_iodc_15min
@@ -368,6 +369,8 @@ enum DomainRegistry: String, CaseIterable {
             return EumetsatSarahDomain.sarah3_30min
         case .jma_jaxa_himawari_10min:
             return JaxaHimawariDomain.himawari_10min
+        case .jma_jaxa_himawari_70e_10min:
+            return JaxaHimawariDomain.himawari_70e_10min
         case .jma_jaxa_mtg_fci_10min:
             return JaxaHimawariDomain.mtg_fci_10min
         case .eumetsat_lsa_saf_msg_15min:
