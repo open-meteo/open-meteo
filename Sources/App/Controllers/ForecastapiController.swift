@@ -858,8 +858,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let sarah3 = try await EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sarah3].compactMap({ $0 })
         case .jma_jaxa_himawari:
-            let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({ $0 })
+            return [
+                try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_70e_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            ].compactMap({ $0 })
         case .jma_jaxa_mtg_fci:
             let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.mtg_fci_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({ $0 })
@@ -877,7 +879,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return [try await EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
             }
             if (90...).contains(lon) { // Himawari on 140°
-                return [try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
+                return [
+                    try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_70e_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                    try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                ].compactMap({ $0 })
             }
             // TODO GOES east + west
             return []

@@ -117,9 +117,7 @@ struct JaxaHimawariDownload: AsyncCommand {
 
         let timeDifference: [Double]
         switch domain {
-        case .himawari_70e_10min:
-            fatalError()
-        case .himawari_10min:
+        case .himawari_10min, .himawari_70e_10min:
             if run.minute == 40 && [2, 14].contains(run.hour) {
                 // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
                 logger.info("Skipping run \(run) because it is during a house-keeping window")
@@ -129,7 +127,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             let metaDataFile = "\(domain.downloadDirectory)/AuxilaryData.nc"
             if !FileManager.default.fileExists(atPath: metaDataFile) {
                 try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-                let path = "/jma/netcdf/202501/01/NC_H09_20250101_0000_R21_FLDK.02401_02401.nc"
+                let path = "/jma/netcdf/202501/01/NC_H09_20250101_0000_R21_FLDK.0\(domain.grid.nx)_02401.nc"
                 let data = try await downloader.get(logger: logger, path: path)
                 try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
             }
@@ -154,12 +152,10 @@ struct JaxaHimawariDownload: AsyncCommand {
             /// For whatever reason, H08 is used again after 2025-10-11 at 15:20
             let satellite: String = run >= Timestamp(2022, 12, 13) && run <= Timestamp(2025,10,11,15,20) ? "H09" : "H08"
             switch domain {
-            case .himawari_10min:
-                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.02401_02401.nc"
+            case .himawari_10min, .himawari_70e_10min:
+                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.0\(domain.grid.nx)_02401.nc"
             // case .himawari_hourly:
             //    path = "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc"
-            case .himawari_70e_10min:
-                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.02801_02401.nc"
             case .mtg_fci_10min:
                 // pub/mtg/L2/PAR/001/202510/16/06/M3_FCI_20251016_0630_RFL001_FLDK.02801_02401.nc
                 path = "/pub/mtg/L2/PAR/001/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/M3_FCI_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL001_FLDK.02801_02401.nc"
