@@ -106,25 +106,24 @@ struct WeatherApiController {
             guard let host else {
                 return .none
             }
-            if host.starts(with: "historical-forecast-api") || host.starts(with: "customer-historical-forecast-api") {
+            switch host {
+            case "historical-forecast-api.open-meteo.com", "customer-historical-forecast-api.open-meteo.com":
                 return .historicalForecast
-            }
-            if host.starts(with: "previous-runs-api") || host.starts(with: "customer-previous-runs-api") {
+            case "previous-runs-api.open-meteo.com", "customer-previous-runs-api.open-meteo.com":
                 return .previousRuns
-            }
-            if host.starts(with: "single-runs-api") || host.starts(with: "customer-single-runs-api") {
+            case "single-runs-api.open-meteo.com", "customer-single-runs-api.open-meteo.com":
                 return .singleRunsApi
-            }
-            if host.starts(with: "archive-api") || host.starts(with: "customer-archive-api") {
+            case "archive-api.open-meteo.com", "customer-archive-api.open-meteo.com":
                 return .archive
-            }
-            if host.starts(with: "satellite-api") || host.starts(with: "customer-satellite-api") {
+            case "satellite-api.open-meteo.com", "customer-satellite-api.open-meteo.com":
                 return .satellite
-            }
-            if host.starts(with: "seasonal-api") || host.starts(with: "customer-seasonal-api") {
+            case "seasonal-api.open-meteo.com", "customer-seasonal-api.open-meteo.com":
                 return .seasonal
+            case "api.open-meteo.com", "customer-api.open-meteo.com":
+                return .forecast
+            default:
+                return .none
             }
-            return .forecast
         }
     }
     
