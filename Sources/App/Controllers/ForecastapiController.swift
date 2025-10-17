@@ -106,25 +106,24 @@ struct WeatherApiController {
             guard let host else {
                 return .none
             }
-            if host.starts(with: "historical-forecast-api") || host.starts(with: "customer-historical-forecast-api") {
+            switch host {
+            case "historical-forecast-api.open-meteo.com", "customer-historical-forecast-api.open-meteo.com":
                 return .historicalForecast
-            }
-            if host.starts(with: "previous-runs-api") || host.starts(with: "customer-previous-runs-api") {
+            case "previous-runs-api.open-meteo.com", "customer-previous-runs-api.open-meteo.com":
                 return .previousRuns
-            }
-            if host.starts(with: "single-runs-api") || host.starts(with: "customer-single-runs-api") {
+            case "single-runs-api.open-meteo.com", "customer-single-runs-api.open-meteo.com":
                 return .singleRunsApi
-            }
-            if host.starts(with: "archive-api") || host.starts(with: "customer-archive-api") {
+            case "archive-api.open-meteo.com", "customer-archive-api.open-meteo.com":
                 return .archive
-            }
-            if host.starts(with: "satellite-api") || host.starts(with: "customer-satellite-api") {
+            case "satellite-api.open-meteo.com", "customer-satellite-api.open-meteo.com":
                 return .satellite
-            }
-            if host.starts(with: "seasonal-api") || host.starts(with: "customer-seasonal-api") {
+            case "seasonal-api.open-meteo.com", "customer-seasonal-api.open-meteo.com":
                 return .seasonal
+            case "api.open-meteo.com", "customer-api.open-meteo.com":
+                return .forecast
+            default:
+                return .none
             }
-            return .forecast
         }
     }
     
@@ -552,6 +551,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case eumetsat_lsa_saf_msg
     case eumetsat_lsa_saf_iodc
     case jma_jaxa_himawari
+    case jma_jaxa_mtg_fci
 
     case kma_seamless
     case kma_gdps
@@ -857,7 +857,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let sarah3 = try await EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sarah3].compactMap({ $0 })
         case .jma_jaxa_himawari:
-            let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [
+                try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_70e_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            ].compactMap({ $0 })
+        case .jma_jaxa_mtg_fci:
+            let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.mtg_fci_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [sat].compactMap({ $0 })
         case .eumetsat_lsa_saf_msg:
             let sat = try await EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -873,7 +878,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return [try await EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
             }
             if (90...).contains(lon) { // Himawari on 140°
-                return [try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
+                return [
+                    try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_70e_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                    try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                ].compactMap({ $0 })
             }
             // TODO GOES east + west
             return []
@@ -1081,6 +1089,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return EumetsatLsaSafDomain.iodc
         case .jma_jaxa_himawari:
             return JaxaHimawariDomain.himawari_10min
+        case .jma_jaxa_mtg_fci:
+            return JaxaHimawariDomain.mtg_fci_10min
         case .kma_seamless:
             return nil
         case .kma_gdps:
@@ -1271,6 +1281,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await EumetsatLsaSafReader(domain: .iodc, gridpoint: gridpoint, options: options)
         case .jma_jaxa_himawari:
             return try await JaxaHimawariReader(domain: .himawari_10min, gridpoint: gridpoint, options: options)
+        case .jma_jaxa_mtg_fci:
+            return try await JaxaHimawariReader(domain: .mtg_fci_10min, gridpoint: gridpoint, options: options)
         case .kma_seamless:
             return nil
         case .kma_gdps:

@@ -814,6 +814,9 @@ extension MultiDomains {
             return .meteoswissIconCh1Ensemble
         case .meteoswiss_icon_ch2_ensemble:
             return .meteoswissIconCh2Ensemble
+        case .jma_jaxa_mtg_fci:
+            // TODO register in SDK
+            return .jmaJaxaHimawari
         }
     }
 }
