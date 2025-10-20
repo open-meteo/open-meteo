@@ -258,10 +258,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
                         }
-                        if (entry.param == "max_2t" || entry.param == "mn2t3" || entry.param == "mn2t6") && variable == .temperature_2m_max {
+                        if ["mx2t6", "max_2t", "mx2t3"].contains(entry.param) && variable == .temperature_2m_max {
                             return true
                         }
-                        if (entry.param == "min_2t" || entry.param == "mx2t3" || entry.param == "mx2t6") && variable == .temperature_2m_min {
+                        if ["mn2t6", "min_2t", "mn2t3"].contains(entry.param) && variable == .temperature_2m_min {
                             return true
                         }
                         if let level = entry.level {
@@ -292,10 +292,10 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         if shortName == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
                         }
-                        if shortName == "max_2t" && variable == .temperature_2m_max {
+                        if ["mx2t6", "max_2t", "mx2t3"].contains(shortName) && variable == .temperature_2m_max {
                             return true
                         }
-                        if shortName == "min_2t" && variable == .temperature_2m_min {
+                        if ["mn2t6", "min_2t", "mn2t3"].contains(shortName) && variable == .temperature_2m_min {
                             return true
                         }
                         if let level = variable.level {
