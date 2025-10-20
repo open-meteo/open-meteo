@@ -115,34 +115,50 @@ struct JaxaHimawariDownload: AsyncCommand {
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: JaxaHimawariDomain, variables: [JaxaHimawariVariable], downloader: JaxaFtpDownloader) async throws -> [GenericVariableHandle] {
         let logger = application.logger
 
-        if run.minute == 40 && [2, 14].contains(run.hour) {
-            // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
-            logger.info("Skipping run \(run) because it is during a house-keeping window")
-            return []
-        }
-
-        // Download meta data for scan time offsets
-        let metaDataFile = "\(domain.downloadDirectory)/AuxilaryData.nc"
-        if !FileManager.default.fileExists(atPath: metaDataFile) {
-            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-            let path = "/jma/netcdf/202501/01/NC_H09_20250101_0000_R21_FLDK.02401_02401.nc"
-            let data = try await downloader.get(logger: logger, path: path)
-            try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
-        }
-        guard let timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour") else {
-            fatalError("Could not read meta data file")
+        let timeDifference: [Double]
+        switch domain {
+        case .himawari_10min, .himawari_70e_10min:
+            if run.minute == 40 && [2, 14].contains(run.hour) {
+                // Please note that no observations are planned at 0240-0250UTC and 1440-1450UTC everyday for house-keeping of the Himawai-8 and -9 satellites
+                logger.info("Skipping run \(run) because it is during a house-keeping window")
+                return []
+            }
+            // Download meta data for scan time offsets
+            let metaDataFile = "\(domain.downloadDirectory)/AuxilaryData.nc"
+            if !FileManager.default.fileExists(atPath: metaDataFile) {
+                try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+                let path = "/jma/netcdf/202501/01/NC_H09_20250101_0000_R21_FLDK.0\(domain.grid.nx)_02401.nc"
+                let data = try await downloader.get(logger: logger, path: path)
+                try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
+            }
+            timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")!.data.map(Double.init)
+        case .mtg_fci_10min:
+            /// MTG FCI image scans are performed from South to North. Scan time is around 9 minutes 30 seconds
+            /// Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 8 minutes.
+            /// OpenMeteo grids are ordered South to North, therefore the scan time should increase with the line number
+            /// We use a linear interpolation assuming 15 seconds offset from start and 9:30 sweep time
+            /// This is not 100% correct, but a reasonable approximation
+            timeDifference = (0..<2801 * 2401).map {
+                let line = $0 / 2801
+                let lineFraction = Double(line) / (2401-1)
+                return (15 + lineFraction * (9.5*60) ) / 3600
+            }
         }
 
         return try await variables.asyncCompactMap({ variable -> GenericVariableHandle? in
             logger.info("Downloading \(variable) \(run.iso8601_YYYY_MM_dd_HH_mm)")
             let c = run.toComponents()
             let path: String
-            let satellite: String = run >= Timestamp(2022, 12, 13) ? "H09" : "H08"
+            /// For whatever reason, H08 is used again after 2025-10-11 at 15:20
+            let satellite: String = run >= Timestamp(2022, 12, 13) && run <= Timestamp(2025,10,11,15,20) ? "H09" : "H08"
             switch domain {
-            case .himawari_10min:
-                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.02401_02401.nc"
+            case .himawari_10min, .himawari_70e_10min:
+                path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.0\(domain.grid.nx)_02401.nc"
             // case .himawari_hourly:
             //    path = "/pub/himawari/L3/PAR/021/\(c.year)\(c.mm)/\(c.dd)/H09_\(run.format_YYYYMMdd)_\(run.hh)00_1H_RFL021_FLDK.02401_02401.nc"
+            case .mtg_fci_10min:
+                // pub/mtg/L2/PAR/001/202510/16/06/M3_FCI_20251016_0630_RFL001_FLDK.02801_02401.nc
+                path = "/pub/mtg/L2/PAR/001/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/M3_FCI_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL001_FLDK.02801_02401.nc"
             }
 
             guard let data = try await downloader.get(logger: logger, path: path) else {
@@ -165,7 +181,7 @@ struct JaxaHimawariDownload: AsyncCommand {
                         grid: domain.grid,
                         locationRange: 0..<domain.grid.count,
                         timerange: timerange,
-                        scanTimeDifferenceHours: timeDifference.data.map(Double.init),
+                        scanTimeDifferenceHours: timeDifference,
                         sunDeclinationCutOffDegrees: 1
                     )
                     logger.info("\(variable) conversion took \(start.timeElapsedPretty())")

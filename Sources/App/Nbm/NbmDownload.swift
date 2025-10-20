@@ -124,6 +124,14 @@ struct NbmDownload: AsyncCommand {
         let timestamps = forecastHours.map { run.add(hours: $0) }
 
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        /// Domain elevation field. Used to correct snowfall amount
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -131,6 +139,7 @@ struct NbmDownload: AsyncCommand {
 
             let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0)
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
+            let inMemory = VariablePerMemberStorage<NbmSurfaceVariable>()
 
             let variables: [NbmVariableAndDomain] = variables.map {
                 let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -175,6 +184,18 @@ struct NbmDownload: AsyncCommand {
                 if let fma = variable.variable.multiplyAdd(domain: domain) {
                     grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                 }
+                
+                /// Calculate correct snowfall water equivalent based on liquid ratio
+                if let variable = variable.variable as? NbmSurfaceVariable {
+                    if variable == .snowfall || variable == .snowfall_water_equivalent || variable == .precipitation || variable == .snowfall_height {
+                        await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
+                        try await inMemory.calculateSnowfallWaterEquivalent(snowfall: .snowfall, liquidRatio: .snowfall_water_equivalent, precipitation: .precipitation, snowfallHeight: .snowfall_height, domainElevation: domainElevation, outVariable: NbmSurfaceVariable.snowfall_water_equivalent, writer: writer)
+                        if variable == .snowfall_water_equivalent {
+                            continue
+                        }
+                    }
+                }
+                
                 try await writer.write( member: 0, variable: variable.variable, data: grib2d.array.data)
             }
             let completed = i == timestamps.count - 1
