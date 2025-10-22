@@ -178,10 +178,6 @@ enum CamsVariable: String, CaseIterable, GenericVariable, GenericVariableMixable
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var unit: SiUnit {
         switch self {
         case .pm10:

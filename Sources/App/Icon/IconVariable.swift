@@ -16,10 +16,6 @@ struct IconPressureVariable: PressureVariableRespresentable, Hashable, GenericVa
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         (rawValue, 0)
     }
@@ -324,19 +320,6 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             return .metrePerSecondNotUnitConverted
         case .visibility:
             return .metre
-        }
-    }
-
-    /// Soil moisture or snow depth are cumulative processes and have offsets if multiple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_1cm: return true
-        case .soil_moisture_1_to_3cm: return true
-        case .soil_moisture_3_to_9cm: return true
-        case .soil_moisture_9_to_27cm: return true
-        case .soil_moisture_27_to_81cm: return true
-        case .snow_depth: return true
-        default: return false
         }
     }
 

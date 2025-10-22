@@ -35,11 +35,6 @@ enum EcmwfSeasVariableSingleLevelDerived: String, RawRepresentableString, Generi
     //case sunshine_duration
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct EcmwfSeas5Controller6Hourly: GenericReaderDerivedSimple, GenericReaderProtocol {

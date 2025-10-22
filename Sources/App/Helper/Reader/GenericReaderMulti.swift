@@ -71,43 +71,19 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         // Integrate now lower resolution models
         var data: [Float]?
         var unit: SiUnit?
-        let requiresOffsetCorrectionForMixing = variable.rawValue.starts(with: "soil_moisture_") || variable.rawValue == "snow_depth"
-        if requiresOffsetCorrectionForMixing {
-            for r in reader.reversed() {
-                guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
-                    continue
-                }
-                if data == nil {
-                    // first iteration
-                    data = d.data
-                    unit = d.unit
-                    data?.deltaEncode()
-                } else {
-                    data?.integrateIfNaNDeltaCoded(d.data)
-                }
-                if data?.containsNaN() == false {
-                    break
-                }
+        for r in reader.reversed() {
+            guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
+                continue
             }
-            // undo delta operation
-            data?.deltaDecode()
-            data?.greater(than: 0)
-        } else {
-            // default case, just place new data in 1:1
-            for r in reader.reversed() {
-                guard let d = try await r.get(mixed: variable.rawValue, time: time) else {
-                    continue
-                }
-                if data == nil {
-                    // first iteration
-                    data = d.data
-                    unit = d.unit
-                } else {
-                    data?.integrateIfNaN(d.data)
-                }
-                if data?.containsNaN() == false {
-                    break
-                }
+            if data == nil {
+                // first iteration
+                data = d.data
+                unit = d.unit
+            } else {
+                data?.integrateIfNaN(d.data)
+            }
+            if data?.containsNaN() == false {
+                break
             }
         }
         guard let data, let unit else {

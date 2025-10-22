@@ -195,10 +195,6 @@ enum CamsVariableDerived: String, GenericVariableMixable {
     case us_aqi_carbon_monoxide
 
     case is_day
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {

@@ -13,3 +13,4 @@ data_run/
 data_spatial/
 .cache
 .venv
+.vscode/

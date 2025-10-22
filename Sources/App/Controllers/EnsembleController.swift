@@ -306,18 +306,6 @@ enum EnsembleSurfaceVariable: String, GenericVariableMixable, Equatable, RawRepr
     case soil_moisture_100_to_200cm
 
     case sunshine_duration
-
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_10cm, .soil_moisture_10_to_40cm, .soil_moisture_40_to_100cm, .soil_moisture_100_to_200cm:
-            return true
-        case .snow_depth:
-            return true
-        default:
-            return false
-        }
-    }
 }
 
 /// Available pressure level variables
@@ -335,19 +323,11 @@ enum EnsemblePressureVariableType: String, GenericVariableMixable {
     case cloudcover
     case cloud_cover
     case vertical_velocity
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct EnsemblePressureVariable: PressureVariableRespresentable, GenericVariableMixable {
     let variable: EnsemblePressureVariableType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias EnsembleVariableWithoutMember = SurfacePressureAndHeightVariable<EnsembleSurfaceVariable, EnsemblePressureVariable, ForecastHeightVariable>

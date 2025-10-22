@@ -60,10 +60,6 @@ enum MeteoSwissSurfaceVariable: String, CaseIterable, MeteoSwissVariableDownload
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -298,10 +294,6 @@ struct MeteoSwissPressureVariable: PressureVariableRespresentable, MeteoSwissVar
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -414,11 +406,7 @@ struct MeteoSwissHeightVariable: HeightVariableRespresentable, MeteoSwissVariabl
     var gribName: String {
         fatalError()
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
+    
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

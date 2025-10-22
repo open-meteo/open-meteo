@@ -53,10 +53,6 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -419,10 +415,6 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -555,10 +547,6 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
         default:
             return false
         }
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
     }
 
     var omFileName: (file: String, level: Int) {

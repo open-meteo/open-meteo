@@ -48,7 +48,4 @@ struct VariableAndPreviousDay: RawRepresentableString {
 extension VariableAndPreviousDay: Hashable, Equatable {}
 
 extension VariableAndPreviousDay: GenericVariableMixable {
-    var requiresOffsetCorrectionForMixing: Bool {
-        variable.requiresOffsetCorrectionForMixing
-    }
 }

@@ -42,10 +42,6 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -158,10 +154,6 @@ struct NbmPressureVariable: PressureVariableRespresentable, GenericVariable, Has
     let level: Int
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

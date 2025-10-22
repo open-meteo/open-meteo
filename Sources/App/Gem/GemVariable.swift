@@ -401,10 +401,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return self == .soil_moisture_0_to_10cm || self == .snow_depth
-    }
-
     var skipHour0: Bool {
         switch self {
         case .precipitation: return true
@@ -435,10 +431,6 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
     let level: Int
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

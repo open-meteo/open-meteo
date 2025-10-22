@@ -41,10 +41,6 @@ enum CerraVariableDerived: String, RawRepresentableString, GenericVariableMixabl
     case cloud_cover_mid
     case cloud_cover_high
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct CerraReader: GenericReaderDerivedSimple, GenericReaderProtocol {
@@ -393,10 +389,6 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .snow_depth, .snow_depth_water_equivalent:
             return .linear
         }
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-         return false
     }
 
     /// Name used to query the ECMWF CDS API via python

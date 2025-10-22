@@ -46,10 +46,6 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case windgusts_10m
 
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -71,10 +67,6 @@ enum GemPressureVariableDerivedType: String, CaseIterable {
 struct GemPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: GemPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias GemVariableDerived = SurfaceAndPressureVariable<GemVariableDerivedSurface, GemPressureVariableDerived>

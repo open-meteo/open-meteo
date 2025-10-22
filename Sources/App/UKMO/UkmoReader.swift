@@ -37,10 +37,6 @@ enum UkmoVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -62,10 +58,6 @@ enum UkmoPressureVariableDerivedType: String, CaseIterable {
 struct UkmoPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: UkmoPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias UkmoVariableDerived = SurfaceAndPressureVariable<UkmoVariableDerivedSurface, UkmoPressureVariableDerived>

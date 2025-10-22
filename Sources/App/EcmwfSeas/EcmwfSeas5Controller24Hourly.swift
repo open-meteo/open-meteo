@@ -2,10 +2,6 @@ enum EcmwfSeasVariable24HourlySingleLevelDerived: String, RawRepresentableString
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /// Available daily aggregations

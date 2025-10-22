@@ -25,10 +25,6 @@ enum NbmVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case is_day
     case wet_bulb_temperature_2m
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -51,10 +47,6 @@ enum NbmPressureVariableDerivedType: String, CaseIterable {
 struct NbmPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: NbmPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /// Read GFS domains and perform domain specific corrections
