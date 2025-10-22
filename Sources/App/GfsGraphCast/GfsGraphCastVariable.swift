@@ -30,10 +30,6 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var multiplyAdd: (multiply: Float, add: Float)? {
         switch self {
         case .temperature_2m:
@@ -131,10 +127,6 @@ struct GfsGraphCastPressureVariable: PressureVariableRespresentable, Hashable, G
     let level: Int
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

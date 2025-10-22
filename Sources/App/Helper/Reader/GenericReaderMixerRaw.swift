@@ -1,8 +1,6 @@
 import Foundation
 
 protocol GenericVariableMixable: RawRepresentableString {
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool { get }
 }
 
 /// Mix differnet domains together, that offer the same or similar variable set
@@ -85,38 +83,18 @@ extension GenericReaderMixerRaw {
         // Integrate now lower resolution models
         var data: [Float]?
         var unit: SiUnit?
-        if variable.requiresOffsetCorrectionForMixing {
-            for r in reader.reversed() {
-                let d = try await r.get(variable: variable, time: time)
-                if data == nil {
-                    // first iteration
-                    data = d.data
-                    unit = d.unit
-                    data?.deltaEncode()
-                } else {
-                    data?.integrateIfNaNDeltaCoded(d.data)
-                }
-                if data?.containsNaN() == false {
-                    break
-                }
+        // default case, just place new data in 1:1
+        for r in reader.reversed() {
+            let d = try await r.get(variable: variable, time: time)
+            if data == nil {
+                // first iteration
+                data = d.data
+                unit = d.unit
+            } else {
+                data?.integrateIfNaN(d.data)
             }
-            // undo delta operation
-            data?.deltaDecode()
-            data?.greater(than: 0)
-        } else {
-            // default case, just place new data in 1:1
-            for r in reader.reversed() {
-                let d = try await r.get(variable: variable, time: time)
-                if data == nil {
-                    // first iteration
-                    data = d.data
-                    unit = d.unit
-                } else {
-                    data?.integrateIfNaN(d.data)
-                }
-                if data?.containsNaN() == false {
-                    break
-                }
+            if data?.containsNaN() == false {
+                break
             }
         }
         guard let data, let unit else {
@@ -127,14 +105,6 @@ extension GenericReaderMixerRaw {
 }
 
 extension VariableOrDerived: GenericVariableMixable where Raw: GenericVariableMixable, Derived: GenericVariableMixable {
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .raw(let raw):
-            return raw.requiresOffsetCorrectionForMixing
-        case .derived(let derived):
-            return derived.requiresOffsetCorrectionForMixing
-        }
-    }
 }
 
 extension Array where Element == Float {

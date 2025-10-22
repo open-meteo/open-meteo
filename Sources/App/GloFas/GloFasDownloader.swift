@@ -404,10 +404,6 @@ enum GloFasVariable: String, GenericVariable {
     var isElevationCorrectable: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /// Variable to store each member in its own file
@@ -440,10 +436,6 @@ fileprivate struct GloFasVariableAndMember: GenericVariable {
     }
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

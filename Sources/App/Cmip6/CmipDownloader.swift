@@ -331,10 +331,6 @@ enum Cmip6Variable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         case mean
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

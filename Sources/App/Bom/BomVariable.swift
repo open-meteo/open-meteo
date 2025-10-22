@@ -39,17 +39,6 @@ enum BomVariable: String, CaseIterable, GenericVariableMixable, GenericVariable 
     case visibility
     case wind_gusts_10m
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_10cm: return true
-        case .soil_moisture_10_to_35cm: return true
-        case .soil_moisture_35_to_100cm: return true
-        case .soil_moisture_100_to_300cm: return true
-        case .snow_depth: return true
-        default: return false
-        }
-    }
-
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true

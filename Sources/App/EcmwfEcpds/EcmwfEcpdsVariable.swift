@@ -380,10 +380,6 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "blh"
         }
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
     
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {

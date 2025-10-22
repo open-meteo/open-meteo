@@ -60,10 +60,6 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         return rawValue
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var gribName: String? {
         // mp2    Mean zero-crossing wave period
         switch self {
@@ -297,10 +293,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     var nameInFiles: String {
         return rawValue
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
     }
 
     var unit: SiUnit {
@@ -908,8 +900,4 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case soil_moisture_index_28_to_100cm
     case soil_moisture_index_100_to_255cm
     case soil_moisture_index_0_to_100cm
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }

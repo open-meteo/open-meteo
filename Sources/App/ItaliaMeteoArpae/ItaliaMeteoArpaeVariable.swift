@@ -224,19 +224,6 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         }
     }
 
-    /// Soil moisture or snow depth are cumulative processes and have offsets if multiple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_1cm: return true
-        case .soil_moisture_1_to_3cm: return true
-        case .soil_moisture_3_to_9cm: return true
-        case .soil_moisture_9_to_27cm: return true
-        case .soil_moisture_27_to_81cm: return true
-        case .snow_depth: return true
-        default: return false
-        }
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -424,10 +411,6 @@ struct ItaliaMeteoArpaePressureVariable: PressureVariableRespresentable, Generic
     let level: Int
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

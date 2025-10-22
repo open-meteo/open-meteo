@@ -71,10 +71,6 @@ enum EcmwfEcdpsIfsVariableDerived: String, GenericVariableMixable {
     case soil_moisture_index_0_to_100cm
     
     case snow_depth_water_equivalent
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 

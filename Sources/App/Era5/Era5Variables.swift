@@ -479,8 +479,4 @@ enum Era5Variable: String, CaseIterable, GenericVariable, GribMessageAssociated 
             return nil
         }
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }

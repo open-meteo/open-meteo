@@ -14,10 +14,6 @@ enum GfsGraphCastVariableDerivedSurface: String, CaseIterable, GenericVariableMi
     case cloudcover_low
     case cloudcover_mid
     case cloudcover_high
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -41,10 +37,6 @@ enum GfsGraphCastPressureVariableDerivedType: String, CaseIterable {
 struct GfsGraphCastPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: GfsGraphCastPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias GfsGraphCastVariableDerived = SurfaceAndPressureVariable<GfsGraphCastVariableDerivedSurface, GfsGraphCastPressureVariableDerived>

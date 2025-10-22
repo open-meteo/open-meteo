@@ -66,10 +66,6 @@ enum KnmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -91,10 +87,6 @@ enum KnmiPressureVariableDerivedType: String, CaseIterable {
 struct KnmiPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: KnmiPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias KnmiVariableDerived = SurfaceAndPressureVariable<KnmiVariableDerivedSurface, KnmiPressureVariableDerived>

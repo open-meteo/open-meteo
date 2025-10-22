@@ -22,10 +22,6 @@ enum MfWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixab
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -118,10 +114,6 @@ enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -158,10 +150,6 @@ enum MfCurrentVariable: String, CaseIterable, GenericVariable, GenericVariableMi
 enum MfCurrentVariableDerived: String, CaseIterable, GenericVariableMixable {
     case ocean_current_velocity
     case ocean_current_direction
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct MfCurrentReader: GenericReaderDerived, GenericReaderProtocol {
@@ -263,10 +251,6 @@ enum MfSSTVariable: String, CaseIterable, GenericVariable, GenericVariableMixabl
     }
 
     var isElevationCorrectable: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

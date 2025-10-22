@@ -30,10 +30,6 @@ enum ProbabilityVariable: String, CaseIterable, GenericVariable, GenericVariable
     var storePreviousForecast: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**

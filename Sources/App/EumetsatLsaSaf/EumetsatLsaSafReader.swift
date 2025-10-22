@@ -12,10 +12,6 @@ enum EumetsatLsaSafVariableDerived: String, GenericVariableMixable {
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct EumetsatLsaSafReader: GenericReaderDerived, GenericReaderProtocol {

@@ -3,10 +3,6 @@ enum EcmwfSeasVariableMonthlyDerived: String, RawRepresentableString, GenericVar
     case snowfall_anomaly
     case snow_depth_mean
     case snow_depth_anomaly
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct EcmwfSeas5ControllerMonthly: GenericReaderDerivedSimple, GenericReaderProtocol {

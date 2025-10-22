@@ -56,10 +56,6 @@ enum GfsVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case mass_density_8m
 
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -82,10 +78,6 @@ enum GfsPressureVariableDerivedType: String, CaseIterable {
 struct GfsPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: GfsPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /// Read GFS domains and perform domain specific corrections

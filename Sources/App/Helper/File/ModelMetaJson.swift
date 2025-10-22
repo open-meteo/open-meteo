@@ -28,10 +28,6 @@ import OmFileFormat
     var storePreviousForecast: Bool {
         return true
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }*/
 
 /**

@@ -191,10 +191,6 @@ struct MeteoFranceDownload: AsyncCommand {
         var storePreviousForecast: Bool {
             return false
         }
-
-        var requiresOffsetCorrectionForMixing: Bool {
-            return false
-        }
     }
 
     /**

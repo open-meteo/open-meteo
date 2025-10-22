@@ -163,14 +163,6 @@ extension SurfaceAndPressureVariable: GenericVariable where Surface: GenericVari
 }
 
 extension SurfaceAndPressureVariable: GenericVariableMixable where Surface: GenericVariableMixable, Pressure: GenericVariableMixable {
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .surface(let surface):
-            return surface.requiresOffsetCorrectionForMixing
-        case .pressure(let pressure):
-            return pressure.requiresOffsetCorrectionForMixing
-        }
-    }
 }
 
 /// Enum with surface and pressure variable
@@ -260,16 +252,6 @@ extension SurfacePressureAndHeightVariable: GenericVariable where Surface: Gener
 }
 
 extension SurfacePressureAndHeightVariable: GenericVariableMixable where Surface: GenericVariableMixable, Pressure: GenericVariableMixable, Height: GenericVariableMixable {
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .surface(let surface):
-            return surface.requiresOffsetCorrectionForMixing
-        case .pressure(let pressure):
-            return pressure.requiresOffsetCorrectionForMixing
-        case .height(let height):
-            return height.requiresOffsetCorrectionForMixing
-        }
-    }
 }
 
 enum VariableOrDerived<Raw: RawRepresentableString & Sendable, Derived: RawRepresentableString & Sendable>: RawRepresentableString, Sendable {

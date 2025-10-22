@@ -33,8 +33,4 @@ enum JaxaHimawariVariable: String, CaseIterable, GenericVariable, GenericVariabl
     var storePreviousForecast: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }

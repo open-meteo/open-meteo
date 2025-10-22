@@ -1637,28 +1637,6 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
             return self
         }
     }
-
-    /// Soil moisture or snow depth are cumulative processes and have offests if mutliple models are mixed
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_1cm: return true
-        case .soil_moisture_0_to_100cm: return true
-        case .soil_moisture_0_to_10cm: return true
-        case .soil_moisture_0_to_7cm: return true
-        case .soil_moisture_100_to_200cm: return true
-        case .soil_moisture_100_to_255cm: return true
-        case .soil_moisture_10_to_40cm: return true
-        case .soil_moisture_1_3cm: return true
-        case .soil_moisture_27_81cm: return true
-        case .soil_moisture_28_to_100cm: return true
-        case .soil_moisture_3_9cm: return true
-        case .soil_moisture_40_to_100cm: return true
-        case .soil_moisture_7_to_28cm: return true
-        case .soil_moisture_9_27cm: return true
-        case .snow_depth: return true
-        default: return false
-        }
-    }
 }
 
 /// Available pressure level variables
@@ -1678,19 +1656,11 @@ enum ForecastPressureVariableType: String, GenericVariableMixable {
     case cloudcover
     case cloud_cover
     case vertical_velocity
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariableMixable {
     let variable: ForecastPressureVariableType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /// Available pressure level variables
@@ -1709,19 +1679,11 @@ enum ForecastHeightVariableType: String, GenericVariableMixable {
     case cloudcover
     case cloud_cover
     case vertical_velocity
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixable {
     let variable: ForecastHeightVariableType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, ForecastPressureVariable, ForecastHeightVariable>

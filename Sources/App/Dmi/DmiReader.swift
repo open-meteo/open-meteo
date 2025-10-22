@@ -62,10 +62,6 @@ enum DmiVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -89,10 +85,6 @@ enum DmiPressureVariableDerivedType: String, CaseIterable {
 struct DmiPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: DmiPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias DmiVariableDerived = SurfaceAndPressureVariable<DmiVariableDerivedSurface, DmiPressureVariableDerived>

@@ -60,10 +60,6 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -206,10 +202,6 @@ struct KnmiPressureVariable: PressureVariableRespresentable, GenericVariable, Ha
     let level: Int
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

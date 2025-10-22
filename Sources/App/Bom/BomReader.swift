@@ -47,10 +47,6 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case soil_moisture_10_to_40cm
     case soil_moisture_40_to_100cm
     case soil_moisture_100_to_200cm
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias BomVariableCombined = VariableOrDerived<BomVariable, BomVariableDerived>
