@@ -100,10 +100,6 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

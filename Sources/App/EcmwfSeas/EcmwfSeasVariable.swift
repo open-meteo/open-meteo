@@ -182,10 +182,6 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
     var storePreviousForecast: Bool {
         return false
     }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /// 24 hourly variables in O320 grid
@@ -315,15 +311,6 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     
     var storePreviousForecast: Bool {
         return false
-    }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
-            return true
-        default:
-            return false
-        }
     }
 }
 
@@ -469,10 +456,6 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     }
     
     var storePreviousForecast: Bool {
-        return false
-    }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 }
@@ -932,15 +915,6 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     
     var storePreviousForecast: Bool {
         return false
-    }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        switch self {
-        case .soil_moisture_0_to_7cm_mean, .soil_moisture_7_to_28cm_mean, .soil_moisture_28_to_100cm_mean, .soil_moisture_100_to_255cm_mean:
-            return true
-        default:
-            return false
-        }
     }
     
     

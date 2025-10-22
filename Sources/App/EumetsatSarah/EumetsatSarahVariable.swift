@@ -52,8 +52,4 @@ enum EumetsatSarahVariable: String, CaseIterable, GenericVariable, GenericVariab
     var storePreviousForecast: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }

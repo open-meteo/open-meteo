@@ -34,8 +34,4 @@ enum EumetsatLsaSafVariable: String, CaseIterable, GenericVariable, GenericVaria
     var storePreviousForecast: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }

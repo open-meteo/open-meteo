@@ -153,7 +153,7 @@ extension Array where Element == Float {
     }
 
     /// Perform a simple delta encoding. Leave the first value as seed.
-    mutating func deltaEncode() {
+    /*mutating func deltaEncode() {
         if count <= 1 {
             return
         }
@@ -183,5 +183,5 @@ extension Array where Element == Float {
         for x in 0..<count {
             self[x] = Swift.max(self[x], value)
         }
-    }
+    }*/
 }

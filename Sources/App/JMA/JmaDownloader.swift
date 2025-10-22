@@ -347,10 +347,6 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         return self == .temperature_2m
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var skipHour0: Bool {
         switch self {
         case .precipitation: return true
@@ -380,10 +376,6 @@ struct JmaPressureVariable: PressureVariableRespresentable, JmaVariableDownloada
     let level: Int
 
     var storePreviousForecast: Bool {
-        return false
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
         return false
     }
 

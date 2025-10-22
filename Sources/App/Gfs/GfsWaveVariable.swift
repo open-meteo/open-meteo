@@ -25,10 +25,6 @@ enum GfsWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMixa
         return false
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

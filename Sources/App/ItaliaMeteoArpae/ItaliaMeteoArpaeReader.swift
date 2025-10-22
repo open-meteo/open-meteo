@@ -35,10 +35,6 @@ enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariab
     case windgusts_10m
     case sunshine_duration
     case surface_temperature
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -60,10 +56,6 @@ enum ItaliaMeteoArpaePressureVariableDerivedType: String, CaseIterable {
 struct ItaliaMeteoArpaePressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: ItaliaMeteoArpaePressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias ItaliaMeteoArpaeVariableDerived = SurfaceAndPressureVariable<ItaliaMeteoArpaeVariableDerivedSurface, ItaliaMeteoArpaePressureVariableDerived>

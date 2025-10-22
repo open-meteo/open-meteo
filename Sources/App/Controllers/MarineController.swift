@@ -115,10 +115,6 @@ enum MarineVariable: String, GenericVariableMixable {
     case sea_level_height_msl
     case invert_barometer_height
     case sea_surface_temperature
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct IconWaveController {

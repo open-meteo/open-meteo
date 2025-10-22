@@ -414,10 +414,6 @@ enum MeteoFranceSurfaceVariable: String, CaseIterable, GenericVariable, GenericV
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
@@ -564,11 +560,6 @@ struct MeteoFrancePressureVariable: PressureVariableRespresentable, GenericVaria
     var storePreviousForecast: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }

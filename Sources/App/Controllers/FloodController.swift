@@ -19,10 +19,6 @@ enum GlofasDerivedVariable: String, CaseIterable, GenericVariableMixable {
     case river_discharge_median
     case river_discharge_p25
     case river_discharge_p75
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias GloFasVariableOrDerived = VariableOrDerived<GloFasVariable, GlofasDerivedVariable>

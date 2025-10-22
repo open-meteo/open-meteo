@@ -185,10 +185,6 @@ enum SatelliteVariable: String, CaseIterable, GenericVariableMixable, GenericVar
     var isElevationCorrectable: Bool {
         return false
     }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 enum SatelliteDomain: String, CaseIterable, GenericDomain {
@@ -257,9 +253,5 @@ enum SatelliteDomain: String, CaseIterable, GenericDomain {
 
     var interpolation: ReaderInterpolation {
         fatalError("Interpolation not required for cerra")
-    }
-
-    var requiresOffsetCorrectionForMixing: Bool {
-         return false
     }
 }

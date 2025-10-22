@@ -75,10 +75,6 @@ enum CmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case cloudcover_high
     case windgusts_10m
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 /**
@@ -101,10 +97,6 @@ enum CmaPressureVariableDerivedType: String, CaseIterable {
 struct CmaPressureVariableDerived: PressureVariableRespresentable, GenericVariableMixable {
     let variable: CmaPressureVariableDerivedType
     let level: Int
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 typealias CmaVariableDerived = SurfaceAndPressureVariable<CmaVariableDerivedSurface, CmaPressureVariableDerived>

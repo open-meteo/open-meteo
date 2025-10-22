@@ -162,10 +162,6 @@ enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, Cas
     case windgusts_10m_mean
     case windgusts_10m_max
     case vapor_pressure_deficit_max
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIterable, GenericVariableBiasCorrectable {
@@ -182,10 +178,6 @@ enum Cmip6VariableDerivedBiasCorrected: String, GenericVariableMixable, CaseIter
     case vapour_pressure_deficit_max
     case wind_gusts_10m_mean
     case wind_gusts_10m_max
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 
     var biasCorrectionType: QuantileDeltaMappingBiasCorrection.ChangeType {
         switch self {

@@ -59,10 +59,6 @@ enum Era5VariableDerived: String, RawRepresentableString, GenericVariableMixable
     case wind_direction_10m_spread
     case wind_direction_100m_spread
     case snowfall_spread
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 enum Era5Factory {

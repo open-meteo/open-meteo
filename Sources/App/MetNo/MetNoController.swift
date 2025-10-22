@@ -265,8 +265,4 @@ enum MetNoVariableDerived: String, GenericVariableMixable {
     case winddirection_10m
     case windgusts_10m
     case sunshine_duration
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }

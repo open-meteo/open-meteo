@@ -82,10 +82,6 @@ enum MetNoVariable: String, CaseIterable, GenericVariable, GenericVariableMixabl
         }
     }
 
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
-
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
     }
