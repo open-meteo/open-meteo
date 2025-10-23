@@ -1,532 +1,64 @@
 import Vapor
 import OpenMeteoSdk
 
+protocol SeasonalForecastControllerReadableHourly: GenericDeriverProtocol where SourceVariable == SeasonalVariableHourly {
+    
+}
+protocol SeasonalForecastControllerReadableDaily: GenericDeriverProtocol where SourceVariable == SeasonalVariableDaily {
+    
+}
+protocol SeasonalForecastControllerReadableMonthly: GenericDeriverProtocol where SourceVariable == SeasonalVariableMonthly {
+    
+}
 
-enum SeasonalForecastVariableHourly: String, RawRepresentableString, GenericVariableMixable, FlatBuffersVariable {
-    case temperature_2m
-    case dew_point_2m
-    case pressure_msl
-    case sea_surface_temperature
-    case wind_u_component_10m
-    case wind_v_component_10m
-    case snowfall_water_equivalent
-    case precipitation
-    case shortwave_radiation
-    case cloud_cover
-    case wind_u_component_100m
-    case wind_v_component_100m
-    case wind_u_component_200m
-    case wind_v_component_200m
-    case wind_u_component_70m
-    case wind_v_component_70m
-    case wind_u_component_170m
-    case wind_v_component_170m
-    case direct_radiation
-    case temperature_2m_max
-    case temperature_2m_min
-    case soil_temperature_0_to_7cm
-    case soil_temperature_7_to_28cm
-    case soil_temperature_28_to_100cm
-    case soil_temperature_100_to_255cm
-    case soil_moisture_0_to_7cm
-    case soil_moisture_7_to_28cm
-    case soil_moisture_28_to_100cm
-    case soil_moisture_100_to_255cm
-    case showers
-    case wind_gusts_10m
-    case sunshine_duration
-    case apparent_temperature
-    case dewpoint_2m
-    case relativehumidity_2m
-    case relative_humidity_2m
-    case windspeed_10m
-    case wind_speed_10m
-    case winddirection_10m
-    case wind_direction_10m
-    case windspeed_100m
-    case wind_speed_100m
-    case winddirection_100m
-    case wind_direction_100m
-    case windspeed_200m
-    case wind_speed_200m
-    case winddirection_200m
-    case wind_direction_200m
-    case vapor_pressure_deficit
-    case vapour_pressure_deficit
-    case surface_pressure
-    case snowfall
-    case rain
-    case et0_fao_evapotranspiration
-    case cloudcover
-   
-    case direct_normal_irradiance
-    case weathercode
-    case weather_code
-    case is_day
+enum SeasonalForecastControllerDomains: String, Codable, CaseIterable, MultiDomainMixerDomain {
+    var countEnsembleMember: Int {
+        fatalError()
+    }
     
-    case diffuse_radiation
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
-    case shortwave_radiation_instant
-    case diffuse_radiation_instant
-    case direct_radiation_instant
-    case direct_normal_irradiance_instant
-    case wet_bulb_temperature_2m
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> [any GenericReaderProtocol] {
+        fatalError()
+    }
     
-    case global_tilted_irradiance
-    case global_tilted_irradiance_instant
+    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
+        fatalError()
+    }
     
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .temperature_2m:
-            return .init(variable: .temperature, altitude: 2)
-        case .dew_point_2m:
-            return .init(variable: .dewPoint, altitude: 2)
-        case .pressure_msl:
-            return .init(variable: .pressureMsl)
-        case .sea_surface_temperature:
-            return .init(variable: .seaSurfaceTemperature)
-        case .wind_u_component_10m:
-            return .init(variable: .windUComponent, altitude: 10)
-        case .wind_v_component_10m:
-            return .init(variable: .windVComponent, altitude: 10)
-        case .wind_u_component_70m:
-            return .init(variable: .windUComponent, altitude: 70)
-        case .wind_v_component_70m:
-            return .init(variable: .windVComponent, altitude: 70)
-        case .wind_u_component_170m:
-            return .init(variable: .windUComponent, altitude: 170)
-        case .wind_v_component_170m:
-            return .init(variable: .windVComponent, altitude: 170)
-        case .snowfall_water_equivalent:
-            return .init(variable: .snowfallWaterEquivalent)
-        case .precipitation:
-            return .init(variable: .precipitation)
-        case .shortwave_radiation:
-            return .init(variable: .shortwaveRadiation)
-        case .soil_temperature_0_to_7cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm:
-            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm:
-            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm:
-            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
-        case .cloud_cover:
-            return .init(variable: .cloudCover)
-        case .apparent_temperature:
-            return .init(variable: .apparentTemperature)
-        case .dewpoint_2m:
-            return .init(variable: .dewPoint, altitude: 2)
-        case .relativehumidity_2m, .relative_humidity_2m:
-            return .init(variable: .relativeHumidity, altitude: 2)
-        case .windspeed_10m, .wind_speed_10m:
-            return .init(variable: .windSpeed, altitude: 10)
-        case .winddirection_10m, .wind_direction_10m:
-            return .init(variable: .windDirection, altitude: 10)
-        case .vapor_pressure_deficit, .vapour_pressure_deficit:
-            return .init(variable: .vapourPressureDeficit)
-        case .surface_pressure:
-            return .init(variable: .surfacePressure)
-        case .snowfall:
-            return .init(variable: .snowfall)
-        case .rain:
-            return .init(variable: .rain)
-        case .et0_fao_evapotranspiration:
-            return .init(variable: .et0FaoEvapotranspiration)
-        case .cloudcover:
-            return .init(variable: .cloudCover)
-        case .direct_normal_irradiance:
-            return .init(variable: .directNormalIrradiance)
-        case .weathercode, .weather_code:
-            return .init(variable: .weatherCode)
-        case .is_day:
-            return .init(variable: .isDay)
-        case .diffuse_radiation:
-            return .init(variable: .diffuseRadiation)
-        case .direct_radiation:
-            return .init(variable: .directRadiation)
-        case .terrestrial_radiation:
-            return .init(variable: .terrestrialRadiation)
-        case .terrestrial_radiation_instant:
-            return .init(variable: .terrestrialRadiationInstant)
-        case .shortwave_radiation_instant:
-            return .init(variable: .shortwaveRadiationInstant)
-        case .diffuse_radiation_instant:
-            return .init(variable: .diffuseRadiationInstant)
-        case .direct_radiation_instant:
-            return .init(variable: .directRadiationInstant)
-        case .direct_normal_irradiance_instant:
-            return .init(variable: .directNormalIrradianceInstant)
-        case .wet_bulb_temperature_2m:
-            return .init(variable: .wetBulbTemperature, altitude: 2)
-        case .global_tilted_irradiance:
-            return .init(variable: .globalTiltedIrradiance)
-        case .global_tilted_irradiance_instant:
-            return .init(variable: .globalTiltedIrradianceInstant)
-        case .wind_u_component_100m:
-            return .init(variable: .windUComponent, altitude: 100)
-        case .wind_v_component_100m:
-            return .init(variable: .windVComponent, altitude: 100)
-        case .wind_u_component_200m:
-            return .init(variable: .windUComponent, altitude: 200)
-        case .wind_v_component_200m:
-            return .init(variable: .windVComponent, altitude: 200)
-        case .temperature_2m_max:
-            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
-        case .temperature_2m_min:
-            return .init(variable: .temperature, aggregation: .minimum, altitude: 2)
-        case .showers:
-            return .init(variable: .showers)
-        case .wind_gusts_10m:
-            return .init(variable: .windGusts, altitude: 10)
-        case .sunshine_duration:
-            return .init(variable: .sunshineDuration)
-        case .windspeed_100m, .wind_speed_100m:
-            return .init(variable: .windSpeed, altitude: 100)
-        case .winddirection_100m, .wind_direction_100m:
-            return .init(variable: .windDirection, altitude: 100)
-        case .windspeed_200m, .wind_speed_200m:
-            return .init(variable: .windSpeed, altitude: 200)
-        case .winddirection_200m, .wind_direction_200m:
-            return .init(variable: .windDirection, altitude: 200)
+    var genericDomain: (any GenericDomain)? {
+        fatalError()
+    }
+    
+    case ecmwf_seasonal_seamless
+    case ecmwf_seas5
+    case ecmwf_ec46
+}
+
+struct Seas5ReaderMixDaily {
+    //let readerHourly: SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>>
+    //let readerDaily: SeasonalForecastDeriverDaily<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>>
+    //let readerMonthly: SeasonalForecastDeriverMonthly<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableMonthly>>
+    
+    let readerHourly: [any SeasonalForecastControllerReadableHourly]
+    let readerDaily: [any SeasonalForecastControllerReadableDaily]
+    let readerMonthly: [any SeasonalForecastControllerReadableMonthly]
+    
+    func getHourly(variable: SeasonalVariableHourly, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        // TODO mix results
+        return try await readerHourly.get(variable: variable, time: time)
+    }
+    
+    func getDaily(variable: SeasonalVariableDaily, time: TimerangeDtAndSettings, params: ApiQueryParameter) async throws -> DataAndUnit? {
+        if let nativeDaily = try await readerDaily.get(variable: variable, time: time)?.convertAndRound(params: params) {
+            return nativeDaily
         }
+        return try await readerHourly.getDaily(variable: variable, params: params, time: time)
+    }
+    
+    func getMonthly(variable: SeasonalVariableMonthly, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        return try await readerMonthly.get(variable: variable, time: time)
     }
 }
 
-
-indirect enum DerivedMapping<Variable> {
-    enum RawOrMapped {
-        case raw(Variable)
-        case mapped(DerivedMapping)
-    }
-    
-    case direct(Variable)
-    case independent((TimerangeDtAndSettings) -> DataAndUnit)
-    case one(RawOrMapped, (DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
-    case two(RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
-    case three(RawOrMapped, RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
-    case four(RawOrMapped, RawOrMapped, RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
-    
-    case weatherCode(cloudcover: RawOrMapped, precipitation: Variable, convectivePrecipitation: Variable?, snowfallCentimeters: RawOrMapped, gusts: Variable?, cape: Variable?, liftedIndex: Variable?, visibilityMeters: Variable?, categoricalFreezingRain: Variable?)
-    
-    static func windSpeed(u: Variable?, v: Variable?) -> Self? {
-        guard let u, let v else {
-            return nil
-        }
-        return .two(.raw(u), .raw(v), {u, v, _ in
-            return DataAndUnit(zip(u.data, v.data).map(Meteorology.windspeed), .metrePerSecond)
-        })
-    }
-    
-    static func windSpeed(u: Variable?, v: Variable?, levelFrom: Float, levelTo: Float) -> Self? {
-        guard let u, let v else {
-            return nil
-        }
-        return .two(.raw(u), .raw(v), {u, v, _ in
-            return DataAndUnit(Meteorology.windspeed(u: u.data, v: v.data, levelFrom: levelFrom, levelTo: levelTo), .metrePerSecond)
-        })
-    }
-    
-    static func windDirection(u: Variable?, v: Variable?) -> Self? {
-        guard let u, let v else {
-            return nil
-        }
-        return .two(.raw(u), .raw(v), {u, v, _ in
-            return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .metrePerSecond)
-        })
-    }
-}
-
-
-struct SeasonalForecastDeriverHourly<Reader: GenericReaderProtocol> {
-    let reader: Reader
-    let options: GenericReaderOptions
-    
-    func getDeriverMap(variable: SeasonalForecastVariableHourly) -> DerivedMapping<Reader.MixingVar>? {
-        if let variable = Reader.variableFromString(variable.rawValue) {
-            return .direct(variable)
-        }
-        switch variable {
-        case .windspeed_10m:
-            return getDeriverMap(variable: .wind_speed_10m)
-        case .wind_speed_10m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"))
-        case .winddirection_10m:
-            return getDeriverMap(variable: .wind_direction_10m)
-        case .wind_direction_10m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"))
-        case .windspeed_100m:
-            return getDeriverMap(variable: .wind_speed_100m)
-        case .wind_speed_100m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), levelFrom: 70, levelTo: 100)
-        case .winddirection_100m:
-            return getDeriverMap(variable: .wind_direction_100m)
-        case .wind_direction_100m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"))
-        case .windspeed_200m:
-            return getDeriverMap(variable: .wind_speed_200m)
-        case .wind_speed_200m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"), levelFrom: 170, levelTo: 200)
-        case .winddirection_200m:
-            return getDeriverMap(variable: .wind_direction_200m)
-        case .wind_direction_200m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"))
-        case .apparent_temperature:
-            guard
-                let wind = getDeriverMap(variable: .windspeed_10m),
-                let temp = Reader.variableFromString("temperature_2m"),
-                let relhum = getDeriverMap(variable: .relative_humidity_2m),
-                let radiation = getDeriverMap(variable: .shortwave_radiation)
-            else {
-                return nil
-            }
-            return .four(.mapped(wind), .raw(temp), .mapped(relhum), .mapped(radiation)) {
-                windspeed, temperature, relhum, radiation, time in
-                return DataAndUnit(Meteorology.apparentTemperature(temperature_2m: temperature.data, relativehumidity_2m: relhum.data, windspeed_10m: windspeed.data, shortwave_radiation: radiation.data), .celsius)
-            }
-        case .relativehumidity_2m:
-            return getDeriverMap(variable: .relative_humidity_2m)
-        case .relative_humidity_2m:
-            guard
-                let temperature = Reader.variableFromString("temperature_2m"),
-                let dew = Reader.variableFromString("dew_point_2m")
-            else {
-                return nil
-            }
-            return .two(.raw(temperature), .raw(dew)) { temperature, dew, _ in
-                let relativeHumidity = zip(temperature.data, dew.data).map(Meteorology.relativeHumidity)
-                return DataAndUnit(relativeHumidity, .percentage)
-            }
-        case .dewpoint_2m:
-            return getDeriverMap(variable: .dew_point_2m)
-        case .dew_point_2m:
-            guard
-                let temperature = Reader.variableFromString("temperature_2m"),
-                let rh = Reader.variableFromString("relative_humidity_2m")
-            else {
-                return nil
-            }
-            return .two(.raw(temperature), .raw(rh)) { temperature, rh, _ in
-                let dewpoint = zip(temperature.data, rh.data).map(Meteorology.dewpoint)
-                return DataAndUnit(dewpoint, .percentage)
-            }
-        case .vapour_pressure_deficit, .vapor_pressure_deficit:
-            guard
-                let temperature = Reader.variableFromString("temperature_2m"),
-                let rh = self.getDeriverMap(variable: .relativehumidity_2m)
-            else {
-                return nil
-            }
-            return .two(.raw(temperature), .mapped(rh)) { temperature, dewpoint, _ in
-                return DataAndUnit(zip(temperature.data, dewpoint.data).map(Meteorology.vaporPressureDeficit), .kilopascal)
-            }
-        case .et0_fao_evapotranspiration:
-            guard
-                let wind = getDeriverMap(variable: .windspeed_10m),
-                let temp = Reader.variableFromString("temperature_2m"),
-                let dew = getDeriverMap(variable: .dewpoint_2m),
-                let radiation = getDeriverMap(variable: .shortwave_radiation)
-            else {
-                return nil
-            }
-            return .four(.mapped(radiation), .raw(temp), .mapped(wind), .mapped(dew)) { swrad, temperature, windspeed, dewpoint, time in
-                let exrad = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                let et0 = swrad.data.indices.map { i in
-                    return Meteorology.et0Evapotranspiration(temperature2mCelsius: temperature.data[i], windspeed10mMeterPerSecond: windspeed.data[i], dewpointCelsius: dewpoint.data[i], shortwaveRadiationWatts: swrad.data[i], elevation: reader.modelElevation.numeric, extraTerrestrialRadiation: exrad[i], dtSeconds: time.dtSeconds)
-                }
-                return DataAndUnit(et0, .millimetre)
-            }
-        case .diffuse_radiation:
-            guard let swrad = Reader.variableFromString("shortwave_radiation") else {
-                return nil
-            }
-            if let direct = Reader.variableFromString("direct_radiation") {
-                return .two(.raw(swrad), .raw(direct)) { swrad, direct, _ in
-                    return DataAndUnit(zip(swrad.data, direct.data).map(-), swrad.unit)
-                }
-            }
-            return .one(.raw(swrad)) { swrad, time in
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(diffuse, .wattPerSquareMetre)
-            }
-        case .direct_radiation:
-            guard let swrad = Reader.variableFromString("shortwave_radiation") else {
-                return nil
-            }
-            if let diffuse = Reader.variableFromString("diffuse_radiation") {
-                return .two(.raw(swrad), .raw(diffuse)) { swrad, diffuse, _ in
-                    return DataAndUnit(zip(swrad.data, diffuse.data).map(-), swrad.unit)
-                }
-            }
-            return .one(.raw(swrad)) { swrad, time in
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                let direct = zip(swrad.data, diffuse).map(-)
-                return DataAndUnit(direct, .wattPerSquareMetre)
-            }
-        case .surface_pressure:
-            guard
-                let temperature = Reader.variableFromString("temperature_2m"),
-                let pressure = Reader.variableFromString("pressure_msl")
-            else {
-                return nil
-            }
-            return .two(.raw(temperature), .raw(pressure)) { temperature, pressure, _ in
-                return DataAndUnit(Meteorology.surfacePressure(temperature: temperature.data, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
-            }
-        case .cloudcover:
-            return getDeriverMap(variable: .cloud_cover)
-        case .snowfall:
-            guard let snowWater = Reader.variableFromString("snowfall_water_equivalent") else {
-                return nil
-            }
-            return .one(.raw(snowWater)) { snowWater, time in
-                let snowfall = snowWater.data.map { $0 * 0.7 }
-                return DataAndUnit(snowfall, .centimetre)
-            }
-        case .direct_normal_irradiance:
-            guard let directRadiation  = getDeriverMap(variable: .direct_radiation) else {
-                return nil
-            }
-            return .one(.mapped(directRadiation)) { dhi, time in
-                let dni = Zensun.calculateBackwardsDNI(directRadiation: dhi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(dni, .wattPerSquareMetre)
-            }
-        case .rain:
-            guard
-                let snowwater = Reader.variableFromString("snowfall_water_equivalent"),
-                let precip = Reader.variableFromString("precipitation")
-            else {
-                return nil
-            }
-            if let showers = Reader.variableFromString("showers") {
-                return .three(.raw(precip), .raw(snowwater), .raw(showers)) { precip, snowwater, showers, _ in
-                    let rain = zip(precip.data, zip(snowwater.data, showers.data)).map({
-                        return max($0.0 - $0.1.0 - $0.1.1, 0)
-                    })
-                    return DataAndUnit(rain, precip.unit)
-                }
-
-            }
-            return .two(.raw(precip), .raw(snowwater)) { precip, snowwater, _ in
-                let rain = zip(precip.data, snowwater.data).map({
-                    return max($0.0 - $0.1, 0)
-                })
-                return DataAndUnit(rain, precip.unit)
-            }
-        case .weather_code, .weathercode:
-            guard
-                let cloudCover = getDeriverMap(variable: .cloud_cover),
-                let snowfall = getDeriverMap(variable: .snowfall),
-                let precipitation = Reader.variableFromString("precipitation")
-            else {
-                return nil
-            }
-            return .weatherCode(
-                cloudcover: .mapped(cloudCover),
-                precipitation: precipitation,
-                convectivePrecipitation: Reader.variableFromString("showers"),
-                snowfallCentimeters: .mapped(snowfall),
-                gusts: Reader.variableFromString("wind_gusts_10m"),
-                cape: nil,
-                liftedIndex: nil,
-                visibilityMeters: nil,
-                categoricalFreezingRain: nil
-            )
-        case .is_day:
-            return .independent({ time in
-                return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
-            })
-
-        case .terrestrial_radiation:
-            return .independent({ time in
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            })
-        case .terrestrial_radiation_instant:
-            return .independent({ time in
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            })
-        case .shortwave_radiation_instant:
-            guard let radiation = getDeriverMap(variable: .shortwave_radiation) else {
-                return nil
-            }
-            return .one(.mapped(radiation)) { sw, time in
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
-                return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
-            }
-        case .direct_normal_irradiance_instant:
-            guard let directRadiation  = getDeriverMap(variable: .direct_radiation) else {
-                return nil
-            }
-            return .one(.mapped(directRadiation)) { direct, time in
-                let dni = Zensun.calculateBackwardsDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertToInstant: true)
-                return DataAndUnit(dni, direct.unit)
-            }
-        case .direct_radiation_instant:
-            guard let directRadiation  = getDeriverMap(variable: .direct_radiation) else {
-                return nil
-            }
-            return .one(.mapped(directRadiation)) { direct, time in
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
-                return DataAndUnit(zip(direct.data, factor).map(*), direct.unit)
-            }
-        case .diffuse_radiation_instant:
-            guard let diffuseRadiation  = getDeriverMap(variable: .diffuse_radiation) else {
-                return nil
-            }
-            return .one(.mapped(diffuseRadiation)) { diff, time in
-                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
-                return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-            }
-        case .wet_bulb_temperature_2m:
-            guard
-                let temperature = Reader.variableFromString("temperature_2m"),
-                let rh = self.getDeriverMap(variable: .relativehumidity_2m)
-            else {
-                return nil
-            }
-            return .two(.raw(temperature), .mapped(rh)) { temperature, rh, _ in
-                return DataAndUnit(zip(temperature.data, rh.data).map(Meteorology.wetBulbTemperature), temperature.unit)
-
-            }
-        case .global_tilted_irradiance:
-            guard
-                let directRadiation = getDeriverMap(variable: .direct_radiation),
-                let diffuseRadiation = getDeriverMap(variable: .diffuse_radiation)
-            else {
-                return nil
-            }
-            return .two(.mapped(directRadiation), .mapped(diffuseRadiation)) { directRadiation, diffuseRadiation, time in
-                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation.data, diffuseRadiation: diffuseRadiation.data, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: false)
-                return DataAndUnit(gti, .wattPerSquareMetre)
-            }
-
-        case .global_tilted_irradiance_instant:
-            guard
-                let directRadiation = getDeriverMap(variable: .direct_radiation),
-                let diffuseRadiation = getDeriverMap(variable: .diffuse_radiation)
-            else {
-                return nil
-            }
-            return .two(.mapped(directRadiation), .mapped(diffuseRadiation)) { directRadiation, diffuseRadiation, time in
-                let gti = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation.data, diffuseRadiation: diffuseRadiation.data, tilt: options.tilt, azimuth: options.azimuth, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertBackwardsToInstant: true)
-                return DataAndUnit(gti, .wattPerSquareMetre)
-            }
-        default:
-            return nil
-        }
-    }
-}
 
 
 struct SeasonalForecastController {
@@ -542,10 +74,10 @@ struct SeasonalForecastController {
                 throw ForecastApiError.generic(message: "Bounding box not supported")
             }
             /// Will be configurable by API later
-            let domains = [EcmwfSeasDomain.seas5_6hourly]
+            let domains = [SeasonalForecastControllerDomains.ecmwf_seasonal_seamless]
 
             let paramsSixHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.six_hourly)
-            let paramsHourly = try SeasonalForecastVariableHourly.load(commaSeparatedOptional: params.hourly)
+            let paramsHourly = try SeasonalVariableHourly.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
             let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
             let nMember = 51
@@ -565,16 +97,17 @@ struct SeasonalForecastController {
                 let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
 
                 let readers: [Seas5Reader] = try await domains.asyncCompactMap { domain -> Seas5Reader? in
-                    guard let readerHourly = try await EcmwfSeas5Controller6Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
-                        return nil
-                    }
-                    guard let readerDaily = try await EcmwfSeas5Controller24Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
-                        return nil
-                    }
-                    guard let readerMonthly = try await EcmwfSeas5ControllerMonthly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
-                        return nil
-                    }
-                    return Seas5Reader(readerHourly: readerHourly, readerDaily: readerDaily, readerMonthly: readerMonthly, params: params, time: time, timezone: timezone, run: run)
+//                    guard let readerHourly = try await EcmwfSeas5Controller6Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+//                        return nil
+//                    }
+//                    guard let readerDaily = try await EcmwfSeas5Controller24Hourly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+//                        return nil
+//                    }
+//                    guard let readerMonthly = try await EcmwfSeas5ControllerMonthly(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options) else {
+//                        return nil
+//                    }
+                    let reader = try await domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
+                    return Seas5Reader(reader: reader, params: params, time: time, timezone: timezone, run: run)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
@@ -588,11 +121,11 @@ struct SeasonalForecastController {
 
 
 struct Seas5Reader: ModelFlatbufferSerialisable {
-    typealias MonthlyVariable = VariableOrDerived<EcmwfSeasVariableMonthly, EcmwfSeasVariableMonthlyDerived>
+    typealias MonthlyVariable = SeasonalVariableMonthly //VariableOrDerived<EcmwfSeasVariableMonthly, EcmwfSeasVariableMonthlyDerived>
     
-    typealias HourlyVariable = SeasonalForecastVariableHourly //VariableOrDerived<EcmwfSeasVariableSingleLevel, EcmwfSeasVariableSingleLevelDerived>
+    typealias HourlyVariable = SeasonalVariableHourly //VariableOrDerived<EcmwfSeasVariableSingleLevel, EcmwfSeasVariableSingleLevelDerived>
     
-    typealias DailyVariable = VariableOrDerived<VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>, EcmwfSeasVariableDailyComputed>
+    typealias DailyVariable = SeasonalVariableDaily //VariableOrDerived<VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>, EcmwfSeasVariableDailyComputed>
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
         .ecmwfSeas5
@@ -602,20 +135,22 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         "seas5"
     }
         
-    let readerHourly: EcmwfSeas5Controller6Hourly
-    let readerDaily: EcmwfSeas5Controller24Hourly
-    let readerMonthly: EcmwfSeas5ControllerMonthly
+    let reader: GenericReaderMulti<SeasonalVariableHourly, SeasonalForecastControllerDomains>
+    
+    //let readerHourly: EcmwfSeas5Controller6Hourly
+    //let readerDaily: EcmwfSeas5Controller24Hourly
+    //let readerMonthly: EcmwfSeas5ControllerMonthly
     
     var latitude: Float {
-        readerHourly.modelLat
+        reader.modelLat
     }
     
     var longitude: Float {
-        readerHourly.modelLon
+        reader.modelLon
     }
     
     var elevation: Float? {
-        readerHourly.targetElevation
+        reader.targetElevation
     }
     
     let params: ApiQueryParameter
@@ -624,21 +159,21 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     let run: IsoDateTime
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
-        /*let members = 0..<readerHourly.reader.domain.countEnsembleMember
+        let members = 0..<reader.countEnsembleMember
         if let sixHourlyVariables {
             let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
             for variable in sixHourlyVariables {
                 for member in members {
-                    try await readerHourly.prefetchData(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    //try await readerHourly.prefetchData(variable: variable, time: timeSixHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
                 }
             }
         }
         if let hourlyVariables {
-            let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? readerHourly.modelDtSeconds
+            let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? reader.modelDtSeconds
             let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
                 for member in members {
-                    try await readerHourly.prefetchData(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    try await reader.prefetchHourly(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run))
                 }
             }
         }
@@ -647,9 +182,9 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
                 for member in members {
                     switch variable {
                     case .derived(let variable):
-                        try await readerHourly.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                        //try await readerHourly.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
                     case .raw(let variable):
-                        try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                        //try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
                     }
                     
                 }
@@ -660,9 +195,9 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
             let timeMonthlyRead = timeMonthlyDisplay
             for variable in monthlyVariables {
-                try await readerMonthly.prefetchData(variable: variable, time: timeMonthlyRead.toSettings())
+                //try await readerMonthly.prefetchData(variable: variable, time: timeMonthlyRead.toSettings())
             }
-        }*/
+        }
     }
 
     func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
@@ -670,18 +205,19 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     }
     
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        fatalError()
-        /*guard let variables else {
+        guard let variables else {
             return nil
         }
-        let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? readerHourly.modelDtSeconds
+        let hourlyDt = (params.temporal_resolution ?? .hourly_6).dtSeconds ?? reader.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
         let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        let members = 0..<readerHourly.reader.domain.countEnsembleMember
+        let members = 0..<reader.countEnsembleMember
         return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncCompactMap { variable in
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let d = try await readerHourly.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+                guard let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings(ensembleMemberLevel: member, run: run))?.convertAndRound(params: params) else {
+                    return nil
+                }
                 unit = d.unit
                 assert(timeHourlyRead.count == d.data.count)
                 return ApiArray.float(d.data)
@@ -690,50 +226,51 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
                 return nil
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
-        })*/
+        })
     }
     
     func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
-        guard let variables else {
-            return nil
-        }
-        let members = 0..<readerDaily.reader.domain.countEnsembleMember
-        var riseSet: (rise: [Timestamp], set: [Timestamp])?
-        return ApiSection<DailyVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
-            var unit: SiUnit?
-            if case .derived(let variable) = variable {
-                if variable == .sunrise || variable == .sunset {
-                    // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
-                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerHourly.modelLat, lon: readerHourly.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                    riseSet = times
-                    if variable == .sunset {
-                        return ApiColumn(variable: .derived(.sunset), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
-                    } else {
-                        return ApiColumn(variable: .derived(.sunrise), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
-                    }
-                }
-                if variable == .daylight_duration {
-                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerHourly.modelLat)
-                    return ApiColumn(variable: .derived(.daylight_duration), unit: .seconds, variables: [.float(duration)])
-                }
-            }
-            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let d: DataAndUnit
-                switch variable {
-                case .derived(let variable):
-                    d = try await readerHourly.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
-                case .raw(let variable):
-                    d = try await readerDaily.get(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
-                }
-                unit = d.unit
-                assert(time.dailyRead.count == d.data.count)
-                return ApiArray.float(d.data)
-            }
-            guard allMembers.count > 0 else {
-                return nil
-            }
-            return ApiColumn<DailyVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
-        })
+        fatalError()
+//        guard let variables else {
+//            return nil
+//        }
+//        let members = 0..<readerDaily.reader.domain.countEnsembleMember
+//        var riseSet: (rise: [Timestamp], set: [Timestamp])?
+//        return ApiSection<DailyVariable>(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncCompactMap { variable in
+//            var unit: SiUnit?
+//            if case .derived(let variable) = variable {
+//                if variable == .sunrise || variable == .sunset {
+//                    // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
+//                    let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerHourly.modelLat, lon: readerHourly.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
+//                    riseSet = times
+//                    if variable == .sunset {
+//                        return ApiColumn(variable: .derived(.sunset), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
+//                    } else {
+//                        return ApiColumn(variable: .derived(.sunrise), unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.rise)])
+//                    }
+//                }
+//                if variable == .daylight_duration {
+//                    let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerHourly.modelLat)
+//                    return ApiColumn(variable: .derived(.daylight_duration), unit: .seconds, variables: [.float(duration)])
+//                }
+//            }
+//            let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
+//                let d: DataAndUnit
+//                switch variable {
+//                case .derived(let variable):
+//                    d = try await readerHourly.getDaily(variable: variable, params: params, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+//                case .raw(let variable):
+//                    d = try await readerDaily.get(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)).convertAndRound(params: params)
+//                }
+//                unit = d.unit
+//                assert(time.dailyRead.count == d.data.count)
+//                return ApiArray.float(d.data)
+//            }
+//            guard allMembers.count > 0 else {
+//                return nil
+//            }
+//            return ApiColumn<DailyVariable>(variable: variable, unit: unit ?? .undefined, variables: allMembers)
+//        })
     }
     
     func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
@@ -765,307 +302,308 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     }
     
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
-        guard let variables else {
-            return nil
-        }
-        let yearMonths = time.dailyRead.toYearMonth()
-        let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
-        let timeMonthlyRead = timeMonthlyDisplay
-        return ApiSection<MonthlyVariable>(name: "monthly", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
-            let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings()).convertAndRound(params: params)
-            assert(timeMonthlyDisplay.count == d.data.count)
-            return ApiColumn<MonthlyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
-        })
+        fatalError()
+//        guard let variables else {
+//            return nil
+//        }
+//        let yearMonths = time.dailyRead.toYearMonth()
+//        let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+//        let timeMonthlyRead = timeMonthlyDisplay
+//        return ApiSection<MonthlyVariable>(name: "monthly", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
+//            let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings()).convertAndRound(params: params)
+//            assert(timeMonthlyDisplay.count == d.data.count)
+//            return ApiColumn<MonthlyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
+//        })
     }
 }
 
 
-extension EcmwfSeasVariableMonthly: FlatBuffersVariable {
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .wind_gusts_10m_anomaly:
-            return .init(variable: .windGusts, aggregation: .anomaly, altitude: 10)
-        case .wind_speed_10m_mean:
-            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
-        case .wind_speed_10m_anomaly:
-            return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
-        case .albedo_mean:
-            return .init(variable: .albedo, aggregation: .mean)
-        case .albedo_anomaly:
-            return .init(variable: .albedo, aggregation: .anomaly)
-        case .cloud_cover_low_mean:
-            return .init(variable: .cloudCoverLow, aggregation: .mean)
-        case .cloud_cover_low_anomaly:
-            return .init(variable: .cloudCoverLow, aggregation: .anomaly)
-        case .showers_mean:
-            return .init(variable: .showers, aggregation: .mean)
-        case .showers_anomaly:
-            return .init(variable: .showers, aggregation: .anomaly)
-        case .runoff_mean:
-            return .init(variable: .runoff, aggregation: .mean)
-        case .runoff_anomaly:
-            return .init(variable: .runoff, aggregation: .anomaly)
-        case .snow_density_mean:
-            return .init(variable: .snowDensity, aggregation: .mean)
-        case .snow_density_anomaly:
-            return .init(variable: .snowDensity, aggregation: .anomaly)
-        case .snow_depth_water_equivalent_mean:
-            return .init(variable: .snowDepthWaterEquivalent, aggregation: .mean)
-        case .snow_depth_water_equivalent_anomaly:
-            return .init(variable: .snowDepthWaterEquivalent, aggregation: .anomaly)
-        case .total_column_integrated_water_vapour_mean:
-            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .mean)
-        case .total_column_integrated_water_vapour_anomaly:
-            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .anomaly)
-        case .temperature_2m_mean:
-            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
-        case .temperature_2m_anomaly:
-            return .init(variable: .temperature, aggregation: .anomaly, altitude: 2)
-        case .dew_point_2m_mean:
-            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
-        case .dew_point_2m_anomaly:
-            return .init(variable: .dewPoint, aggregation: .anomaly, altitude: 2)
-        case .pressure_msl_mean:
-            return .init(variable: .pressureMsl, aggregation: .mean)
-        case .pressure_msl_anomaly:
-            return .init(variable: .pressureMsl, aggregation: .anomaly)
-        case .sea_surface_temperature_mean:
-            return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
-        case .sea_surface_temperature_anomaly:
-            return .init(variable: .seaSurfaceTemperature, aggregation: .anomaly)
-        case .wind_u_component_10m_mean:
-            return .init(variable: .windUComponent, aggregation: .mean, altitude: 10)
-        case .wind_u_component_10m_anomaly:
-            return .init(variable: .windUComponent, aggregation: .anomaly, altitude: 10)
-        case .wind_v_component_10m_mean:
-            return .init(variable: .windVComponent, aggregation: .mean, altitude: 10)
-        case .wind_v_component_10m_anomaly:
-            return .init(variable: .windVComponent, aggregation: .anomaly, altitude: 10)
-        case .snowfall_water_equivalent_mean:
-            return .init(variable: .snowfallWaterEquivalent, aggregation: .mean)
-        case .snowfall_water_equivalent_anomaly:
-            return .init(variable: .snowfallWaterEquivalent, aggregation: .anomaly)
-        case .precipitation_mean:
-            return .init(variable: .precipitation, aggregation: .mean)
-        case .precipitation_anomaly:
-            return .init(variable: .precipitation, aggregation: .anomaly)
-        case .shortwave_radiation_mean:
-            return .init(variable: .shortwaveRadiation, aggregation: .mean)
-        case .shortwave_radiation_anomaly:
-            return .init(variable: .shortwaveRadiation, aggregation: .anomaly)
-        case .cloud_cover_mean:
-            return .init(variable: .cloudCover, aggregation: .mean)
-        case .cloud_cover_anomaly:
-            return .init(variable: .cloudCover, aggregation: .anomaly)
-        case .sunshine_duration_mean:
-            return .init(variable: .sunshineDuration, aggregation: .mean)
-        case .sunshine_duration_anomaly:
-            return .init(variable: .sunshineDuration, aggregation: .anomaly)
-        case .soil_temperature_0_to_7cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
-        case .soil_temperature_0_to_7cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
-        case .soil_temperature_7_to_28cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
-        case .soil_temperature_28_to_100cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
-        case .soil_temperature_100_to_255cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
-        case .soil_moisture_0_to_7cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
-        case .soil_moisture_7_to_28cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
-        case .soil_moisture_28_to_100cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
-        case .soil_moisture_100_to_255cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 100, depthTo: 255)
-        case .temperature_max24h_2m_mean:
-            return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
-        case .temperature_max24h_2m_anomaly:
-            return .init(variable: .temperatureMax24h, aggregation: .anomaly, altitude: 2)
-        case .temperature_min24h_2m_mean:
-            return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
-        case .temperature_min24h_2m_anomaly:
-            return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
-        case .longwave_radiation_mean:
-            return .init(variable: .longwaveRadiation, aggregation: .mean)
-        case .longwave_radiation_anomaly:
-            return .init(variable: .longwaveRadiation, aggregation: .anomaly)
-        case .sea_ice_cover_mean:
-            return .init(variable: .seaIceCover, aggregation: .mean)
-        case .sea_ice_cover_anomaly:
-            return .init(variable: .seaIceCover, aggregation: .anomaly)
-        case .latent_heat_flux_mean:
-            return .init(variable: .latentHeatFlux, aggregation: .mean)
-        case .latent_heat_flux_anomaly:
-            return .init(variable: .latentHeatFlux, aggregation: .anomaly)
-        case .sensible_heat_flux_mean:
-            return .init(variable: .sensibleHeatFlux, aggregation: .mean)
-        case .sensible_heat_flux_anomaly:
-            return .init(variable: .sensibleHeatFlux, aggregation: .anomaly)
-        case .evapotranspiration_mean:
-            return .init(variable: .evapotranspiration, aggregation: .mean)
-        case .evapotranspiration_anomaly:
-            return .init(variable: .evapotranspiration, aggregation: .anomaly)
-        }
-    }
-}
-
-extension EcmwfSeasVariableSingleLevel: FlatBuffersVariable {
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .temperature_2m:
-            return .init(variable: .temperature, altitude: 2)
-        case .dew_point_2m:
-            return .init(variable: .dewPoint, altitude: 2)
-        case .pressure_msl:
-            return .init(variable: .pressureMsl)
-        case .sea_surface_temperature:
-            return .init(variable: .seaSurfaceTemperature)
-        case .wind_u_component_10m:
-            return .init(variable: .windUComponent, altitude: 10)
-        case .wind_v_component_10m:
-            return .init(variable: .windVComponent, altitude: 10)
-        case .snowfall_water_equivalent:
-            return .init(variable: .snowfallWaterEquivalent)
-        case .precipitation:
-            return .init(variable: .precipitation)
-        case .shortwave_radiation:
-            return .init(variable: .shortwaveRadiation)
-        case .soil_temperature_0_to_7cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
-        case .cloud_cover:
-            return .init(variable: .cloudCover)
-        }
-    }
-}
-
-extension EcmwfSeasVariableSingleLevelDerived: FlatBuffersVariable {
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .apparent_temperature:
-            return .init(variable: .apparentTemperature)
-        case .dewpoint_2m:
-            return .init(variable: .dewPoint, altitude: 2)
-        case .relativehumidity_2m, .relative_humidity_2m:
-            return .init(variable: .relativeHumidity, altitude: 2)
-        case .windspeed_10m, .wind_speed_10m:
-            return .init(variable: .windSpeed, altitude: 10)
-        case .winddirection_10m, .wind_direction_10m:
-            return .init(variable: .windDirection, altitude: 10)
-        case .vapor_pressure_deficit, .vapour_pressure_deficit:
-            return .init(variable: .vapourPressureDeficit)
-        case .surface_pressure:
-            return .init(variable: .surfacePressure)
-        case .snowfall:
-            return .init(variable: .snowfall)
-        case .rain:
-            return .init(variable: .rain)
-        case .et0_fao_evapotranspiration:
-            return .init(variable: .et0FaoEvapotranspiration)
-        case .cloudcover:
-            return .init(variable: .cloudCover)
-        case .direct_normal_irradiance:
-            return .init(variable: .directNormalIrradiance)
-        case .weathercode, .weather_code:
-            return .init(variable: .weatherCode)
-        case .is_day:
-            return .init(variable: .isDay)
-        case .diffuse_radiation:
-            return .init(variable: .diffuseRadiation)
-        case .direct_radiation:
-            return .init(variable: .directRadiation)
-        case .terrestrial_radiation:
-            return .init(variable: .terrestrialRadiation)
-        case .terrestrial_radiation_instant:
-            return .init(variable: .terrestrialRadiationInstant)
-        case .shortwave_radiation_instant:
-            return .init(variable: .shortwaveRadiationInstant)
-        case .diffuse_radiation_instant:
-            return .init(variable: .diffuseRadiationInstant)
-        case .direct_radiation_instant:
-            return .init(variable: .directRadiationInstant)
-        case .direct_normal_irradiance_instant:
-            return .init(variable: .directNormalIrradianceInstant)
-        case .wet_bulb_temperature_2m:
-            return .init(variable: .wetBulbTemperature, altitude: 2)
-        case .global_tilted_irradiance:
-            return .init(variable: .globalTiltedIrradiance)
-        case .global_tilted_irradiance_instant:
-            return .init(variable: .globalTiltedIrradianceInstant)
-        }
-    }
-}
-
-extension EcmwfSeasVariable24HourlySingleLevel: FlatBuffersVariable {
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .soil_temperature_0_to_7cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm:
-            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm:
-            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm:
-            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
-        case .temperature_max24h_2m:
-            return .init(variable: .temperatureMax24h, altitude: 2)
-        case .temperature_min24h_2m:
-                return .init(variable: .temperatureMin24h, altitude: 2)
-        case .temperature_mean24h_2m:
-            return .init(variable: .temperatureMean24h, altitude: 2)
-        case .sunshine_duration:
-            return .init(variable: .sunshineDuration)
-        }
-    }
-}
-
-extension EcmwfSeasVariable24HourlySingleLevelDerived: FlatBuffersVariable {
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .temperature_2m_max:
-            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
-        case .temperature_2m_min:
-            return .init(variable: .temperature, aggregation: .minimum, altitude: 2)
-        case .temperature_2m_mean:
-            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
-        }
-    }
-}
-
-extension EcmwfSeasVariableMonthlyDerived: FlatBuffersVariable {
-    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
-        switch self {
-        case .snowfall_mean:
-            return .init(variable: .snowfall, aggregation: .mean)
-        case .snowfall_anomaly:
-            return .init(variable: .snowfall, aggregation: .anomaly)
-        case .snow_depth_mean:
-            return .init(variable: .snowDepth, aggregation: .mean)
-        case .snow_depth_anomaly:
-            return .init(variable: .snowDepth, aggregation: .anomaly)
-        }
-    }
-}
+//extension EcmwfSeasVariableMonthly: FlatBuffersVariable {
+//    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+//        switch self {
+//        case .wind_gusts_10m_anomaly:
+//            return .init(variable: .windGusts, aggregation: .anomaly, altitude: 10)
+//        case .wind_speed_10m_mean:
+//            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+//        case .wind_speed_10m_anomaly:
+//            return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
+//        case .albedo_mean:
+//            return .init(variable: .albedo, aggregation: .mean)
+//        case .albedo_anomaly:
+//            return .init(variable: .albedo, aggregation: .anomaly)
+//        case .cloud_cover_low_mean:
+//            return .init(variable: .cloudCoverLow, aggregation: .mean)
+//        case .cloud_cover_low_anomaly:
+//            return .init(variable: .cloudCoverLow, aggregation: .anomaly)
+//        case .showers_mean:
+//            return .init(variable: .showers, aggregation: .mean)
+//        case .showers_anomaly:
+//            return .init(variable: .showers, aggregation: .anomaly)
+//        case .runoff_mean:
+//            return .init(variable: .runoff, aggregation: .mean)
+//        case .runoff_anomaly:
+//            return .init(variable: .runoff, aggregation: .anomaly)
+//        case .snow_density_mean:
+//            return .init(variable: .snowDensity, aggregation: .mean)
+//        case .snow_density_anomaly:
+//            return .init(variable: .snowDensity, aggregation: .anomaly)
+//        case .snow_depth_water_equivalent_mean:
+//            return .init(variable: .snowDepthWaterEquivalent, aggregation: .mean)
+//        case .snow_depth_water_equivalent_anomaly:
+//            return .init(variable: .snowDepthWaterEquivalent, aggregation: .anomaly)
+//        case .total_column_integrated_water_vapour_mean:
+//            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .mean)
+//        case .total_column_integrated_water_vapour_anomaly:
+//            return .init(variable: .totalColumnIntegratedWaterVapour, aggregation: .anomaly)
+//        case .temperature_2m_mean:
+//            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+//        case .temperature_2m_anomaly:
+//            return .init(variable: .temperature, aggregation: .anomaly, altitude: 2)
+//        case .dew_point_2m_mean:
+//            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+//        case .dew_point_2m_anomaly:
+//            return .init(variable: .dewPoint, aggregation: .anomaly, altitude: 2)
+//        case .pressure_msl_mean:
+//            return .init(variable: .pressureMsl, aggregation: .mean)
+//        case .pressure_msl_anomaly:
+//            return .init(variable: .pressureMsl, aggregation: .anomaly)
+//        case .sea_surface_temperature_mean:
+//            return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
+//        case .sea_surface_temperature_anomaly:
+//            return .init(variable: .seaSurfaceTemperature, aggregation: .anomaly)
+//        case .wind_u_component_10m_mean:
+//            return .init(variable: .windUComponent, aggregation: .mean, altitude: 10)
+//        case .wind_u_component_10m_anomaly:
+//            return .init(variable: .windUComponent, aggregation: .anomaly, altitude: 10)
+//        case .wind_v_component_10m_mean:
+//            return .init(variable: .windVComponent, aggregation: .mean, altitude: 10)
+//        case .wind_v_component_10m_anomaly:
+//            return .init(variable: .windVComponent, aggregation: .anomaly, altitude: 10)
+//        case .snowfall_water_equivalent_mean:
+//            return .init(variable: .snowfallWaterEquivalent, aggregation: .mean)
+//        case .snowfall_water_equivalent_anomaly:
+//            return .init(variable: .snowfallWaterEquivalent, aggregation: .anomaly)
+//        case .precipitation_mean:
+//            return .init(variable: .precipitation, aggregation: .mean)
+//        case .precipitation_anomaly:
+//            return .init(variable: .precipitation, aggregation: .anomaly)
+//        case .shortwave_radiation_mean:
+//            return .init(variable: .shortwaveRadiation, aggregation: .mean)
+//        case .shortwave_radiation_anomaly:
+//            return .init(variable: .shortwaveRadiation, aggregation: .anomaly)
+//        case .cloud_cover_mean:
+//            return .init(variable: .cloudCover, aggregation: .mean)
+//        case .cloud_cover_anomaly:
+//            return .init(variable: .cloudCover, aggregation: .anomaly)
+//        case .sunshine_duration_mean:
+//            return .init(variable: .sunshineDuration, aggregation: .mean)
+//        case .sunshine_duration_anomaly:
+//            return .init(variable: .sunshineDuration, aggregation: .anomaly)
+//        case .soil_temperature_0_to_7cm_mean:
+//            return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
+//        case .soil_temperature_0_to_7cm_anomaly:
+//            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
+//        case .soil_temperature_7_to_28cm_mean:
+//            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
+//        case .soil_temperature_7_to_28cm_anomaly:
+//            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 7, depthTo: 28)
+//        case .soil_temperature_28_to_100cm_mean:
+//            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
+//        case .soil_temperature_28_to_100cm_anomaly:
+//            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 28, depthTo: 100)
+//        case .soil_temperature_100_to_255cm_mean:
+//            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
+//        case .soil_temperature_100_to_255cm_anomaly:
+//            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 100, depthTo: 255)
+//        case .soil_moisture_0_to_7cm_mean:
+//            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
+//        case .soil_moisture_0_to_7cm_anomaly:
+//            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 0, depthTo: 7)
+//        case .soil_moisture_7_to_28cm_mean:
+//            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
+//        case .soil_moisture_7_to_28cm_anomaly:
+//            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 7, depthTo: 28)
+//        case .soil_moisture_28_to_100cm_mean:
+//            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
+//        case .soil_moisture_28_to_100cm_anomaly:
+//            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 28, depthTo: 100)
+//        case .soil_moisture_100_to_255cm_mean:
+//            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
+//        case .soil_moisture_100_to_255cm_anomaly:
+//            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 100, depthTo: 255)
+//        case .temperature_max24h_2m_mean:
+//            return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
+//        case .temperature_max24h_2m_anomaly:
+//            return .init(variable: .temperatureMax24h, aggregation: .anomaly, altitude: 2)
+//        case .temperature_min24h_2m_mean:
+//            return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
+//        case .temperature_min24h_2m_anomaly:
+//            return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
+//        case .longwave_radiation_mean:
+//            return .init(variable: .longwaveRadiation, aggregation: .mean)
+//        case .longwave_radiation_anomaly:
+//            return .init(variable: .longwaveRadiation, aggregation: .anomaly)
+//        case .sea_ice_cover_mean:
+//            return .init(variable: .seaIceCover, aggregation: .mean)
+//        case .sea_ice_cover_anomaly:
+//            return .init(variable: .seaIceCover, aggregation: .anomaly)
+//        case .latent_heat_flux_mean:
+//            return .init(variable: .latentHeatFlux, aggregation: .mean)
+//        case .latent_heat_flux_anomaly:
+//            return .init(variable: .latentHeatFlux, aggregation: .anomaly)
+//        case .sensible_heat_flux_mean:
+//            return .init(variable: .sensibleHeatFlux, aggregation: .mean)
+//        case .sensible_heat_flux_anomaly:
+//            return .init(variable: .sensibleHeatFlux, aggregation: .anomaly)
+//        case .evapotranspiration_mean:
+//            return .init(variable: .evapotranspiration, aggregation: .mean)
+//        case .evapotranspiration_anomaly:
+//            return .init(variable: .evapotranspiration, aggregation: .anomaly)
+//        }
+//    }
+//}
+//
+//extension EcmwfSeasVariableSingleLevel: FlatBuffersVariable {
+//    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+//        switch self {
+//        case .temperature_2m:
+//            return .init(variable: .temperature, altitude: 2)
+//        case .dew_point_2m:
+//            return .init(variable: .dewPoint, altitude: 2)
+//        case .pressure_msl:
+//            return .init(variable: .pressureMsl)
+//        case .sea_surface_temperature:
+//            return .init(variable: .seaSurfaceTemperature)
+//        case .wind_u_component_10m:
+//            return .init(variable: .windUComponent, altitude: 10)
+//        case .wind_v_component_10m:
+//            return .init(variable: .windVComponent, altitude: 10)
+//        case .snowfall_water_equivalent:
+//            return .init(variable: .snowfallWaterEquivalent)
+//        case .precipitation:
+//            return .init(variable: .precipitation)
+//        case .shortwave_radiation:
+//            return .init(variable: .shortwaveRadiation)
+//        case .soil_temperature_0_to_7cm:
+//            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+//        case .cloud_cover:
+//            return .init(variable: .cloudCover)
+//        }
+//    }
+//}
+//
+//extension EcmwfSeasVariableSingleLevelDerived: FlatBuffersVariable {
+//    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+//        switch self {
+//        case .apparent_temperature:
+//            return .init(variable: .apparentTemperature)
+//        case .dewpoint_2m:
+//            return .init(variable: .dewPoint, altitude: 2)
+//        case .relativehumidity_2m, .relative_humidity_2m:
+//            return .init(variable: .relativeHumidity, altitude: 2)
+//        case .windspeed_10m, .wind_speed_10m:
+//            return .init(variable: .windSpeed, altitude: 10)
+//        case .winddirection_10m, .wind_direction_10m:
+//            return .init(variable: .windDirection, altitude: 10)
+//        case .vapor_pressure_deficit, .vapour_pressure_deficit:
+//            return .init(variable: .vapourPressureDeficit)
+//        case .surface_pressure:
+//            return .init(variable: .surfacePressure)
+//        case .snowfall:
+//            return .init(variable: .snowfall)
+//        case .rain:
+//            return .init(variable: .rain)
+//        case .et0_fao_evapotranspiration:
+//            return .init(variable: .et0FaoEvapotranspiration)
+//        case .cloudcover:
+//            return .init(variable: .cloudCover)
+//        case .direct_normal_irradiance:
+//            return .init(variable: .directNormalIrradiance)
+//        case .weathercode, .weather_code:
+//            return .init(variable: .weatherCode)
+//        case .is_day:
+//            return .init(variable: .isDay)
+//        case .diffuse_radiation:
+//            return .init(variable: .diffuseRadiation)
+//        case .direct_radiation:
+//            return .init(variable: .directRadiation)
+//        case .terrestrial_radiation:
+//            return .init(variable: .terrestrialRadiation)
+//        case .terrestrial_radiation_instant:
+//            return .init(variable: .terrestrialRadiationInstant)
+//        case .shortwave_radiation_instant:
+//            return .init(variable: .shortwaveRadiationInstant)
+//        case .diffuse_radiation_instant:
+//            return .init(variable: .diffuseRadiationInstant)
+//        case .direct_radiation_instant:
+//            return .init(variable: .directRadiationInstant)
+//        case .direct_normal_irradiance_instant:
+//            return .init(variable: .directNormalIrradianceInstant)
+//        case .wet_bulb_temperature_2m:
+//            return .init(variable: .wetBulbTemperature, altitude: 2)
+//        case .global_tilted_irradiance:
+//            return .init(variable: .globalTiltedIrradiance)
+//        case .global_tilted_irradiance_instant:
+//            return .init(variable: .globalTiltedIrradianceInstant)
+//        }
+//    }
+//}
+//
+//extension EcmwfSeasVariable24HourlySingleLevel: FlatBuffersVariable {
+//    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+//        switch self {
+//        case .soil_temperature_0_to_7cm:
+//            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+//        case .soil_temperature_7_to_28cm:
+//            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
+//        case .soil_temperature_28_to_100cm:
+//            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
+//        case .soil_temperature_100_to_255cm:
+//            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
+//        case .soil_moisture_0_to_7cm:
+//            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
+//        case .soil_moisture_7_to_28cm:
+//            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
+//        case .soil_moisture_28_to_100cm:
+//            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
+//        case .soil_moisture_100_to_255cm:
+//            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
+//        case .temperature_max24h_2m:
+//            return .init(variable: .temperatureMax24h, altitude: 2)
+//        case .temperature_min24h_2m:
+//                return .init(variable: .temperatureMin24h, altitude: 2)
+//        case .temperature_mean24h_2m:
+//            return .init(variable: .temperatureMean24h, altitude: 2)
+//        case .sunshine_duration:
+//            return .init(variable: .sunshineDuration)
+//        }
+//    }
+//}
+//
+//extension EcmwfSeasVariable24HourlySingleLevelDerived: FlatBuffersVariable {
+//    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+//        switch self {
+//        case .temperature_2m_max:
+//            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
+//        case .temperature_2m_min:
+//            return .init(variable: .temperature, aggregation: .minimum, altitude: 2)
+//        case .temperature_2m_mean:
+//            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
+//        }
+//    }
+//}
+//
+//extension EcmwfSeasVariableMonthlyDerived: FlatBuffersVariable {
+//    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+//        switch self {
+//        case .snowfall_mean:
+//            return .init(variable: .snowfall, aggregation: .mean)
+//        case .snowfall_anomaly:
+//            return .init(variable: .snowfall, aggregation: .anomaly)
+//        case .snow_depth_mean:
+//            return .init(variable: .snowDepth, aggregation: .mean)
+//        case .snow_depth_anomaly:
+//            return .init(variable: .snowDepth, aggregation: .anomaly)
+//        }
+//    }
+//}
