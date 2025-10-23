@@ -6,6 +6,14 @@ enum Meteorology {
     @inlinable static func windspeed(u: Float, v: Float) -> Float {
         return sqrt(u * u + v * v)
     }
+    
+    // Calculate wind speed and adjust level using logarithmic wind power law
+    @inlinable static func windspeed(u: [Float], v: [Float], levelFrom: Float, levelTo: Float) -> [Float] {
+        let factor = Self.scaleWindFactor(from: levelFrom, to: levelTo)
+        return zip(u,v).map {
+            sqrt($0*$0 + $1*$1) * factor
+        }
+    }
 
     /// Calculate wind direction in degrees
     // @inlinable static func windirection(u: Float, v: Float) -> Float {
@@ -157,7 +165,7 @@ enum Meteorology {
         return max(esat - ea, 0)
     }
 
-    /// Factor that need to be applied to scale wind from onee level to another. Only valid for altitude below 100 meters.
+    /// Factor that need to be applied to scale wind from one level to another. Only valid for altitude below 100 meters.
     /// http://www.fao.org/3/x0490e/x0490e07.htm
     public static func scaleWindFactor(from: Float, to: Float) -> Float {
         let factorFrom = 4.87 / (log(67.8 * from - 5.42))

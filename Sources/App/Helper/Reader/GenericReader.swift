@@ -17,6 +17,16 @@ protocol GenericReaderProtocol {
     func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws
 }
 
+extension GenericReaderProtocol {
+    /// Try to initialise a given variable from a string
+    static func variableFromString(_ string: String) -> MixingVar? {
+        guard let variable = MixingVar(rawValue: string) else {
+            return nil
+        }
+        return variable
+    }
+}
+
 /**
  Each call to `get` or `prefetch` is accompanied by time, ensemble member and previous day information
  */

@@ -43,10 +43,6 @@ enum EcmwfEC46Variable6HourlyDerived: String, RawRepresentableString, GenericVar
     
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
-
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
 
 struct EcmwfEC46Controller6Hourly: GenericReaderDerivedSimple, GenericReaderProtocol {
@@ -254,7 +250,7 @@ struct EcmwfEC46Controller6Hourly: GenericReaderDerivedSimple, GenericReaderProt
             return DataAndUnit(WeatherCode.calculate(
                 cloudcover: cloudcover,
                 precipitation: precipitation,
-                convectivePrecipitation: precipitation,
+                convectivePrecipitation: showers,
                 snowfallCentimeters: snowfall,
                 gusts: nil,
                 cape: nil,

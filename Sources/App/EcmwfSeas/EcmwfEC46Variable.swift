@@ -252,8 +252,4 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
     var storePreviousForecast: Bool {
         return false
     }
-    
-    var requiresOffsetCorrectionForMixing: Bool {
-        return false
-    }
 }
