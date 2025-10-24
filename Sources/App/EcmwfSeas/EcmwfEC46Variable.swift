@@ -78,9 +78,9 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
         case .pressure_msl:
             return "msl"
         case .temperature_2m_min:
-            return "mn2t"
+            return "mn2t6"
         case .temperature_2m_max:
-            return "mx2t"
+            return "mx2t6"
         case .snowfall_water_equivalent:
             return "sf"
         case .shortwave_radiation:
@@ -100,6 +100,15 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
     
     var shift24h: Bool {
         return false
+    }
+    
+    var skipHour0: Bool {
+        switch self {
+        case .temperature_2m_max, .temperature_2m_min:
+            return true
+        default:
+            return isAccumulated
+        }
     }
     
     var isAccumulated: Bool {

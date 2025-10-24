@@ -132,7 +132,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
         
         let deaverager = GribDeaverager()
-        for day in 0..<3 {
+        for day in 0..<46 {
             let dayTimestamp = run.add(days: day)
             /// ope_e1_ifs-subs_od_eefo_cf_20251008T000000Z_20251008_d01.bz2
             let urls = ["cf","pf"].map({"\(server)ope_e1_ifs-subs_od_eefo_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
@@ -165,11 +165,11 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
+                    if variable.skipHour0 && run == time {
+                        logger.debug("Skipping accumulated variable as forecast hour 0")
+                        return
+                    }
                     if variable.isAccumulated {
-                        if run == time {
-                            logger.debug("Skipping accumulated variable as forecast hour 0")
-                            return
-                        }
                         // Collect all accumulated variables and process them as soon as they are in sequential order
                         await inMemoryAccumulated.set(variable: .init(variable: variable), timestamp: time, member: member, data: array2d.array)
                         while true {
@@ -258,11 +258,11 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     if let fma = variable.multiplyAdd(dtSeconds: dtSecondActual) {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
+                    if variable.skipHour0 && run == time {
+                        logger.debug("Skipping accumulated variable as forecast hour 0")
+                        return
+                    }
                     if variable.isAccumulated {
-                        if run == time {
-                            logger.debug("Skipping accumulated variable as forecast hour 0")
-                            return
-                        }
                         // Collect all accumulated variables and process them as soon as they are in sequential order
                         await inMemoryAccumulated.set(variable: .init(variable: variable), timestamp: time, member: member, data: array2d.array)
                         while true {

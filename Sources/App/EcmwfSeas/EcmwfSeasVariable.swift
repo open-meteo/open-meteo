@@ -2,6 +2,7 @@ protocol EcmwfSeasVariable: GenericVariable, Hashable {
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var isAccumulated: Bool { get }
     var shift24h: Bool { get }
+    var skipHour0: Bool { get }
 }
 
 /// Used to type erase and make EcmwfSeasVariable hashable
@@ -67,6 +68,10 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
     
     var shift24h: Bool {
         return false
+    }
+    
+    var skipHour0: Bool {
+        return isAccumulated
     }
     
     var isAccumulated: Bool {
@@ -254,6 +259,10 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
         }
     }
     
+    var skipHour0: Bool {
+        return isAccumulated || shift24h
+    }
+    
     var isAccumulated: Bool {
         switch self {
         case .sunshine_duration:
@@ -401,6 +410,10 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     }
     
     var isAccumulated: Bool {
+        return false
+    }
+    
+    var skipHour0: Bool {
         return false
     }
     
@@ -724,6 +737,10 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     }
     
     var isAccumulated: Bool {
+        return false
+    }
+    
+    var skipHour0: Bool {
         return false
     }
     
