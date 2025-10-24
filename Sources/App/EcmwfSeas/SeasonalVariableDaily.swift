@@ -54,6 +54,7 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     
     case soil_temperature_0_to_7cm_mean
     
+    // TODO rename to mean
     case soil_temperature_0_to_7cm
     case soil_temperature_7_to_28cm
     case soil_temperature_28_to_100cm
