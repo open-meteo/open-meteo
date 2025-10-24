@@ -2,19 +2,28 @@ import Foundation
 import OmFileFormat
 import Vapor
 
-/// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
-protocol GenericReaderProtocol {
-    associatedtype MixingVar: GenericVariableMixable
-
+protocol GenericReaderBaseProtocol {
     var modelLat: Float { get }
     var modelLon: Float { get }
     var modelElevation: ElevationOrSea { get }
     var targetElevation: Float { get }
     var modelDtSeconds: Int { get }
+    func getStatic(type: ReaderStaticVariable) async throws -> Float?
+}
+
+/// Requirements to the reader in order to mix. Could be a GenericReaderDerived or just GenericReader
+protocol GenericReaderProtocol: GenericReaderBaseProtocol {
+    associatedtype MixingVar: GenericVariableMixable
 
     func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    func getStatic(type: ReaderStaticVariable) async throws -> Float?
     func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws
+}
+
+protocol GenericReaderOptionalProtocol<VariableOpt>: GenericReaderBaseProtocol {
+    associatedtype VariableOpt: GenericVariableMixable
+
+    func get(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> DataAndUnit?
+    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> Bool
 }
 
 extension GenericReaderProtocol {

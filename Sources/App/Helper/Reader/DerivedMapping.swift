@@ -53,12 +53,11 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     }
 }
 
-protocol GenericDeriverProtocol: GenericReaderProtocol where MixingVar == DerivedMapping<Reader.MixingVar> {
-    associatedtype SourceVariable
+protocol GenericDeriverProtocol: GenericReaderOptionalProtocol {
     associatedtype Reader: GenericReaderProtocol
     
     var reader: Reader {get}
-    func getDeriverMap(variable: SourceVariable) -> MixingVar?
+    func getDeriverMap(variable: VariableOpt) -> DerivedMapping<Reader.MixingVar>?
 }
 
 extension GenericDeriverProtocol {
@@ -86,21 +85,22 @@ extension GenericDeriverProtocol {
         return try await reader.getStatic(type: type)
     }
     
-    func get(variable: SourceVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+    func get(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         guard let mapping = getDeriverMap(variable: variable) else {
             return nil
         }
         return try await get(variable: mapping, time: time)
     }
     
-    func prefetchData(variable: SourceVariable, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> Bool {
         guard let mapping = getDeriverMap(variable: variable) else {
-            return
+            return false
         }
         try await prefetchData(variable: mapping, time: time)
+        return true
     }
     
-    private func get(mapping: MixingVar.RawOrMapped, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+    fileprivate func get(mapping: DerivedMapping<Reader.MixingVar>.RawOrMapped, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch mapping {
         case .raw(let variable):
             return try await reader.get(variable: variable, time: time)
@@ -113,10 +113,10 @@ extension GenericDeriverProtocol {
         guard let variable else {
             return nil
         }
-        return try await get(variable: variable, time: time)
+        return try await reader.get(variable: variable, time: time)
     }
     
-    func get(variable: MixingVar, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
+    fileprivate func get(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
         case .direct(let variable):
             return try await reader.get(variable: variable, time: time)
@@ -163,10 +163,10 @@ extension GenericDeriverProtocol {
         }
     }
     
-    private func prefetchData(mapping: MixingVar.RawOrMapped, time: TimerangeDtAndSettings) async throws {
+    fileprivate func prefetchData(mapping: DerivedMapping<Reader.MixingVar>.RawOrMapped, time: TimerangeDtAndSettings) async throws {
         switch mapping {
         case .raw(let variable):
-            try await prefetchData(variable: variable, time: time)
+            try await reader.prefetchData(variable: variable, time: time)
         case .mapped(let derivedMapping):
             try await prefetchData(variable: derivedMapping, time: time)
         }
@@ -176,10 +176,10 @@ extension GenericDeriverProtocol {
         guard let variable else {
             return
         }
-        return try await prefetchData(variable: variable, time: time)
+        return try await reader.prefetchData(variable: variable, time: time)
     }
     
-    func prefetchData(variable: MixingVar, time: TimerangeDtAndSettings) async throws {
+    fileprivate func prefetchData(variable: DerivedMapping<Reader.MixingVar>, time: TimerangeDtAndSettings) async throws {
         switch variable {
         case .direct(let variable):
             try await prefetchData(variable: variable, time: time)

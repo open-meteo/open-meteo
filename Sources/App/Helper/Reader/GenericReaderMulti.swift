@@ -110,3 +110,79 @@ extension GenericReaderProtocol {
         return true
     }
 }
+
+
+protocol MultiDomainMixerDomainSameType<VariableHourly, VariableDaily, VariableMonthly>: RawRepresentableString, GenericDomainProvider {
+    associatedtype VariableHourly: GenericVariableMixable
+    associatedtype VariableDaily: GenericVariableMixable
+    associatedtype VariableMonthly: GenericVariableMixable
+    var countEnsembleMember: Int { get }
+
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])
+
+    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])?
+}
+
+
+
+/// Combine multiple independent weather models, that may not have given forecast variable
+struct GenericReaderMultiSameType<Variable: GenericVariableMixable> {
+    let reader: [any GenericReaderOptionalProtocol<Variable>]
+
+    var modelLat: Float {
+        reader.last!.modelLat
+    }
+    var modelLon: Float {
+        reader.last!.modelLon
+    }
+    var targetElevation: Float {
+        reader.last!.targetElevation
+    }
+    var modelDtSeconds: Int {
+        reader.first!.modelDtSeconds
+    }
+    var modelElevation: ElevationOrSea {
+        reader.last!.modelElevation
+    }
+
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
+        for reader in reader {
+            if try await reader.prefetchData(variable: variable, time: time) {
+                return true
+            }
+        }
+        return false
+    }
+
+    func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
+        for variable in variables {
+            let _ = try await prefetchData(variable: variable, time: time)
+        }
+    }
+
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        // Last reader return highest resolution data. therefore reverse iteration
+        // Integrate now lower resolution models
+        var data: [Float]?
+        var unit: SiUnit?
+        for r in reader.reversed() {
+            guard let d = try await r.get(variable: variable, time: time) else {
+                continue
+            }
+            if data == nil {
+                // first iteration
+                data = d.data
+                unit = d.unit
+            } else {
+                data?.integrateIfNaN(d.data)
+            }
+            if data?.containsNaN() == false {
+                break
+            }
+        }
+        guard let data, let unit else {
+            return nil
+        }
+        return DataAndUnit(data, unit)
+    }
+}

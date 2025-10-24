@@ -256,13 +256,12 @@ enum SeasonalVariableMonthly: String, GenericVariableMixable, RawRepresentableSt
 
 
 struct SeasonalForecastDeriverMonthly<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
-    typealias MixingVar = DerivedMapping<Reader.MixingVar>
-    typealias SourceVariable = SeasonalVariableMonthly
+    typealias VariableOpt = SeasonalVariableMonthly
     
     let reader: Reader
     let options: GenericReaderOptions
     
-    func getDeriverMap(variable: SourceVariable) -> DerivedMapping<Reader.MixingVar>? {
+    func getDeriverMap(variable: SeasonalVariableMonthly) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }

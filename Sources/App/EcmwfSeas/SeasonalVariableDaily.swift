@@ -53,6 +53,23 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     case sea_surface_temperature_mean
     
     case soil_temperature_0_to_7cm_mean
+    
+    case soil_temperature_0_to_7cm
+    case soil_temperature_7_to_28cm
+    case soil_temperature_28_to_100cm
+    case soil_temperature_100_to_255cm
+    
+    case soil_moisture_0_to_7cm
+    case soil_moisture_7_to_28cm
+    case soil_moisture_28_to_100cm
+    case soil_moisture_100_to_255cm
+    
+    case temperature_max24h_2m
+    case temperature_min24h_2m
+    case temperature_mean24h_2m
+    
+    case sunshine_duration
+    
 
     var aggregation: DailyAggregation<SeasonalVariableHourly> {
         switch self {
@@ -143,6 +160,8 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .max(.temperature_2m)
         case .temperature_2m_mean:
             return .mean(.temperature_2m)
+        default:
+            return .none
         }
     }
     
@@ -234,18 +253,41 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
         case .soil_temperature_0_to_7cm_mean:
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_temperature_0_to_7cm:
+            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
+        case .soil_temperature_7_to_28cm:
+            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm:
+            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm:
+            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm:
+            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm:
+            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm:
+            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm:
+            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
+        case .temperature_max24h_2m:
+            return .init(variable: .temperatureMax24h, altitude: 2)
+        case .temperature_min24h_2m:
+                return .init(variable: .temperatureMin24h, altitude: 2)
+        case .temperature_mean24h_2m:
+            return .init(variable: .temperatureMean24h, altitude: 2)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
         }
     }
 }
 
 struct SeasonalForecastDeriverDaily<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
-    typealias MixingVar = DerivedMapping<Reader.MixingVar>
-    typealias SourceVariable = SeasonalVariableDaily
+    typealias VariableOpt = SeasonalVariableDaily
     
     let reader: Reader
     let options: GenericReaderOptions
     
-    func getDeriverMap(variable: SourceVariable) -> DerivedMapping<Reader.MixingVar>? {
+    func getDeriverMap(variable: VariableOpt) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }

@@ -199,8 +199,7 @@ enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixa
 }
 
 struct SeasonalForecastDeriverHourly<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
-    typealias MixingVar = DerivedMapping<Reader.MixingVar>
-    typealias SourceVariable = SeasonalVariableHourly
+    typealias VariableOpt = SeasonalVariableHourly
     
     let reader: Reader
     let options: GenericReaderOptions
