@@ -1,4 +1,4 @@
-enum EcmwfEC46Variable6HourlyDerived: String, RawRepresentableString, GenericVariableMixable {
+/*enum EcmwfEC46Variable6HourlyDerived: String, RawRepresentableString, GenericVariableMixable {
     case apparent_temperature
     case dewpoint_2m
     case relativehumidity_2m
@@ -305,3 +305,4 @@ struct EcmwfEC46Controller6Hourly: GenericReaderDerivedSimple, GenericReaderProt
         }
     }
 }
+*/

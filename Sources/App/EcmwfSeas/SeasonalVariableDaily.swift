@@ -53,21 +53,14 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     case sea_surface_temperature_mean
     
     case soil_temperature_0_to_7cm_mean
+    case soil_temperature_7_to_28cm_mean
+    case soil_temperature_28_to_100cm_mean
+    case soil_temperature_100_to_255cm_mean
     
-    // TODO rename to mean
-    case soil_temperature_0_to_7cm
-    case soil_temperature_7_to_28cm
-    case soil_temperature_28_to_100cm
-    case soil_temperature_100_to_255cm
-    
-    case soil_moisture_0_to_7cm
-    case soil_moisture_7_to_28cm
-    case soil_moisture_28_to_100cm
-    case soil_moisture_100_to_255cm
-    
-    case temperature_max24h_2m
-    case temperature_min24h_2m
-    case temperature_mean24h_2m
+    case soil_moisture_0_to_7cm_mean
+    case soil_moisture_7_to_28cm_mean
+    case soil_moisture_28_to_100cm_mean
+    case soil_moisture_100_to_255cm_mean
     
     case sunshine_duration
     
@@ -154,14 +147,27 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .mean(.sea_surface_temperature)
         case .soil_temperature_0_to_7cm_mean:
             return .mean(.soil_temperature_0_to_7cm)
+        case .soil_temperature_7_to_28cm_mean:
+            return .mean(.soil_temperature_7_to_28cm)
+        case .soil_temperature_28_to_100cm_mean:
+            return .mean(.soil_temperature_28_to_100cm)
+        case .soil_temperature_100_to_255cm_mean:
+            return .mean(.soil_temperature_100_to_255cm)
+        case .soil_moisture_0_to_7cm_mean:
+            return .mean(.soil_moisture_0_to_7cm)
+        case .soil_moisture_7_to_28cm_mean:
+            return .mean(.soil_moisture_7_to_28cm)
+        case .soil_moisture_28_to_100cm_mean:
+            return .mean(.soil_moisture_28_to_100cm)
+        case .soil_moisture_100_to_255cm_mean:
+            return .mean(.soil_moisture_100_to_255cm)
         case .temperature_2m_max:
-            // TODO also use temperature_2m_max from hourly
-            return .max(.temperature_2m)
+            return .maxTwo(intervalMax: .temperature_2m_max, hourly: .temperature_2m)
         case .temperature_2m_min:
-            return .max(.temperature_2m)
+            return .maxTwo(intervalMax: .temperature_2m_min, hourly: .temperature_2m)
         case .temperature_2m_mean:
             return .mean(.temperature_2m)
-        default:
+        case .sunshine_duration:
             return .none
         }
     }
@@ -254,28 +260,20 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
         case .soil_temperature_0_to_7cm_mean:
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
-        case .soil_temperature_0_to_7cm:
-            return .init(variable: .soilTemperature, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm:
-            return .init(variable: .soilTemperature, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm:
-            return .init(variable: .soilTemperature, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm:
-            return .init(variable: .soilTemperature, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm:
-            return .init(variable: .soilMoisture, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm:
-            return .init(variable: .soilMoisture, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm:
-            return .init(variable: .soilMoisture, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm:
-            return .init(variable: .soilMoisture, depth: 100, depthTo: 255)
-        case .temperature_max24h_2m:
-            return .init(variable: .temperatureMax24h, altitude: 2)
-        case .temperature_min24h_2m:
-                return .init(variable: .temperatureMin24h, altitude: 2)
-        case .temperature_mean24h_2m:
-            return .init(variable: .temperatureMean24h, altitude: 2)
+        case .soil_temperature_7_to_28cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
         case .sunshine_duration:
             return .init(variable: .sunshineDuration)
         }
@@ -293,7 +291,7 @@ struct SeasonalForecastDeriverDaily<Reader: GenericReaderProtocol>: GenericDeriv
             return .direct(variable)
         }
         switch variable {
-        case .temperature_2m_max:
+        /*case .temperature_2m_max:
             guard let v = Reader.variableFromString("temperature_max24h_2m") else {
                 return nil
             }
@@ -307,7 +305,7 @@ struct SeasonalForecastDeriverDaily<Reader: GenericReaderProtocol>: GenericDeriv
             guard let v = Reader.variableFromString("temperature_mean24h_2m") else {
                 return nil
             }
-            return .directShift24Hour(v)
+            return .directShift24Hour(v)*/
         default:
             return nil
         }

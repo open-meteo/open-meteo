@@ -1,6 +1,7 @@
 protocol EcmwfSeasVariable: GenericVariable, Hashable {
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)?
     var isAccumulated: Bool { get }
+    var shift24h: Bool { get }
 }
 
 /// Used to type erase and make EcmwfSeasVariable hashable
@@ -62,6 +63,10 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
         default:
             return nil
         }
+    }
+    
+    var shift24h: Bool {
+        return false
     }
     
     var isAccumulated: Bool {
@@ -191,50 +196,61 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     // TODO correct timeshift for t2 and sun while downloading
     // TODO rename variables to correct daily
     
-    case soil_temperature_0_to_7cm
-    case soil_temperature_7_to_28cm
-    case soil_temperature_28_to_100cm
-    case soil_temperature_100_to_255cm
+    case soil_temperature_0_to_7cm_mean
+    case soil_temperature_7_to_28cm_mean
+    case soil_temperature_28_to_100cm_mean
+    case soil_temperature_100_to_255cm_mean
     
-    case soil_moisture_0_to_7cm
-    case soil_moisture_7_to_28cm
-    case soil_moisture_28_to_100cm
-    case soil_moisture_100_to_255cm
+    case soil_moisture_0_to_7cm_mean
+    case soil_moisture_7_to_28cm_mean
+    case soil_moisture_28_to_100cm_mean
+    case soil_moisture_100_to_255cm_mean
     
-    case temperature_max24h_2m
-    case temperature_min24h_2m
-    case temperature_mean24h_2m
+    case temperature_2m_max
+    case temperature_2m_min
+    case temperature_2m_mean
     
     case sunshine_duration
     
     static func from(shortName: String) -> Self? {
         switch shortName {
         case "stl1":
-            return .soil_temperature_0_to_7cm
+            return .soil_temperature_0_to_7cm_mean
         case "stl2":
-            return .soil_temperature_7_to_28cm
+            return .soil_temperature_7_to_28cm_mean
         case "stl3":
-            return .soil_temperature_28_to_100cm
+            return .soil_temperature_28_to_100cm_mean
         case "stl4":
-            return .soil_temperature_100_to_255cm
+            return .soil_temperature_100_to_255cm_mean
         case "sund":
             return .sunshine_duration
         case "swvl1":
-            return .soil_moisture_0_to_7cm
+            return .soil_moisture_0_to_7cm_mean
         case "swvl2":
-            return .soil_moisture_7_to_28cm
+            return .soil_moisture_7_to_28cm_mean
         case "swvl3":
-            return .soil_moisture_28_to_100cm
+            return .soil_moisture_28_to_100cm_mean
         case "swvl4":
-            return .soil_moisture_100_to_255cm
+            return .soil_moisture_100_to_255cm_mean
         case "mean2t24":
-            return .temperature_mean24h_2m
+            return .temperature_2m_mean
         case "mn2t24":
-            return .temperature_min24h_2m
+            return .temperature_2m_min
         case "mx2t24":
-            return .temperature_max24h_2m
+            return .temperature_2m_max
         default:
             return nil
+        }
+    }
+    
+    var shift24h: Bool {
+        switch self {
+        case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
+            return true
+        case .sunshine_duration:
+            return true
+        default:
+            return false
         }
     }
     
@@ -249,9 +265,9 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
+        case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return (1, -273.15)
-        case .temperature_max24h_2m, .temperature_min24h_2m, .temperature_mean24h_2m:
+        case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
             return (1, -273.15)
         default:
             return nil
@@ -264,11 +280,11 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     
     var scalefactor: Float {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
+        case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return 20
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
+        case .soil_moisture_0_to_7cm_mean, .soil_moisture_7_to_28cm_mean, .soil_moisture_28_to_100cm_mean, .soil_moisture_100_to_255cm_mean:
             return 1000
-        case .temperature_max24h_2m, .temperature_min24h_2m, .temperature_mean24h_2m:
+        case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
             return 20
         case .sunshine_duration:
             return 1/60
@@ -277,11 +293,11 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     
     var interpolation: ReaderInterpolation {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
+        case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return .hermite(bounds: nil)
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
+        case .soil_moisture_0_to_7cm_mean, .soil_moisture_7_to_28cm_mean, .soil_moisture_28_to_100cm_mean, .soil_moisture_100_to_255cm_mean:
             return .hermite(bounds: nil)
-        case .temperature_max24h_2m, .temperature_min24h_2m, .temperature_mean24h_2m:
+        case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
             return .backwards
         case .sunshine_duration:
             return .backwards
@@ -290,11 +306,11 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     
     var unit: SiUnit {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
+        case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return .celsius
-        case .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .soil_moisture_28_to_100cm, .soil_moisture_100_to_255cm:
+        case .soil_moisture_0_to_7cm_mean, .soil_moisture_7_to_28cm_mean, .soil_moisture_28_to_100cm_mean, .soil_moisture_100_to_255cm_mean:
             return .cubicMetrePerCubicMetre
-        case .temperature_max24h_2m, .temperature_min24h_2m, .temperature_mean24h_2m:
+        case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
             return .celsius
         case .sunshine_duration:
             return .seconds
@@ -303,9 +319,9 @@ enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable 
     
     var isElevationCorrectable: Bool {
         switch self {
-        case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm:
+        case .soil_temperature_0_to_7cm_mean, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean:
             return true
-        case .temperature_max24h_2m, .temperature_min24h_2m, .temperature_mean24h_2m:
+        case .temperature_2m_max, .temperature_2m_min, .temperature_2m_mean:
             return true
         default:
             return false
@@ -385,6 +401,10 @@ enum EcmwfSeasVariableUpperLevel: String, EcmwfSeasVariable {
     }
     
     var isAccumulated: Bool {
+        return false
+    }
+    
+    var shift24h: Bool {
         return false
     }
     
@@ -704,6 +724,10 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
     }
     
     var isAccumulated: Bool {
+        return false
+    }
+    
+    var shift24h: Bool {
         return false
     }
     

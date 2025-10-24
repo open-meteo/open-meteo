@@ -53,7 +53,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let generateTimeSeries: Bool
         switch domain {
         case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly:
-            generateTimeSeries = false
+            generateTimeSeries = true
         case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly, .ec46_6hourly:
             generateTimeSeries = true
         }
@@ -66,7 +66,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         case .seas5_6hourly, .seas5_monthly, .seas5_12hourly, .seas5_24hourly, .seas5_monthly_upper_level:
             handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         }
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: generateTimeSeries)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: generateTimeSeries)
     }
     
     func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool) async throws {
@@ -128,8 +128,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
         //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
         
         let deaverager = GribDeaverager()
@@ -281,9 +280,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         }
                         return
                     }
-                    logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
-                    // TODO On the fly conversions: Specific humidity to relative humidity, needs pressure
-                    try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
+                    let timeOut = variable.shift24h ? time.add(hours: -24) : time
+                    logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(timeOut.format_YYYYMMddHH)")
+                    try await writer.write(time: timeOut, member: member, variable: variable, data: array2d.array.data)
                 }
             }
         }

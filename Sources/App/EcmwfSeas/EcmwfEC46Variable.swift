@@ -98,6 +98,10 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
         return Self.allCases.first(where: { $0.gribCode == shortName })
     }
     
+    var shift24h: Bool {
+        return false
+    }
+    
     var isAccumulated: Bool {
         switch self {
         case .precipitation, .snowfall_water_equivalent ,.showers:

@@ -9,6 +9,8 @@ enum DailyAggregation<WeatherVariable> {
     case none
     case max(WeatherVariable)
     case min(WeatherVariable)
+    case maxTwo(intervalMax: WeatherVariable, hourly: WeatherVariable)
+    case minTwo(intervalMin: WeatherVariable, hourly: WeatherVariable)
     case mean(WeatherVariable)
     case sum(WeatherVariable)
     case radiationSum(WeatherVariable)
@@ -25,6 +27,10 @@ enum DailyAggregation<WeatherVariable> {
             return (weatherVariable, nil)
         case .min(let weatherVariable):
             return (weatherVariable, nil)
+        case .maxTwo(intervalMax: let a, hourly: let b):
+            return (a, b)
+        case .minTwo(intervalMin: let a, hourly: let b):
+            return (a, b)
         case .mean(let weatherVariable):
             return (weatherVariable, nil)
         case .sum(let weatherVariable):
@@ -74,6 +80,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     }
     
     func get(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        // TODO supersampling to 1h not always required
         let time = timeDaily.with(dtSeconds: 3600)
 
         switch variable.aggregation {
@@ -91,6 +98,22 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .mean(let variable):
             guard let data = try await reader.get(variable: variable, time: time) else {
+                return nil
+            }
+            return DataAndUnit(data.data.mean(by: 24), data.unit)
+        case .minTwo(let variable, let b):
+            if let data = try await reader.get(variable: variable, time: time) {
+                return DataAndUnit(data.data.min(by: 24), data.unit)
+            }
+            guard let data = try await reader.get(variable: b, time: time) else {
+                return nil
+            }
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, let b):
+            if let data = try await reader.get(variable: variable, time: time) {
+                return DataAndUnit(data.data.max(by: 24), data.unit)
+            }
+            guard let data = try await reader.get(variable: b, time: time) else {
                 return nil
             }
             return DataAndUnit(data.data.mean(by: 24), data.unit)
@@ -164,6 +187,12 @@ extension GenericReaderProtocol {
         case .min(let variable):
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, let b):
+            let data = try await get(variable: variable, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .minTwo(let variable, let b):
+            let data = try await get(variable: variable, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.min(by: 24), data.unit)
         case .mean(let variable):
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.mean(by: 24), data.unit)
@@ -231,6 +260,22 @@ extension GenericReaderMulti {
                 return nil
             }
             return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .minTwo(let variable, let b):
+            if let data = try await get(variable: variable, time: time) {
+                return DataAndUnit(data.data.min(by: 24), data.unit)
+            }
+            guard let data = try await get(variable: b, time: time) else {
+                return nil
+            }
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, let b):
+            if let data = try await get(variable: variable, time: time) {
+                return DataAndUnit(data.data.max(by: 24), data.unit)
+            }
+            guard let data = try await get(variable: b, time: time) else {
+                return nil
+            }
+            return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .mean(let variable):
             guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
