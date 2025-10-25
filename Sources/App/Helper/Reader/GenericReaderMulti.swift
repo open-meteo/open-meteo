@@ -112,15 +112,16 @@ extension GenericReaderProtocol {
 }
 
 
-protocol MultiDomainMixerDomainSameType<VariableHourly, VariableDaily, VariableMonthly>: RawRepresentableString, GenericDomainProvider {
+protocol MultiDomainMixerDomainSameType<VariableHourly, VariableDaily, VariableWeekly, VariableMonthly>: RawRepresentableString, GenericDomainProvider {
     associatedtype VariableHourly: GenericVariableMixable
     associatedtype VariableDaily: GenericVariableMixable
+    associatedtype VariableWeekly: GenericVariableMixable
     associatedtype VariableMonthly: GenericVariableMixable
     var countEnsembleMember: Int { get }
 
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], weekly: [any GenericReaderOptionalProtocol<VariableWeekly>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])
 
-    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])?
+    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], weekly: [any GenericReaderOptionalProtocol<VariableWeekly>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])?
 }
 
 

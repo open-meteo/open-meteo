@@ -12,6 +12,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
 
     typealias DailyVariable = ForecastVariableDaily
 
+    typealias WeeklyVariable = ForecastVariableDaily
     typealias MonthlyVariable = ForecastVariableDaily
 
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
@@ -34,7 +35,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         nil
     }
 
-    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, sixHourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [MonthlyVariable]?) async throws {
+    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, sixHourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [MonthlyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
 
     }
 
@@ -73,6 +74,9 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             ApiColumn(variable: .cloud_cover_mean, unit: .percentage, variables: [.float(.init(repeating: 10, count: 2))])
         ])
     }
+    func weekly(variables: [WeeklyVariable]?) async throws -> ApiSection<WeeklyVariable>? {
+        return nil
+    }
 
     static func makeData(timeformat: Timeformat, locationCount: Int) -> ForecastapiResult<Self>  {
         let res = DummyDataProvider()
@@ -87,6 +91,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             hourlyVariables: [.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))],
             sixHourlyVariables: nil,
             dailyVariables: [.temperature_2m_mean, .windspeed_10m_mean],
+            weeklyVariables: [],
             monthlyVariables: [.apparent_temperature_mean, .cloud_cover_mean]
         )
         return data

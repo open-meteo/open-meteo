@@ -2,7 +2,7 @@ import Vapor
 import OpenMeteoSdk
 
 enum SeasonalForecastControllerDomains: String, Codable, CaseIterable, MultiDomainMixerDomainSameType, GenericDomainProvider {
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<SeasonalVariableHourly>], daily: [any GenericReaderOptionalProtocol<SeasonalVariableDaily>], monthly: [any GenericReaderOptionalProtocol<SeasonalVariableMonthly>]) {
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<SeasonalVariableHourly>], daily: [any GenericReaderOptionalProtocol<SeasonalVariableDaily>], weekly: [any GenericReaderOptionalProtocol<SeasonalVariableWeekly>], monthly: [any GenericReaderOptionalProtocol<SeasonalVariableMonthly>]) {
         switch self {
         case .ecmwf_seasonal_seamless:
             let seas5daily = try await SeasonalForecastDeriverDaily<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>(domain: .seas5_24hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
@@ -13,30 +13,36 @@ enum SeasonalForecastControllerDomains: String, Codable, CaseIterable, MultiDoma
             let ec46hourly = try await SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             let ec46hourlyToDaily = DailyReaderConverter<SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, SeasonalVariableDaily>(reader: ec46hourly)
             
-            return ([seas6hourly, ec46hourly], [seas6hourlyToDaily, seas5daily, ec46hourlyToDaily], [seas6monthly])
+            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            return ([seas6hourly, ec46hourly], [seas6hourlyToDaily, seas5daily, ec46hourlyToDaily], [ec46weekly], [seas6monthly])
         case .ecmwf_seas5:
             let seas5daily = try await SeasonalForecastDeriverDaily<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>(domain: .seas5_24hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             let seas6hourly = try await SeasonalForecastDeriverHourly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>(domain: .seas5_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             let seas6hourlyToDaily = DailyReaderConverter<SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>>, SeasonalVariableDaily>(reader: seas6hourly)
             let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             
-            return ([seas6hourly], [seas6hourlyToDaily, seas5daily], [seas6monthly])
+            return ([seas6hourly], [seas6hourlyToDaily, seas5daily], [], [seas6monthly])
         case .ecmwf_ec46:
             let ec46hourly = try await SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             
             let ec46hourlyToDaily = DailyReaderConverter<SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, SeasonalVariableDaily>(reader: ec46hourly)
             
-            return ([ec46hourly], [ec46hourlyToDaily], [])
+            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            return ([ec46hourly], [ec46hourlyToDaily], [ec46weekly], [])
         }
     }
     
-    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<SeasonalVariableHourly>], daily: [any GenericReaderOptionalProtocol<SeasonalVariableDaily>], monthly: [any GenericReaderOptionalProtocol<SeasonalVariableMonthly>])? {
+    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<SeasonalVariableHourly>], daily: [any GenericReaderOptionalProtocol<SeasonalVariableDaily>], weekly: [any GenericReaderOptionalProtocol<SeasonalVariableWeekly>], monthly: [any GenericReaderOptionalProtocol<SeasonalVariableMonthly>])? {
         fatalError()
     }
     
     typealias VariableHourly = SeasonalVariableHourly
     
     typealias VariableDaily = SeasonalVariableDaily
+    
+    typealias VariableWeekly = SeasonalVariableWeekly
     
     typealias VariableMonthly = SeasonalVariableMonthly
     
@@ -73,6 +79,7 @@ struct SeasonalForecastController {
             let paramsSixHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.six_hourly)
             let paramsHourly = try SeasonalVariableHourly.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
+            let paramsWeekly = try Seas5Reader.WeeklyVariable.load(commaSeparatedOptional: params.weekly)
             let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
             let nMember = 51
             let nVariables6Hourly = ((paramsHourly?.count ?? 0) + (paramsSixHourly?.count ?? 0)) * nMember / 6
@@ -93,14 +100,14 @@ struct SeasonalForecastController {
 
                 let readers: [Seas5Reader] = try await domains.asyncCompactMap { domain -> Seas5Reader? in
                     let r = try await domain.getReader(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
-                    return Seas5Reader(domain: domain, readerHourly: GenericReaderMultiSameType(reader: r.hourly), readerDaily: GenericReaderMultiSameType(reader: r.daily), readerMonthly: GenericReaderMultiSameType(reader: r.monthly), params: params, time: time, timezone: timezone, run: params.run)
+                    return Seas5Reader(domain: domain, readerHourly: GenericReaderMultiSameType(reader: r.hourly), readerDaily: GenericReaderMultiSameType(reader: r.daily), readerWeekly: GenericReaderMultiSameType(reader: r.weekly), readerMonthly: GenericReaderMultiSameType(reader: r.monthly), params: params, time: time, timezone: timezone, run: params.run)
                 }
                 guard !readers.isEmpty else {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<Seas5Reader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<Seas5Reader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: paramsHourly, sixHourlyVariables: paramsSixHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
         }
     }
 }
@@ -108,6 +115,7 @@ struct SeasonalForecastController {
 
 struct Seas5Reader: ModelFlatbufferSerialisable {
     typealias MonthlyVariable = SeasonalVariableMonthly
+    typealias WeeklyVariable = SeasonalVariableWeekly
     
     typealias HourlyVariable = SeasonalVariableHourly
     
@@ -124,6 +132,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     let domain: SeasonalForecastControllerDomains
     let readerHourly: GenericReaderMultiSameType<SeasonalVariableHourly>
     let readerDaily: GenericReaderMultiSameType<SeasonalVariableDaily>
+    let readerWeekly: GenericReaderMultiSameType<SeasonalVariableWeekly>
     let readerMonthly: GenericReaderMultiSameType<SeasonalVariableMonthly>
     
     var latitude: Float {
@@ -143,7 +152,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     let timezone: TimezoneWithOffset
     let run: IsoDateTime?
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let members = 0..<domain.countEnsembleMember
         if let sixHourlyVariables {
             let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
@@ -167,6 +176,13 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
                 for member in members {
                     let _ = try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
                 }
+            }
+        }
+        if let weeklyVariables {
+            // TODO weekly alignment
+            let timeRead = time.dailyRead.with(dtSeconds: 7*24*3600)
+            for variable in weeklyVariables {
+                let _ = try await readerWeekly.prefetchData(variable: variable, time: timeRead.toSettings())
             }
         }
         if let monthlyVariables {
@@ -274,6 +290,19 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         return nil
     }
     
+    func weekly(variables: [WeeklyVariable]?) async throws -> ApiSection<WeeklyVariable>? {
+        guard let variables else {
+            return nil
+        }
+        let timeRead = time.dailyRead.with(dtSeconds: 7*24*3600)
+        return ApiSection<WeeklyVariable>(name: "weekly", time: timeRead, columns: try await variables.asyncCompactMap { variable in
+            guard let d = try await readerWeekly.get(variable: variable, time: timeRead.toSettings())?.convertAndRound(params: params) else {
+                return nil
+            }
+            assert(timeRead.count == d.data.count)
+            return ApiColumn<WeeklyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
+        })
+    }    
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
         guard let variables else {
             return nil

@@ -118,7 +118,7 @@ struct GloFasController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
@@ -129,6 +129,7 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
     typealias DailyVariable = GloFasVariableOrDerived
     
     typealias MonthlyVariable = FlatBuffersVariableNone
+    typealias WeeklyVariable = FlatBuffersVariableNone
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
         domain.flatBufferModel
@@ -157,7 +158,7 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         if let dailyVariables {
             for param in dailyVariables {
                 try await reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
@@ -207,6 +208,9 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
         return nil
     }
     
+    func weekly(variables: [WeeklyVariable]?) async throws -> ApiSection<WeeklyVariable>? {
+        return nil
+    }
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
         return nil
     }
