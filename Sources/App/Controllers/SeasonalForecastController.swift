@@ -69,9 +69,7 @@ struct SeasonalForecastController {
             guard case .coordinates(let prepared) = prepared else {
                 throw ForecastApiError.generic(message: "Bounding box not supported")
             }
-            /// Will be configurable by API later
-            let domains = [SeasonalForecastControllerDomains.ecmwf_seasonal_seamless]
-
+            let domains = try SeasonalForecastControllerDomains.load(commaSeparatedOptional: params.models) ?? [.ecmwf_seasonal_seamless]
             let paramsSixHourly = try Seas5Reader.HourlyVariable.load(commaSeparatedOptional: params.six_hourly)
             let paramsHourly = try SeasonalVariableHourly.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try Seas5Reader.DailyVariable.load(commaSeparatedOptional: params.daily)
