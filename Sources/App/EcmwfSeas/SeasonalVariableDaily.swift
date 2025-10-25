@@ -19,6 +19,7 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     case pressure_msl_min
     case precipitation_sum
     case rain_sum
+    case showers_sum
     case relative_humidity_2m_max
     case relative_humidity_2m_mean
     case relative_humidity_2m_min
@@ -44,6 +45,13 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     case wind_speed_10m_max
     case wind_speed_10m_mean
     case wind_speed_10m_min
+    case wind_speed_100m_max
+    case wind_speed_100m_mean
+    case wind_speed_100m_min
+    case wind_speed_200m_max
+    case wind_speed_200m_mean
+    case wind_speed_200m_min
+    case wind_gusts_10m_max
     case wet_bulb_temperature_2m_max
     case wet_bulb_temperature_2m_mean
     case wet_bulb_temperature_2m_min
@@ -95,6 +103,8 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .min(.pressure_msl)
         case .rain_sum:
             return .sum(.rain)
+        case .showers_sum:
+            return .sum(.showers)
         case .relative_humidity_2m_max:
             return .max(.relative_humidity_2m)
         case .relative_humidity_2m_mean:
@@ -131,6 +141,20 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .mean(.wind_speed_10m)
         case .wind_speed_10m_min:
             return .min(.wind_speed_10m)
+        case .wind_speed_100m_max:
+            return .max(.wind_speed_100m)
+        case .wind_speed_100m_mean:
+            return .mean(.wind_speed_100m)
+        case .wind_speed_100m_min:
+            return .min(.wind_speed_100m)
+        case .wind_speed_200m_max:
+            return .max(.wind_speed_200m)
+        case .wind_speed_200m_mean:
+            return .mean(.wind_speed_200m)
+        case .wind_speed_200m_min:
+            return .min(.wind_speed_200m)
+        case .wind_gusts_10m_max:
+            return .max(.wind_gusts_10m)
         case .wet_bulb_temperature_2m_max:
             return .max(.wet_bulb_temperature_2m)
         case .wet_bulb_temperature_2m_mean:
@@ -168,7 +192,7 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
         case .temperature_2m_mean:
             return .mean(.temperature_2m)
         case .sunshine_duration:
-            return .none
+            return .sum(.sunshine_duration)
         }
     }
     
@@ -210,6 +234,8 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .init(variable: .precipitation, aggregation: .sum)
         case .rain_sum:
             return .init(variable: .rain, aggregation: .sum)
+        case .showers_sum:
+            return .init(variable: .showers, aggregation: .sum)
         case .relative_humidity_2m_max:
             return .init(variable: .relativeHumidity, aggregation: .maximum, altitude: 2)
         case .relative_humidity_2m_mean:
@@ -246,6 +272,20 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .wind_speed_10m_min:
             return .init(variable: .windSpeed, aggregation: .minimum, altitude: 10)
+        case .wind_speed_100m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 100)
+        case .wind_speed_100m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 100)
+        case .wind_speed_100m_min:
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 100)
+        case .wind_speed_200m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 200)
+        case .wind_speed_200m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 200)
+        case .wind_speed_200m_min:
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 200)
+        case .wind_gusts_10m_max:
+            return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         case .wet_bulb_temperature_2m_max:
             return .init(variable: .wetBulbTemperature, aggregation: .maximum, altitude: 2)
         case .wet_bulb_temperature_2m_mean:
