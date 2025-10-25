@@ -1098,6 +1098,10 @@ enum EcmwfSeasVariableMonthly: String, EcmwfSeasVariable {
             return .longwave_radiation_mean
         case "strdara":
             return .longwave_radiation_anomaly
+        case "sst":
+            return .sea_surface_temperature_mean
+        case "ssta":
+            return .sea_surface_temperature_anomaly
         default:
             return nil
         }

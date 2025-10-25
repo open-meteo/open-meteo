@@ -131,11 +131,30 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
         //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
         
+        let package: String
+        let types: [String]
+        switch domain {
+        case .ec46_6hourly:
+            package = "e1"
+            types = ["cf","pf"]
+        case .ec46_weekly:
+            package = "e2"
+            types = ["taem"] // ["efi", "ep", "sot", "taem"]
+        default:
+            fatalError()
+        }
+                
         let deaverager = GribDeaverager()
         for day in 0..<46 {
             let dayTimestamp = run.add(days: day)
+            
+            if domain.dtSeconds == 7*24*3600 && (dayTimestamp.weekday != .monday || day < 7 ) {
+                // Weekly data has only data every 7 days on Monday
+                continue
+            }
+            
             /// ope_e1_ifs-subs_od_eefo_cf_20251008T000000Z_20251008_d01.bz2
-            let urls = ["cf","pf"].map({"\(server)ope_e1_ifs-subs_od_eefo_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
+            let urls = types.map({"\(server)ope_\(package)_ifs-subs_od_eefo_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
             
             for url in urls {
                 /// Single GRIB files contains multiple time-steps in mixed order
@@ -154,12 +173,12 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     case .ec46_6hourly:
                         variable = EcmwfEC46Variable6Hourly.from(shortName: attributes.shortName)
                     case .ec46_weekly:
-                        fatalError()
+                        variable = EcmwfEC46VariableWeekly.from(shortName: attributes.shortName)
                     default:
                         fatalError()
                     }
                     guard let variable else {
-                        logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
+                        logger.info("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
                         return
                     }
                     if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
