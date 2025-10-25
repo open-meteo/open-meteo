@@ -354,13 +354,20 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
  param               = 2ti, number              = 10 (-> 10:100)
  
  
- // Extreme Forecast Index (EFI)
+ // Extreme Forecast Index (EFI) index -1 to +1
  2 metre temperature index (2ti)
  Total precipitation index (tpi)
  type                = efi,
  param               = tpi/2ti
  */
 enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
+    case temperature_2m_sot10
+    case temperature_2m_sot90
+    case temperature_2m_efi
+    
+    case precipitation_efi
+    case precipitation_sot90
+    
     //case wind_gusts_10m_anomaly
     
     //case wind_speed_10m_mean
@@ -564,6 +571,15 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return 10
         case .total_column_integrated_water_vapour_anomaly:
             return 10
+        case .temperature_2m_sot10, .temperature_2m_sot90:
+            return 100
+        case .temperature_2m_efi:
+            // TODO check range
+            return 100
+        case .precipitation_efi:
+            return 100
+        case .precipitation_sot90:
+            return 100
         }
     }
     
@@ -634,6 +650,14 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return .kilogramPerSquareMetre
         case .total_column_integrated_water_vapour_anomaly:
             return .kilogramPerSquareMetre
+        case .temperature_2m_sot10, .temperature_2m_sot90:
+            return .kelvin
+        case .temperature_2m_efi:
+            return .dimensionless
+        case .precipitation_efi:
+            return .millimetre
+        case .precipitation_sot90:
+            return .dimensionless
         }
     }
     
@@ -654,7 +678,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
     }
     
     
-    static func from(shortName: String) -> Self? {
+    static func from(shortName: String, number: Int?) -> Self? {
         switch shortName {
         case "cprate":
             return .showers_mean
@@ -732,6 +756,22 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return .sea_surface_temperature_mean
         case "ssta":
             return .sea_surface_temperature_anomaly
+        case "tpi":
+            switch number {
+            case 90:
+                return .precipitation_sot90
+            default:
+                return .precipitation_efi
+            }
+        case "2ti":
+            switch number {
+            case 10:
+                return .temperature_2m_sot10
+            case 90:
+                return .temperature_2m_sot90
+            default:
+                return .temperature_2m_efi
+            }
         default:
             return nil
         }

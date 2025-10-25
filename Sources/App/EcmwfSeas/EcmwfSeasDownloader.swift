@@ -128,7 +128,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: domain == .ec46_weekly, realm: nil)
         //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
         
         let package: String
@@ -139,7 +139,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             types = ["cf","pf"]
         case .ec46_weekly:
             package = "e2"
-            types = ["taem"] // ["efi", "ep", "sot", "taem"]
+            types = ["sot", "efi"] // ["efi", "ep", "sot", "taem"]
         default:
             fatalError()
         }
@@ -166,14 +166,14 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
                     let time = attributes.timestamp
                     var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
-                    let member = message.getLong(attribute: "perturbationNumber") ?? 0
+                    let member = domain.dtSeconds > 24*3600 ? 0 : message.getLong(attribute: "perturbationNumber") ?? 0
                     
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {
                     case .ec46_6hourly:
                         variable = EcmwfEC46Variable6Hourly.from(shortName: attributes.shortName)
                     case .ec46_weekly:
-                        variable = EcmwfEC46VariableWeekly.from(shortName: attributes.shortName)
+                        variable = EcmwfEC46VariableWeekly.from(shortName: attributes.shortName, number: message.getLong(attribute: "number"))
                     default:
                         fatalError()
                     }
