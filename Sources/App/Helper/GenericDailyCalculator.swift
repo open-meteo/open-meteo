@@ -187,10 +187,10 @@ extension GenericReaderProtocol {
         case .min(let variable):
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
-        case .maxTwo(let variable, let b):
+        case .maxTwo(let variable, _):
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
-        case .minTwo(let variable, let b):
+        case .minTwo(let variable, _):
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .mean(let variable):

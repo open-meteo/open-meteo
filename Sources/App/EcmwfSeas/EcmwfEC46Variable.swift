@@ -361,6 +361,18 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
  param               = tpi/2ti
  */
 enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
+    case temperature_2m_anomaly_gt_1k
+    case temperature_2m_anomaly_gt_2k
+    case temperature_2m_anomaly_gt_0k
+    case temperature_2m_anomaly_lt_minus1k
+    case temperature_2m_anomaly_lt_minus2k
+    case pressure_msl_anomaly_gt_0Pa
+    case surface_temperature_anomaly_gt_0K
+    case precipitation_anomaly_gt_0mm
+    case precipitation_anomaly_gt_10mm
+    case precipitation_anomaly_gt_20mm
+    
+    
     case temperature_2m_sot10
     case temperature_2m_sot90
     case temperature_2m_efi
@@ -580,6 +592,14 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return 100
         case .precipitation_sot90:
             return 100
+        case .temperature_2m_anomaly_gt_1k, .temperature_2m_anomaly_gt_2k, .temperature_2m_anomaly_gt_0k, .temperature_2m_anomaly_lt_minus1k, .temperature_2m_anomaly_lt_minus2k:
+            return 100
+        case .pressure_msl_anomaly_gt_0Pa:
+            return 100
+        case .surface_temperature_anomaly_gt_0K:
+            return 100
+        case .precipitation_anomaly_gt_0mm, .precipitation_anomaly_gt_10mm, .precipitation_anomaly_gt_20mm:
+            return 100
         }
     }
     
@@ -658,6 +678,14 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return .millimetre
         case .precipitation_sot90:
             return .dimensionless
+        case .temperature_2m_anomaly_gt_1k, .temperature_2m_anomaly_gt_2k, .temperature_2m_anomaly_gt_0k, .temperature_2m_anomaly_lt_minus1k, .temperature_2m_anomaly_lt_minus2k:
+            return .percentage
+        case .pressure_msl_anomaly_gt_0Pa:
+            return .percentage
+        case .surface_temperature_anomaly_gt_0K:
+            return .percentage
+        case .precipitation_anomaly_gt_0mm, .precipitation_anomaly_gt_10mm, .precipitation_anomaly_gt_20mm:
+            return .percentage
         }
     }
     
@@ -772,6 +800,26 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             default:
                 return .temperature_2m_efi
             }
+        case "2tag1":
+            return .temperature_2m_anomaly_gt_1k
+        case "2tag2":
+            return .temperature_2m_anomaly_gt_2k
+        case "2tag0":
+            return .temperature_2m_anomaly_gt_0k
+        case "2talm1":
+            return .temperature_2m_anomaly_lt_minus1k
+        case "2talm2":
+            return .temperature_2m_anomaly_lt_minus2k
+        case "mslag0":
+            return .pressure_msl_anomaly_gt_0Pa
+        case "stag0":
+            return .surface_temperature_anomaly_gt_0K
+        case "tpag0":
+            return .precipitation_anomaly_gt_0mm
+        case "tpag10":
+            return .precipitation_anomaly_gt_10mm
+        case "tpag20":
+            return .precipitation_anomaly_gt_20mm
         default:
             return nil
         }

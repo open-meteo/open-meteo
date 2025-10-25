@@ -139,7 +139,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             types = ["cf","pf"]
         case .ec46_weekly:
             package = "e2"
-            types = ["sot", "efi"] // ["efi", "ep", "sot", "taem"]
+            types = ["efi", "ep", "sot", "taem"]
         default:
             fatalError()
         }
