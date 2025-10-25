@@ -52,6 +52,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     let current: [String]?
     let hourly: [String]?
     let daily: [String]?
+    let weekly: [String]?
     let monthly: [String]?
     /// For seasonal forecast
     let six_hourly: [String]?
@@ -147,6 +148,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         current = try c.decodeIfPresent([String].self, forKey: .current)
         hourly = try c.decodeIfPresent([String].self, forKey: .hourly)
         daily = try c.decodeIfPresent([String].self, forKey: .daily)
+        weekly = try c.decodeIfPresent([String].self, forKey: .weekly)
         monthly = try c.decodeIfPresent([String].self, forKey: .monthly)
         six_hourly = try c.decodeIfPresent([String].self, forKey: .six_hourly)
         current_weather = try c.decodeIfPresent(Bool.self, forKey: .current_weather) ?? false

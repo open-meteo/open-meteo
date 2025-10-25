@@ -1,11 +1,8 @@
-enum EcmwfSeasVariable24HourlySingleLevelDerived: String, RawRepresentableString, GenericVariableMixable {
+enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMixable, RawRepresentableString, FlatBuffersVariable {
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
-}
-
-/// Available daily aggregations
-enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepresentableString, FlatBuffersVariable {
+    
     case apparent_temperature_max
     case apparent_temperature_mean
     case apparent_temperature_min
@@ -22,6 +19,7 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
     case pressure_msl_min
     case precipitation_sum
     case rain_sum
+    case showers_sum
     case relative_humidity_2m_max
     case relative_humidity_2m_mean
     case relative_humidity_2m_min
@@ -47,6 +45,13 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
     case wind_speed_10m_max
     case wind_speed_10m_mean
     case wind_speed_10m_min
+    case wind_speed_100m_max
+    case wind_speed_100m_mean
+    case wind_speed_100m_min
+    case wind_speed_200m_max
+    case wind_speed_200m_mean
+    case wind_speed_200m_min
+    case wind_gusts_10m_max
     case wet_bulb_temperature_2m_max
     case wet_bulb_temperature_2m_mean
     case wet_bulb_temperature_2m_min
@@ -56,49 +61,62 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
     case sea_surface_temperature_mean
     
     case soil_temperature_0_to_7cm_mean
+    case soil_temperature_7_to_28cm_mean
+    case soil_temperature_28_to_100cm_mean
+    case soil_temperature_100_to_255cm_mean
+    
+    case soil_moisture_0_to_7cm_mean
+    case soil_moisture_7_to_28cm_mean
+    case soil_moisture_28_to_100cm_mean
+    case soil_moisture_100_to_255cm_mean
+    
+    case sunshine_duration
+    
 
-    var aggregation: DailyAggregation<EcmwfSeas5Controller6Hourly.Variable> {
+    var aggregation: DailyAggregation<SeasonalVariableHourly> {
         switch self {
         case .apparent_temperature_max:
-            return .max(.derived(.apparent_temperature))
+            return .max(.apparent_temperature)
         case .apparent_temperature_mean:
-            return .mean(.derived(.apparent_temperature))
+            return .mean(.apparent_temperature)
         case .apparent_temperature_min:
-            return .min(.derived(.apparent_temperature))
+            return .min(.apparent_temperature)
         case .cloud_cover_max:
-            return .max(.raw(.cloud_cover))
+            return .max(.cloud_cover)
         case .cloud_cover_mean:
-            return .mean(.raw(.cloud_cover))
+            return .mean(.cloud_cover)
         case .cloud_cover_min:
-            return .min(.raw(.cloud_cover))
+            return .min(.cloud_cover)
         case .dew_point_2m_max:
-            return .max(.raw(.dew_point_2m))
+            return .max(.dew_point_2m)
         case .dew_point_2m_mean:
-            return .mean(.raw(.dew_point_2m))
+            return .mean(.dew_point_2m)
         case .dew_point_2m_min:
-            return .min(.raw(.dew_point_2m))
+            return .min(.dew_point_2m)
         case .et0_fao_evapotranspiration, .et0_fao_evapotranspiration_sum:
-            return .sum(.derived(.et0_fao_evapotranspiration))
+            return .sum(.et0_fao_evapotranspiration)
         case .pressure_msl_max:
-            return .max(.raw(.pressure_msl))
+            return .max(.pressure_msl)
         case .pressure_msl_mean:
-            return .mean(.raw(.pressure_msl))
+            return .mean(.pressure_msl)
         case .pressure_msl_min:
-            return .min(.raw(.pressure_msl))
+            return .min(.pressure_msl)
         case .rain_sum:
-            return .sum(.derived(.rain))
+            return .sum(.rain)
+        case .showers_sum:
+            return .sum(.showers)
         case .relative_humidity_2m_max:
-            return .max(.derived(.relative_humidity_2m))
+            return .max(.relative_humidity_2m)
         case .relative_humidity_2m_mean:
-            return .mean(.derived(.relative_humidity_2m))
+            return .mean(.relative_humidity_2m)
         case .relative_humidity_2m_min:
-            return .min(.derived(.relative_humidity_2m))
+            return .min(.relative_humidity_2m)
         case .shortwave_radiation_sum:
-            return .radiationSum(.raw(.shortwave_radiation))
+            return .radiationSum(.shortwave_radiation)
         case .snowfall_sum:
-            return .sum(.derived(.snowfall))
+            return .sum(.snowfall)
         case .snowfall_water_equivalent_sum:
-            return .sum(.raw(.snowfall_water_equivalent))
+            return .sum(.snowfall_water_equivalent)
         case .sunrise:
             return .none
         case .sunset:
@@ -106,44 +124,86 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
         case .daylight_duration:
             return .none
         case .surface_pressure_max:
-            return .max(.derived(.surface_pressure))
+            return .max(.surface_pressure)
         case .surface_pressure_mean:
-            return .mean(.derived(.surface_pressure))
+            return .mean(.surface_pressure)
         case .surface_pressure_min:
-            return .min(.derived(.surface_pressure))
+            return .min(.surface_pressure)
         case .vapor_pressure_deficit_max, .vapour_pressure_deficit_max:
-            return .max(.derived(.vapor_pressure_deficit))
+            return .max(.vapor_pressure_deficit)
         case .weathercode, .weather_code:
-            return .max(.derived(.weathercode))
+            return .max(.weathercode)
         case .wind_direction_10m_dominant:
-            return .dominantDirectionComponents(u: .raw(.wind_u_component_10m), v: .raw(.wind_v_component_10m))
+            return .dominantDirectionComponents(u: .wind_u_component_10m, v: .wind_v_component_10m)
         case .wind_speed_10m_max:
-            return .max(.derived(.wind_speed_10m))
+            return .max(.wind_speed_10m)
         case .wind_speed_10m_mean:
-            return .mean(.derived(.wind_speed_10m))
+            return .mean(.wind_speed_10m)
         case .wind_speed_10m_min:
-            return .min(.derived(.wind_speed_10m))
+            return .min(.wind_speed_10m)
+        case .wind_speed_100m_max:
+            return .max(.wind_speed_100m)
+        case .wind_speed_100m_mean:
+            return .mean(.wind_speed_100m)
+        case .wind_speed_100m_min:
+            return .min(.wind_speed_100m)
+        case .wind_speed_200m_max:
+            return .max(.wind_speed_200m)
+        case .wind_speed_200m_mean:
+            return .mean(.wind_speed_200m)
+        case .wind_speed_200m_min:
+            return .min(.wind_speed_200m)
+        case .wind_gusts_10m_max:
+            return .max(.wind_gusts_10m)
         case .wet_bulb_temperature_2m_max:
-            return .max(.derived(.wet_bulb_temperature_2m))
+            return .max(.wet_bulb_temperature_2m)
         case .wet_bulb_temperature_2m_mean:
-            return .mean(.derived(.wet_bulb_temperature_2m))
+            return .mean(.wet_bulb_temperature_2m)
         case .wet_bulb_temperature_2m_min:
-            return .min(.derived(.wet_bulb_temperature_2m))
+            return .min(.wet_bulb_temperature_2m)
         case .precipitation_sum:
-            return .sum(.raw(.precipitation))
+            return .sum(.precipitation)
         case .sea_surface_temperature_min:
-            return .min(.raw(.sea_surface_temperature))
+            return .min(.sea_surface_temperature)
         case .sea_surface_temperature_max:
-            return .max(.raw(.sea_surface_temperature))
+            return .max(.sea_surface_temperature)
         case .sea_surface_temperature_mean:
-            return .mean(.raw(.sea_surface_temperature))
+            return .mean(.sea_surface_temperature)
         case .soil_temperature_0_to_7cm_mean:
-            return .mean(.raw(.soil_temperature_0_to_7cm))
+            return .mean(.soil_temperature_0_to_7cm)
+        case .soil_temperature_7_to_28cm_mean:
+            return .mean(.soil_temperature_7_to_28cm)
+        case .soil_temperature_28_to_100cm_mean:
+            return .mean(.soil_temperature_28_to_100cm)
+        case .soil_temperature_100_to_255cm_mean:
+            return .mean(.soil_temperature_100_to_255cm)
+        case .soil_moisture_0_to_7cm_mean:
+            return .mean(.soil_moisture_0_to_7cm)
+        case .soil_moisture_7_to_28cm_mean:
+            return .mean(.soil_moisture_7_to_28cm)
+        case .soil_moisture_28_to_100cm_mean:
+            return .mean(.soil_moisture_28_to_100cm)
+        case .soil_moisture_100_to_255cm_mean:
+            return .mean(.soil_moisture_100_to_255cm)
+        case .temperature_2m_max:
+            return .maxTwo(intervalMax: .temperature_2m_max, hourly: .temperature_2m)
+        case .temperature_2m_min:
+            return .maxTwo(intervalMax: .temperature_2m_min, hourly: .temperature_2m)
+        case .temperature_2m_mean:
+            return .mean(.temperature_2m)
+        case .sunshine_duration:
+            return .sum(.sunshine_duration)
         }
     }
     
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
+        case .temperature_2m_max:
+            return .init(variable: .temperature, aggregation: .maximum, altitude: 2)
+        case .temperature_2m_min:
+            return .init(variable: .temperature, aggregation: .minimum, altitude: 2)
+        case .temperature_2m_mean:
+            return .init(variable: .temperature, aggregation: .mean, altitude: 2)
         case .apparent_temperature_max:
             return .init(variable: .apparentTemperature, aggregation: .maximum)
         case .apparent_temperature_mean:
@@ -174,6 +234,8 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
             return .init(variable: .precipitation, aggregation: .sum)
         case .rain_sum:
             return .init(variable: .rain, aggregation: .sum)
+        case .showers_sum:
+            return .init(variable: .showers, aggregation: .sum)
         case .relative_humidity_2m_max:
             return .init(variable: .relativeHumidity, aggregation: .maximum, altitude: 2)
         case .relative_humidity_2m_mean:
@@ -210,6 +272,20 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
             return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .wind_speed_10m_min:
             return .init(variable: .windSpeed, aggregation: .minimum, altitude: 10)
+        case .wind_speed_100m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 100)
+        case .wind_speed_100m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 100)
+        case .wind_speed_100m_min:
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 100)
+        case .wind_speed_200m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 200)
+        case .wind_speed_200m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 200)
+        case .wind_speed_200m_min:
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 200)
+        case .wind_gusts_10m_max:
+            return .init(variable: .windGusts, aggregation: .maximum, altitude: 10)
         case .wet_bulb_temperature_2m_max:
             return .init(variable: .wetBulbTemperature, aggregation: .maximum, altitude: 2)
         case .wet_bulb_temperature_2m_mean:
@@ -224,77 +300,54 @@ enum EcmwfSeasVariableDailyComputed: String, DailyVariableCalculatable, RawRepre
             return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
         case .soil_temperature_0_to_7cm_mean:
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_temperature_7_to_28cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_temperature_28_to_100cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_temperature_100_to_255cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_moisture_0_to_7cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
+        case .soil_moisture_7_to_28cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
+        case .soil_moisture_28_to_100cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
+        case .soil_moisture_100_to_255cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
+        case .sunshine_duration:
+            return .init(variable: .sunshineDuration)
         }
     }
 }
 
-
-struct EcmwfSeas5Controller24Hourly: GenericReaderDerivedSimple, GenericReaderProtocol {
-    let reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariable24HourlySingleLevel>
-
-    let options: GenericReaderOptions
-
-    typealias Domain = EcmwfSeasDomain
-
-    typealias Variable = VariableOrDerived<EcmwfSeasVariable24HourlySingleLevel, EcmwfSeasVariable24HourlySingleLevelDerived>
-
-    typealias Derived = EcmwfSeasVariable24HourlySingleLevelDerived
-
-    public init?(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await GenericReader<Domain, EcmwfSeasVariable24HourlySingleLevel>(domain: .seas5_24hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            return nil
-        }
-        self.reader = GenericReaderCached(reader: reader)
-        self.options = options
-    }
+struct SeasonalForecastDeriverDaily<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
+    typealias VariableOpt = SeasonalVariableDaily
     
-    public init(gridpoint: Int, options: GenericReaderOptions) async throws {
-        let reader = try await GenericReader<Domain, EcmwfSeasVariable24HourlySingleLevel>(domain: .seas5_24hourly, position: gridpoint, options: options)
-        self.reader = GenericReaderCached(reader: reader)
-        self.options = options
-    }
-
-    func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
-        for variable in variables {
-            switch variable {
-            case .raw(let v):
-                try await prefetchData(raw: v, time: time)
-            case .derived(let v):
-                try await prefetchData(derived: v, time: time)
-            }
+    let reader: Reader
+    let options: GenericReaderOptions
+    
+    func getDeriverMap(variable: VariableOpt) -> DerivedMapping<Reader.MixingVar>? {
+        if let variable = Reader.variableFromString(variable.rawValue) {
+            return .direct(variable)
         }
-    }
-
-    func prefetchData(derived: EcmwfSeasVariable24HourlySingleLevelDerived, time: TimerangeDtAndSettings) async throws {
-        let time24hAgo = time.with(time: time.time.add(-86400))
-        switch derived {
-        case .temperature_2m_max:
-            try await prefetchData(raw: .temperature_max24h_2m, time: time24hAgo)
-        case .temperature_2m_min:
-            try await prefetchData(raw: .temperature_min24h_2m, time: time24hAgo)
-        case .temperature_2m_mean:
-            try await prefetchData(raw: .temperature_mean24h_2m, time: time24hAgo)
-        }
-    }
-
-    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch variable {
-        case .raw(let variable):
-            return try await get(raw: variable, time: time)
-        case .derived(let variable):
-            return try await get(derived: variable, time: time)
-        }
-    }
-
-    func get(derived: EcmwfSeasVariable24HourlySingleLevelDerived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        let time24hAgo = time.with(time: time.time.add(-86400))
-        switch derived {
-        case .temperature_2m_max:
-            return try await get(raw: .temperature_max24h_2m, time: time24hAgo)
+        /*case .temperature_2m_max:
+            guard let v = Reader.variableFromString("temperature_max24h_2m") else {
+                return nil
+            }
+            return .directShift24Hour(v)
         case .temperature_2m_min:
-            return try await get(raw: .temperature_min24h_2m, time: time24hAgo)
+            guard let v = Reader.variableFromString("temperature_min24h_2m") else {
+                return nil
+            }
+            return .directShift24Hour(v)
         case .temperature_2m_mean:
-            return try await get(raw: .temperature_mean24h_2m, time: time24hAgo)
+            guard let v = Reader.variableFromString("temperature_mean24h_2m") else {
+                return nil
+            }
+            return .directShift24Hour(v)*/
+        default:
+            return nil
         }
     }
 }
