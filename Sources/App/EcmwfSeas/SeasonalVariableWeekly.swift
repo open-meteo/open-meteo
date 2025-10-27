@@ -3,6 +3,10 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
     case wind_speed_10m_anomaly
     case wind_speed_100m_mean
     case wind_speed_100m_anomaly
+    case wind_direction_10m_mean
+    case wind_direction_10m_anomaly
+    case wind_direction_100m_mean
+    case wind_direction_100m_anomaly
     case snow_depth_mean
     case snow_depth_anomaly
     case snowfall_mean
@@ -92,13 +96,21 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
         case .snow_depth_anomaly:
             return .init(variable: .snowDepth, aggregation: .anomaly)
         case .wind_speed_10m_mean:
-            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .wind_speed_10m_anomaly:
             return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
         case .wind_speed_100m_mean:
-            return .init(variable: .windGusts, aggregation: .mean, altitude: 100)
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 100)
         case .wind_speed_100m_anomaly:
             return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 100)
+        case .wind_direction_10m_mean:
+            return .init(variable: .windDirection, aggregation: .mean, altitude: 10)
+        case .wind_direction_10m_anomaly:
+            return .init(variable: .windDirection, aggregation: .anomaly, altitude: 10)
+        case .wind_direction_100m_mean:
+            return .init(variable: .windDirection, aggregation: .mean, altitude: 100)
+        case .wind_direction_100m_anomaly:
+            return .init(variable: .windDirection, aggregation: .anomaly, altitude: 100)
         case .showers_mean:
             return .init(variable: .showers, aggregation: .mean)
         case .snow_density_mean:
@@ -227,6 +239,22 @@ struct SeasonalForecastDeriverWeekly<Reader: GenericReaderProtocol>: GenericDeri
             return .two(.raw(water), .raw(density)) { water, density, time in
                 return DataAndUnit(zip(water.data, density.data).map({$0/$1}), .metre)
             }
+        case .wind_speed_10m_mean:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_10m_mean"), v: Reader.variableFromString("wind_v_component_10m_mean"))
+        case .wind_speed_100m_mean:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_100m_mean"), v: Reader.variableFromString("wind_v_component_100m_mean"))
+        case .wind_direction_10m_mean:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_10m_mean"), v: Reader.variableFromString("wind_v_component_10m_mean"))
+        case .wind_direction_100m_mean:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_100m_mean"), v: Reader.variableFromString("wind_v_component_100m_mean"))
+        case .wind_speed_10m_anomaly:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_10m_anomaly"), v: Reader.variableFromString("wind_v_component_10m_anomaly"))
+        case .wind_speed_100m_anomaly:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_100m_anomaly"), v: Reader.variableFromString("wind_v_component_100m_anomaly"))
+        case .wind_direction_10m_anomaly:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_10m_anomaly"), v: Reader.variableFromString("wind_v_component_10m_anomaly"))
+        case .wind_direction_100m_anomaly:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_100m_anomaly"), v: Reader.variableFromString("wind_v_component_100m_anomaly"))
         default:
             return nil
         }

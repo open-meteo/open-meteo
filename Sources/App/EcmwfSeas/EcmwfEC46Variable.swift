@@ -713,9 +713,9 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         switch shortName {
         case "cprate":
             return .showers_mean
-        case "mcpra":
+//        case "mcpra":
 //            return .showers_anomaly
-//        case "rsn":
+        case "rsn":
             return .snow_density_mean
         case "rsna":
             return .snow_density_anomaly

@@ -115,7 +115,7 @@ enum SeasonalVariableMonthly: String, GenericVariableMixable, RawRepresentableSt
         case .wind_gusts_10m_anomaly:
             return .init(variable: .windGusts, aggregation: .anomaly, altitude: 10)
         case .wind_speed_10m_mean:
-            return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 10)
         case .wind_speed_10m_anomaly:
             return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
         case .albedo_mean:
