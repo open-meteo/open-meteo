@@ -586,22 +586,21 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         case .total_column_integrated_water_vapour_anomaly:
             return 10
         case .temperature_2m_sot10, .temperature_2m_sot90:
-            return 100
+            return 20
         case .temperature_2m_efi:
-            // TODO check range
-            return 100
+            return 20
         case .precipitation_efi:
-            return 100
+            return 10
         case .precipitation_sot90:
-            return 100
+            return 10
         case .temperature_2m_anomaly_gt_1k, .temperature_2m_anomaly_gt_2k, .temperature_2m_anomaly_gt_0k, .temperature_2m_anomaly_lt_minus1k, .temperature_2m_anomaly_lt_minus2k:
-            return 100
+            return 1 // percent
         case .pressure_msl_anomaly_gt_0Pa:
-            return 100
+            return 1
         case .surface_temperature_anomaly_gt_0K:
-            return 100
+            return 1
         case .precipitation_anomaly_gt_0mm, .precipitation_anomaly_gt_10mm, .precipitation_anomaly_gt_20mm:
-            return 100
+            return 1
         }
     }
     
