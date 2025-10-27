@@ -80,10 +80,10 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
     // there is a "6h" version and "last post processing" -> both contain exactly the same data
     // a 24h min/max would be way better
     // TODO: rename to 6h
-    case temperature_max24h_2m_mean
-    case temperature_max24h_2m_anomaly
-    case temperature_min24h_2m_mean
-    case temperature_min24h_2m_anomaly
+    case temperature_max6h_2m_mean
+    case temperature_max6h_2m_anomaly
+    case temperature_min6h_2m_mean
+    case temperature_min6h_2m_anomaly
     
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -177,13 +177,14 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
         case .soil_temperature_0_to_7cm_anomaly:
             return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
-        case .temperature_max24h_2m_mean:
+        case .temperature_max6h_2m_mean:
+            // TODO: fix 24h to 6h definition
             return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
-        case .temperature_max24h_2m_anomaly:
+        case .temperature_max6h_2m_anomaly:
             return .init(variable: .temperatureMax24h, aggregation: .anomaly, altitude: 2)
-        case .temperature_min24h_2m_mean:
+        case .temperature_min6h_2m_mean:
             return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
-        case .temperature_min24h_2m_anomaly:
+        case .temperature_min6h_2m_anomaly:
             return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
         default:
             // TODO define SOT, EFI, etc

@@ -468,11 +468,10 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
     
     // there is a "6h" version and "last post processing" -> both contain exactly the same data
     // a 24h min/max would be way better
-    // TODO: rename to 6h
-    case temperature_max24h_2m_mean
-    case temperature_max24h_2m_anomaly
-    case temperature_min24h_2m_mean
-    case temperature_min24h_2m_anomaly
+    case temperature_max6h_2m_mean
+    case temperature_max6h_2m_anomaly
+    case temperature_min6h_2m_mean
+    case temperature_min6h_2m_anomaly
     
     //case sea_ice_cover_mean
     //case sea_ice_cover_anomaly
@@ -490,7 +489,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         switch self {
         case .soil_temperature_0_to_7cm_mean /*, .soil_temperature_7_to_28cm_mean, .soil_temperature_28_to_100cm_mean, .soil_temperature_100_to_255cm_mean*/:
             return (1, -273.15)
-        case .temperature_max24h_2m_mean, .temperature_min24h_2m_mean:
+        case .temperature_max6h_2m_mean, .temperature_min6h_2m_mean:
             return (1, -273.15)
         case .temperature_2m_mean, .dew_point_2m_mean:
             return (1, -273.15)
@@ -532,7 +531,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         switch self {
         case .soil_temperature_0_to_7cm_mean:
             return 20
-        case .temperature_max24h_2m_mean, .temperature_min24h_2m_mean:
+        case .temperature_max6h_2m_mean, .temperature_min6h_2m_mean:
             return 20
         case .sunshine_duration_mean:
             return 1/3600
@@ -556,7 +555,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return 10
         case .soil_temperature_0_to_7cm_anomaly:
             return 20
-        case .temperature_max24h_2m_anomaly, .temperature_min24h_2m_anomaly, .temperature_2m_anomaly, .dew_point_2m_anomaly:
+        case .temperature_max6h_2m_anomaly, .temperature_min6h_2m_anomaly, .temperature_2m_anomaly, .dew_point_2m_anomaly:
             return 20
         case .pressure_msl_anomaly:
             return 10
@@ -615,7 +614,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         switch self {
         case .soil_temperature_0_to_7cm_mean:
             return .celsius
-        case .temperature_max24h_2m_mean, .temperature_min24h_2m_mean:
+        case .temperature_max6h_2m_mean, .temperature_min6h_2m_mean:
             return .celsius
         case .sunshine_duration_mean:
             return .seconds
@@ -637,7 +636,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return .percentage
         case .soil_temperature_0_to_7cm_anomaly:
             return .kelvin
-        case .temperature_max24h_2m_anomaly, .temperature_min24h_2m_anomaly:
+        case .temperature_max6h_2m_anomaly, .temperature_min6h_2m_anomaly:
             return .kelvin
         case .sunshine_duration_anomaly:
             return .seconds
@@ -696,7 +695,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         switch self {
         case .soil_temperature_0_to_7cm_mean:
             return true
-        case .temperature_max24h_2m_mean, .temperature_min24h_2m_mean:
+        case .temperature_max6h_2m_mean, .temperature_min6h_2m_mean:
             return true
         case .temperature_2m_mean, .dew_point_2m_mean: return true
         default:
@@ -748,9 +747,9 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         case "tprate":
             return .precipitation_mean
         case "mn2t":
-            return .temperature_min24h_2m_mean
+            return .temperature_min6h_2m_mean
         case "mx2t":
-            return .temperature_max24h_2m_mean
+            return .temperature_max6h_2m_mean
         case "stal1":
             return .soil_temperature_0_to_7cm_anomaly
         case "sundara":
@@ -776,9 +775,9 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         case "tpara":
             return .precipitation_anomaly
         case "mn2ta":
-            return .temperature_min24h_2m_anomaly
+            return .temperature_min6h_2m_anomaly
         case "mx2ta":
-            return .temperature_max24h_2m_anomaly
+            return .temperature_max6h_2m_anomaly
         case "tcwv":
             return .total_column_integrated_water_vapour_mean
         case "tcwva":
