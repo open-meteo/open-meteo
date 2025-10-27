@@ -130,6 +130,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: domain == .ec46_weekly, realm: nil)
         //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
+        let isWeekly = domain.dtSeconds == 7*24*3600
         
         let package: String
         let types: [String]
@@ -163,8 +164,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
-                    /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
-                    let time = attributes.timestamp
+                    /// For weekly data, subtract 7 days, to make the timestamp start at a given week instead of end at a given week (forward definition)
+                    let time = isWeekly ? attributes.timestamp.add(days: -7) : attributes.timestamp
                     var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                     let member = domain.dtSeconds > 24*3600 ? 0 : message.getLong(attribute: "perturbationNumber") ?? 0
                     
