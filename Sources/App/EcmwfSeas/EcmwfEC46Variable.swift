@@ -392,7 +392,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
     //case cloud_cover_low_anomaly
     
     case showers_mean // OK
-    case showers_anomaly // missing
+    //case showers_anomaly // missing
     
     //case runoff_mean
     //case runoff_anomaly
@@ -466,7 +466,10 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
     case soil_moisture_100_to_255cm_mean
     case soil_moisture_100_to_255cm_anomaly*/
     
-    case temperature_max24h_2m_mean // there is a 6h version and "last post processing" -> currently mapping last post processing
+    // there is a "6h" version and "last post processing" -> both contain exactly the same data
+    // a 24h min/max would be way better
+    // TODO: rename to 6h
+    case temperature_max24h_2m_mean
     case temperature_max24h_2m_anomaly
     case temperature_min24h_2m_mean
     case temperature_min24h_2m_anomaly
@@ -499,7 +502,7 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return (Float(dtSeconds),0)
         case .snow_depth_water_equivalent_mean, .snow_depth_water_equivalent_anomaly:
             return (1000, 0) // metre to millimetre
-        case .precipitation_mean, .precipitation_anomaly, .showers_mean, .showers_anomaly, .snowfall_water_equivalent_mean, .snowfall_water_equivalent_anomaly:
+        case .precipitation_mean, .precipitation_anomaly, .showers_mean, /*.showers_anomaly,*/ .snowfall_water_equivalent_mean, .snowfall_water_equivalent_anomaly:
             // Metre per second rate to mm per month
             return (Float(dtSeconds*1000), 0)
         //case .shortwave_radiation_mean:
@@ -569,8 +572,8 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return 1
         case .showers_mean:
             return 10
-        case .showers_anomaly:
-            return 10
+//        case .showers_anomaly:
+//            return 10
         case .snow_density_mean:
             return 10
         case .snow_density_anomaly:
@@ -656,8 +659,8 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return .percentage
         case .showers_mean:
             return .millimetre
-        case .showers_anomaly:
-            return .millimetre
+//        case .showers_anomaly:
+//            return .millimetre
         case .snow_density_mean:
             return .kilogramPerCubicMetre
         case .snow_density_anomaly:
@@ -711,8 +714,8 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
         case "cprate":
             return .showers_mean
         case "mcpra":
-            return .showers_anomaly
-        case "rsn":
+//            return .showers_anomaly
+//        case "rsn":
             return .snow_density_mean
         case "rsna":
             return .snow_density_anomaly

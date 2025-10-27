@@ -1,106 +1,85 @@
 enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableString, FlatBuffersVariable {
-    case wind_gusts_10m_anomaly
-    
     case wind_speed_10m_mean
     case wind_speed_10m_anomaly
+    case wind_speed_100m_mean
+    case wind_speed_100m_anomaly
+    case snow_depth_mean
+    case snow_depth_anomaly
+    case snowfall_mean
+    case snowfall_anomaly
     
-    case albedo_mean
-    case albedo_anomaly
+    case temperature_2m_anomaly_gt_1k
+    case temperature_2m_anomaly_gt_2k
+    case temperature_2m_anomaly_gt_0k
+    case temperature_2m_anomaly_lt_minus1k
+    case temperature_2m_anomaly_lt_minus2k
+    case pressure_msl_anomaly_gt_0Pa
+    case surface_temperature_anomaly_gt_0K
+    case precipitation_anomaly_gt_0mm
+    case precipitation_anomaly_gt_10mm
+    case precipitation_anomaly_gt_20mm
     
-    case cloud_cover_low_mean
-    case cloud_cover_low_anomaly
     
-    case showers_mean
-    case showers_anomaly
+    case temperature_2m_sot10
+    case temperature_2m_sot90
+    case temperature_2m_efi
     
-    case runoff_mean
-    case runoff_anomaly
-    
-    case snow_density_mean
+    case precipitation_efi
+    case precipitation_sot90
+    case showers_mean // OK
+    //case showers_anomaly // missing
+    case snow_density_mean // OK
     case snow_density_anomaly
     case snow_depth_water_equivalent_mean
     case snow_depth_water_equivalent_anomaly
     
-    case total_column_integrated_water_vapour_mean
+    case total_column_integrated_water_vapour_mean // ok
     case total_column_integrated_water_vapour_anomaly
     
-    case temperature_2m_mean
+    case temperature_2m_mean // OK
     case temperature_2m_anomaly
     
-    case dew_point_2m_mean
+    case dew_point_2m_mean //OK
     case dew_point_2m_anomaly
     
-    case pressure_msl_mean
+    case pressure_msl_mean // OK
     case pressure_msl_anomaly
     
-    case sea_surface_temperature_mean
+    case sea_surface_temperature_mean // OK
     case sea_surface_temperature_anomaly
     
-    case wind_u_component_10m_mean
+    case wind_u_component_10m_mean // OK
     case wind_u_component_10m_anomaly
-    
     case wind_v_component_10m_mean
     case wind_v_component_10m_anomaly
     
-    case snowfall_water_equivalent_mean
+    case wind_u_component_100m_mean // OK
+    case wind_u_component_100m_anomaly
+    case wind_v_component_100m_mean
+    case wind_v_component_100m_anomaly
+    
+    case snowfall_water_equivalent_mean // OK
     case snowfall_water_equivalent_anomaly
     
-    case precipitation_mean
+    case precipitation_mean // OK
     case precipitation_anomaly
     
-    case shortwave_radiation_mean
-    case shortwave_radiation_anomaly
-    
-    case longwave_radiation_mean
-    case longwave_radiation_anomaly
-    
-    case cloud_cover_mean
+    case cloud_cover_mean // ok
     case cloud_cover_anomaly
     
-    case sunshine_duration_mean
+    case sunshine_duration_mean // ok
     case sunshine_duration_anomaly
     
-    case soil_temperature_0_to_7cm_mean
+    case soil_temperature_0_to_7cm_mean // OK
     case soil_temperature_0_to_7cm_anomaly
-    case soil_temperature_7_to_28cm_mean
-    case soil_temperature_7_to_28cm_anomaly
-    case soil_temperature_28_to_100cm_mean
-    case soil_temperature_28_to_100cm_anomaly
-    case soil_temperature_100_to_255cm_mean
-    case soil_temperature_100_to_255cm_anomaly
     
-    case soil_moisture_0_to_7cm_mean
-    case soil_moisture_0_to_7cm_anomaly
-    case soil_moisture_7_to_28cm_mean
-    case soil_moisture_7_to_28cm_anomaly
-    
-    case soil_moisture_28_to_100cm_mean
-    case soil_moisture_28_to_100cm_anomaly
-    
-    case soil_moisture_100_to_255cm_mean
-    case soil_moisture_100_to_255cm_anomaly
-    
+    // there is a "6h" version and "last post processing" -> both contain exactly the same data
+    // a 24h min/max would be way better
+    // TODO: rename to 6h
     case temperature_max24h_2m_mean
     case temperature_max24h_2m_anomaly
     case temperature_min24h_2m_mean
     case temperature_min24h_2m_anomaly
-    
-    case sea_ice_cover_mean
-    case sea_ice_cover_anomaly
-    
-    case latent_heat_flux_mean
-    case latent_heat_flux_anomaly
-    
-    case sensible_heat_flux_mean
-    case sensible_heat_flux_anomaly
-    
-    case evapotranspiration_mean
-    case evapotranspiration_anomaly
-    
-    case snowfall_mean
-    case snowfall_anomaly
-    case snow_depth_mean
-    case snow_depth_anomaly
     
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -112,28 +91,16 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
             return .init(variable: .snowDepth, aggregation: .mean)
         case .snow_depth_anomaly:
             return .init(variable: .snowDepth, aggregation: .anomaly)
-        case .wind_gusts_10m_anomaly:
-            return .init(variable: .windGusts, aggregation: .anomaly, altitude: 10)
         case .wind_speed_10m_mean:
             return .init(variable: .windGusts, aggregation: .mean, altitude: 10)
         case .wind_speed_10m_anomaly:
             return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 10)
-        case .albedo_mean:
-            return .init(variable: .albedo, aggregation: .mean)
-        case .albedo_anomaly:
-            return .init(variable: .albedo, aggregation: .anomaly)
-        case .cloud_cover_low_mean:
-            return .init(variable: .cloudCoverLow, aggregation: .mean)
-        case .cloud_cover_low_anomaly:
-            return .init(variable: .cloudCoverLow, aggregation: .anomaly)
+        case .wind_speed_100m_mean:
+            return .init(variable: .windGusts, aggregation: .mean, altitude: 100)
+        case .wind_speed_100m_anomaly:
+            return .init(variable: .windSpeed, aggregation: .anomaly, altitude: 100)
         case .showers_mean:
             return .init(variable: .showers, aggregation: .mean)
-        case .showers_anomaly:
-            return .init(variable: .showers, aggregation: .anomaly)
-        case .runoff_mean:
-            return .init(variable: .runoff, aggregation: .mean)
-        case .runoff_anomaly:
-            return .init(variable: .runoff, aggregation: .anomaly)
         case .snow_density_mean:
             return .init(variable: .snowDensity, aggregation: .mean)
         case .snow_density_anomaly:
@@ -170,6 +137,14 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
             return .init(variable: .windVComponent, aggregation: .mean, altitude: 10)
         case .wind_v_component_10m_anomaly:
             return .init(variable: .windVComponent, aggregation: .anomaly, altitude: 10)
+        case .wind_u_component_100m_mean:
+            return .init(variable: .windUComponent, aggregation: .mean, altitude: 100)
+        case .wind_u_component_100m_anomaly:
+            return .init(variable: .windUComponent, aggregation: .anomaly, altitude: 100)
+        case .wind_v_component_100m_mean:
+            return .init(variable: .windVComponent, aggregation: .mean, altitude: 100)
+        case .wind_v_component_100m_anomaly:
+            return .init(variable: .windVComponent, aggregation: .anomaly, altitude: 100)
         case .snowfall_water_equivalent_mean:
             return .init(variable: .snowfallWaterEquivalent, aggregation: .mean)
         case .snowfall_water_equivalent_anomaly:
@@ -178,10 +153,6 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
             return .init(variable: .precipitation, aggregation: .mean)
         case .precipitation_anomaly:
             return .init(variable: .precipitation, aggregation: .anomaly)
-        case .shortwave_radiation_mean:
-            return .init(variable: .shortwaveRadiation, aggregation: .mean)
-        case .shortwave_radiation_anomaly:
-            return .init(variable: .shortwaveRadiation, aggregation: .anomaly)
         case .cloud_cover_mean:
             return .init(variable: .cloudCover, aggregation: .mean)
         case .cloud_cover_anomaly:
@@ -194,34 +165,6 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
             return .init(variable: .soilTemperature, aggregation: .mean, depth: 0, depthTo: 7)
         case .soil_temperature_0_to_7cm_anomaly:
             return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
-        case .soil_temperature_7_to_28cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 7, depthTo: 28)
-        case .soil_temperature_7_to_28cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 7, depthTo: 28)
-        case .soil_temperature_28_to_100cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 28, depthTo: 100)
-        case .soil_temperature_28_to_100cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 28, depthTo: 100)
-        case .soil_temperature_100_to_255cm_mean:
-            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
-        case .soil_temperature_100_to_255cm_anomaly:
-            return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 100, depthTo: 255)
-        case .soil_moisture_0_to_7cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 0, depthTo: 7)
-        case .soil_moisture_0_to_7cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 0, depthTo: 7)
-        case .soil_moisture_7_to_28cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 7, depthTo: 28)
-        case .soil_moisture_7_to_28cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 7, depthTo: 28)
-        case .soil_moisture_28_to_100cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 28, depthTo: 100)
-        case .soil_moisture_28_to_100cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 28, depthTo: 100)
-        case .soil_moisture_100_to_255cm_mean:
-            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
-        case .soil_moisture_100_to_255cm_anomaly:
-            return .init(variable: .soilMoisture, aggregation: .anomaly, depth: 100, depthTo: 255)
         case .temperature_max24h_2m_mean:
             return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
         case .temperature_max24h_2m_anomaly:
@@ -230,26 +173,9 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
             return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
         case .temperature_min24h_2m_anomaly:
             return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
-        case .longwave_radiation_mean:
-            return .init(variable: .longwaveRadiation, aggregation: .mean)
-        case .longwave_radiation_anomaly:
-            return .init(variable: .longwaveRadiation, aggregation: .anomaly)
-        case .sea_ice_cover_mean:
-            return .init(variable: .seaIceCover, aggregation: .mean)
-        case .sea_ice_cover_anomaly:
-            return .init(variable: .seaIceCover, aggregation: .anomaly)
-        case .latent_heat_flux_mean:
-            return .init(variable: .latentHeatFlux, aggregation: .mean)
-        case .latent_heat_flux_anomaly:
-            return .init(variable: .latentHeatFlux, aggregation: .anomaly)
-        case .sensible_heat_flux_mean:
-            return .init(variable: .sensibleHeatFlux, aggregation: .mean)
-        case .sensible_heat_flux_anomaly:
-            return .init(variable: .sensibleHeatFlux, aggregation: .anomaly)
-        case .evapotranspiration_mean:
-            return .init(variable: .evapotranspiration, aggregation: .mean)
-        case .evapotranspiration_anomaly:
-            return .init(variable: .evapotranspiration, aggregation: .anomaly)
+        default:
+            // TODO define SOT, EFI, etc
+            return .init(variable: .undefined)
         }
     }
 }
