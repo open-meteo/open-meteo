@@ -13,7 +13,7 @@ enum SeasonalForecastControllerDomains: String, Codable, CaseIterable, MultiDoma
             let ec46hourly = try await SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             let ec46hourlyToDaily = DailyReaderConverter<SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, SeasonalVariableDaily>(reader: ec46hourly)
             
-            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             
             return ([seas6hourly, ec46hourly], [seas6hourlyToDaily, seas5daily, ec46hourlyToDaily], [ec46weekly], [seas6monthly])
         case .ecmwf_seas5:
@@ -28,7 +28,7 @@ enum SeasonalForecastControllerDomains: String, Codable, CaseIterable, MultiDoma
             
             let ec46hourlyToDaily = DailyReaderConverter<SeasonalForecastDeriverHourly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, SeasonalVariableDaily>(reader: ec46hourly)
             
-            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_6hourly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             
             return ([ec46hourly], [ec46hourlyToDaily], [ec46weekly], [])
         }
@@ -179,10 +179,13 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
             }
         }
         if let weeklyVariables {
-            // TODO weekly alignment
-            let timeRead = time.dailyRead.with(dtSeconds: 7*24*3600)
+            let timeWeekly = TimerangeDt(
+                start: time.dailyRead.range.lowerBound.add(-4*24*3600).floor(toNearest: 7*24*3600).add(4*24*3600),
+                to: time.dailyRead.range.upperBound.add(-4*24*3600).ceil(toNearest: 7*24*3600).add(4*24*3600),
+                dtSeconds: 7*24*3600
+            )
             for variable in weeklyVariables {
-                let _ = try await readerWeekly.prefetchData(variable: variable, time: timeRead.toSettings())
+                let _ = try await readerWeekly.prefetchData(variable: variable, time: timeWeekly.toSettings())
             }
         }
         if let monthlyVariables {
@@ -294,12 +297,17 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         guard let variables else {
             return nil
         }
-        let timeRead = time.dailyRead.with(dtSeconds: 7*24*3600)
-        return ApiSection<WeeklyVariable>(name: "weekly", time: timeRead, columns: try await variables.asyncCompactMap { variable in
-            guard let d = try await readerWeekly.get(variable: variable, time: timeRead.toSettings())?.convertAndRound(params: params) else {
+        // Align data start to Monday of each week
+        let timeWeekly = TimerangeDt(
+            start: time.dailyRead.range.lowerBound.add(-4*24*3600).floor(toNearest: 7*24*3600).add(4*24*3600),
+            to: time.dailyRead.range.upperBound.add(-4*24*3600).ceil(toNearest: 7*24*3600).add(4*24*3600),
+            dtSeconds: 7*24*3600
+        )
+        return ApiSection<WeeklyVariable>(name: "weekly", time: timeWeekly, columns: try await variables.asyncCompactMap { variable in
+            guard let d = try await readerWeekly.get(variable: variable, time: timeWeekly.toSettings())?.convertAndRound(params: params) else {
                 return nil
             }
-            assert(timeRead.count == d.data.count)
+            assert(timeWeekly.count == d.data.count)
             return ApiColumn<WeeklyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
         })
     }    
