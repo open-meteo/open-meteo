@@ -71,6 +71,7 @@ Apps:
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
+- [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
 
 Repositories:
 
