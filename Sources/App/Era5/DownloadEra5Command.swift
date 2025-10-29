@@ -307,7 +307,7 @@ struct DownloadEra5Command: AsyncCommand {
                     landmask = data.map { $0.isNaN ? 1 : 0 }
                 case "2t":
                     // Used in ERA5-Land to mask out exactly which grid-cells provide data
-                    landmask = data.map { $0.isNaN ? 1 : 0 }
+                    landmask = data.map { $0.isNaN ? 0 : 1 }
                 default:
                     fatalError("Found \(shortName) in grib")
                 }
