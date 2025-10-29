@@ -72,6 +72,11 @@ enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixa
     case global_tilted_irradiance
     case global_tilted_irradiance_instant
     
+    case wave_direction
+    case wave_height
+    case wave_period
+    case wave_period_peak
+    
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
         case .temperature_2m:
@@ -194,6 +199,15 @@ enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixa
             return .init(variable: .windSpeed, altitude: 200)
         case .winddirection_200m, .wind_direction_200m:
             return .init(variable: .windDirection, altitude: 200)
+        case .wave_direction:
+            return .init(variable: .windDirection)
+        case .wave_height:
+            return .init(variable: .waveHeight)
+        case .wave_period:
+            return .init(variable: .wavePeriod)
+        case .wave_period_peak:
+            // TODO register wave_period_peak
+            return .init(variable: .wavePeriod)
         }
     }
 }

@@ -42,6 +42,8 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     case weather_code
     
     case wind_direction_10m_dominant
+    case wind_direction_100m_dominant
+    case wind_direction_200m_dominant
     case wind_speed_10m_max
     case wind_speed_10m_mean
     case wind_speed_10m_min
@@ -135,6 +137,10 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .max(.weathercode)
         case .wind_direction_10m_dominant:
             return .dominantDirectionComponents(u: .wind_u_component_10m, v: .wind_v_component_10m)
+        case .wind_direction_100m_dominant:
+            return .dominantDirectionComponents(u: .wind_u_component_100m, v: .wind_v_component_100m)
+        case .wind_direction_200m_dominant:
+            return .dominantDirectionComponents(u: .wind_u_component_200m, v: .wind_v_component_200m)
         case .wind_speed_10m_max:
             return .max(.wind_speed_10m)
         case .wind_speed_10m_mean:
@@ -266,6 +272,10 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
             return .init(variable: .weatherCode)
         case .wind_direction_10m_dominant:
             return .init(variable: .windDirection, aggregation: .dominant, altitude: 10)
+        case .wind_direction_100m_dominant:
+            return .init(variable: .windDirection, aggregation: .dominant, altitude: 100)
+        case .wind_direction_200m_dominant:
+            return .init(variable: .windDirection, aggregation: .dominant, altitude: 200)
         case .wind_speed_10m_max:
             return .init(variable: .windSpeed, aggregation: .maximum, altitude: 10)
         case .wind_speed_10m_mean:

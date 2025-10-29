@@ -33,6 +33,11 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
     case wind_gusts_10m
     case sunshine_duration
     
+    case wave_direction
+    case wave_height
+    case wave_period
+    case wave_period_peak
+    
     var gribCode: String {
         switch self {
         case .wind_u_component_10m:
@@ -91,6 +96,14 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return "sst"
         case .sunshine_duration:
             return "sund"
+        case .wave_direction:
+            return "mwd"
+        case .wave_height:
+            return "swh" // Significant height of combined wind waves and swell
+        case .wave_period:
+            return "mwp"
+        case .wave_period_peak:
+            return "pp1d"
         }
     }
     
@@ -158,6 +171,12 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return 1
         case .sunshine_duration:
             return 1/60
+        case .wave_height:
+            return 50 // 0.02m resolution
+        case .wave_period, .wave_period_peak:
+            return 20 // 0.05s resolution
+        case .wave_direction:
+            return 1
         }
     }
     
@@ -201,6 +220,12 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return .hermite(bounds: 0...100)
         case .sunshine_duration:
             return .backwards
+        case .wave_height:
+            return .linear
+        case .wave_period, .wave_period_peak:
+            return .hermite(bounds: 0...Float.infinity)
+        case .wave_direction:
+            return .linearDegrees
         }
     }
     
@@ -234,6 +259,12 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return .percentage
         case .sunshine_duration:
             return .seconds
+        case .wave_height:
+            return .metre
+        case .wave_period, .wave_period_peak:
+            return .seconds
+        case .wave_direction:
+            return .degreeDirection
         }
     }
     

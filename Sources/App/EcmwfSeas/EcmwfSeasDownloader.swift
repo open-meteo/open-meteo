@@ -134,12 +134,15 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         let package: String
         let types: [String]
+        let streams: [String]
         switch domain {
         case .ec46_6hourly:
             package = "e1"
             types = ["cf","pf"]
+            streams = ["eefo", "weef"]
         case .ec46_weekly:
             package = "e2"
+            streams = ["eefo"]
             types = ["efi", "ep", "sot", "taem"]
         default:
             fatalError()
@@ -155,7 +158,10 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             
             /// ope_e1_ifs-subs_od_eefo_cf_20251008T000000Z_20251008_d01.bz2
-            let urls = types.map({"\(server)ope_\(package)_ifs-subs_od_eefo_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
+            let urls = streams.flatMap { stream in
+                types.map({"\(server)ope_\(package)_ifs-subs_od_\(stream)_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
+            }
+            
             
             for url in urls {
                 /// Single GRIB files contains multiple time-steps in mixed order
