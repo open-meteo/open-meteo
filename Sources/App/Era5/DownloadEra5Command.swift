@@ -227,12 +227,24 @@ struct DownloadEra5Command: AsyncCommand {
                 }
                 try await curl.downloadCdsApi(dataset: domain.cdsDatasetName, query: Query(product_type: domain == .era5_ensemble ? "ensemble_mean" : "reanalysis"), apikey: cdskey, destinationFile: tempDownloadGribFile)
             case .era5_land:
+                struct Query: Encodable {
+                    let product_type = "reanalysis"
+                    let format = "grib"
+                    let data_format = "grib"
+                    let download_format = "unarchived"
+                    let variable = ["2m_temperature"]
+                    let time = "00:00"
+                    let day = "01"
+                    let month = "01"
+                    let year = "2022"
+                }
+                try await curl.downloadCdsApi(dataset: domain.cdsDatasetName, query: Query(), apikey: cdskey, destinationFile: tempDownloadGribFile2!)
                 let z = "https://confluence.ecmwf.int/download/attachments/140385202/geo_1279l4_0.1x0.1.grb?version=1&modificationDate=1570448352562&api=v2&download=true"
-                let lsm = "https://confluence.ecmwf.int/download/attachments/140385202/lsm_1279l4_0.1x0.1.grb?version=1&modificationDate=1567525024201&api=v2&download=true"
+                //let lsm = "https://confluence.ecmwf.int/download/attachments/140385202/lsm_1279l4_0.1x0.1.grb?version=1&modificationDate=1567525024201&api=v2&download=true"
                 let soilType = "https://confluence.ecmwf.int/download/attachments/140385202/slt.grib?version=1&modificationDate=1634824634152&api=v2&download=true"
                 let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
                 try await curl.download(url: z, toFile: tempDownloadGribFile, bzip2Decode: false)
-                try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
+                //try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
                 try await curl.download(url: soilType, toFile: tempDownloadGribFile3!, bzip2Decode: false)
             case .cerra:
                 struct Query: Encodable {
@@ -293,6 +305,9 @@ struct DownloadEra5Command: AsyncCommand {
                 case "swh":
                     elevation = .init(repeating: .nan, count: data.count)
                     landmask = data.map { $0.isNaN ? 1 : 0 }
+                case "2t":
+                    // Used in ERA5-Land to mask out exactly which grid-cells provide data
+                    landmask = data.map { $0.isNaN ? 0 : 1 }
                 default:
                     fatalError("Found \(shortName) in grib")
                 }
