@@ -244,7 +244,8 @@ struct GenericVariableHandle: Sendable {
             }
             /// `timeMinMax.min.time` has issues with `skip`
             /// Start time (timeMinMax.min) might be before run time in case of MF wave which contains hind-cast data
-            let startTime = min(run ?? timeMin, timeMin)
+            /// For weekly and monthly data, always use timeMin instead of run
+            let startTime = dtSeconds >= 7*24*3600 ? timeMin : min(run ?? timeMin, timeMin)
             let time = TimerangeDt(range: startTime..<timeMax, dtSeconds: dtSeconds)
 
             let variable = handles[0].variable
