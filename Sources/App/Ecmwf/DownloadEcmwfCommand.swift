@@ -365,7 +365,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     
                     // For AIFS keep specific humidity and temperature in memory
-                    // geopotential and vertical velocity for wind calculation
+                    // geopotential (gh, z) and vertical velocity (w in Pa/s) for wind calculation
                     if [EcmwfDomain.aifs025, .aifs025_single, .aifs025_ensemble].contains(domain) && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
@@ -480,6 +480,20 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
                 }
             }
+            
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_1000hPa, temperature: .temperature_1000hPa, pressureLevel: 1000, outVariable: EcmwfVariable.vertical_velocity_1000hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_925hPa, temperature: .temperature_925hPa, pressureLevel: 925, outVariable: EcmwfVariable.vertical_velocity_925hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_850hPa, temperature: .temperature_850hPa, pressureLevel: 850, outVariable: EcmwfVariable.vertical_velocity_850hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_700hPa, temperature: .temperature_700hPa, pressureLevel: 700, outVariable: EcmwfVariable.vertical_velocity_700hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_600hPa, temperature: .temperature_600hPa, pressureLevel: 600, outVariable: EcmwfVariable.vertical_velocity_600hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_500hPa, temperature: .temperature_500hPa, pressureLevel: 500, outVariable: EcmwfVariable.vertical_velocity_500hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_400hPa, temperature: .temperature_400hPa, pressureLevel: 400, outVariable: EcmwfVariable.vertical_velocity_400hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_300hPa, temperature: .temperature_300hPa, pressureLevel: 300, outVariable: EcmwfVariable.vertical_velocity_300hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_250hPa, temperature: .temperature_250hPa, pressureLevel: 250, outVariable: EcmwfVariable.vertical_velocity_250hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_200hPa, temperature: .temperature_200hPa, pressureLevel: 200, outVariable: EcmwfVariable.vertical_velocity_200hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_150hPa, temperature: .temperature_150hPa, pressureLevel: 150, outVariable: EcmwfVariable.vertical_velocity_150hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_100hPa, temperature: .temperature_100hPa, pressureLevel: 100, outVariable: EcmwfVariable.vertical_velocity_100hPa, writer: writer)
+            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_50hPa, temperature: .temperature_50hPa, pressureLevel: 50, outVariable: EcmwfVariable.vertical_velocity_50hPa, writer: writer)
 
             if let writerProbabilities {
                 logger.info("Calculating precipitation probability")
