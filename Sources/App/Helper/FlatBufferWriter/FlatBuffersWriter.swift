@@ -28,10 +28,10 @@ extension ForecastapiResult {
                     for model in location.results {
                         try await model.writeToFlatbuffer(&fbb, variables: variables, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
                         let buffer = fbb.buffer
-                        buffer.withUnsafePointerToSlice(index: buffer.capacity-Int(buffer.size), count: Int(buffer.size)){ ptr in
-                            b.buffer.writeBytes(ptr)
-                        }
-                        fbb.clear()
+                        buffer.withUnsafeBytes(body: { ptr in
+                            b.buffer.writeBytes(UnsafeRawBufferPointer(start: ptr.baseAddress?.advanced(by: buffer.reader), count: Int(buffer.size)))
+                        })
+                        fbb.clear(keepingCapacity: true)
                         try await b.flushIfRequired()
                     }
                 }
