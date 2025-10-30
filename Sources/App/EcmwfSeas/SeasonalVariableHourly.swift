@@ -75,7 +75,7 @@ enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixa
     case wave_direction
     case wave_height
     case wave_period
-    case wave_period_peak
+    case wave_peak_period
     
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
@@ -205,9 +205,8 @@ enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixa
             return .init(variable: .waveHeight)
         case .wave_period:
             return .init(variable: .wavePeriod)
-        case .wave_period_peak:
-            // TODO register wave_period_peak
-            return .init(variable: .wavePeriod)
+        case .wave_peak_period:
+            return .init(variable: .wavePeakPeriod)
         }
     }
 }

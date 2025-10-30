@@ -12,7 +12,7 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
     case snowfall_mean
     case snowfall_anomaly
     
-    case temperature_2m_anomaly_gt_1k
+    case temperature_2m_anomaly_gt1
     case temperature_2m_anomaly_gt_2k
     case temperature_2m_anomaly_gt_0k
     case temperature_2m_anomaly_lt_minus1k
@@ -79,7 +79,6 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
     
     // there is a "6h" version and "last post processing" -> both contain exactly the same data
     // a 24h min/max would be way better
-    // TODO: rename to 6h
     case temperature_max6h_2m_mean
     case temperature_max6h_2m_anomaly
     case temperature_min6h_2m_mean
@@ -178,17 +177,43 @@ enum SeasonalVariableWeekly: String, GenericVariableMixable, RawRepresentableStr
         case .soil_temperature_0_to_7cm_anomaly:
             return .init(variable: .soilTemperature, aggregation: .anomaly, depth: 0, depthTo: 7)
         case .temperature_max6h_2m_mean:
-            // TODO: fix 24h to 6h definition
-            return .init(variable: .temperatureMax24h, aggregation: .mean, altitude: 2)
+            return .init(variable: .temperatureMax6h, aggregation: .mean, altitude: 2)
         case .temperature_max6h_2m_anomaly:
-            return .init(variable: .temperatureMax24h, aggregation: .anomaly, altitude: 2)
+            return .init(variable: .temperatureMax6h, aggregation: .anomaly, altitude: 2)
         case .temperature_min6h_2m_mean:
-            return .init(variable: .temperatureMin24h, aggregation: .mean, altitude: 2)
+            return .init(variable: .temperatureMin6h, aggregation: .mean, altitude: 2)
         case .temperature_min6h_2m_anomaly:
-            return .init(variable: .temperatureMin24h, aggregation: .anomaly, altitude: 2)
-        default:
-            // TODO define SOT, EFI, etc
-            return .init(variable: .undefined)
+            return .init(variable: .temperatureMin6h, aggregation: .anomaly, altitude: 2)
+        case .temperature_2m_anomaly_gt1:
+            return .init(variable: .temperature, aggregation: .anomaly, probability: .gt1, altitude: 2)
+        case .temperature_2m_anomaly_gt_2k:
+            return .init(variable: .temperature, aggregation: .anomaly, probability: .gt2, altitude: 2)
+        case .temperature_2m_anomaly_gt_0k:
+            return .init(variable: .temperature, aggregation: .anomaly, probability: .gt0, altitude: 2)
+        case .temperature_2m_anomaly_lt_minus1k:
+            return .init(variable: .temperature, aggregation: .anomaly, probability: .ltm1, altitude: 2)
+        case .temperature_2m_anomaly_lt_minus2k:
+            return .init(variable: .temperature, aggregation: .anomaly, probability: .ltm2, altitude: 2)
+        case .pressure_msl_anomaly_gt_0Pa:
+            return .init(variable: .pressureMsl, aggregation: .anomaly, probability: .gt0)
+        case .surface_temperature_anomaly_gt_0K:
+            return .init(variable: .surfacePressure, aggregation: .anomaly, probability: .gt0)
+        case .precipitation_anomaly_gt_0mm:
+            return .init(variable: .precipitation, aggregation: .anomaly, probability: .gt0)
+        case .precipitation_anomaly_gt_10mm:
+            return .init(variable: .precipitation, aggregation: .anomaly, probability: .gt10)
+        case .precipitation_anomaly_gt_20mm:
+            return .init(variable: .precipitation, aggregation: .anomaly, probability: .gt20)
+        case .temperature_2m_sot10:
+            return .init(variable: .temperature, aggregation: .sot10, altitude: 2)
+        case .temperature_2m_sot90:
+            return .init(variable: .temperature, aggregation: .sot90, altitude: 2)
+        case .temperature_2m_efi:
+            return .init(variable: .temperature, aggregation: .efi, altitude: 2)
+        case .precipitation_efi:
+            return .init(variable: .precipitation, aggregation: .efi)
+        case .precipitation_sot90:
+            return .init(variable: .precipitation, aggregation: .sot10)
         }
     }
 }

@@ -7,13 +7,13 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     case wave_direction
     case wave_height
     case wave_period
-    case wave_period_peak
+    case wave_peak_period
 
     var interpolation: ReaderInterpolation {
         switch self {
         case .wave_height:
             return .linear
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
             return .linearDegrees
@@ -24,7 +24,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return .metre
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return .seconds
         case .wave_direction:
             return .degreeDirection
@@ -37,7 +37,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return height
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return period
         case .wave_direction:
             return direction
@@ -69,7 +69,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return "swh" // Significant height of combined wind waves and swell
         case .wave_period:
             return "mwp"
-        case .wave_period_peak:
+        case .wave_peak_period:
             return "pp1d"
         }
     }

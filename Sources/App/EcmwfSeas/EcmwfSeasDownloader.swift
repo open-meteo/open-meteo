@@ -52,7 +52,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         let generateTimeSeries: Bool
         switch domain {
-        case .seas5_6hourly, .seas5_12hourly, .seas5_24hourly:
+        case .seas5_6hourly, .seas5_12hourly, .seas5_daily:
             generateTimeSeries = true
         case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly, .ec46_6hourly:
             generateTimeSeries = true
@@ -63,7 +63,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         switch domain {
         case .ec46_6hourly, .ec46_weekly:
             handles = try await downloadEC46(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
-        case .seas5_6hourly, .seas5_monthly, .seas5_12hourly, .seas5_24hourly, .seas5_monthly_upper_level:
+        case .seas5_6hourly, .seas5_monthly, .seas5_12hourly, .seas5_daily, .seas5_monthly_upper_level:
             handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         }
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: generateTimeSeries)
@@ -266,8 +266,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         variable = EcmwfSeasVariableSingleLevel.from(shortName: attributes.shortName)
                     case .seas5_12hourly:
                         variable = EcmwfSeasVariableUpperLevel.from(shortName: attributes.shortName, level: attributes.levelStr)
-                    case .seas5_24hourly:
-                        variable = EcmwfSeasVariable24HourlySingleLevel.from(shortName: attributes.shortName)
+                    case .seas5_daily:
+                        variable = EcmwfSeasVariableDailySingleLevel.from(shortName: attributes.shortName)
                     case .seas5_monthly_upper_level:
                         variable = nil
                     case .seas5_monthly:
@@ -333,7 +333,7 @@ extension EcmwfSeasDomain {
             return [2]
         case .seas5_12hourly:
             return [1, 4]
-        case .seas5_24hourly:
+        case .seas5_daily:
             return [3]
         case .seas5_monthly_upper_level:
             return [6, 8]
@@ -349,7 +349,7 @@ extension EcmwfSeasDomain {
     var ensembleMembers: Int {
         // Note: model levels = 11 member, pressure levels full 51
         switch self {
-        case .seas5_6hourly, .seas5_24hourly, .seas5_monthly, .ec46_6hourly:
+        case .seas5_6hourly, .seas5_daily, .seas5_monthly, .ec46_6hourly:
             return 51
         case .seas5_12hourly, .seas5_monthly_upper_level, .ec46_weekly:
             return 11

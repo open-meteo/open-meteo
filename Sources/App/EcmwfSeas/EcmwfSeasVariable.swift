@@ -197,10 +197,8 @@ enum EcmwfSeasVariableSingleLevel: String, EcmwfSeasVariable {
 /// 24 hourly variables in O320 grid
 /// STL1/STL2/STL3/STL4/SUND/SWVL1/SWVL2/SWVL3/SWVL4
 /// MEAN2T24/MN2T24/MX2T24
-enum EcmwfSeasVariable24HourlySingleLevel: String, EcmwfSeasVariable, Equatable {
-    // TODO correct timeshift for t2 and sun while downloading
-    // TODO rename variables to correct daily
-    
+/// Note: Data is back-shifted by 24 hours for 24h aggregations like temperature and sunshine duration. Thus data on 01.01.2025 is data for the first of January
+enum EcmwfSeasVariableDailySingleLevel: String, EcmwfSeasVariable, Equatable {
     case soil_temperature_0_to_7cm_mean
     case soil_temperature_7_to_28cm_mean
     case soil_temperature_28_to_100cm_mean

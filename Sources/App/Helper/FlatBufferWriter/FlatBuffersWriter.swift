@@ -27,7 +27,9 @@ extension ForecastapiResult {
                 for location in results {
                     for model in location.results {
                         try await model.writeToFlatbuffer(&fbb, variables: variables, timezone: location.timezone, fixedGenerationTime: fixedGenerationTime, locationId: location.locationId)
-                        b.buffer.writeBytes(fbb.buffer.unsafeRawBufferPointer)
+                        fbb.buffer.withUnsafeBytes(body: { ptr in
+                            b.buffer.writeBytes(ptr)
+                        })
                         fbb.clear()
                         try await b.flushIfRequired()
                     }
@@ -41,29 +43,21 @@ extension ForecastapiResult {
     }
 }
 
-fileprivate extension FlatBuffers.ByteBuffer {
-    /// Create a pointer to the data region. Flatbuffer is filling the buffer backwards.
-    var unsafeRawBufferPointer: UnsafeRawBufferPointer {
-        .init(start: memory.advanced(by: self.capacity - Int(self.size)), count: Int(size))
-    }
-}
-
-
-
-
 /// Encode meta data for flatbuffer variables
 struct FlatBufferVariableMeta {
     let variable: openmeteo_sdk_Variable
     let aggregation: openmeteo_sdk_Aggregation
+    let probability: openmeteo_sdk_Probability
     let altitude: Int16
     let pressureLevel: Int16
     let depth: Int16
     let depthTo: Int16
     let previousDay: Int16
 
-    init(variable: openmeteo_sdk_Variable, aggregation: openmeteo_sdk_Aggregation = .none_, altitude: Int16 = 0, pressureLevel: Int16 = 0, depth: Int16 = 0, depthTo: Int16 = 0, previousDay: Int16 = 0) {
+    init(variable: openmeteo_sdk_Variable, aggregation: openmeteo_sdk_Aggregation = .none_, probability: openmeteo_sdk_Probability = .none_, altitude: Int16 = 0, pressureLevel: Int16 = 0, depth: Int16 = 0, depthTo: Int16 = 0, previousDay: Int16 = 0) {
         self.variable = variable
         self.aggregation = aggregation
+        self.probability = probability
         self.altitude = altitude
         self.pressureLevel = pressureLevel
         self.depth = depth
@@ -79,6 +73,7 @@ struct FlatBufferVariableMeta {
         openmeteo_sdk_VariableWithValues.add(depth: depth, &fbb)
         openmeteo_sdk_VariableWithValues.add(depthTo: depthTo, &fbb)
         openmeteo_sdk_VariableWithValues.add(previousDay: previousDay, &fbb)
+        openmeteo_sdk_VariableWithValues.add(probability: probability, &fbb)
     }
 }
 

@@ -32,11 +32,10 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
     case showers
     case wind_gusts_10m
     case sunshine_duration
-    
     case wave_direction
     case wave_height
     case wave_period
-    case wave_period_peak
+    case wave_peak_period
     
     var gribCode: String {
         switch self {
@@ -102,7 +101,7 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return "swh" // Significant height of combined wind waves and swell
         case .wave_period:
             return "mwp"
-        case .wave_period_peak:
+        case .wave_peak_period:
             return "pp1d"
         }
     }
@@ -173,7 +172,7 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return 1/60
         case .wave_height:
             return 50 // 0.02m resolution
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return 20 // 0.05s resolution
         case .wave_direction:
             return 1
@@ -222,7 +221,7 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return .backwards
         case .wave_height:
             return .linear
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
             return .linearDegrees
@@ -261,7 +260,7 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
             return .seconds
         case .wave_height:
             return .metre
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return .seconds
         case .wave_direction:
             return .degreeDirection
