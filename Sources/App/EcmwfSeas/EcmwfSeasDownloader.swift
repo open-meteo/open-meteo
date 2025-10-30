@@ -52,18 +52,18 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         let generateTimeSeries: Bool
         switch domain {
-        case .seas5_6hourly, .seas5_12hourly, .seas5_daily:
+        case .seas5, .seas5_12hourly, .seas5_daily:
             generateTimeSeries = true
-        case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly, .ec46_6hourly:
+        case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly, .ec46:
             generateTimeSeries = true
         }
         try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
         logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let handles: [GenericVariableHandle]
         switch domain {
-        case .ec46_6hourly, .ec46_weekly:
+        case .ec46, .ec46_weekly:
             handles = try await downloadEC46(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
-        case .seas5_6hourly, .seas5_monthly, .seas5_12hourly, .seas5_daily, .seas5_monthly_upper_level:
+        case .seas5, .seas5_monthly, .seas5_12hourly, .seas5_daily, .seas5_monthly_upper_level:
             handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         }
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: generateTimeSeries)
@@ -83,7 +83,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         if !FileManager.default.fileExists(atPath: tempDownloadGribFile) {
             logger.info("Downloading elevation and sea mask")
             switch domain {
-            case .seas5_6hourly:
+            case .seas5:
                 guard let email else {
                     fatalError("email required")
                 }
@@ -136,7 +136,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let types: [String]
         let streams: [String]
         switch domain {
-        case .ec46_6hourly:
+        case .ec46:
             package = "e1"
             types = ["cf","pf"]
             streams = ["eefo", "weef"]
@@ -177,7 +177,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {
-                    case .ec46_6hourly:
+                    case .ec46:
                         variable = EcmwfEC46Variable6Hourly.from(shortName: attributes.shortName)
                     case .ec46_weekly:
                         variable = EcmwfEC46VariableWeekly.from(shortName: attributes.shortName, number: message.getLong(attribute: "number"))
@@ -262,7 +262,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {
-                    case .seas5_6hourly:
+                    case .seas5:
                         variable = EcmwfSeasVariableSingleLevel.from(shortName: attributes.shortName)
                     case .seas5_12hourly:
                         variable = EcmwfSeasVariableUpperLevel.from(shortName: attributes.shortName, level: attributes.levelStr)
@@ -272,7 +272,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         variable = nil
                     case .seas5_monthly:
                         variable = EcmwfSeasVariableMonthly.from(shortName: attributes.shortName)
-                    case .ec46_6hourly:
+                    case .ec46:
                         fatalError()
                     case .ec46_weekly:
                         fatalError()
@@ -329,7 +329,7 @@ extension EcmwfSeasDomain {
      */
     var downloadPackages: [Int] {
         switch self {
-        case .seas5_6hourly:
+        case .seas5:
             return [2]
         case .seas5_12hourly:
             return [1, 4]
@@ -339,7 +339,7 @@ extension EcmwfSeasDomain {
             return [6, 8]
         case .seas5_monthly:
             return [5, 7]
-        case .ec46_6hourly:
+        case .ec46:
             return []
         case .ec46_weekly:
             return []
@@ -349,7 +349,7 @@ extension EcmwfSeasDomain {
     var ensembleMembers: Int {
         // Note: model levels = 11 member, pressure levels full 51
         switch self {
-        case .seas5_6hourly, .seas5_daily, .seas5_monthly, .ec46_6hourly:
+        case .seas5, .seas5_daily, .seas5_monthly, .ec46:
             return 51
         case .seas5_12hourly, .seas5_monthly_upper_level, .ec46_weekly:
             return 11
@@ -358,7 +358,7 @@ extension EcmwfSeasDomain {
     
     var lastRun: Timestamp {
         switch self {
-        case .ec46_weekly,.ec46_6hourly:
+        case .ec46_weekly,.ec46:
             // Delay of 20 hours, one update per day
             let t = Timestamp.now()
             return t.add(hours: -19).with(hour: 0)
