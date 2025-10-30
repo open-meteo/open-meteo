@@ -28,9 +28,8 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
-        //.package(url: "https://github.com/google/flatbuffers.git", exact: "25.9.23"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
-        .package(url: "https://github.com/open-meteo/sdk.git", branch: "probabilities"),
+        .package(url: "https://github.com/open-meteo/sdk.git", from: "1.22.0"),
         .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "6631ab874603b8a36da8c6ce6372b31b1b98c32a"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
@@ -49,7 +48,6 @@ let package = Package(
             name: "App",
             dependencies: [
                 .product(name: "Vapor", package: "vapor"),
-                //.product(name: "FlatBuffers", package: "flatbuffers"),
                 .product(name: "OpenMeteoSdk", package: "sdk"),
                 .product(name: "SwiftNetCDF", package: "SwiftNetCDF"),
                 .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
