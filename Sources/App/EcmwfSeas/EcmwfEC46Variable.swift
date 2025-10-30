@@ -391,16 +391,16 @@ enum EcmwfEC46Variable6Hourly: String, EcmwfSeasVariable, CaseIterable {
  param               = tpi/2ti
  */
 enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
-    case temperature_2m_anomaly_gt_1k
-    case temperature_2m_anomaly_gt_2k
-    case temperature_2m_anomaly_gt_0k
-    case temperature_2m_anomaly_lt_minus1k
-    case temperature_2m_anomaly_lt_minus2k
-    case pressure_msl_anomaly_gt_0Pa
-    case surface_temperature_anomaly_gt_0K
-    case precipitation_anomaly_gt_0mm
-    case precipitation_anomaly_gt_10mm
-    case precipitation_anomaly_gt_20mm
+    case temperature_2m_anomaly_gt1
+    case temperature_2m_anomaly_gt2
+    case temperature_2m_anomaly_gt0
+    case temperature_2m_anomaly_ltm1
+    case temperature_2m_anomaly_ltm2
+    case pressure_msl_anomaly_gt0
+    case surface_temperature_anomaly_gt0
+    case precipitation_anomaly_gt0
+    case precipitation_anomaly_gt10
+    case precipitation_anomaly_gt20
     
     
     case temperature_2m_sot10
@@ -623,13 +623,13 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return 10
         case .precipitation_sot90:
             return 10
-        case .temperature_2m_anomaly_gt_1k, .temperature_2m_anomaly_gt_2k, .temperature_2m_anomaly_gt_0k, .temperature_2m_anomaly_lt_minus1k, .temperature_2m_anomaly_lt_minus2k:
+        case .temperature_2m_anomaly_gt1, .temperature_2m_anomaly_gt2, .temperature_2m_anomaly_gt0, .temperature_2m_anomaly_ltm1, .temperature_2m_anomaly_ltm2:
             return 1 // percent
-        case .pressure_msl_anomaly_gt_0Pa:
+        case .pressure_msl_anomaly_gt0:
             return 1
-        case .surface_temperature_anomaly_gt_0K:
+        case .surface_temperature_anomaly_gt0:
             return 1
-        case .precipitation_anomaly_gt_0mm, .precipitation_anomaly_gt_10mm, .precipitation_anomaly_gt_20mm:
+        case .precipitation_anomaly_gt0, .precipitation_anomaly_gt10, .precipitation_anomaly_gt20:
             return 1
         }
     }
@@ -709,13 +709,13 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
             return .millimetre
         case .precipitation_sot90:
             return .dimensionless
-        case .temperature_2m_anomaly_gt_1k, .temperature_2m_anomaly_gt_2k, .temperature_2m_anomaly_gt_0k, .temperature_2m_anomaly_lt_minus1k, .temperature_2m_anomaly_lt_minus2k:
+        case .temperature_2m_anomaly_gt1, .temperature_2m_anomaly_gt2, .temperature_2m_anomaly_gt0, .temperature_2m_anomaly_ltm1, .temperature_2m_anomaly_ltm2:
             return .percentage
-        case .pressure_msl_anomaly_gt_0Pa:
+        case .pressure_msl_anomaly_gt0:
             return .percentage
-        case .surface_temperature_anomaly_gt_0K:
+        case .surface_temperature_anomaly_gt0:
             return .percentage
-        case .precipitation_anomaly_gt_0mm, .precipitation_anomaly_gt_10mm, .precipitation_anomaly_gt_20mm:
+        case .precipitation_anomaly_gt0, .precipitation_anomaly_gt10, .precipitation_anomaly_gt20:
             return .percentage
         }
     }
@@ -832,25 +832,25 @@ enum EcmwfEC46VariableWeekly: String, EcmwfSeasVariable, CaseIterable {
                 return .temperature_2m_efi
             }
         case "2tag1":
-            return .temperature_2m_anomaly_gt_1k
+            return .temperature_2m_anomaly_gt1
         case "2tag2":
-            return .temperature_2m_anomaly_gt_2k
+            return .temperature_2m_anomaly_gt2
         case "2tag0":
-            return .temperature_2m_anomaly_gt_0k
+            return .temperature_2m_anomaly_gt0
         case "2talm1":
-            return .temperature_2m_anomaly_lt_minus1k
+            return .temperature_2m_anomaly_ltm1
         case "2talm2":
-            return .temperature_2m_anomaly_lt_minus2k
+            return .temperature_2m_anomaly_ltm2
         case "mslag0":
-            return .pressure_msl_anomaly_gt_0Pa
+            return .pressure_msl_anomaly_gt0
         case "stag0":
-            return .surface_temperature_anomaly_gt_0K
+            return .surface_temperature_anomaly_gt0
         case "tpag0":
-            return .precipitation_anomaly_gt_0mm
+            return .precipitation_anomaly_gt0
         case "tpag10":
-            return .precipitation_anomaly_gt_10mm
+            return .precipitation_anomaly_gt10
         case "tpag20":
-            return .precipitation_anomaly_gt_20mm
+            return .precipitation_anomaly_gt20
         default:
             return nil
         }
