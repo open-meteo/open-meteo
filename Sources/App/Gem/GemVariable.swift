@@ -177,6 +177,58 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             case .snow_depth:
                 return "SNOD_Sfc"
             }
+        case .gem_hrdps_west:
+            // HRDPS West uses same naming convention as Continental
+            switch self {
+            case .temperature_2m:
+                return "TMP_AGL-2m"
+            case .temperature_40m:
+                return "TMP_AGL-40m"
+            case .temperature_80m:
+                return "TMP_AGL-80m"
+            case .temperature_120m:
+                return "TMP_AGL-120m"
+            case .relative_humidity_2m:
+                return "RH_AGL-2m"
+            case .cloud_cover:
+                return "TCDC_Sfc"
+            case .pressure_msl:
+                return "PRMSL_MSL"
+            case .shortwave_radiation:
+                return "DSWRF_Sfc"
+            case .wind_speed_10m:
+                return "WIND_AGL-10m"
+            case .wind_direction_10m:
+                return "WDIR_AGL-10m"
+            case .wind_speed_40m:
+                return "WIND_AGL-40m"
+            case .wind_direction_40m:
+                return "WDIR_AGL-40m"
+            case .wind_speed_80m:
+                return "WIND_AGL-80m"
+            case .wind_direction_80m:
+                return "WDIR_AGL-80m"
+            case .wind_speed_120m:
+                return "WIND_AGL-120m"
+            case .wind_direction_120m:
+                return "WDIR_AGL-120m"
+            case .wind_gusts_10m:
+                return "GUST_AGL-10m"
+            case .showers:
+                return "ACPCP_Sfc"
+            case .snowfall_water_equivalent:
+                return "WEASN_Sfc"
+            case .soil_temperature_0_to_10cm:
+                return "TSOIL_DBS-0-10cm"
+            case .soil_moisture_0_to_10cm:
+                return "SOILW_DBS-0-10cm"
+            case .precipitation:
+                return "APCP_Sfc"
+            case .cape:
+                return "CAPE_Sfc"
+            case .snow_depth:
+                return "SNOD_Sfc"
+            }
         case .gem_global_ensemble:
             switch self {
             case .relative_humidity_2m:
@@ -438,7 +490,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         return (rawValue, 0)
     }
     func gribName(domain: GemDomain) -> String? {
-        let isbl = (domain == .gem_hrdps_continental || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
+        let isbl = (domain == .gem_hrdps_continental || domain == .gem_hrdps_west || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
         switch variable {
         case .temperature:
             return "TMP_\(isbl)"
@@ -462,7 +514,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return true
         }
         // Since 2003-05-16, upper level geopotenial is missing for hour 46...
-        if domain == .gem_hrdps_continental && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
+        if (domain == .gem_hrdps_continental || domain == .gem_hrdps_west) && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
             return false
         }
         if hour >= 171 && hour % 6 != 0 && variable == .relative_humidity {

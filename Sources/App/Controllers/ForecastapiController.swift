@@ -487,8 +487,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case gem_global
     case gem_regional
     case gem_hrdps_continental
+    case gem_hrdps_west
     case cmc_gem_gdps
     case cmc_gem_hrdps
+    case cmc_gem_hrdps_west
     case cmc_gem_rdps
 
     case icon_seamless
@@ -785,6 +787,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GemReader(domain: .gem_regional, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return try await GemReader(domain: .gem_hrdps_continental, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gem_hrdps_west, .cmc_gem_hrdps_west:
+            return try await GemReader(domain: .gem_hrdps_west, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .archive_best_match:
             return [try await Era5Factory.makeArchiveBestMatch(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
         case .era5_seamless, .copernicus_era5_seamless:
@@ -991,6 +995,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return GemDomain.gem_regional
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return GemDomain.gem_hrdps_continental
+        case .gem_hrdps_west, .cmc_gem_hrdps_west:
+            return GemDomain.gem_hrdps_west
         case .era5, .copernicus_era5:
             return CdsDomain.era5
         case .era5_land, .copernicus_era5_land:
@@ -1200,6 +1206,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GemReader(domain: .gem_regional, gridpoint: gridpoint, options: options)
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return try await GemReader(domain: .gem_hrdps_continental, gridpoint: gridpoint, options: options)
+        case .gem_hrdps_west, .cmc_gem_hrdps_west:
+            return try await GemReader(domain: .gem_hrdps_west, gridpoint: gridpoint, options: options)
         case .era5, .copernicus_era5:
             return try await Era5Factory.makeReader(domain: .era5, gridpoint: gridpoint, options: options)
         case .era5_land, .copernicus_era5_land:
