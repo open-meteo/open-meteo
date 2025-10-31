@@ -105,9 +105,16 @@ struct GemDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 4)
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
-        let terrainGribName = domain == .gem_hrdps_continental ? "HGT_Sfc" : "LAND_SFC_0"
+        let terrainGribName: String
+        if domain == .gem_hrdps_west {
+            terrainGribName = "HGT_SFC_0"
+        } else if domain == .gem_hrdps_continental {
+            terrainGribName = "HGT_Sfc"
+        } else {
+            terrainGribName = "LAND_SFC_0"
+        }
         /// HGT file is not available for analysis in HRDPS
-        let hour: Int = domain == .gem_hrdps_continental ? 1 : 0
+        let hour: Int = (domain == .gem_hrdps_continental || domain == .gem_hrdps_west) ? 1 : 0
         let terrainUrl = domain.getUrl(run: run, hour: hour, gribName: terrainGribName, server: server)
         let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
         try grib2d.load(message: message)
@@ -119,7 +126,7 @@ struct GemDownload: AsyncCommand {
         var height = grib2d.array.data
 
         if domain != .gem_global_ensemble {
-            let gribName = domain == .gem_hrdps_continental ? "LAND_Sfc" : "LAND_SFC_0"
+            let gribName = (domain == .gem_hrdps_continental) ? "LAND_Sfc" : "LAND_SFC_0"
             let landmaskUrl = domain.getUrl(run: run, hour: 0, gribName: gribName, server: server)
             var landmask: Array2D?
             for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
@@ -180,7 +187,7 @@ struct GemDownload: AsyncCommand {
                 }
                 let url = domain.getUrl(run: run, hour: hour, gribName: gribName, server: server)
                 // snowfall file might be missing. Ignore any issues here
-                let isSnowfallWaterEq = domain == .gem_hrdps_continental && (gribName == "WEASN_Sfc" || gribName == "APCP_Sfc")
+                let isSnowfallWaterEq = (domain == .gem_hrdps_continental || domain == .gem_hrdps_west) && (gribName == "WEASN_Sfc" || gribName == "APCP_Sfc")
                 let deadLineHours = isSnowfallWaterEq ? 0.01 : nil
 
                 /// Store precip to calculate probability later

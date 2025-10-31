@@ -851,6 +851,8 @@ extension MultiDomains {
             return .gemRegional
         case .gem_hrdps_continental, .cmc_gem_hrdps:
             return .gemHrdpsContinental
+        case .gem_hrdps_west, .cmc_gem_hrdps_west:
+            return .gemHrdpsWest
         case .icon_mix, .icon_seamless, .dwd_icon_seamless:
             return .iconSeamless
         case .icon_global, .dwd_icon_global, .dwd_icon:
