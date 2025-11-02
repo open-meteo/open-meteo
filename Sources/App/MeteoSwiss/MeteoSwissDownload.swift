@@ -156,10 +156,10 @@ struct MeteoSwissDownload: AsyncCommand {
                         }
                         
                         if variable == .temperature_2m {
-                            try await rhCalculator.ingest(temperature: array2d, member: member, writer: writer)
+                            try await rhCalculator.ingest(.temperature(array2d), member: member, writer: writer)
                         }
                         if variable == .relative_humidity_2m {
-                            try await rhCalculator.ingest(dewpoint: array2d, member: member, writer: writer)
+                            try await rhCalculator.ingest(.dewpoint(array2d), member: member, writer: writer)
                             continue
                         }
                         

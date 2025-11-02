@@ -250,6 +250,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let inMemory2 = VariablePerMemberStorage<ShortNameLevel>()
             
             let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
+            let verticalVelocityCalculator = VerticalVelocityCalculator<EcmwfVariable>()
 
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
@@ -345,28 +346,32 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
-                    // Calculate relative humidity & geometric vertical velocity for AIFS on pressure level
-                    if [EcmwfDomain.aifs025_single, .aifs025_ensemble].contains(domain) && ["t", "q", "w"].contains(variable.gribName) {
-                        await inMemory2.set(variable: ShortNameLevel(shortName, levelhPa), timestamp: timestamp, member: member, data: grib2d.array)
-                        while let (t, q, w, member) = await inMemory2.getThreeRemoving(first: ShortNameLevel("t", levelhPa), second: ShortNameLevel("q", levelhPa), third: ShortNameLevel("w", levelhPa), timestamp: timestamp) {
-                            let rh = zip(t.data, q.data).map { t, q in
-                                return Meteorology.specificToRelativeHumidity(specificHumidity: q, temperature: t, pressure: Float(levelhPa))
-                            }
-                            let geometric = Meteorology.verticalVelocityPressureToGeometric(omega: w.data, temperature: t.data, pressureLevel: Float(levelhPa))
-                            await inMemory.set(variable: .from(shortName: "r", levelhPa: levelhPa)!, timestamp: writer.time, member: member, data: Array2D(data: rh, nx: t.nx, ny: t.ny))
-                            try await writer.write(member: member, variable: EcmwfVariable.from(shortName: "r", levelhPa: levelhPa)!, data: rh)
-                            try await writer.write(member: member, variable: EcmwfVariable.from(shortName: "w", levelhPa: levelhPa)!, data: geometric)
-                        }
-                        if ["q", "w"].contains(variable.gribName) {
-                            return
+                    // Calculate geometric vertical velocity
+                    if ["t", "w"].contains(shortName) {
+                        let level = Float(levelhPa)
+                        let vvVariable = EcmwfVariable.from(shortName: "w", levelhPa: levelhPa)!
+                        switch shortName {
+                        case "t":
+                            try await verticalVelocityCalculator.ingest(.temperature(grib2d.array), member: member, pressureLevel: level, outVariable: vvVariable, writer: writer)
+                        case "w":
+                            try await verticalVelocityCalculator.ingest(.omega(grib2d.array), member: member, pressureLevel: level, outVariable: vvVariable, writer: writer)
+                            return // do not store omega on disk
+                        default:
+                            break
                         }
                     }
                     
-                    // Calculate geometric vertical velocity for IFS on pressure level
-                    if [EcmwfDomain.ifs025, .ifs025_ensemble].contains(domain) && ["t", "w"].contains(variable.gribName) {
+                    // Calculate relative humidity for AIFS on pressure level
+                    if [EcmwfDomain.aifs025_single, .aifs025_ensemble].contains(domain) && ["t", "q"].contains(variable.gribName) {
                         await inMemory2.set(variable: ShortNameLevel(shortName, levelhPa), timestamp: timestamp, member: member, data: grib2d.array)
-                        try await inMemory2.verticalVelocityPressureToGeometric(omega: ShortNameLevel("w", levelhPa), temperature: ShortNameLevel("t", levelhPa), pressureLevel: Float(levelhPa), outVariable: EcmwfVariable.from(shortName: "w", levelhPa: levelhPa)!, writer: writer)
-                        if variable.gribName == "w" {
+                        while let (t, q, member) = await inMemory2.getTwoRemoving(first: ShortNameLevel("t", levelhPa), second: ShortNameLevel("q", levelhPa), timestamp: timestamp) {
+                            let rh = zip(t.data, q.data).map { t, q in
+                                return Meteorology.specificToRelativeHumidity(specificHumidity: q, temperature: t, pressure: Float(levelhPa))
+                            }
+                            await inMemory.set(variable: .from(shortName: "r", levelhPa: levelhPa)!, timestamp: writer.time, member: member, data: Array2D(data: rh, nx: t.nx, ny: t.ny))
+                            try await writer.write(member: member, variable: EcmwfVariable.from(shortName: "r", levelhPa: levelhPa)!, data: rh)
+                        }
+                        if ["q"].contains(variable.gribName) {
                             return
                         }
                     }
@@ -377,11 +382,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     
                     if variable == .temperature_2m {
-                        try await rhCalculator.ingest(temperature: grib2d.array, member: member, writer: writer)
+                        try await rhCalculator.ingest(.temperature(grib2d.array), member: member, writer: writer)
                     }
                     
                     if variable == .dew_point_2m {
-                        try await rhCalculator.ingest(dewpoint: grib2d.array, member: member, writer: writer)
+                        try await rhCalculator.ingest(.dewpoint(grib2d.array), member: member, writer: writer)
                         return // do not store dewpoint on disk
                     }
 

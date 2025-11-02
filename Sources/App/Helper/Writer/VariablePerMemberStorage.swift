@@ -250,16 +250,4 @@ extension VariablePerMemberStorage {
             try await writer.write(member: member, variable: outVariable, data: height)
         }
     }
-    
-    /// Convert pressure vertical velocity `omega` (Pa/s) to geometric vertical velocity `w` (m/s)
-    /// See https://www.ncl.ucar.edu/Document/Functions/Contributed/omega_to_w.shtml
-    /// Temperature in Celsius
-    /// PressureLevel in hPa e.g. 1000
-    /// Removes both variables after use
-    nonisolated func verticalVelocityPressureToGeometric(omega: V, temperature: V, pressureLevel: Float, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        while let (omega, temperature, member) = await getTwoRemoving(first: omega, second: temperature, timestamp: writer.time) {
-            let geometric = Meteorology.verticalVelocityPressureToGeometric(omega: omega.data, temperature: temperature.data, pressureLevel: pressureLevel)
-            try await writer.write(member: member, variable: outVariable, data: geometric)
-        }
-    }
 }

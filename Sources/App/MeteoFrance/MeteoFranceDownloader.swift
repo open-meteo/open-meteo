@@ -308,10 +308,10 @@ struct MeteoFranceDownload: AsyncCommand {
                             grib2d.array.flipLatitude()
                         }
                         if shortName == "10efg" {
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: 0, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: 0, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
                         }
                         if shortName == "10nfg" {
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: 0, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: 0, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
                         }
                         return
                     }

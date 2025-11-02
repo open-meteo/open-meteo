@@ -143,13 +143,13 @@ struct KmaDownload: AsyncCommand {
                 // Convert U/V wind components to speed and direction
                 switch variable {
                 case .wind_speed_10m:
-                    return try await windSpeedCalculator.ingest(u: array2d.array, member: 0, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.u(array2d.array), member: 0, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
                 case .wind_direction_10m:
-                    return try await windSpeedCalculator.ingest(v: array2d.array, member: 0, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.v(array2d.array), member: 0, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
                 case .wind_speed_50m:
-                    return try await windSpeedCalculator.ingest(u: array2d.array, member: 0, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.u(array2d.array), member: 0, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
                 case .wind_direction_50m:
-                    return try await windSpeedCalculator.ingest(v: array2d.array, member: 0, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.v(array2d.array), member: 0, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
                 default:
                     break
                 }

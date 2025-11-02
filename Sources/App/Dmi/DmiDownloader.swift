@@ -134,33 +134,33 @@ struct DmiDownload: AsyncCommand {
                         try grib2d.load(message: message)
                         switch (shortName, typeOfLevel, levelStr) {
                         case ("ugst", "heightAboveGround", "10"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
                         case ("vgst", "heightAboveGround", "10"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
                         case ("u", "heightAboveGround", "50"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
                         case ("v", "heightAboveGround", "50"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
                         case ("100u", "heightAboveGround", "100"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
                         case ("100v", "heightAboveGround", "100"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
                         case ("u", "heightAboveGround", "150"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_150m, outDirection: .wind_direction_150m, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_150m, outDirection: .wind_direction_150m, writer: writer)
                         case ("v", "heightAboveGround", "150"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_150m, outDirection: .wind_direction_150m, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_150m, outDirection: .wind_direction_150m, writer: writer)
                         case ("u", "heightAboveGround", "250"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_250m, outDirection: .wind_direction_250m, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_250m, outDirection: .wind_direction_250m, writer: writer)
                         case ("v", "heightAboveGround", "250"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_250m, outDirection: .wind_direction_250m, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_250m, outDirection: .wind_direction_250m, writer: writer)
                         case ("u", "heightAboveGround", "350"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_350m, outDirection: .wind_direction_350m, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_350m, outDirection: .wind_direction_350m, writer: writer)
                         case ("v", "heightAboveGround", "350"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_350m, outDirection: .wind_direction_350m, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_350m, outDirection: .wind_direction_350m, writer: writer)
                         case ("u", "heightAboveGround", "450"):
-                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_450m, outDirection: .wind_direction_450m, writer: writer)
+                            try await windSpeedCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_450m, outDirection: .wind_direction_450m, writer: writer)
                         case ("v", "heightAboveGround", "450"):
-                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_450m, outDirection: .wind_direction_450m, writer: writer)
+                            try await windSpeedCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_450m, outDirection: .wind_direction_450m, writer: writer)
                         default:
                             break
                         }

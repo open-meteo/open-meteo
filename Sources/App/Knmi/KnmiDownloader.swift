@@ -159,30 +159,30 @@ struct KnmiDownload: AsyncCommand {
                 switch shortName {
                 case "10u":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(u: array, member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
                 case "10v":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(v: array, member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
                 case "100u":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(u: array, member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
                 case "100v":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(v: array, member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
                 case "ugst":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(u: array, member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                    return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
                 case "vgst":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(v: array, member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                    return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
                 case "u":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     let level = Int(levelStr)!
-                    return try await windSpeedCalculatorPressure.ingest(u: array, member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                    return try await windSpeedCalculatorPressure.ingest(.u(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
                 case "v":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     let level = Int(levelStr)!
-                    return try await windSpeedCalculatorPressure.ingest(v: array, member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                    return try await windSpeedCalculatorPressure.ingest(.v(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
                 default:
                     break
                 }
