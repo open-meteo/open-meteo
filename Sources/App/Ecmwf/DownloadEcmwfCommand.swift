@@ -371,9 +371,11 @@ struct DownloadEcmwfCommand: AsyncCommand {
                             await inMemory.set(variable: .from(shortName: "r", levelhPa: levelhPa)!, timestamp: writer.time, member: member, data: Array2D(data: rh, nx: t.nx, ny: t.ny))
                             try await writer.write(member: member, variable: EcmwfVariable.from(shortName: "r", levelhPa: levelhPa)!, data: rh)
                         }
-                        if ["q"].contains(variable.gribName) {
-                            return
-                        }
+                    }
+                    
+                    // Never write specific humidity
+                    if ["q"].contains(variable.gribName) {
+                        return
                     }
                     
                     // Keep pressure level RH in memory for cloud cover calculation
