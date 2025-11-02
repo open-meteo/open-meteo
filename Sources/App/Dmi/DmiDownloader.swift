@@ -47,20 +47,6 @@ struct DmiDownload: AsyncCommand {
 
     /// Temporarily keep those varibles to derive others
     enum DmiVariableTemporary: String {
-        case ugst
-        case vgst
-        case u50
-        case v50
-        case u100
-        case v100
-        case u150
-        case v150
-        case u250
-        case v250
-        case u350
-        case v350
-        case u450
-        case v450
         case landmask
         case elevation
 
@@ -69,34 +55,6 @@ struct DmiDownload: AsyncCommand {
                 return .landmask
             }
             switch (shortName, typeOfLevel, levelStr) {
-            case ("ugst", "heightAboveGround", "10"):
-                return .ugst
-            case ("vgst", "heightAboveGround", "10"):
-                return .vgst
-            case ("u", "heightAboveGround", "50"):
-                return .u50
-            case ("v", "heightAboveGround", "50"):
-                return .v50
-            case ("100u", "heightAboveGround", "100"):
-                return .u100
-            case ("100v", "heightAboveGround", "100"):
-                return .v100
-            case ("u", "heightAboveGround", "150"):
-                return .u150
-            case ("v", "heightAboveGround", "150"):
-                return .v150
-            case ("u", "heightAboveGround", "250"):
-                return .u250
-            case ("v", "heightAboveGround", "250"):
-                return .v250
-            case ("u", "heightAboveGround", "350"):
-                return .u350
-            case ("v", "heightAboveGround", "350"):
-                return .v350
-            case ("u", "heightAboveGround", "450"):
-                return .u450
-            case ("v", "heightAboveGround", "450"):
-                return .v450
             case ("z", "heightAboveGround", "0"):
                 return .elevation
             default:
@@ -146,6 +104,7 @@ struct DmiDownload: AsyncCommand {
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
+                let windSpeedCalculator = WindSpeedCalculator<DmiSurfaceVariable>(trueNorth: trueNorth)
                 let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
 
                 // process sequentialy, as precipitation need to be in order for deaveraging
@@ -169,6 +128,44 @@ struct DmiDownload: AsyncCommand {
                     }
                     let member = message.getLong(attribute: "perturbationNumber") ?? 0
                     let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                    
+                    if ["ugst", "vgst", "v", "u", "100u", "100v"].contains(shortName) {
+                        var grib2d = GribArray2D(nx: nx, ny: ny)
+                        try grib2d.load(message: message)
+                        switch (shortName, typeOfLevel, levelStr) {
+                        case ("ugst", "heightAboveGround", "10"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                        case ("vgst", "heightAboveGround", "10"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                        case ("u", "heightAboveGround", "50"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                        case ("v", "heightAboveGround", "50"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                        case ("100u", "heightAboveGround", "100"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                        case ("100v", "heightAboveGround", "100"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                        case ("u", "heightAboveGround", "150"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_150m, outDirection: .wind_direction_150m, writer: writer)
+                        case ("v", "heightAboveGround", "150"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_150m, outDirection: .wind_direction_150m, writer: writer)
+                        case ("u", "heightAboveGround", "250"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_250m, outDirection: .wind_direction_250m, writer: writer)
+                        case ("v", "heightAboveGround", "250"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_250m, outDirection: .wind_direction_250m, writer: writer)
+                        case ("u", "heightAboveGround", "350"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_350m, outDirection: .wind_direction_350m, writer: writer)
+                        case ("v", "heightAboveGround", "350"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_350m, outDirection: .wind_direction_350m, writer: writer)
+                        case ("u", "heightAboveGround", "450"):
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: member, outSpeed: .wind_speed_450m, outDirection: .wind_direction_450m, writer: writer)
+                        case ("v", "heightAboveGround", "450"):
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: member, outSpeed: .wind_speed_450m, outDirection: .wind_direction_450m, writer: writer)
+                        default:
+                            break
+                        }
+                        return
+                    }
 
                     if let temporary = DmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                         if !generateElevationFile && [DmiVariableTemporary.elevation, .landmask].contains(temporary) {
@@ -184,12 +181,6 @@ struct DmiDownload: AsyncCommand {
                             break
                         }
                         await inMemory.set(variable: temporary, timestamp: timestamp, member: member, data: grib2d.array)
-                        try await inMemory.calculateWindSpeed(u: .u50, v: .v50, outSpeedVariable: DmiSurfaceVariable.wind_speed_50m, outDirectionVariable: DmiSurfaceVariable.wind_direction_50m, writer: writer, trueNorth: trueNorth)
-                        try await inMemory.calculateWindSpeed(u: .u100, v: .v100, outSpeedVariable: DmiSurfaceVariable.wind_speed_100m, outDirectionVariable: DmiSurfaceVariable.wind_direction_100m, writer: writer, trueNorth: trueNorth)
-                        try await inMemory.calculateWindSpeed(u: .u150, v: .v150, outSpeedVariable: DmiSurfaceVariable.wind_speed_150m, outDirectionVariable: DmiSurfaceVariable.wind_direction_150m, writer: writer, trueNorth: trueNorth)
-                        try await inMemory.calculateWindSpeed(u: .u250, v: .v250, outSpeedVariable: DmiSurfaceVariable.wind_speed_250m, outDirectionVariable: DmiSurfaceVariable.wind_direction_250m, writer: writer, trueNorth: trueNorth)
-                        try await inMemory.calculateWindSpeed(u: .u350, v: .v350, outSpeedVariable: DmiSurfaceVariable.wind_speed_350m, outDirectionVariable: DmiSurfaceVariable.wind_direction_350m, writer: writer, trueNorth: trueNorth)
-                        try await inMemory.calculateWindSpeed(u: .u450, v: .v450, outSpeedVariable: DmiSurfaceVariable.wind_speed_450m, outDirectionVariable: DmiSurfaceVariable.wind_direction_450m, writer: writer, trueNorth: trueNorth)
                         return
                     }
 

@@ -133,23 +133,6 @@ struct MeteoFranceDownload: AsyncCommand {
     }
 
     /// Temporarily keep those varibles to derive others
-    enum MfVariableTemporary: String {
-        case ugst
-        case vgst
-
-        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
-            switch (shortName, typeOfLevel, levelStr) {
-            case ("10efg", "heightAboveGround", "10"):
-                return .ugst
-            case ("10nfg", "heightAboveGround", "10"):
-                return .vgst
-            default:
-                return nil
-            }
-        }
-    }
-
-    /// Temporarily keep those varibles to derive others
     enum MfVariablePrecipTemporary: String, GenericVariable {
         case tgrp // graupel
         case tirf // rain
@@ -294,8 +277,8 @@ struct MeteoFranceDownload: AsyncCommand {
                 let gridRes = domain.mfApiGridName.replacingOccurrences(of: ".", with: "")
                 let urlGov = "https://object.data.gouv.fr/meteofrance-pnt/pnt/\(run.iso8601_YYYY_MM_dd_HH_mm):00Z/\(domain.family.rawValue)/\(gridRes)/\(package)/\(domain.family.rawValue)__\(gridRes)__\(package)__\(packageTime)__\(run.iso8601_YYYY_MM_dd_HH_mm):00Z.grib2"
 
-                let inMemory = VariablePerMemberStorage<MfVariableTemporary>()
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
+                let windSpeedCalculator = WindSpeedCalculator<MeteoFranceSurfaceVariable>(trueNorth: nil)
                 
                 try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
 
@@ -314,9 +297,9 @@ struct MeteoFranceDownload: AsyncCommand {
                         fatalError("could not get attributes")
                     }
                     let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
+                    let writer = try await writer.getWriter(time: timestamp)
 
-                    if let temporary = MfVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
-                        logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId)")
+                    if shortName == "10efg" || shortName == "10nfg" {
                         var grib2d = GribArray2D(nx: nx, ny: ny)
                         try grib2d.load(message: message)
                         if domain.isGlobal {
@@ -324,8 +307,12 @@ struct MeteoFranceDownload: AsyncCommand {
                         } else {
                             grib2d.array.flipLatitude()
                         }
-                        await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
-                        try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
+                        if shortName == "10efg" {
+                            try await windSpeedCalculator.ingest(u: grib2d.array, member: 0, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                        }
+                        if shortName == "10nfg" {
+                            try await windSpeedCalculator.ingest(v: grib2d.array, member: 0, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
+                        }
                         return
                     }
 
@@ -349,7 +336,7 @@ struct MeteoFranceDownload: AsyncCommand {
                             return
                         }
                         await inMemoryPrecip.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
-                        try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer.getWriter(time: timestamp))
+                        try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
                         return
                     }
 
@@ -377,7 +364,7 @@ struct MeteoFranceDownload: AsyncCommand {
                     }
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
-                    try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
+                    try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
                 }
             }
             

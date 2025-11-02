@@ -123,44 +123,6 @@ extension VariablePerMemberStorage {
 }
 
 extension VariablePerMemberStorage {
-    /// Calculate wind speed and direction from U/V components for all available members for all timesteps
-    /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    /// Removes processed variables from `self.data`
-    nonisolated func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialMultistepWriter, trueNorth: [Float]? = nil) async throws {
-        // Note: A for loop + remove is not thread safe due to reentrance issues
-        while let (u, v, timestamp, member) = await getTwoRemoving(first: u, second: v) {
-            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-            try await writer.write(time: timestamp, member: member, variable: outSpeedVariable, data: speed)
-
-            if let outDirectionVariable {
-                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
-                if let trueNorth {
-                    direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
-                }
-                try await writer.write(time: timestamp, member: member, variable: outDirectionVariable, data: direction)
-            }
-        }
-    }
-    
-    /// Calculate wind speed and direction from U/V components for all available members for the timestep in writer
-    /// if `trueNorth` is given, correct wind direction due to rotated grid projections. E.g. DMI HARMONIE AROME using LambertCC
-    /// Removes processed variables from `self.data`
-    nonisolated func calculateWindSpeed(u: V, v: V, outSpeedVariable: GenericVariable, outDirectionVariable: GenericVariable?, writer: OmSpatialTimestepWriter, trueNorth: [Float]? = nil) async throws {
-        // Note: A for loop + remove is not thread safe due to reentrance issues
-        while let (u, v, member) = await getTwoRemoving(first: u, second: v, timestamp: writer.time) {
-            let speed = zip(u.data, v.data).map(Meteorology.windspeed)
-            try await writer.write(member: member, variable: outSpeedVariable, data: speed)
-
-            if let outDirectionVariable {
-                var direction = Meteorology.windirectionFast(u: u.data, v: v.data)
-                if let trueNorth {
-                    direction = zip(direction, trueNorth).map({ ($0 - $1 + 360).truncatingRemainder(dividingBy: 360) })
-                }
-                try await writer.write(member: member, variable: outDirectionVariable, data: direction)
-            }
-        }
-    }
-
     /// Generate elevation file
     /// - `elevation`: in metres
     /// - `landMask` 0 = sea, 1 = land. Fractions below 0.5 are considered sea.
