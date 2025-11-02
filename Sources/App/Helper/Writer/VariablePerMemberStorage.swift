@@ -238,17 +238,10 @@ extension VariablePerMemberStorage {
     }
     
     /// Sum up rain, snow and graupel for total precipitation
-    func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
-            guard
-                t.timestamp == writer.time,
-                let tgrp = handles.first(where: { $0.key.variable == tgrp }),
-                let tsnowp = handles.first(where: { $0.key.variable == tsnowp }),
-                let tirf = handles.first(where: { $0.key.variable == tirf }) else {
-                continue
-            }
-            let precip = zip(tgrp.value.data, zip(tsnowp.value.data, tirf.value.data)).map({ $0 + $1.0 + $1.1 })
-            try await writer.write(member: t.member, variable: outVariable, data: precip)
+    nonisolated func calculatePrecip(tgrp: V, tirf: V, tsnowp: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        while let (tgrp, tsnowp, tirf, member) = await getThreeRemoving(first: tgrp, second: tsnowp, third: tirf, timestamp: writer.time) {
+            let precip = zip(tgrp.data, zip(tsnowp.data, tirf.data)).map({ $0 + $1.0 + $1.1 })
+            try await writer.write(member: member, variable: outVariable, data: precip)
         }
     }
     

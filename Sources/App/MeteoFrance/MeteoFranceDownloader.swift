@@ -325,6 +325,7 @@ struct MeteoFranceDownload: AsyncCommand {
                             grib2d.array.flipLatitude()
                         }
                         await inMemory.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                        try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
                         return
                     }
 
@@ -348,6 +349,7 @@ struct MeteoFranceDownload: AsyncCommand {
                             return
                         }
                         await inMemoryPrecip.set(variable: temporary, timestamp: timestamp, member: 0, data: grib2d.array)
+                        try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer.getWriter(time: timestamp))
                         return
                     }
 
@@ -357,7 +359,6 @@ struct MeteoFranceDownload: AsyncCommand {
                     }
 
                     var grib2d = GribArray2D(nx: nx, ny: ny)
-                    // message.dumpAttributes()
                     try grib2d.load(message: message)
                     if domain.isGlobal {
                         grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -377,10 +378,6 @@ struct MeteoFranceDownload: AsyncCommand {
 
                     logger.info("Compressing and writing data to \(timestamp.format_YYYYMMddHH) \(variable)")
                     try await writer.write(time: timestamp, member: 0, variable: variable, data: grib2d.array.data)
-                }
-                for writer in await writer.writer {
-                    try await inMemory.calculateWindSpeed(u: .ugst, v: .vgst, outSpeedVariable: MeteoFranceSurfaceVariable.wind_gusts_10m, outDirectionVariable: nil, writer: writer)
-                    try await inMemoryPrecip.calculatePrecip(tgrp: .tgrp, tirf: .tirf, tsnowp: .tsnowp, outVariable: MeteoFranceSurfaceVariable.precipitation, writer: writer)
                 }
             }
             
