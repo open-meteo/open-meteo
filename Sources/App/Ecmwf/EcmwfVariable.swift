@@ -501,6 +501,30 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return nil
         }
     }
+    
+    static func from(shortName: String, levelhPa: Int) -> Self? {
+        return allCases.first(where: { variable in
+            if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
+                return true
+            }
+            if shortName == "max_i10fg" && variable == .wind_gusts_10m {
+                return true
+            }
+            if ["mx2t6", "max_2t", "mx2t3"].contains(shortName) && variable == .temperature_2m_max {
+                return true
+            }
+            if ["mn2t6", "min_2t", "mn2t3"].contains(shortName) && variable == .temperature_2m_min {
+                return true
+            }
+            if let level = variable.level {
+                if shortName == "z" && variable.gribName == "gh" && levelhPa == level {
+                    return true
+                }
+                return shortName == variable.gribName && levelhPa == level
+            }
+            return shortName == variable.gribName
+        })
+    }
 
     var gribName: String? {
         switch self {

@@ -195,16 +195,22 @@ enum Meteorology {
     public static func specificToRelativeHumidity(specificHumidity: [Float], temperature: [Float], pressure: [Float]) -> [Float] {
         return zip(temperature, zip(specificHumidity, pressure)).map {
             let (temp, (qair, press)) = $0
-
-            let β = Float(17.625)
-            let λ = Float(243.04)
-
-            /// saturation vapor pressure at air temperature Thr. (kPa)
-            let es = 6.112 * exp((β * temp) / (temp + λ))
-            let e = qair / 1000 * press * 100 / (0.378 * qair / 1000 + 0.622)
-            let rh = e / es
-            return max(min(rh, 100), 0)
+            return Self.specificToRelativeHumidity(specificHumidity: qair, temperature: temp, pressure: press)
         }
+    }
+    
+    /// Calculate relative humidity. All variables should be on the same level
+    /// https://cran.r-project.org/web/packages/humidity/vignettes/humidity-measures.html
+    /// humudity in g/kg, temperature in celsius, pressure in hPa
+    @inlinable public static func specificToRelativeHumidity(specificHumidity: Float, temperature: Float, pressure: Float) -> Float {
+        let β = Float(17.625)
+        let λ = Float(243.04)
+
+        /// saturation vapor pressure at air temperature Thr. (kPa)
+        let es = 6.112 * exp((β * temperature) / (temperature + λ))
+        let e = specificHumidity / 1000 * pressure * 100 / (0.378 * specificHumidity / 1000 + 0.622)
+        let rh = e / es
+        return max(min(rh, 100), 0)
     }
 
     /// Calculate relative humidity and correct sea level pressure to surface pressure.
