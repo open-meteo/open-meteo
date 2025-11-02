@@ -248,6 +248,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
             }
             let inMemory = VariablePerMemberStorage<EcmwfVariable>()
             let inMemory2 = VariablePerMemberStorage<ShortNameLevel>()
+            
+            let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
 
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
@@ -374,13 +376,13 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
-                    // calculate RH 2m from dewpoint. Only store RH on disk.
-                    if variable == .temperature_2m || variable == .dew_point_2m {
-                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                        try await inMemory.calculateRelativeHumidityRemoveBoth(temperature: .temperature_2m, dewpoint: .dew_point_2m, outVariable: EcmwfVariable.relative_humidity_2m, writer: writer)
-                        if variable == .dew_point_2m {
-                            return // do not store dewpoint on disk
-                        }
+                    if variable == .temperature_2m {
+                        try await rhCalculator.ingest(temperature: grib2d.array, member: member, writer: writer)
+                    }
+                    
+                    if variable == .dew_point_2m {
+                        try await rhCalculator.ingest(dewpoint: grib2d.array, member: member, writer: writer)
+                        return // do not store dewpoint on disk
                     }
 
                     // Keep precip in memory for probability

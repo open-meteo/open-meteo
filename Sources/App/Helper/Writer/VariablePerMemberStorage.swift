@@ -279,26 +279,6 @@ extension VariablePerMemberStorage {
         }
     }
     
-    /// Calculate relative humidity. Removes dew-point from storage afterwards
-    nonisolated func calculateRelativeHumidity(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        // Note: A for loop + remove is not thread safe due to reentrance issues
-        while
-            let t2m = await data.first(where: {$0.key.variable == temperature && $0.key.timestamp == writer.time}),
-            let dewpoint = await remove(variable: dewpoint, timestamp: writer.time, member: t2m.key.member)
-        {
-            let rh = zip(t2m.value.data, dewpoint.data).map(Meteorology.relativeHumidity)
-            try await writer.write(member: t2m.key.member, variable: outVariable, data: rh)
-        }
-    }
-    
-    /// Calculate relative humidity. Removes dew-point from storage afterwards
-    nonisolated func calculateRelativeHumidityRemoveBoth(temperature: V, dewpoint: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
-        while let (t2m, dewpoint, member) = await getTwoRemoving(first: temperature, second: dewpoint, timestamp: writer.time) {
-            let rh = zip(t2m.data, dewpoint.data).map(Meteorology.relativeHumidity)
-            try await writer.write(member: member, variable: outVariable, data: rh)
-        }
-    }
-    
     /// Calculate snow depth from snow depth water equivalent and snow density. Removes both after use.
     /// Expects water equivalent in mm
     /// Density in kg/m3
