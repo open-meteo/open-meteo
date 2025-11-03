@@ -194,7 +194,7 @@ enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
         case .temperature_2m_max:
             return .maxTwo(intervalMax: .temperature_2m_max, hourly: .temperature_2m)
         case .temperature_2m_min:
-            return .maxTwo(intervalMax: .temperature_2m_min, hourly: .temperature_2m)
+            return .minTwo(intervalMin: .temperature_2m_min, hourly: .temperature_2m)
         case .temperature_2m_mean:
             return .mean(.temperature_2m)
         case .sunshine_duration:

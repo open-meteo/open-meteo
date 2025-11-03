@@ -304,9 +304,9 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 }
             }
         }
-        if let minutely15Variables {
+        if let dailyVariables {
             for member in members {
-                try await reader.prefetchData(variables: minutely15Variables, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
             }
         }
     }
@@ -511,6 +511,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case ecmwf_ifs025
     case ecmwf_aifs025
     case ecmwf_aifs025_single
+    
+    case ecmwf_seasonal_seamless
+    case ecmwf_seas5
+    case ecmwf_ec46
 
     case metno_nordic
 
@@ -620,6 +624,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return self
         }
     }
+    
+    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<ForecastVariable>], daily: [any GenericReaderOptionalProtocol<ForecastVariableDaily>], weekly: [any GenericReaderOptionalProtocol<SeasonalVariableWeekly>], monthly: [any GenericReaderOptionalProtocol<SeasonalVariableMonthly>]) {
+        
+        fatalError()
+        
+    }
+    
     
     /// Return the required readers for this domain configuration
     /// Note: last reader has highes resolution data
@@ -948,6 +959,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await MeteoSwissReader(domain: .icon_ch1_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteoswiss_icon_ch2_ensemble:
             return try await MeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ecmwf_seasonal_seamless:
+            fatalError()
+        case .ecmwf_seas5:
+            fatalError()
+        case .ecmwf_ec46:
+            fatalError()
         }
     }
 
@@ -1141,6 +1158,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .meteoswiss_icon_ch2_ensemble:
             return nil
+        case .ecmwf_seasonal_seamless:
+            fatalError()
+        case .ecmwf_seas5:
+            fatalError()
+        case .ecmwf_ec46:
+            fatalError()
         }
     }
 
@@ -1333,6 +1356,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .meteoswiss_icon_ch2_ensemble:
             return nil
+        case .ecmwf_seasonal_seamless:
+            fatalError()
+        case .ecmwf_seas5:
+            fatalError()
+        case .ecmwf_ec46:
+            fatalError()
         }
     }
 
@@ -1625,6 +1654,93 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case direct_radiation_spread
     case boundary_layer_height_spread
     case sea_surface_temperature
+    
+    /*case wind_u_component_10m
+    case wind_v_component_10m
+    case wind_u_component_100m
+    case wind_v_component_100m
+    case wind_u_component_200m
+    case wind_v_component_200m
+    case wind_u_component_70m
+    case wind_v_component_70m
+    case wind_u_component_170m
+    case wind_v_component_170m*/
+    
+    case pm10
+    case pm2_5
+    case dust
+    case aerosol_optical_depth
+    case carbon_monoxide
+    case carbon_dioxide
+    case nitrogen_dioxide
+    case ammonia
+    case ozone
+    case sulphur_dioxide
+    case methane
+    case alder_pollen
+    case birch_pollen
+    case grass_pollen
+    case mugwort_pollen
+    case olive_pollen
+    case ragweed_pollen
+
+    case formaldehyde
+    case glyoxal
+    case non_methane_volatile_organic_compounds
+    case pm10_wildfires
+    case peroxyacyl_nitrates
+    case secondary_inorganic_aerosol
+    case residential_elementary_carbon
+    case total_elementary_carbon
+    case pm2_5_total_organic_matter
+    case sea_salt_aerosol
+    case nitrogen_monoxide
+    
+    case european_aqi
+    case european_aqi_pm2_5
+    case european_aqi_pm10
+    case european_aqi_no2
+    case european_aqi_o3
+    case european_aqi_so2
+    case european_aqi_nitrogen_dioxide
+    case european_aqi_ozone
+    case european_aqi_sulphur_dioxide
+
+    case us_aqi
+    case us_aqi_pm2_5
+    case us_aqi_pm10
+    case us_aqi_no2
+    case us_aqi_o3
+    case us_aqi_so2
+    case us_aqi_co
+    case us_aqi_nitrogen_dioxide
+    case us_aqi_ozone
+    case us_aqi_sulphur_dioxide
+    case us_aqi_carbon_monoxide
+    
+    case wave_direction
+    case wave_height
+    case wave_period
+    case wave_peak_period
+    case wind_wave_height
+    case wind_wave_period
+    case wind_wave_peak_period
+    case wind_wave_direction
+    case swell_wave_height
+    case swell_wave_period
+    case swell_wave_peak_period
+    case swell_wave_direction
+    case secondary_swell_wave_height
+    case secondary_swell_wave_period
+    case secondary_swell_wave_direction
+    case tertiary_swell_wave_height
+    case tertiary_swell_wave_period
+    case tertiary_swell_wave_direction
+    case ocean_current_velocity
+    case ocean_current_direction
+    case sea_level_height_msl
+    case invert_barometer_height
+
 
     /// Some variables are kept for backwards compatibility
     var remapped: Self {
@@ -1799,13 +1915,52 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
     case wet_bulb_temperature_2m_max
     case wet_bulb_temperature_2m_mean
     case wet_bulb_temperature_2m_min
+    
+    
+    
+    case wind_direction_100m_dominant
+    case wind_direction_200m_dominant
+    case wind_speed_100m_max
+    case wind_speed_100m_mean
+    case wind_speed_100m_min
+    case wind_speed_200m_max
+    case wind_speed_200m_mean
+    case wind_speed_200m_min
+    case sea_surface_temperature_min
+    case sea_surface_temperature_max
+    case sea_surface_temperature_mean
+    case soil_temperature_100_to_255cm_mean
+    case soil_moisture_100_to_255cm_mean
+    
+    case river_discharge
+    case river_discharge_mean
+    case river_discharge_min
+    case river_discharge_max
+    case river_discharge_median
+    case river_discharge_p25
+    case river_discharge_p75
+    
+    case wave_height_max
+    case wind_wave_height_max
+    case swell_wave_height_max
+
+    case wave_direction_dominant
+    case wind_wave_direction_dominant
+    case swell_wave_direction_dominant
+
+    case wave_period_max
+    case wind_wave_period_max
+    case wind_wave_peak_period_max
+    case swell_wave_period_max
+    case swell_wave_peak_period_max
+    
 
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
         case .temperature_2m_max:
-            return .max(.surface(.init(.temperature_2m, 0)))
+            return .maxTwo(intervalMax: .surface(.init(.temperature_2m_max, 0)), hourly: .surface(.init(.temperature_2m, 0)))
         case .temperature_2m_min:
-            return .min(.surface(.init(.temperature_2m, 0)))
+            return .minTwo(intervalMin: .surface(.init(.temperature_2m_min, 0)), hourly: .surface(.init(.temperature_2m, 0)))
         case .temperature_2m_mean:
             return .mean(.surface(.init(.temperature_2m, 0)))
         case .apparent_temperature_max:
@@ -1956,6 +2111,68 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableS
             return .mean(.surface(.init(.snow_depth, 0)))
         case .snow_depth_max:
             return .max(.surface(.init(.snow_depth, 0)))
+        case .wind_direction_100m_dominant:
+            return .dominantDirection(velocity: .surface(.init(.wind_speed_100m, 0)), direction: .surface(.init(.wind_direction_100m, 0)))
+        case .wind_direction_200m_dominant:
+            return .dominantDirection(velocity: .surface(.init(.wind_speed_200m, 0)), direction: .surface(.init(.wind_direction_200m, 0)))
+        case .wind_speed_100m_max:
+            return .max(.surface(.init(.wind_speed_100m, 0)))
+        case .wind_speed_100m_mean:
+            return .mean(.surface(.init(.wind_speed_100m, 0)))
+        case .wind_speed_100m_min:
+            return .min(.surface(.init(.wind_speed_100m, 0)))
+        case .wind_speed_200m_max:
+            return .max(.surface(.init(.wind_speed_200m, 0)))
+        case .wind_speed_200m_mean:
+            return .mean(.surface(.init(.wind_speed_200m, 0)))
+        case .wind_speed_200m_min:
+            return .min(.surface(.init(.wind_speed_200m, 0)))
+        case .sea_surface_temperature_min:
+            return .min(.surface(.init(.sea_surface_temperature, 0)))
+        case .sea_surface_temperature_max:
+            return .max(.surface(.init(.sea_surface_temperature, 0)))
+        case .sea_surface_temperature_mean:
+            return .mean(.surface(.init(.sea_surface_temperature, 0)))
+        case .soil_temperature_100_to_255cm_mean:
+            return .mean(.surface(.init(.soil_temperature_100_to_255cm, 0)))
+        case .soil_moisture_100_to_255cm_mean:
+            return .mean(.surface(.init(.soil_moisture_100_to_255cm, 0)))
+        case .river_discharge:
+            return .none
+        case .river_discharge_mean:
+            return .none
+        case .river_discharge_min:
+            return .none
+        case .river_discharge_max:
+            return .none
+        case .river_discharge_median:
+            return .none
+        case .river_discharge_p25:
+            return .none
+        case .river_discharge_p75:
+            return .none
+        case .wave_height_max:
+            return .max(.surface(.init(.wave_height, 0)))
+        case .wind_wave_height_max:
+            return .max(.surface(.init(.wind_wave_height, 0)))
+        case .swell_wave_height_max:
+            return .max(.surface(.init(.swell_wave_height, 0)))
+        case .wave_direction_dominant:
+            return .dominantDirection(velocity: .surface(.init(.wave_height, 0)), direction: .surface(.init(.wave_direction, 0)))
+        case .wind_wave_direction_dominant:
+            return .dominantDirection(velocity: .surface(.init(.wind_wave_height, 0)), direction: .surface(.init(.wind_wave_direction, 0)))
+        case .swell_wave_direction_dominant:
+            return .dominantDirection(velocity: .surface(.init(.swell_wave_height, 0)), direction: .surface(.init(.swell_wave_direction, 0)))
+        case .wave_period_max:
+            return .max(.surface(.init(.wave_period, 0)))
+        case .wind_wave_period_max:
+            return .max(.surface(.init(.wind_wave_period, 0)))
+        case .wind_wave_peak_period_max:
+            return .max(.surface(.init(.wind_wave_peak_period, 0)))
+        case .swell_wave_period_max:
+            return .max(.surface(.init(.swell_wave_period, 0)))
+        case .swell_wave_peak_period_max:
+            return .max(.surface(.init(.swell_wave_peak_period, 0)))
         }
     }
 }
