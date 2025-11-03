@@ -9,7 +9,10 @@ protocol MultiDomainMixerDomain: RawRepresentableString, GenericDomainProvider {
 }
 
 /// Combine multiple independent weather models, that may not have given forecast variable
-struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainMixerDomain>: GenericReaderProvider {
+struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainMixerDomain>: GenericReaderProvider, GenericReaderOptionalProtocol {
+
+    
+    typealias VariableOpt = Variable
     let reader: [any GenericReaderProtocol]
 
     let domain: Domain
@@ -34,6 +37,11 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         self.reader = reader
         self.domain = domain
     }
+    
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.first?.getStatic(type: type)
+    }
+    
 
     public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
         let reader = try await domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -52,21 +60,22 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         self.reader = [reader]
     }
 
-    func prefetchData(variable: RawRepresentableString, time: TimerangeDtAndSettings) async throws {
+    func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
+        for variable in variables {
+            let _ = try await prefetchData(variable: variable, time: time)
+        }
+    }
+    
+    func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
         for reader in reader {
             if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
                 break
             }
         }
+        return true
     }
 
-    func prefetchData(variables: [RawRepresentableString], time: TimerangeDtAndSettings) async throws {
-        for variable in variables {
-            try await prefetchData(variable: variable, time: time)
-        }
-    }
-
-    func get(variable: RawRepresentableString, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+    func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         // Last reader return highest resolution data. therefore reverse iteration
         // Integrate now lower resolution models
         var data: [Float]?
@@ -127,7 +136,7 @@ protocol MultiDomainMixerDomainSameType<VariableHourly, VariableDaily, VariableW
 
 
 /// Combine multiple independent weather models, that may not have given forecast variable
-struct GenericReaderMultiSameType<Variable: GenericVariableMixable> {
+struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
     let reader: [any GenericReaderOptionalProtocol<Variable>]
 
     var modelLat: Float {
@@ -144,6 +153,10 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable> {
     }
     var modelElevation: ElevationOrSea {
         reader.last!.modelElevation
+    }
+    
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.last?.getStatic(type: type)
     }
 
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {

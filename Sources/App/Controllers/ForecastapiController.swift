@@ -208,7 +208,68 @@ struct WeatherApiController {
             let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember })
             let options = try params.readerOptions(for: req)
             
-            let prepared = try await GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: pastDaysMax, allowedRange: allowedRange)
+            
+            let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
+
+            let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation]
+            switch prepared {
+            case .coordinates(let coordinates):
+                locations = try await coordinates.asyncMap { prepared in
+                    let coordinates = prepared.coordinate
+                    let timezone = prepared.timezone
+                    let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                    let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
+                        let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
+                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime)
+                    }
+                    guard !readers.isEmpty else {
+                        throw ForecastApiError.noDataAvailableForThisLocation
+                    }
+                    let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                    return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
+                }
+            case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
+                fatalError()
+                /*return try await domains.asyncFlatMap({ domain in
+                    guard let grid = domain.genericDomain?.grid else {
+                        throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
+                    }
+                    guard let gridpoionts = grid.findBox(boundingBox: bbox) else {
+                        throw ForecastApiError.generic(message: "Bounding box calls not supported for grid of domain \(domain)")
+                    }
+
+                    if dates.count == 0 {
+                        let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                        var locationId = -1
+                        return await gridpoionts.asyncMap( { gridpoint in
+                            locationId += 1
+                            return (locationId, timezone, time, [(domain, { () -> Self? in
+                                guard let reader = try await Self(domain: domain, gridpoint: gridpoint, options: options) else {
+                                    return nil
+                                }
+                                return reader
+                            })])
+                        })
+                    }
+
+                    return try await dates.asyncFlatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(DomainProvider, () async throws -> Self?)])] in
+                        let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                        var locationId = -1
+                        return await gridpoionts.asyncMap( { gridpoint in
+                            locationId += 1
+                            return (locationId, timezone, time, [(domain, { () -> Self? in
+                                guard let reader = try await Self(domain: domain, gridpoint: gridpoint, options: options) else {
+                                    return nil
+                                }
+                                return reader
+                            })])
+                        })
+                    })
+                })*/
+            }
+            
+            
+            /*let prepared = try await GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: pastDaysMax, allowedRange: allowedRange)
 
             
             
@@ -228,7 +289,7 @@ struct WeatherApiController {
                     throw ForecastApiError.noDataAvailableForThisLocation
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
-            }
+            }*/
             
             return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
@@ -240,29 +301,35 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     
     typealias DailyVariable = ForecastVariableDaily
     
-    typealias MonthlyVariable = FlatBuffersVariableNone
-    typealias WeeklyVariable = FlatBuffersVariableNone
+    typealias MonthlyVariable = SeasonalVariableMonthly
+    typealias WeeklyVariable = SeasonalVariableWeekly
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
-        reader.domain.flatBufferModel
+        domain.flatBufferModel
     }
     
     var modelName: String {
-        reader.domain.rawValue
+        domain.rawValue
     }
     
-    let reader: GenericReaderMulti<ForecastVariable, MultiDomains>
+    //let reader: GenericReaderMulti<ForecastVariable, MultiDomains>
+    let domain: MultiDomains
+    
+    let readerHourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?
+    let readerDaily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?
+    let readerWeekly: (any GenericReaderOptionalProtocol<SeasonalVariableWeekly>)?
+    let readerMonthly: (any GenericReaderOptionalProtocol<SeasonalVariableMonthly>)?
     
     var latitude: Float {
-        reader.modelLat
+        readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
     }
     
     var longitude: Float {
-        reader.modelLon
+        readerHourly?.modelLon ?? readerDaily?.modelLon ?? .nan
     }
     
     var elevation: Float? {
-        reader.targetElevation
+        readerHourly?.targetElevation ?? readerDaily?.targetElevation
     }
     
     let params: ApiQueryParameter
@@ -274,52 +341,69 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let currentTime: Timestamp
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
-        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
-        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-        //let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        let members = 0..<reader.domain.countEnsembleMember
+        let members = 0..<domain.countEnsembleMember
         
-        if let currentVariables {
+        if let currentVariables, let readerHourly {
+            let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
             for variable in currentVariables {
                 let (v, previousDay) = variable.variableAndPreviousDay
-                for member in members {
-                    try await reader.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
-                }
+                let _ = try await readerHourly.prefetchData(variable: v, time: currentTimeRange.toSettings(previousDay: previousDay, run: run))
             }
         }
-        if let minutely15Variables {
+        if let minutely15Variables, let readerHourly {
             for variable in minutely15Variables {
                 let (v, previousDay) = variable.variableAndPreviousDay
                 for member in members {
-                    try await reader.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
+                    let _ = try await readerHourly.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
                 }
             }
         }
-        if let hourlyVariables {
+        if let hourlyVariables, let readerHourly {
+            let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+            let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
                 let (v, previousDay) = variable.variableAndPreviousDay
                 for member in members {
-                    try await reader.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
+                    let _ = try await readerHourly.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
                 }
             }
         }
-        if let dailyVariables {
-            for member in members {
-                try await reader.prefetchData(variables: dailyVariables, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+        if let dailyVariables, let readerDaily {
+            for variable in dailyVariables {
+                for member in members {
+                    let _ = try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                }
+            }
+        }
+        if let weeklyVariables, let readerWeekly {
+            let timeWeekly = TimerangeDt(
+                start: time.dailyRead.range.lowerBound.add(-4*24*3600).floor(toNearest: 7*24*3600).add(4*24*3600),
+                to: time.dailyRead.range.upperBound.add(-4*24*3600).ceil(toNearest: 7*24*3600).add(4*24*3600),
+                dtSeconds: 7*24*3600
+            )
+            for variable in weeklyVariables {
+                let _ = try await readerWeekly.prefetchData(variable: variable, time: timeWeekly.toSettings())
+            }
+        }
+        if let monthlyVariables, let readerMonthly {
+            let yearMonths = time.dailyRead.toYearMonth()
+            let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+            let timeMonthlyRead = timeMonthlyDisplay
+            for variable in monthlyVariables {
+                let _ = try await readerMonthly.prefetchData(variable: variable, time: timeMonthlyRead.toSettings())
             }
         }
     }
 
     func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
-        guard let variables else {
+        guard let variables, let readerHourly else {
             return nil
         }
         let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
         return .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let timeRead = currentTimeRange.toSettings(previousDay: previousDay, run: run)
-            guard let d = try await reader.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
+            guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
                 return .init(variable: variable, unit: .undefined, value: .nan)
             }
             return .init(variable: variable, unit: d.unit, value: d.data.first ?? .nan)
@@ -327,20 +411,20 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        guard let variables else {
+        guard let variables, let readerHourly else {
             return nil
         }
-        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
+        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
         let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        let members = 0..<reader.domain.countEnsembleMember
+        let members = 0..<domain.countEnsembleMember
         
         return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = timeHourlyRead.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)
-                guard let d = try await reader.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
+                guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
                     return nil
                 }
                 unit = d.unit
@@ -348,23 +432,23 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
-                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: reader.domain.countEnsembleMember))
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: timeHourlyRead.count)), count: domain.countEnsembleMember))
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
     }
     
     func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
-        guard let variables else {
+        guard let variables, let readerDaily else {
             return nil
         }
-        let members = 0..<reader.domain.countEnsembleMember
+        let members = 0..<domain.countEnsembleMember
         
         var riseSet: (rise: [Timestamp], set: [Timestamp])?
         return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncMap { variable -> ApiColumn<ForecastVariableDaily> in
             if variable == .sunrise || variable == .sunset {
                 // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
-                let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: reader.modelLat, lon: reader.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
+                let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
                 riseSet = times
                 if variable == .sunset {
                     return ApiColumn(variable: .sunset, unit: params.timeformatOrDefault.unit, variables: [.timestamp(times.set)])
@@ -373,13 +457,13 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 }
             }
             if variable == .daylight_duration {
-                let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: reader.modelLat)
+                let duration = Zensun.calculateDaylightDuration(localMidnight: time.dailyDisplay.range, lat: readerDaily.modelLat)
                 return ApiColumn(variable: .daylight_duration, unit: .seconds, variables: [.float(duration)])
             }
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)
-                guard let d = try await reader.getDaily(variable: variable, params: params, time: timeRead)?.convertAndRound(params: params) else {
+                guard let d = try await readerDaily.get(variable: variable, time: timeRead)?.convertAndRound(params: params) else {
                     return nil
                 }
                 unit = d.unit
@@ -387,7 +471,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
-                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: reader.domain.countEnsembleMember))
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.dailyRead.count)), count: domain.countEnsembleMember))
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
@@ -398,17 +482,17 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     }
     
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        guard let variables else {
+        guard let variables, let readerHourly else {
             return nil
         }
-        let members = 0..<reader.domain.countEnsembleMember
+        let members = 0..<domain.countEnsembleMember
         
         return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)
-                guard let d = try await reader.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
+                guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
                     return nil
                 }
                 unit = d.unit
@@ -416,17 +500,45 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 return ApiArray.float(d.data)
             }
             guard allMembers.count > 0 else {
-                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: reader.domain.countEnsembleMember))
+                return ApiColumn(variable: variable, unit: .undefined, variables: .init(repeating: ApiArray.float([Float](repeating: .nan, count: time.minutely15.count)), count: domain.countEnsembleMember))
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
     }
     
     func weekly(variables: [WeeklyVariable]?) async throws -> ApiSection<WeeklyVariable>? {
-        return nil
+        guard let variables, let readerWeekly else {
+            return nil
+        }
+        // Align data start to Monday of each week
+        let timeWeekly = TimerangeDt(
+            start: time.dailyRead.range.lowerBound.add(-4*24*3600).floor(toNearest: 7*24*3600).add(4*24*3600),
+            to: time.dailyRead.range.upperBound.add(-4*24*3600).ceil(toNearest: 7*24*3600).add(4*24*3600),
+            dtSeconds: 7*24*3600
+        )
+        return ApiSection<WeeklyVariable>(name: "weekly", time: timeWeekly, columns: try await variables.asyncCompactMap { variable in
+            guard let d = try await readerWeekly.get(variable: variable, time: timeWeekly.toSettings())?.convertAndRound(params: params) else {
+                return nil
+            }
+            assert(timeWeekly.count == d.data.count)
+            return ApiColumn<WeeklyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
+        })
     }
+    
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
-        return nil
+        guard let variables, let readerMonthly else {
+            return nil
+        }
+        let yearMonths = time.dailyRead.toYearMonth()
+        let timeMonthlyDisplay = TimerangeDt(start: yearMonths.lowerBound.timestamp, to: yearMonths.upperBound.timestamp, dtSeconds: .dtSecondsMonthly)
+        let timeMonthlyRead = timeMonthlyDisplay
+        return ApiSection<MonthlyVariable>(name: "monthly", time: timeMonthlyDisplay, columns: try await variables.asyncCompactMap { variable in
+            guard let d = try await readerMonthly.get(variable: variable, time: timeMonthlyRead.toSettings())?.convertAndRound(params: params) else {
+                return nil
+            }
+            assert(timeMonthlyDisplay.count == d.data.count)
+            return ApiColumn<MonthlyVariable>(variable: variable, unit: d.unit, variables: [ApiArray.float(d.data)])
+        })
     }
 }
 
@@ -625,9 +737,45 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         }
     }
     
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<ForecastVariable>], daily: [any GenericReaderOptionalProtocol<ForecastVariableDaily>], weekly: [any GenericReaderOptionalProtocol<SeasonalVariableWeekly>], monthly: [any GenericReaderOptionalProtocol<SeasonalVariableMonthly>]) {
+    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<SeasonalVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<SeasonalVariableMonthly>)?) {
         
-        fatalError()
+        switch self {
+        case .ecmwf_seasonal_seamless:
+            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: .seas5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas6hourly = try await VariableHourlyDeriver(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>(domain: .seas5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly)
+            let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            let ec46hourly = try await VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let ec46hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, ForecastVariableDaily>(reader: ec46hourly)
+            
+            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [seas6hourly, ec46hourly])
+            let daily = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [seas6hourlyToDaily, seas5daily, ec46hourlyToDaily])
+            return (hourly, daily, ec46weekly, seas6monthly)
+        case .ecmwf_seas5:
+            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: .seas5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas6hourly = try await VariableHourlyDeriver(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>(domain: .seas5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly)
+            let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            let daily = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [seas6hourlyToDaily, seas5daily])
+            return (seas6hourly, daily, nil, seas6monthly)
+        case .ecmwf_ec46:
+            let ec46hourly = try await VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let ec46hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, ForecastVariableDaily>(reader: ec46hourly)
+            
+            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            return (ec46hourly, ec46hourlyToDaily, ec46weekly, nil)
+            
+        default:
+            let readers: [any GenericReaderProtocol] = try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let hourlyReader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: self, reader: readers)
+            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable, MultiDomains>, ForecastVariableDaily>(reader: hourlyReader)
+            return (hourlyReader, daily, nil, nil)
+        }
         
     }
     
@@ -960,11 +1108,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .meteoswiss_icon_ch2_ensemble:
             return try await MeteoSwissReader(domain: .icon_ch2_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_seasonal_seamless:
-            fatalError()
+            return []
         case .ecmwf_seas5:
-            fatalError()
+            return []
         case .ecmwf_ec46:
-            fatalError()
+            return []
         }
     }
 
@@ -1159,11 +1307,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .meteoswiss_icon_ch2_ensemble:
             return nil
         case .ecmwf_seasonal_seamless:
-            fatalError()
+            return nil
         case .ecmwf_seas5:
-            fatalError()
+            return nil
         case .ecmwf_ec46:
-            fatalError()
+            return nil
         }
     }
 
@@ -1357,11 +1505,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .meteoswiss_icon_ch2_ensemble:
             return nil
         case .ecmwf_seasonal_seamless:
-            fatalError()
+            return nil
         case .ecmwf_seas5:
-            fatalError()
+            return nil
         case .ecmwf_ec46:
-            fatalError()
+            return nil
         }
     }
 
@@ -1397,6 +1545,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return MeteoSwissDomain.icon_ch1_ensemble.countEnsembleMember
         case .meteoswiss_icon_ch2_ensemble:
             return MeteoSwissDomain.icon_ch2_ensemble.countEnsembleMember
+        case .ecmwf_seasonal_seamless, .ecmwf_seas5, .ecmwf_ec46:
+            return EcmwfSeasDomain.seas5.countEnsembleMember
         default:
             return 1
         }
@@ -1411,768 +1561,5 @@ enum ModelError: AbortError {
     case domainInitFailed(domain: String)
 }
 
-/// Define all available surface weather variables
-enum ForecastSurfaceVariable: String, GenericVariableMixable {
-    /// Maps to `temperature_2m`. Used for compatibility with `current_weather` block
-    case temperature
-    /// Maps to `windspeed_10m`. Used for compatibility with `current_weather` block
-    case windspeed
-    /// Maps to `winddirection_10m`. Used for compatibility with `current_weather` block
-    case winddirection
-
-    case wet_bulb_temperature_2m
-    case apparent_temperature
-    case cape
-    case cloudcover
-    case cloudcover_high
-    case cloudcover_low
-    case cloudcover_mid
-    case cloud_cover
-    case cloud_cover_high
-    case cloud_cover_low
-    case cloud_cover_mid
-    case cloud_cover_2m
-    case cloud_base
-    case cloud_top
-    case convective_cloud_base
-    case convective_cloud_top
-    case dewpoint_2m
-    case dew_point_2m
-    case diffuse_radiation
-    case diffuse_radiation_instant
-    case direct_normal_irradiance
-    case direct_normal_irradiance_instant
-    case direct_radiation
-    case direct_radiation_instant
-    case et0_fao_evapotranspiration
-    case evapotranspiration
-    case freezinglevel_height
-    case freezing_level_height
-    case growing_degree_days_base_0_limit_50
-    case is_day
-    case latent_heatflux
-    case latent_heat_flux
-    case lifted_index
-    case convective_inhibition
-    case leaf_wetness_probability
-    case lightning_potential
-    case mass_density_8m
-    case precipitation
-    case precipitation_probability
-    case precipitation_type
-    case pressure_msl
-    case rain
-    case relativehumidity_2m
-    case relative_humidity_2m
-    case runoff
-    case sensible_heatflux
-    case sensible_heat_flux
-    case shortwave_radiation
-    case shortwave_radiation_instant
-    case showers
-    case skin_temperature
-    case snow_density
-    case snow_depth
-    case snow_depth_water_equivalent
-    case snow_height
-    case hail
-    case snowfall
-    case snowfall_water_equivalent
-    case sunshine_duration
-    case soil_moisture_0_1cm
-    case soil_moisture_0_to_1cm
-    case soil_moisture_0_to_100cm
-    case soil_moisture_0_to_10cm
-    case soil_moisture_0_to_7cm
-    case soil_moisture_100_to_200cm
-    case soil_moisture_100_to_255cm
-    case soil_moisture_10_to_40cm
-    case soil_moisture_1_3cm
-    case soil_moisture_1_to_3cm
-    case soil_moisture_27_81cm
-    case soil_moisture_27_to_81cm
-    case soil_moisture_28_to_100cm
-    case soil_moisture_3_9cm
-    case soil_moisture_3_to_9cm
-    case soil_moisture_40_to_100cm
-    case soil_moisture_7_to_28cm
-    case soil_moisture_9_27cm
-    case soil_moisture_9_to_27cm
-    case soil_moisture_81_to_243cm
-    case soil_moisture_243_to_729cm
-    case soil_moisture_729_to_2187cm
-    case soil_moisture_index_0_to_100cm
-    case soil_moisture_index_0_to_7cm
-    case soil_moisture_index_100_to_255cm
-    case soil_moisture_index_28_to_100cm
-    case soil_moisture_index_7_to_28cm
-    case soil_temperature_0_to_100cm
-    case soil_temperature_0_to_10cm
-    case soil_temperature_0_to_7cm
-    case soil_temperature_0cm
-    case soil_temperature_100_to_200cm
-    case soil_temperature_100_to_255cm
-    case soil_temperature_10_to_40cm
-    case soil_temperature_18cm
-    case soil_temperature_28_to_100cm
-    case soil_temperature_40_to_100cm
-    case soil_temperature_54cm
-    case soil_temperature_6cm
-    case soil_temperature_7_to_28cm
-    case soil_temperature_162cm
-    case soil_temperature_486cm
-    case soil_temperature_1458cm
-    case surface_air_pressure
-    case snowfall_height
-    case surface_pressure
-    case surface_temperature
-    case temperature_100m
-    case temperature_120m
-    case temperature_150m
-    case temperature_180m
-    case temperature_2m
-    case temperature_20m
-    case temperature_200m
-    case temperature_50m
-    case temperature_40m
-    case temperature_80m
-    case temperature_2m_max
-    case temperature_2m_min
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
-    case total_column_integrated_water_vapour
-    case updraft
-    case uv_index
-    case uv_index_clear_sky
-    case vapor_pressure_deficit
-    case vapour_pressure_deficit
-    case visibility
-    case weathercode
-    case weather_code
-    case winddirection_100m
-    case winddirection_10m
-    case winddirection_120m
-    case winddirection_150m
-    case winddirection_180m
-    case winddirection_200m
-    case winddirection_20m
-    case winddirection_40m
-    case winddirection_50m
-    case winddirection_80m
-    case windgusts_10m
-    case windspeed_100m
-    case windspeed_10m
-    case windspeed_120m
-    case windspeed_150m
-    case windspeed_180m
-    case windspeed_200m
-    case windspeed_20m
-    case windspeed_40m
-    case windspeed_50m
-    case windspeed_80m
-    case wind_direction_250m
-    case wind_direction_300m
-    case wind_direction_350m
-    case wind_direction_450m
-    case wind_direction_100m
-    case wind_direction_10m
-    case wind_direction_120m
-    case wind_direction_140m
-    case wind_direction_150m
-    case wind_direction_160m
-    case wind_direction_180m
-    case wind_direction_200m
-    case wind_direction_20m
-    case wind_direction_40m
-    case wind_direction_30m
-    case wind_direction_50m
-    case wind_direction_80m
-    case wind_direction_70m
-    case wind_gusts_10m
-    case wind_speed_250m
-    case wind_speed_300m
-    case wind_speed_350m
-    case wind_speed_450m
-    case wind_speed_100m
-    case wind_speed_10m
-    case wind_speed_120m
-    case wind_speed_140m
-    case wind_speed_150m
-    case wind_speed_160m
-    case wind_speed_180m
-    case wind_speed_200m
-    case wind_speed_20m
-    case wind_speed_40m
-    case wind_speed_30m
-    case wind_speed_50m
-    case wind_speed_70m
-    case wind_speed_80m
-    case soil_temperature_10_to_35cm
-    case soil_temperature_35_to_100cm
-    case soil_temperature_100_to_300cm
-    case soil_moisture_10_to_35cm
-    case soil_moisture_35_to_100cm
-    case soil_moisture_100_to_300cm
-    case shortwave_radiation_clear_sky
-    case global_tilted_irradiance
-    case global_tilted_irradiance_instant
-    case boundary_layer_height
-    case thunderstorm_probability
-    case rain_probability
-    case freezing_rain_probability
-    case ice_pellets_probability
-    case snowfall_probability
-    case albedo
-    case k_index
-    case roughness_length
-    case potential_evapotranspiration
-
-    case wind_speed_10m_spread
-    case wind_speed_100m_spread
-    case wind_direction_10m_spread
-    case wind_direction_100m_spread
-    case snowfall_spread
-    case temperature_2m_spread
-    case wind_gusts_10m_spread
-    case dew_point_2m_spread
-    case cloud_cover_low_spread
-    case cloud_cover_mid_spread
-    case cloud_cover_high_spread
-    case pressure_msl_spread
-    case snowfall_water_equivalent_spread
-    case snow_depth_spread
-    case soil_temperature_0_to_7cm_spread
-    case soil_temperature_7_to_28cm_spread
-    case soil_temperature_28_to_100cm_spread
-    case soil_temperature_100_to_255cm_spread
-    case soil_moisture_0_to_7cm_spread
-    case soil_moisture_7_to_28cm_spread
-    case soil_moisture_28_to_100cm_spread
-    case soil_moisture_100_to_255cm_spread
-    case shortwave_radiation_spread
-    case precipitation_spread
-    case direct_radiation_spread
-    case boundary_layer_height_spread
-    case sea_surface_temperature
-    
-    /*case wind_u_component_10m
-    case wind_v_component_10m
-    case wind_u_component_100m
-    case wind_v_component_100m
-    case wind_u_component_200m
-    case wind_v_component_200m
-    case wind_u_component_70m
-    case wind_v_component_70m
-    case wind_u_component_170m
-    case wind_v_component_170m*/
-    
-    case pm10
-    case pm2_5
-    case dust
-    case aerosol_optical_depth
-    case carbon_monoxide
-    case carbon_dioxide
-    case nitrogen_dioxide
-    case ammonia
-    case ozone
-    case sulphur_dioxide
-    case methane
-    case alder_pollen
-    case birch_pollen
-    case grass_pollen
-    case mugwort_pollen
-    case olive_pollen
-    case ragweed_pollen
-
-    case formaldehyde
-    case glyoxal
-    case non_methane_volatile_organic_compounds
-    case pm10_wildfires
-    case peroxyacyl_nitrates
-    case secondary_inorganic_aerosol
-    case residential_elementary_carbon
-    case total_elementary_carbon
-    case pm2_5_total_organic_matter
-    case sea_salt_aerosol
-    case nitrogen_monoxide
-    
-    case european_aqi
-    case european_aqi_pm2_5
-    case european_aqi_pm10
-    case european_aqi_no2
-    case european_aqi_o3
-    case european_aqi_so2
-    case european_aqi_nitrogen_dioxide
-    case european_aqi_ozone
-    case european_aqi_sulphur_dioxide
-
-    case us_aqi
-    case us_aqi_pm2_5
-    case us_aqi_pm10
-    case us_aqi_no2
-    case us_aqi_o3
-    case us_aqi_so2
-    case us_aqi_co
-    case us_aqi_nitrogen_dioxide
-    case us_aqi_ozone
-    case us_aqi_sulphur_dioxide
-    case us_aqi_carbon_monoxide
-    
-    case wave_direction
-    case wave_height
-    case wave_period
-    case wave_peak_period
-    case wind_wave_height
-    case wind_wave_period
-    case wind_wave_peak_period
-    case wind_wave_direction
-    case swell_wave_height
-    case swell_wave_period
-    case swell_wave_peak_period
-    case swell_wave_direction
-    case secondary_swell_wave_height
-    case secondary_swell_wave_period
-    case secondary_swell_wave_direction
-    case tertiary_swell_wave_height
-    case tertiary_swell_wave_period
-    case tertiary_swell_wave_direction
-    case ocean_current_velocity
-    case ocean_current_direction
-    case sea_level_height_msl
-    case invert_barometer_height
 
 
-    /// Some variables are kept for backwards compatibility
-    var remapped: Self {
-        switch self {
-        case .temperature:
-            return .temperature_2m
-        case .windspeed:
-            return .wind_speed_10m
-        case .winddirection:
-            return .wind_direction_10m
-        case .surface_air_pressure:
-            return .surface_pressure
-        default:
-            return self
-        }
-    }
-}
-
-/// Available pressure level variables
-enum ForecastPressureVariableType: String, GenericVariableMixable {
-    case temperature
-    case geopotential_height
-    case relativehumidity
-    case relative_humidity
-    case windspeed
-    case wind_speed
-    case winddirection
-    case wind_direction
-    case wind_u_component
-    case wind_v_component
-    case dewpoint
-    case dew_point
-    case cloudcover
-    case cloud_cover
-    case vertical_velocity
-}
-
-struct ForecastPressureVariable: PressureVariableRespresentable, GenericVariableMixable {
-    let variable: ForecastPressureVariableType
-    let level: Int
-}
-
-/// Available pressure level variables
-enum ForecastHeightVariableType: String, GenericVariableMixable {
-    case temperature
-    case relativehumidity
-    case relative_humidity
-    case windspeed
-    case wind_speed
-    case winddirection
-    case wind_direction
-    case wind_u_component
-    case wind_v_component
-    case dewpoint
-    case dew_point
-    case cloudcover
-    case cloud_cover
-    case vertical_velocity
-}
-
-struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixable {
-    let variable: ForecastHeightVariableType
-    let level: Int
-}
-
-typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, ForecastPressureVariable, ForecastHeightVariable>
-
-extension ForecastVariable {
-    var variableAndPreviousDay: (ForecastVariable, Int) {
-        switch self {
-        case .surface(let surface):
-            return (ForecastVariable.surface(.init(surface.variable.remapped, 0)), surface.previousDay)
-        case .pressure(let pressure):
-            return (ForecastVariable.pressure(pressure), 0)
-        case .height(let height):
-            return (ForecastVariable.height(height), 0)
-        }
-    }
-}
-
-/// Available daily aggregations
-enum ForecastVariableDaily: String, DailyVariableCalculatable, RawRepresentableString {
-    case apparent_temperature_max
-    case apparent_temperature_mean
-    case apparent_temperature_min
-    case cape_max
-    case cape_mean
-    case cape_min
-    case cloudcover_max
-    case cloudcover_mean
-    case cloudcover_min
-    case cloud_cover_max
-    case cloud_cover_mean
-    case cloud_cover_min
-    case dewpoint_2m_max
-    case dewpoint_2m_mean
-    case dewpoint_2m_min
-    case dew_point_2m_max
-    case dew_point_2m_mean
-    case dew_point_2m_min
-    case et0_fao_evapotranspiration
-    case et0_fao_evapotranspiration_sum
-    case growing_degree_days_base_0_limit_50
-    case leaf_wetness_probability_mean
-    case precipitation_hours
-    case precipitation_probability_max
-    case precipitation_probability_mean
-    case precipitation_probability_min
-    case precipitation_sum
-    case pressure_msl_max
-    case pressure_msl_mean
-    case pressure_msl_min
-    case rain_sum
-    case relative_humidity_2m_max
-    case relative_humidity_2m_mean
-    case relative_humidity_2m_min
-    case shortwave_radiation_sum
-    case showers_sum
-    case snowfall_sum
-    case snowfall_water_equivalent_sum
-    case snow_depth_min
-    case snow_depth_mean
-    case snow_depth_max
-    case soil_moisture_0_to_100cm_mean
-    case soil_moisture_0_to_10cm_mean
-    case soil_moisture_0_to_7cm_mean
-    case soil_moisture_28_to_100cm_mean
-    case soil_moisture_7_to_28cm_mean
-    case soil_moisture_index_0_to_100cm_mean
-    case soil_moisture_index_0_to_7cm_mean
-    case soil_moisture_index_100_to_255cm_mean
-    case soil_moisture_index_28_to_100cm_mean
-    case soil_moisture_index_7_to_28cm_mean
-    case soil_temperature_0_to_100cm_mean
-    case soil_temperature_0_to_7cm_mean
-    case soil_temperature_28_to_100cm_mean
-    case soil_temperature_7_to_28cm_mean
-    case sunrise
-    case sunset
-    case daylight_duration
-    case sunshine_duration
-    case surface_pressure_max
-    case surface_pressure_mean
-    case surface_pressure_min
-    case temperature_2m_max
-    case temperature_2m_mean
-    case temperature_2m_min
-    case updraft_max
-    case uv_index_clear_sky_max
-    case uv_index_max
-    case vapor_pressure_deficit_max
-    case vapour_pressure_deficit_max
-    case visibility_max
-    case visibility_mean
-    case visibility_min
-    case weathercode
-    case weather_code
-    case winddirection_10m_dominant
-    case windgusts_10m_max
-    case windgusts_10m_mean
-    case windgusts_10m_min
-    case windspeed_10m_max
-    case windspeed_10m_mean
-    case windspeed_10m_min
-    case wind_direction_10m_dominant
-    case wind_gusts_10m_max
-    case wind_gusts_10m_mean
-    case wind_gusts_10m_min
-    case wind_speed_10m_max
-    case wind_speed_10m_mean
-    case wind_speed_10m_min
-    case wet_bulb_temperature_2m_max
-    case wet_bulb_temperature_2m_mean
-    case wet_bulb_temperature_2m_min
-    
-    
-    
-    case wind_direction_100m_dominant
-    case wind_direction_200m_dominant
-    case wind_speed_100m_max
-    case wind_speed_100m_mean
-    case wind_speed_100m_min
-    case wind_speed_200m_max
-    case wind_speed_200m_mean
-    case wind_speed_200m_min
-    case sea_surface_temperature_min
-    case sea_surface_temperature_max
-    case sea_surface_temperature_mean
-    case soil_temperature_100_to_255cm_mean
-    case soil_moisture_100_to_255cm_mean
-    
-    case river_discharge
-    case river_discharge_mean
-    case river_discharge_min
-    case river_discharge_max
-    case river_discharge_median
-    case river_discharge_p25
-    case river_discharge_p75
-    
-    case wave_height_max
-    case wind_wave_height_max
-    case swell_wave_height_max
-
-    case wave_direction_dominant
-    case wind_wave_direction_dominant
-    case swell_wave_direction_dominant
-
-    case wave_period_max
-    case wind_wave_period_max
-    case wind_wave_peak_period_max
-    case swell_wave_period_max
-    case swell_wave_peak_period_max
-    
-
-    var aggregation: DailyAggregation<ForecastVariable> {
-        switch self {
-        case .temperature_2m_max:
-            return .maxTwo(intervalMax: .surface(.init(.temperature_2m_max, 0)), hourly: .surface(.init(.temperature_2m, 0)))
-        case .temperature_2m_min:
-            return .minTwo(intervalMin: .surface(.init(.temperature_2m_min, 0)), hourly: .surface(.init(.temperature_2m, 0)))
-        case .temperature_2m_mean:
-            return .mean(.surface(.init(.temperature_2m, 0)))
-        case .apparent_temperature_max:
-            return .max(.surface(.init(.apparent_temperature, 0)))
-        case .apparent_temperature_mean:
-            return .mean(.surface(.init(.apparent_temperature, 0)))
-        case .apparent_temperature_min:
-            return .min(.surface(.init(.apparent_temperature, 0)))
-        case .precipitation_sum:
-            return .sum(.surface(.init(.precipitation, 0)))
-        case .snowfall_sum:
-            return .sum(.surface(.init(.snowfall, 0)))
-        case .rain_sum:
-            return .sum(.surface(.init(.rain, 0)))
-        case .showers_sum:
-            return .sum(.surface(.init(.showers, 0)))
-        case .weathercode, .weather_code:
-            return .max(.surface(.init(.weathercode, 0)))
-        case .shortwave_radiation_sum:
-            return .radiationSum(.surface(.init(.shortwave_radiation, 0)))
-        case .windspeed_10m_max, .wind_speed_10m_max:
-            return .max(.surface(.init(.wind_speed_10m, 0)))
-        case .windspeed_10m_min, .wind_speed_10m_min:
-            return .min(.surface(.init(.wind_speed_10m, 0)))
-        case .windspeed_10m_mean, .wind_speed_10m_mean:
-            return .mean(.surface(.init(.wind_speed_10m, 0)))
-        case .windgusts_10m_max, .wind_gusts_10m_max:
-            return .max(.surface(.init(.wind_gusts_10m, 0)))
-        case .windgusts_10m_min, .wind_gusts_10m_min:
-            return .min(.surface(.init(.wind_gusts_10m, 0)))
-        case .windgusts_10m_mean, .wind_gusts_10m_mean:
-            return .mean(.surface(.init(.wind_gusts_10m, 0)))
-        case .winddirection_10m_dominant, .wind_direction_10m_dominant:
-            return .dominantDirection(velocity: .surface(.init(.wind_speed_10m, 0)), direction: .surface(.init(.wind_direction_10m, 0)))
-        case .precipitation_hours:
-            return .precipitationHours(.surface(.init(.precipitation, 0)))
-        case .sunrise:
-            return .none
-        case .sunset:
-            return .none
-        case .et0_fao_evapotranspiration:
-            return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
-        case .visibility_max:
-            return .max(.surface(.init(.visibility, 0)))
-        case .visibility_min:
-            return .min(.surface(.init(.visibility, 0)))
-        case .visibility_mean:
-            return .mean(.surface(.init(.visibility, 0)))
-        case .pressure_msl_max:
-            return .max(.surface(.init(.pressure_msl, 0)))
-        case .pressure_msl_min:
-            return .min(.surface(.init(.pressure_msl, 0)))
-        case .pressure_msl_mean:
-            return .mean(.surface(.init(.pressure_msl, 0)))
-        case .surface_pressure_max:
-            return .max(.surface(.init(.surface_pressure, 0)))
-        case .surface_pressure_min:
-            return .min(.surface(.init(.surface_pressure, 0)))
-        case .surface_pressure_mean:
-            return .mean(.surface(.init(.surface_pressure, 0)))
-        case .cape_max:
-            return .max(.surface(.init(.cape, 0)))
-        case .cape_min:
-            return .min(.surface(.init(.cape, 0)))
-        case .cape_mean:
-            return .mean(.surface(.init(.cape, 0)))
-        case .cloudcover_max, .cloud_cover_max:
-            return .max(.surface(.init(.cloudcover, 0)))
-        case .cloudcover_min, .cloud_cover_min:
-            return .min(.surface(.init(.cloudcover, 0)))
-        case .cloudcover_mean, .cloud_cover_mean:
-            return .mean(.surface(.init(.cloudcover, 0)))
-        case .uv_index_max:
-            return .max(.surface(.init(.uv_index, 0)))
-        case .uv_index_clear_sky_max:
-            return .max(.surface(.init(.uv_index_clear_sky, 0)))
-        case .precipitation_probability_max:
-            return .max(.surface(.init(.precipitation_probability, 0)))
-        case .precipitation_probability_min:
-            return .min(.surface(.init(.precipitation_probability, 0)))
-        case .precipitation_probability_mean:
-            return .mean(.surface(.init(.precipitation_probability, 0)))
-        case .dewpoint_2m_max, .dew_point_2m_max:
-            return .max(.surface(.init(.dewpoint_2m, 0)))
-        case .dewpoint_2m_mean, .dew_point_2m_mean:
-            return .mean(.surface(.init(.dewpoint_2m, 0)))
-        case .dewpoint_2m_min, .dew_point_2m_min:
-            return .min(.surface(.init(.dewpoint_2m, 0)))
-        case .et0_fao_evapotranspiration_sum:
-            return .sum(.surface(.init(.et0_fao_evapotranspiration, 0)))
-        case .growing_degree_days_base_0_limit_50:
-            return .sum(.surface(.init(.growing_degree_days_base_0_limit_50, 0)))
-        case .leaf_wetness_probability_mean:
-            return .mean(.surface(.init(.leaf_wetness_probability, 0)))
-        case .relative_humidity_2m_max:
-            return .max(.surface(.init(.relativehumidity_2m, 0)))
-        case .relative_humidity_2m_mean:
-            return .mean(.surface(.init(.relativehumidity_2m, 0)))
-        case .relative_humidity_2m_min:
-            return .min(.surface(.init(.relativehumidity_2m, 0)))
-        case .snowfall_water_equivalent_sum:
-            return .sum(.surface(.init(.snowfall_water_equivalent, 0)))
-        case .soil_moisture_0_to_100cm_mean:
-            return .mean(.surface(.init(.soil_moisture_0_to_100cm, 0)))
-        case .soil_moisture_0_to_10cm_mean:
-            return .mean(.surface(.init(.soil_moisture_0_to_10cm, 0)))
-        case .soil_moisture_0_to_7cm_mean:
-            return .mean(.surface(.init(.soil_moisture_0_to_7cm, 0)))
-        case .soil_moisture_28_to_100cm_mean:
-            return .mean(.surface(.init(.soil_moisture_28_to_100cm, 0)))
-        case .soil_moisture_7_to_28cm_mean:
-            return .mean(.surface(.init(.soil_moisture_7_to_28cm, 0)))
-        case .soil_moisture_index_0_to_100cm_mean:
-            return .mean(.surface(.init(.soil_moisture_index_0_to_100cm, 0)))
-        case .soil_moisture_index_0_to_7cm_mean:
-            return .mean(.surface(.init(.soil_moisture_index_0_to_7cm, 0)))
-        case .soil_moisture_index_100_to_255cm_mean:
-            return .mean(.surface(.init(.soil_moisture_index_100_to_255cm, 0)))
-        case .soil_moisture_index_28_to_100cm_mean:
-            return .mean(.surface(.init(.soil_moisture_index_28_to_100cm, 0)))
-        case .soil_moisture_index_7_to_28cm_mean:
-            return .mean(.surface(.init(.soil_moisture_index_7_to_28cm, 0)))
-        case .soil_temperature_0_to_100cm_mean:
-            return .mean(.surface(.init(.soil_temperature_0_to_100cm, 0)))
-        case .soil_temperature_0_to_7cm_mean:
-            return .mean(.surface(.init(.soil_temperature_0_to_7cm, 0)))
-        case .soil_temperature_28_to_100cm_mean:
-            return .mean(.surface(.init(.soil_temperature_28_to_100cm, 0)))
-        case .soil_temperature_7_to_28cm_mean:
-            return .mean(.surface(.init(.soil_temperature_7_to_28cm, 0)))
-        case .updraft_max:
-            return .max(.surface(.init(.updraft, 0)))
-        case .vapor_pressure_deficit_max, .vapour_pressure_deficit_max:
-            return .max(.surface(.init(.vapor_pressure_deficit, 0)))
-        case .wet_bulb_temperature_2m_max:
-            return .max(.surface(.init(.wet_bulb_temperature_2m, 0)))
-        case .wet_bulb_temperature_2m_min:
-            return .min(.surface(.init(.wet_bulb_temperature_2m, 0)))
-        case .wet_bulb_temperature_2m_mean:
-            return .mean(.surface(.init(.wet_bulb_temperature_2m, 0)))
-        case .daylight_duration:
-            return .none
-        case .sunshine_duration:
-            return .sum(.surface(.init(.sunshine_duration, 0)))
-        case .snow_depth_min:
-            return .min(.surface(.init(.snow_depth, 0)))
-        case .snow_depth_mean:
-            return .mean(.surface(.init(.snow_depth, 0)))
-        case .snow_depth_max:
-            return .max(.surface(.init(.snow_depth, 0)))
-        case .wind_direction_100m_dominant:
-            return .dominantDirection(velocity: .surface(.init(.wind_speed_100m, 0)), direction: .surface(.init(.wind_direction_100m, 0)))
-        case .wind_direction_200m_dominant:
-            return .dominantDirection(velocity: .surface(.init(.wind_speed_200m, 0)), direction: .surface(.init(.wind_direction_200m, 0)))
-        case .wind_speed_100m_max:
-            return .max(.surface(.init(.wind_speed_100m, 0)))
-        case .wind_speed_100m_mean:
-            return .mean(.surface(.init(.wind_speed_100m, 0)))
-        case .wind_speed_100m_min:
-            return .min(.surface(.init(.wind_speed_100m, 0)))
-        case .wind_speed_200m_max:
-            return .max(.surface(.init(.wind_speed_200m, 0)))
-        case .wind_speed_200m_mean:
-            return .mean(.surface(.init(.wind_speed_200m, 0)))
-        case .wind_speed_200m_min:
-            return .min(.surface(.init(.wind_speed_200m, 0)))
-        case .sea_surface_temperature_min:
-            return .min(.surface(.init(.sea_surface_temperature, 0)))
-        case .sea_surface_temperature_max:
-            return .max(.surface(.init(.sea_surface_temperature, 0)))
-        case .sea_surface_temperature_mean:
-            return .mean(.surface(.init(.sea_surface_temperature, 0)))
-        case .soil_temperature_100_to_255cm_mean:
-            return .mean(.surface(.init(.soil_temperature_100_to_255cm, 0)))
-        case .soil_moisture_100_to_255cm_mean:
-            return .mean(.surface(.init(.soil_moisture_100_to_255cm, 0)))
-        case .river_discharge:
-            return .none
-        case .river_discharge_mean:
-            return .none
-        case .river_discharge_min:
-            return .none
-        case .river_discharge_max:
-            return .none
-        case .river_discharge_median:
-            return .none
-        case .river_discharge_p25:
-            return .none
-        case .river_discharge_p75:
-            return .none
-        case .wave_height_max:
-            return .max(.surface(.init(.wave_height, 0)))
-        case .wind_wave_height_max:
-            return .max(.surface(.init(.wind_wave_height, 0)))
-        case .swell_wave_height_max:
-            return .max(.surface(.init(.swell_wave_height, 0)))
-        case .wave_direction_dominant:
-            return .dominantDirection(velocity: .surface(.init(.wave_height, 0)), direction: .surface(.init(.wave_direction, 0)))
-        case .wind_wave_direction_dominant:
-            return .dominantDirection(velocity: .surface(.init(.wind_wave_height, 0)), direction: .surface(.init(.wind_wave_direction, 0)))
-        case .swell_wave_direction_dominant:
-            return .dominantDirection(velocity: .surface(.init(.swell_wave_height, 0)), direction: .surface(.init(.swell_wave_direction, 0)))
-        case .wave_period_max:
-            return .max(.surface(.init(.wave_period, 0)))
-        case .wind_wave_period_max:
-            return .max(.surface(.init(.wind_wave_period, 0)))
-        case .wind_wave_peak_period_max:
-            return .max(.surface(.init(.wind_wave_peak_period, 0)))
-        case .swell_wave_period_max:
-            return .max(.surface(.init(.swell_wave_period, 0)))
-        case .swell_wave_peak_period_max:
-            return .max(.surface(.init(.swell_wave_peak_period, 0)))
-        }
-    }
-}
