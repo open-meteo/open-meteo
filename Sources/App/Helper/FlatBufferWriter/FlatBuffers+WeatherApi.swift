@@ -1053,6 +1053,20 @@ extension MultiDomains {
             return .mpiEsm12Xr
         case .NICAM16_8S:
             return .nicam168s
+        case .flood_best_match:
+            return .bestMatch
+        case .seamless_v3:
+            return .glofasSeamlessV3
+        case .forecast_v3:
+            return .glofasForecastV3
+        case .consolidated_v3:
+            return .glofasConsolidatedV3
+        case .seamless_v4:
+            return .glofasSeamlessV4
+        case .forecast_v4:
+            return .glofasForecastV4
+        case .consolidated_v4:
+            return .glofasConsolidatedV4
         }
     }
 }

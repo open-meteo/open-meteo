@@ -75,7 +75,13 @@ public struct ForecastapiController: RouteCollection {
             subdomain: "seasonal-api",
             type: .seasonal
         ).query)
-        categoriesRoute.getAndPost("flood", use: GloFasController().query)
+        categoriesRoute.getAndPost("flood", use: WeatherApiController(
+            has15minutely: false,
+            hasCurrentWeather: false,
+            defaultModel: .flood_best_match,
+            subdomain: "flood-api",
+            type: .flood
+        ).query)
         categoriesRoute.getAndPost("climate", use: WeatherApiController(
             has15minutely: false,
             hasCurrentWeather: false,
@@ -128,6 +134,7 @@ struct WeatherApiController {
         case marine
         case airQuality
         case climate
+        case flood
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -154,6 +161,8 @@ struct WeatherApiController {
                 return .airQuality
             case "climate-api.open-meteo.com", "customer-climate-api.open-meteo.com":
                 return .climate
+            case "flood-api.open-meteo.com", "customer-flood-api.open-meteo.com":
+                return .flood
             default:
                 return .none
             }
@@ -232,6 +241,11 @@ struct WeatherApiController {
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(2013, 1, 1)
                 temporalResolutionDefault = .hourly
+            case .flood:
+                forecastDaysMax = 366
+                forecastDayDefault = 92
+                historyStartDate = Timestamp(1984, 1, 1)
+                temporalResolutionDefault = .hourly
             }
             let run = params.run
             switch type {
@@ -241,7 +255,7 @@ struct WeatherApiController {
                 guard run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality, .climate:
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality, .climate, .flood:
                 guard run == nil else {
                     throw ForecastApiError.parameterMostNotBeSet(name: "run")
                 }
@@ -421,8 +435,15 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         }
         if let dailyVariables, let readerDaily {
             for variable in dailyVariables {
+                /// Flood API uses a boolean flag to enable ensemble members for river_discharge
+                /// Also, flood API uses `ensembleMember` instead of `ensembleMemberLevel`, because members are stored in different files
+                let allMembersForRiverDischarge = variable == .river_discharge && params.ensemble
+                let members = allMembersForRiverDischarge ? 0..<51 : members
                 for member in members {
-                    let _ = try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(ensembleMemberLevel: member, run: run))
+                    let _ = try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(
+                        ensembleMember: allMembersForRiverDischarge ? member : nil,
+                        ensembleMemberLevel: allMembersForRiverDischarge ? nil : member,
+                        run: run))
                 }
             }
         }
@@ -497,6 +518,10 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         
         var riseSet: (rise: [Timestamp], set: [Timestamp])?
         return ApiSection(name: "daily", time: time.dailyDisplay, columns: try await variables.asyncMap { variable -> ApiColumn<ForecastVariableDaily> in
+            /// Flood API uses a boolean flag to enable ensemble members for river_discharge
+            /// /// Also, flood API uses `ensembleMember` instead of `ensembleMemberLevel`, because members are stored in different files
+            let allMembersForRiverDischarge = variable == .river_discharge && params.ensemble
+            let members = allMembersForRiverDischarge ? 0..<51 : members
             if variable == .sunrise || variable == .sunset {
                 // only calculate sunrise/set once. Need to use `dailyDisplay` to make sure half-hour time zone offsets are applied correctly
                 let times = riseSet ?? Zensun.calculateSunRiseSet(timeRange: time.dailyDisplay.range, lat: readerDaily.modelLat, lon: readerDaily.modelLon, utcOffsetSeconds: timezone.utcOffsetSeconds)
@@ -513,7 +538,11 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             }
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
-                let timeRead = time.dailyRead.toSettings(ensembleMemberLevel: member, run: run)
+                let timeRead = time.dailyRead.toSettings(
+                    ensembleMember: allMembersForRiverDischarge ? member : nil,
+                    ensembleMemberLevel: allMembersForRiverDischarge ? nil : member,
+                    run: run
+                )
                 guard let d = try await readerDaily.get(variable: variable, time: timeRead)?.convertAndRound(params: params) else {
                     return nil
                 }
@@ -776,6 +805,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case MPI_ESM1_2_XR
     case NICAM16_8S
     
+    // GloFas domains should be prefixed with glofas in the future
+    case flood_best_match
+    case seamless_v3
+    case forecast_v3
+    case consolidated_v3
+    case seamless_v4
+    case forecast_v4
+    case consolidated_v4
+
+    
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
     var remappedToEnsembleApi: Self {
         switch self {
@@ -861,6 +900,42 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
         case .NICAM16_8S:
             let reader = try await Cmip6Domain.NICAM16_8S.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            
+        case .flood_best_match:
+            guard let reader = try await GloFasMixer(domains: [.seasonal, .consolidated, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .seamless_v3:
+            guard let reader = try await GloFasMixer(domains: [.seasonalv3, .consolidatedv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .forecast_v3:
+            guard let reader = try await GloFasMixer(domains: [.seasonalv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .consolidated_v3:
+            guard let reader = try await GloFasMixer(domains: [.consolidatedv3], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .seamless_v4:
+            guard let reader = try await GloFasMixer(domains: [.seasonal, .consolidated, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .forecast_v4:
+            guard let reader = try await GloFasMixer(domains: [.seasonal, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .consolidated_v4:
+            guard let reader = try await GloFasMixer(domains: [.consolidated], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return (nil, nil, nil, nil)
+            }
             return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
             
         default:
@@ -1284,6 +1359,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return [reader]
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return []
+        case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
+            return []
         }
     }
 
@@ -1512,6 +1589,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .cams_europe:
             return CamsDomain.cams_europe
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
+            return nil
+        case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
             return nil
         }
     }
@@ -1742,6 +1821,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint, options: options)
             return CamsReader(reader: GenericReaderCached(reader: reader))
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
+            return nil
+        case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
             return nil
         }
     }

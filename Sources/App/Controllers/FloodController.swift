@@ -82,7 +82,7 @@ struct GloFasReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     }
 }
 
-struct GloFasController {
+/*struct GloFasController {
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter("flood-api") { _, params in
             let currentTime = Timestamp.now()
@@ -245,3 +245,4 @@ enum GlofasDomainApi: String, RawRepresentableString, CaseIterable, Sendable {
         }
     }
 }
+*/
