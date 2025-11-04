@@ -218,8 +218,8 @@ struct WeatherApiController {
             let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
             let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
-            let paramsWeekly = try Seas5Reader.WeeklyVariable.load(commaSeparatedOptional: params.weekly)
-            let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
+            let paramsWeekly = try ForecastVariableWeekly.load(commaSeparatedOptional: params.weekly)
+            let paramsMonthly = try ForecastVariableMonthly.load(commaSeparatedOptional: params.monthly)
             
             let nParamsHourly = paramsHourly?.count ?? 0
             let nParamsMinutely = paramsMinutely?.count ?? 0
@@ -286,7 +286,7 @@ struct WeatherApiController {
                 })
             }
             
-            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
         }
     }
 }
@@ -296,8 +296,8 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     
     typealias DailyVariable = ForecastVariableDaily
     
-    typealias MonthlyVariable = SeasonalVariableMonthly
-    typealias WeeklyVariable = SeasonalVariableWeekly
+    typealias MonthlyVariable = ForecastVariableMonthly
+    typealias WeeklyVariable = ForecastVariableWeekly
     
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
         domain.flatBufferModel
@@ -312,8 +312,8 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     
     let readerHourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?
     let readerDaily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?
-    let readerWeekly: (any GenericReaderOptionalProtocol<SeasonalVariableWeekly>)?
-    let readerMonthly: (any GenericReaderOptionalProtocol<SeasonalVariableMonthly>)?
+    let readerWeekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?
+    let readerMonthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
     
     var latitude: Float {
         readerHourly?.modelLat ?? readerDaily?.modelLat ?? .nan
@@ -336,7 +336,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let currentTime: Timestamp
     let temporalResolution: ApiTemporalResolution
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let members = 0..<domain.countEnsembleMember
         
         if let currentVariables, let readerHourly {
@@ -471,10 +471,6 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             }
             return .init(variable: variable, unit: unit ?? .undefined, variables: allMembers)
         })
-    }
-    
-    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        return nil
     }
     
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
@@ -733,7 +729,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         }
     }
     
-    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<SeasonalVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<SeasonalVariableMonthly>)?) {
+    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         switch self {
         case .ecmwf_seasonal_seamless:
@@ -775,7 +771,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         
     }
     
-    func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<SeasonalVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<SeasonalVariableMonthly>)?) {
+    func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         switch self {
         default:

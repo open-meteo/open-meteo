@@ -1,4 +1,4 @@
-enum SeasonalVariableMonthly: String, GenericVariableMixable, RawRepresentableString, FlatBuffersVariable {
+enum ForecastVariableMonthly: String, GenericVariableMixable, RawRepresentableString, FlatBuffersVariable {
     case wind_gusts_10m_anomaly
     
     case wind_speed_10m_mean
@@ -256,12 +256,12 @@ enum SeasonalVariableMonthly: String, GenericVariableMixable, RawRepresentableSt
 
 
 struct SeasonalForecastDeriverMonthly<Reader: GenericReaderProtocol>: GenericDeriverProtocol {
-    typealias VariableOpt = SeasonalVariableMonthly
+    typealias VariableOpt = ForecastVariableMonthly
     
     let reader: Reader
     let options: GenericReaderOptions
     
-    func getDeriverMap(variable: SeasonalVariableMonthly) -> DerivedMapping<Reader.MixingVar>? {
+    func getDeriverMap(variable: ForecastVariableMonthly) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }

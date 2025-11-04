@@ -170,11 +170,7 @@ extension ApiSectionSingle where Variable: FlatBuffersVariable {
 }
 
 extension ModelFlatbufferSerialisable {
-    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {
-        guard variables.sixHourlyVariables == nil else {
-            throw ForecastApiError.generic(message: "&six_hourly= variables are not supported for &format=flatbuffers and will be removed entirely in the future")
-        }
-        
+    func writeToFlatbuffer(_ fbb: inout FlatBufferBuilder, variables: ForecastapiResult<Self>.RequestVariables, timezone: TimezoneWithOffset, fixedGenerationTime: Double?, locationId: Int) async throws {        
         let generationTimeStart = Date()
         let hourly = await (try hourly(variables: variables.hourlyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()

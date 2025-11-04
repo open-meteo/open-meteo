@@ -118,7 +118,7 @@ struct GloFasController {
                 }
                 return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
             }
-            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, sixHourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult<GlofasDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: nil, minutely15Variables: nil, hourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
         }
     }
 }
@@ -158,7 +158,7 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
     let params: ApiQueryParameter
     let time: ForecastApiTimeRange
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         if let dailyVariables {
             for param in dailyVariables {
                 try await reader.prefetchData(variable: param, time: time.dailyRead.toSettings())
@@ -199,11 +199,7 @@ struct GlofasDomainsReader: ModelFlatbufferSerialisable {
             }
         })
     }
-    
-    func sixHourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        return nil
-    }
-    
+
     func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         return nil
     }

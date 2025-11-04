@@ -1,4 +1,4 @@
-import Vapor
+/*import Vapor
 import OpenMeteoSdk
 
 enum SeasonalForecastControllerDomains: String, Codable, CaseIterable, MultiDomainMixerDomainSameType, GenericDomainProvider {
@@ -152,7 +152,7 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
     let timezone: TimezoneWithOffset
     let run: IsoDateTime?
     
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
+    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let members = 0..<domain.countEnsembleMember
         if let sixHourlyVariables {
             let timeSixHourlyRead = time.dailyRead.with(dtSeconds: 3600 * 6)
@@ -327,3 +327,4 @@ struct Seas5Reader: ModelFlatbufferSerialisable {
         })
     }
 }
+*/

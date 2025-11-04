@@ -35,8 +35,8 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         nil
     }
 
-    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, sixHourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [MonthlyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
-
+    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [App.ForecastVariableDaily]?) async throws {
+        
     }
 
     func current(variables: [App.ForecastVariable]?) async throws -> App.ApiSectionSingle<App.ForecastVariable>? {
@@ -51,10 +51,6 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
             ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))])
         ])
-    }
-
-    func sixHourly(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
-        nil
     }
 
     func minutely15(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
@@ -89,7 +85,6 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             currentVariables: [.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))],
             minutely15Variables: nil,
             hourlyVariables: [.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))],
-            sixHourlyVariables: nil,
             dailyVariables: [.temperature_2m_mean, .windspeed_10m_mean],
             weeklyVariables: [],
             monthlyVariables: [.apparent_temperature_mean, .cloud_cover_mean]

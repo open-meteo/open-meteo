@@ -319,10 +319,10 @@ extension GenericReaderMulti {
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             if let v0 = variable.aggregation.variables.0 {
-                try await prefetchData(variable: v0, time: time)
+                let _ = try await prefetchData(variable: v0, time: time)
             }
             if let v1 = variable.aggregation.variables.1 {
-                try await prefetchData(variable: v1, time: time)
+                let _ = try await prefetchData(variable: v1, time: time)
             }
         }
     }
@@ -330,10 +330,10 @@ extension GenericReaderMulti {
     func prefetchData<V: DailyVariableCalculatable>(variable: V, time timeDaily: TimerangeDtAndSettings) async throws where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
         if let v0 = variable.aggregation.variables.0 {
-            try await prefetchData(variable: v0, time: time)
+            let _ = try await prefetchData(variable: v0, time: time)
         }
         if let v1 = variable.aggregation.variables.1 {
-            try await prefetchData(variable: v1, time: time)
+            let _ = try await prefetchData(variable: v1, time: time)
         }
     }
 }
