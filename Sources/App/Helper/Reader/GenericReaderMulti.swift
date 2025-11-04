@@ -18,19 +18,19 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
     let domain: Domain
 
     var modelLat: Float {
-        reader.last!.modelLat
+        reader.last?.modelLat ?? .nan
     }
     var modelLon: Float {
-        reader.last!.modelLon
+        reader.last?.modelLon ?? .nan
     }
     var targetElevation: Float {
-        reader.last!.targetElevation
+        reader.last?.targetElevation ?? .nan
     }
     var modelDtSeconds: Int {
-        reader.first!.modelDtSeconds
+        reader.first?.modelDtSeconds ?? 3600
     }
     var modelElevation: ElevationOrSea {
-        reader.last!.modelElevation
+        reader.last?.modelElevation ?? .noData
     }
 
     public init(domain: Domain, reader: [any GenericReaderProtocol]) {
@@ -140,19 +140,19 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
     let reader: [any GenericReaderOptionalProtocol<Variable>]
 
     var modelLat: Float {
-        reader.last!.modelLat
+        reader.last?.modelLat ?? .nan
     }
     var modelLon: Float {
-        reader.last!.modelLon
+        reader.last?.modelLon ?? .nan
     }
     var targetElevation: Float {
-        reader.last!.targetElevation
+        reader.last?.targetElevation ?? .nan
     }
     var modelDtSeconds: Int {
-        reader.first!.modelDtSeconds
+        reader.first?.modelDtSeconds ?? 3600
     }
     var modelElevation: ElevationOrSea {
-        reader.last!.modelElevation
+        reader.last?.modelElevation ?? .noData
     }
     
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {

@@ -47,19 +47,19 @@ extension GenericReaderMixer {
 
 extension GenericReaderMixerRaw {
     var modelLat: Float {
-        reader.last!.modelLat
+        reader.last?.modelLat ?? .nan
     }
     var modelLon: Float {
-        reader.last!.modelLon
+        reader.last?.modelLon ?? .nan
     }
     var modelElevation: ElevationOrSea {
-        reader.last!.modelElevation
+        reader.last?.modelElevation ?? .noData
     }
     var targetElevation: Float {
-        reader.last!.targetElevation
+        reader.last?.targetElevation ?? .nan
     }
     var modelDtSeconds: Int {
-        reader.last!.modelDtSeconds
+        reader.last?.modelDtSeconds ?? 3600
     }
 
     func prefetchData(variable: Reader.MixingVar, time: TimerangeDtAndSettings) async throws {
