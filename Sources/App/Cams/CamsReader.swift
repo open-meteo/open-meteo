@@ -1,202 +1,4 @@
-/*import Foundation
-import Vapor
-import OpenMeteoSdk
 
-extension CamsQuery.Domain: GenericDomainProvider {
-    var genericDomain: (any GenericDomain)? {
-        switch self {
-        case .auto:
-            return nil
-        case .cams_global:
-            return CamsDomain.cams_global
-        case .cams_europe:
-            return CamsDomain.cams_europe
-        }
-    }
-}
-
-extension CamsMixer: GenericReaderProvider {
-    init?(domain: CamsQuery.Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        guard let reader = try await Self(domains: domain.camsDomains, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-            return nil
-        }
-        self = reader
-    }
-
-    init?(domain: CamsQuery.Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
-        switch domain {
-        case .auto:
-            return nil
-        case .cams_global:
-            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint, options: options)
-            self.reader = [CamsReader(reader: GenericReaderCached(reader: reader))]
-        case .cams_europe:
-            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint, options: options)
-            self.reader = [CamsReader(reader: GenericReaderCached(reader: reader))]
-        }
-    }
-}
-
-/**
- API for Air quality data
- */
-struct CamsController {
-    func query(_ req: Request) async throws -> Response {
-        try await req.withApiParameter("air-quality-api") { _, params in
-            let currentTime = Timestamp.now()
-            let allowedRange = Timestamp(2013, 1, 1) ..< currentTime.add(86400 * 6)
-
-            let paramsHourly = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.hourly)
-            let paramsCurrent = try VariableOrDerived<CamsVariable, CamsVariableDerived>.load(commaSeparatedOptional: params.current)
-            let domains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
-
-            let nVariables = (paramsHourly?.count ?? 0) * domains.count
-            let options = try params.readerOptions(for: req)
-
-            let prepared = try await CamsMixer.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: 5, forecastDaysMax: 7, pastDaysMax: 92, allowedRange: allowedRange)
-
-            let locations: [ForecastapiResult<CamsDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
-                let timezone = prepared.timezone
-                let time = prepared.time
-                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-
-                let readers: [CamsDomainsReader] = try await prepared.perModel.asyncCompactMap { readerAndDomain in
-                    guard let reader = try await readerAndDomain.reader() else {
-                        return nil
-                    }
-                    let domain = readerAndDomain.domain
-                    return CamsDomainsReader(domain: domain, reader: reader, params: params, time: time, currentTime: currentTime)
-                }
-                guard !readers.isEmpty else {
-                    throw ForecastApiError.noDataAvailableForThisLocation
-                }
-                return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
-            }
-            return ForecastapiResult<CamsDomainsReader>(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: nil, hourlyVariables: paramsHourly, dailyVariables: nil, weeklyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
-        }
-    }
-}
-
-
-struct CamsDomainsReader: ModelFlatbufferSerialisable {
-    typealias MonthlyVariable = FlatBuffersVariableNone
-    typealias WeeklyVariable = FlatBuffersVariableNone
-    
-    typealias HourlyVariable = CamsReader.MixingVar
-    
-    typealias DailyVariable = FlatBuffersVariableNone
-    
-    var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
-        domain.flatBufferModel
-    }
-    
-    var modelName: String {
-        domain.rawValue
-    }
-    
-    let domain: CamsQuery.Domain
-    
-    let reader: CamsMixer
-    
-    var latitude: Float {
-        reader.modelLat
-    }
-    
-    var longitude: Float {
-        reader.modelLon
-    }
-    
-    var elevation: Float? {
-        reader.targetElevation
-    }
-    
-    let params: ApiQueryParameter
-    
-    let time: ForecastApiTimeRange
-    let currentTime: Timestamp
-    
-    func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
-        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
-        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-        //let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        
-        if let currentVariables {
-            try await reader.prefetchData(variables: currentVariables, time: currentTimeRange.toSettings())
-        }
-        if let hourlyVariables {
-            try await reader.prefetchData(variables: hourlyVariables, time: timeHourlyRead.toSettings())
-        }
-    }
-
-    func current(variables: [HourlyVariable]?) async throws -> ApiSectionSingle<HourlyVariable>? {
-        guard let variables else {
-            return nil
-        }
-        let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
-        return .init(name: "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
-            let d = try await reader.get(variable: variable, time: currentTimeRange.toSettings()).convertAndRound(params: params)
-            return .init(variable: variable, unit: d.unit, value: d.data.first ?? .nan)
-        })
-    }
-    
-    func hourly(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        guard let variables else {
-            return nil
-        }
-        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? reader.modelDtSeconds
-        let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
-        let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        
-        return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
-            let d = try await reader.get(variable: variable, time: timeHourlyRead.toSettings()).convertAndRound(params: params)
-            assert(timeHourlyRead.count == d.data.count)
-            return .init(variable: variable, unit: d.unit, variables: [.float(d.data)])
-        })
-    }
-    
-    func daily(variables: [DailyVariable]?) async throws -> ApiSection<DailyVariable>? {
-        return nil
-    }
-    
-    func minutely15(variables: [HourlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
-        return nil
-    }
-    
-    func weekly(variables: [WeeklyVariable]?) async throws -> ApiSection<WeeklyVariable>? {
-        return nil
-    }
-    
-    func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
-        return nil
-    }
-}*/
-
-enum CamsVariableDerived: String, GenericVariableMixable {
-    case european_aqi
-    case european_aqi_pm2_5
-    case european_aqi_pm10
-    case european_aqi_no2
-    case european_aqi_o3
-    case european_aqi_so2
-    case european_aqi_nitrogen_dioxide
-    case european_aqi_ozone
-    case european_aqi_sulphur_dioxide
-
-    case us_aqi
-    case us_aqi_pm2_5
-    case us_aqi_pm10
-    case us_aqi_no2
-    case us_aqi_o3
-    case us_aqi_so2
-    case us_aqi_co
-    case us_aqi_nitrogen_dioxide
-    case us_aqi_ozone
-    case us_aqi_sulphur_dioxide
-    case us_aqi_carbon_monoxide
-
-    case is_day
-}
 
 struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     typealias MixingVar = VariableOrDerived<CamsVariable, CamsVariableDerived>
@@ -326,6 +128,33 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
     }
 }
 
+
+enum CamsVariableDerived: String, GenericVariableMixable {
+    case european_aqi
+    case european_aqi_pm2_5
+    case european_aqi_pm10
+    case european_aqi_no2
+    case european_aqi_o3
+    case european_aqi_so2
+    case european_aqi_nitrogen_dioxide
+    case european_aqi_ozone
+    case european_aqi_sulphur_dioxide
+
+    case us_aqi
+    case us_aqi_pm2_5
+    case us_aqi_pm10
+    case us_aqi_no2
+    case us_aqi_o3
+    case us_aqi_so2
+    case us_aqi_co
+    case us_aqi_nitrogen_dioxide
+    case us_aqi_ozone
+    case us_aqi_sulphur_dioxide
+    case us_aqi_carbon_monoxide
+
+    case is_day
+}
+
 extension TimerangeDt {
     func with(start: Timestamp) -> TimerangeDt {
         TimerangeDt(start: start, to: range.upperBound, dtSeconds: dtSeconds)
@@ -371,16 +200,5 @@ extension CamsQuery {
                 return .cams_europe
             }
         }
-
-        /*var camsDomains: [CamsDomain] {
-            switch self {
-            case .auto:
-                return [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
-            case .cams_global:
-                return [.cams_global, .cams_global_greenhouse_gases]
-            case .cams_europe:
-                return [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
-            }
-        }*/
     }
 }

@@ -245,3 +245,15 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
         }
     }
 }
+
+
+typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
+
+struct IconWaveMixer: GenericReaderMixer {
+    let reader: [IconWaveReader]
+
+    static func makeReader(domain: IconWaveDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> IconWaveReader? {
+        return try await IconWaveReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    }
+}
+
