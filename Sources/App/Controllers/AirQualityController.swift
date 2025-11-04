@@ -1,4 +1,4 @@
-import Foundation
+/*import Foundation
 import Vapor
 import OpenMeteoSdk
 
@@ -170,7 +170,7 @@ struct CamsDomainsReader: ModelFlatbufferSerialisable {
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<MonthlyVariable>? {
         return nil
     }
-}
+}*/
 
 enum CamsVariableDerived: String, GenericVariableMixable {
     case european_aqi
@@ -360,8 +360,19 @@ extension CamsQuery {
         case auto
         case cams_global
         case cams_europe
+        
+        var multiDomain: MultiDomains {
+            switch self {
+            case .auto:
+                return .air_quality_best_match
+            case .cams_global:
+                return .cams_global
+            case .cams_europe:
+                return .cams_europe
+            }
+        }
 
-        var camsDomains: [CamsDomain] {
+        /*var camsDomains: [CamsDomain] {
             switch self {
             case .auto:
                 return [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
@@ -370,6 +381,6 @@ extension CamsQuery {
             case .cams_europe:
                 return [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018]
             }
-        }
+        }*/
     }
 }

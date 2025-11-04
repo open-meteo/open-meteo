@@ -61,7 +61,13 @@ public struct ForecastapiController: RouteCollection {
         )
 
         categoriesRoute.getAndPost("elevation", use: DemController().query)
-        categoriesRoute.getAndPost("air-quality", use: CamsController().query)
+        categoriesRoute.getAndPost("air-quality", use: WeatherApiController(
+            has15minutely: false,
+            hasCurrentWeather: true,
+            defaultModel: .air_quality_best_match,
+            subdomain: "air-quality-api",
+            type: .airQuality
+        ).query)
         categoriesRoute.getAndPost("seasonal", use: WeatherApiController(
             has15minutely: false,
             hasCurrentWeather: false,
@@ -114,6 +120,7 @@ struct WeatherApiController {
         case seasonal
         case ensemble
         case marine
+        case airQuality
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -136,6 +143,8 @@ struct WeatherApiController {
                 return .forecast
             case "marine-api.open-meteo.com", "customer-marine-api.open-meteo.com":
                 return .marine
+            case "air-quality-api.open-meteo.com", "customer-air-quality-api.open-meteo.com":
+                return .airQuality
             default:
                 return .none
             }
@@ -203,6 +212,11 @@ struct WeatherApiController {
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(1940, 1, 1)
                 temporalResolutionDefault = .hourly
+            case .airQuality:
+                forecastDaysMax = 7
+                forecastDayDefault = 5
+                historyStartDate = Timestamp(2013, 1, 1)
+                temporalResolutionDefault = .hourly
             }
             let run = params.run
             switch type {
@@ -212,7 +226,7 @@ struct WeatherApiController {
                 guard run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine:
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality:
                 guard run == nil else {
                     throw ForecastApiError.parameterMostNotBeSet(name: "run")
                 }
@@ -223,8 +237,18 @@ struct WeatherApiController {
             let allowedRange = historyStartDate ..< currentTimeHour0.add(days: forecastDaysMax)
 
             let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
-            // Translate domain names from Ensemble API for compatibility
-            let domains = type == .ensemble ? domainsParam.map{$0.remappedToEnsembleApi} : domainsParam
+            let domains: [MultiDomains]
+            switch type {
+            case .ensemble:
+                // Translate domain names from Ensemble API for compatibility
+                domains = domainsParam.map{$0.remappedToEnsembleApi}
+            case .airQuality:
+                // Air quality API used domains=auto, global or europe
+                let camsDomains = try (params.domains.map({ [$0] }) ?? CamsQuery.Domain.load(commaSeparatedOptional: params.models) ?? [.auto])
+                domains = camsDomains.map(\.multiDomain)
+            default:
+                domains = domainsParam
+            }
             
             let paramsMinutely = has15minutely ? try ForecastVariable.load(commaSeparatedOptional: params.minutely_15) : nil
             let defaultCurrentWeather = [ForecastVariable.surface(.init(.temperature, 0)), .surface(.init(.windspeed, 0)), .surface(.init(.winddirection, 0)), .surface(.init(.is_day, 0)), .surface(.init(.weathercode, 0))]
@@ -722,6 +746,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case meteofrance_wave
     case meteofrance_currents
     
+    case air_quality_best_match
+    case cams_global
+    case cams_europe
+    
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
     var remappedToEnsembleApi: Self {
         switch self {
@@ -1191,6 +1219,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ncep_gfswave016:
             return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .air_quality_best_match:
+            guard let reader = try await CamsMixer(domains: [.cams_global, .cams_global_greenhouse_gases, .cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return []
+            }
+            return [reader]
+        case .cams_global:
+            guard let reader = try await CamsMixer(domains: [.cams_global, .cams_global_greenhouse_gases], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return []
+            }
+            return [reader]
+        case .cams_europe:
+            guard let reader = try await CamsMixer(domains: [.cams_europe, .cams_europe_reanalysis_interim, .cams_europe_reanalysis_validated, .cams_europe_reanalysis_validated_pre2020, .cams_europe_reanalysis_validated_pre2018], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return []
+            }
+            return [reader]
         }
     }
 
@@ -1412,6 +1455,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .meteofrance_currents:
             return nil
+        case .air_quality_best_match:
+            return nil
+        case .cams_global:
+            return CamsDomain.cams_global
+        case .cams_europe:
+            return CamsDomain.cams_europe
         }
     }
 
@@ -1632,6 +1681,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .meteofrance_currents:
             return nil
+        case .air_quality_best_match:
+            return nil
+        case .cams_global:
+            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_global, position: gridpoint, options: options)
+            return CamsReader(reader: GenericReaderCached(reader: reader))
+        case .cams_europe:
+            let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint, options: options)
+            return CamsReader(reader: GenericReaderCached(reader: reader))
         }
     }
 

@@ -1033,6 +1033,12 @@ extension MultiDomains {
             return .ncepGfswave016
         case .ncep_gefswave025:
             return .ncepGefswave025
+        case .air_quality_best_match:
+            return .bestMatch
+        case .cams_global:
+            return .camsGlobal
+        case .cams_europe:
+            return .camsEurope
         }
     }
 }
