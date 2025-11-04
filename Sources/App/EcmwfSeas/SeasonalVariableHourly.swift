@@ -1,4 +1,4 @@
-enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixable, FlatBuffersVariable {
+/*enum SeasonalVariableHourly: String, RawRepresentableString, GenericVariableMixable, FlatBuffersVariable {
     case temperature_2m
     case dew_point_2m
     case pressure_msl
@@ -493,3 +493,4 @@ struct SeasonalForecastDeriverHourly<Reader: GenericReaderProtocol>: GenericDeri
         }
     }
 }
+*/

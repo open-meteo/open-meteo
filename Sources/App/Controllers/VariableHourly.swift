@@ -416,6 +416,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     let options: GenericReaderOptions
     
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
+        if let variable = Reader.variableFromString(variable.rawValue) {
+            return .direct(variable)
+        }
+        
         switch variable {
         case .windspeed_10m:
             return getDeriverMap(variable: .wind_speed_10m)
@@ -443,7 +447,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"))
         case .apparent_temperature:
             guard
-                let wind = getDeriverMap(variable: .windspeed_10m),
+                let wind = getDeriverMap(variable: .wind_speed_10m),
                 let temp = Reader.variableFromString("temperature_2m"),
                 let relhum = getDeriverMap(variable: .relative_humidity_2m),
                 let radiation = getDeriverMap(variable: .shortwave_radiation)
@@ -492,9 +496,9 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         case .et0_fao_evapotranspiration:
             guard
-                let wind = getDeriverMap(variable: .windspeed_10m),
+                let wind = getDeriverMap(variable: .wind_speed_10m),
                 let temp = Reader.variableFromString("temperature_2m"),
-                let dew = getDeriverMap(variable: .dewpoint_2m),
+                let dew = getDeriverMap(variable: .dew_point_2m),
                 let radiation = getDeriverMap(variable: .shortwave_radiation)
             else {
                 return nil
@@ -690,9 +694,6 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     
     
     func getDeriverMap(variable: ForecastVariable) -> DerivedMapping<Reader.MixingVar>? {
-        if let variable = Reader.variableFromString(variable.rawValue) {
-            return .direct(variable)
-        }
         switch variable {
         case .surface(let variable):
             return getDeriverMap(variable: variable.variable)

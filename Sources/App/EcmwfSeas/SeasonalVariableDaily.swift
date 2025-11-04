@@ -1,4 +1,4 @@
-enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMixable, RawRepresentableString, FlatBuffersVariable {
+/*enum SeasonalVariableDaily: String, DailyVariableCalculatable, GenericVariableMixable, RawRepresentableString, FlatBuffersVariable {
     case temperature_2m_max
     case temperature_2m_min
     case temperature_2m_mean
@@ -361,3 +361,4 @@ struct SeasonalForecastDeriverDaily<Reader: GenericReaderProtocol>: GenericDeriv
         }
     }
 }
+*/
