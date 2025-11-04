@@ -1,4 +1,4 @@
-import Foundation
+/*import Foundation
 import FlatBuffers
 import OpenMeteoSdk
 
@@ -131,3 +131,4 @@ extension Cmip6Domain {
         }
     }
 }
+*/

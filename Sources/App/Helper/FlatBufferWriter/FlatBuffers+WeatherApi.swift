@@ -1039,6 +1039,20 @@ extension MultiDomains {
             return .camsGlobal
         case .cams_europe:
             return .camsEurope
+        case .CMCC_CM2_VHR4:
+            return .cmccCm2Vhr4
+        case .FGOALS_f3_H:
+            return .fgoalsF3H
+        case .HiRAM_SIT_HR:
+            return .hiramSitHr
+        case .MRI_AGCM3_2_S:
+            return .mriAgcm32S
+        case .EC_Earth3P_HR:
+            return .ecEarth3pHr
+        case .MPI_ESM1_2_XR:
+            return .mpiEsm12Xr
+        case .NICAM16_8S:
+            return .nicam168s
         }
     }
 }

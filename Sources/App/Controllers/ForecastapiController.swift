@@ -76,7 +76,13 @@ public struct ForecastapiController: RouteCollection {
             type: .seasonal
         ).query)
         categoriesRoute.getAndPost("flood", use: GloFasController().query)
-        categoriesRoute.getAndPost("climate", use: CmipController().query)
+        categoriesRoute.getAndPost("climate", use: WeatherApiController(
+            has15minutely: false,
+            hasCurrentWeather: false,
+            defaultModel: .MRI_AGCM3_2_S,
+            subdomain: "climate-api",
+            type: .climate
+        ).query)
         categoriesRoute.getAndPost("marine", use: WeatherApiController(
             has15minutely: true,
             hasCurrentWeather: true,
@@ -121,6 +127,7 @@ struct WeatherApiController {
         case ensemble
         case marine
         case airQuality
+        case climate
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -145,6 +152,8 @@ struct WeatherApiController {
                 return .marine
             case "air-quality-api.open-meteo.com", "customer-air-quality-api.open-meteo.com":
                 return .airQuality
+            case "climate-api.open-meteo.com", "customer-climate-api.open-meteo.com":
+                return .climate
             default:
                 return .none
             }
@@ -160,6 +169,7 @@ struct WeatherApiController {
             let forecastDaysMax: Int
             let forecastDayDefault: Int
             let historyStartDate: Timestamp
+            let historyEndDate: Timestamp? = type == .climate ? Timestamp(2051, 1, 1) : nil
             let temporalResolutionDefault: ApiTemporalResolution
             switch type {
             case .none:
@@ -217,6 +227,11 @@ struct WeatherApiController {
                 forecastDayDefault = 5
                 historyStartDate = Timestamp(2013, 1, 1)
                 temporalResolutionDefault = .hourly
+            case .climate:
+                forecastDaysMax = 14
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(2013, 1, 1)
+                temporalResolutionDefault = .hourly
             }
             let run = params.run
             switch type {
@@ -226,15 +241,16 @@ struct WeatherApiController {
                 guard run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality:
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine, .airQuality, .climate:
                 guard run == nil else {
                     throw ForecastApiError.parameterMostNotBeSet(name: "run")
                 }
             }
             let cellSelection = params.cell_selection ?? (type == .marine ? .sea : .land)
+            let biasCorrection = !(params.disable_bias_correction ?? false)
             
             let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
-            let allowedRange = historyStartDate ..< currentTimeHour0.add(days: forecastDaysMax)
+            let allowedRange = historyStartDate ..< (historyEndDate ?? currentTimeHour0.add(days: forecastDaysMax))
 
             let domainsParam = try MultiDomains.load(commaSeparatedOptional: params.models)?.map({ $0 == .best_match ? defaultModel : $0 }) ?? [defaultModel]
             let domains: [MultiDomains]
@@ -266,6 +282,8 @@ struct WeatherApiController {
             let nParamsMonthly = paramsMonthly?.count ?? 0
             let nVariableNonEnsemble = (nParamsWeekly + nParamsMonthly) * domains.count
             let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember }) + nVariableNonEnsemble
+            // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
+            let nVariablesAdjusted = type == .seasonal ? nVariables / 24 / 5 : nVariables
             let options = try params.readerOptions(for: req)
             let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
             
@@ -279,7 +297,7 @@ struct WeatherApiController {
                     let timezone = prepared.timezone
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
-                        let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options)
+                        let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection)
                         return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                     }
                     guard !readers.isEmpty else {
@@ -323,7 +341,7 @@ struct WeatherApiController {
                 })
             }
             
-            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariablesAdjusted)
         }
     }
 }
@@ -750,6 +768,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case cams_global
     case cams_europe
     
+    case CMCC_CM2_VHR4
+    case FGOALS_f3_H
+    case HiRAM_SIT_HR
+    case MRI_AGCM3_2_S
+    case EC_Earth3P_HR
+    case MPI_ESM1_2_XR
+    case NICAM16_8S
+    
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
     var remappedToEnsembleApi: Self {
         switch self {
@@ -782,7 +808,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         }
     }
     
-    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
+    func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         switch self {
         case .ecmwf_seasonal_seamless:
@@ -814,6 +840,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
             
             return (ec46hourly, ec46hourlyToDaily, ec46weekly, nil)
+            
+        case .CMCC_CM2_VHR4:
+            let reader = try await Cmip6Domain.CMCC_CM2_VHR4.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .FGOALS_f3_H:
+            let reader = try await Cmip6Domain.FGOALS_f3_H.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .HiRAM_SIT_HR:
+            let reader = try await Cmip6Domain.HiRAM_SIT_HR.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .MRI_AGCM3_2_S:
+            let reader = try await Cmip6Domain.MRI_AGCM3_2_S.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .EC_Earth3P_HR:
+            let reader = try await Cmip6Domain.EC_Earth3P_HR.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .MPI_ESM1_2_XR:
+            let reader = try await Cmip6Domain.MPI_ESM1_2_XR.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+        case .NICAM16_8S:
+            let reader = try await Cmip6Domain.NICAM16_8S.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
             
         default:
             let readers: [any GenericReaderProtocol] = try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1234,6 +1282,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
                 return []
             }
             return [reader]
+        case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
+            return []
         }
     }
 
@@ -1461,6 +1511,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return CamsDomain.cams_global
         case .cams_europe:
             return CamsDomain.cams_europe
+        case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
+            return nil
         }
     }
 
@@ -1689,6 +1741,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
         case .cams_europe:
             let reader = try await GenericReader<CamsDomain, CamsVariable>(domain: .cams_europe, position: gridpoint, options: options)
             return CamsReader(reader: GenericReaderCached(reader: reader))
+        case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
+            return nil
         }
     }
 

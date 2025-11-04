@@ -3,7 +3,7 @@ import OmFileFormat
 import Vapor
 import OpenMeteoSdk
 
-struct CmipController {
+/*struct CmipController {
     func query(_ req: Request) async throws -> Response {
         try await req.withApiParameter("climate-api") { _, params in
             let currentTime = Timestamp.now()
@@ -127,18 +127,18 @@ struct CmipDomainsReader: ModelFlatbufferSerialisable {
     func monthly(variables: [MonthlyVariable]?) async throws -> ApiSection<HourlyVariable>? {
         return nil
     }
-}
+}*/
 
 
-protocol Cmip6Readerable {
-    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) async throws
-    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDtAndSettings) async throws -> DataAndUnit
-    var modelLat: Float { get }
-    var modelLon: Float { get }
-    var modelElevation: ElevationOrSea { get }
-    var targetElevation: Float { get }
-    var modelDtSeconds: Int { get }
-}
+//protocol Cmip6Readerable {
+//    func prefetchData(variables: [Cmip6VariableOrDerivedPostBias], time: TimerangeDtAndSettings) async throws
+//    func get(variable: Cmip6VariableOrDerivedPostBias, time: TimerangeDtAndSettings) async throws -> DataAndUnit
+//    var modelLat: Float { get }
+//    var modelLon: Float { get }
+//    var modelElevation: ElevationOrSea { get }
+//    var targetElevation: Float { get }
+//    var modelDtSeconds: Int { get }
+//}
 
 /// Derived variables that do not need bias correction, but use bias corrected inputs
 enum Cmip6VariableDerivedPostBiasCorrection: String, GenericVariableMixable, CaseIterable {
@@ -655,7 +655,7 @@ struct Cmip6BiasCorrectorGenericDomain: GenericReaderProtocol {
 /// There are 2 layers of derived variables
 /// "PreBiasCorrected" calculated derived variables before any bias correction
 /// "PostBiasCorrected" is done after bias correction
-struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol, Cmip6Readerable where ReaderNext.MixingVar == Cmip6VariableOrDerived {
+struct Cmip6ReaderPostBiasCorrected<ReaderNext: GenericReaderProtocol>: GenericReaderDerivedSimple, GenericReaderProtocol where ReaderNext.MixingVar == Cmip6VariableOrDerived {
     typealias Derived = Cmip6VariableDerivedPostBiasCorrection
 
     let reader: ReaderNext
