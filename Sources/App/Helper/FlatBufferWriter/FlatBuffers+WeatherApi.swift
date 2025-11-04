@@ -1011,6 +1011,28 @@ extension MultiDomains {
             return .ecmwfSeas5
         case .ecmwf_ec46:
             return .ecmwfEc46
+        case .marine_best_match:
+            return .bestMatch
+        case .gwam:
+            return .gwam
+        case .ewam:
+            return .ewam
+        case .era5_ocean:
+            return .era5Ocean
+        case .ecmwf_wam025:
+            return .ecmwfWam025
+        case .ecmwf_wam025_ensemble:
+            return .ecmwfWam025Ensemble
+        case .meteofrance_wave:
+            return .meteofranceWave
+        case .meteofrance_currents:
+            return .meteofranceCurrents
+        case .ncep_gfswave025:
+            return .ncepGfswave025
+        case .ncep_gfswave016:
+            return .ncepGfswave016
+        case .ncep_gefswave025:
+            return .ncepGefswave025
         }
     }
 }

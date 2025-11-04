@@ -1,4 +1,4 @@
-import Foundation
+/*import Foundation
 import Vapor
 import OpenMeteoSdk
 
@@ -308,7 +308,7 @@ struct MarineDomainsReader: ModelFlatbufferSerialisable {
         return nil
     }
 }
-
+ */
 
 typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
 
@@ -319,3 +319,4 @@ struct IconWaveMixer: GenericReaderMixer {
         return try await IconWaveReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
 }
+

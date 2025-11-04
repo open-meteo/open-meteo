@@ -57,8 +57,6 @@ public struct ForecastapiController: RouteCollection {
         )
         categoriesRoute.getAndPost("arpae", use: WeatherApiController(
             has15minutely: false,
-            
-            
             defaultModel: .arpae_cosmo_seamless).query
         )
 
@@ -73,7 +71,13 @@ public struct ForecastapiController: RouteCollection {
         ).query)
         categoriesRoute.getAndPost("flood", use: GloFasController().query)
         categoriesRoute.getAndPost("climate", use: CmipController().query)
-        categoriesRoute.getAndPost("marine", use: IconWaveController().query)
+        categoriesRoute.getAndPost("marine", use: WeatherApiController(
+            has15minutely: true,
+            hasCurrentWeather: true,
+            defaultModel: .marine_best_match,
+            subdomain: "marine-api",
+            type: .marine
+        ).query)
         categoriesRoute.getAndPost("ensemble", use: WeatherApiController(
             defaultModel: .ncep_gefs_seamless,
             subdomain: "ensemble-api").query
@@ -109,6 +113,7 @@ struct WeatherApiController {
         case singleRunsApi
         case seasonal
         case ensemble
+        case marine
         
         static func detect(host: String?) -> Self {
             guard let host else {
@@ -129,6 +134,8 @@ struct WeatherApiController {
                 return .seasonal
             case "api.open-meteo.com", "customer-api.open-meteo.com":
                 return .forecast
+            case "marine-api.open-meteo.com", "customer-marine-api.open-meteo.com":
+                return .marine
             default:
                 return .none
             }
@@ -191,6 +198,11 @@ struct WeatherApiController {
                 forecastDayDefault = 7
                 historyStartDate = currentTimeHour0.subtract(days: 93)
                 temporalResolutionDefault = .hourly
+            case .marine:
+                forecastDaysMax = 16
+                forecastDayDefault = 7
+                historyStartDate = Timestamp(1940, 1, 1)
+                temporalResolutionDefault = .hourly
             }
             let run = params.run
             switch type {
@@ -200,11 +212,12 @@ struct WeatherApiController {
                 guard run != nil else {
                     throw ForecastApiError.parameterIsRequired(name: "run")
                 }
-            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble:
+            case .forecast, .archive, .historicalForecast, .previousRuns, .satellite, .ensemble, .marine:
                 guard run == nil else {
                     throw ForecastApiError.parameterMostNotBeSet(name: "run")
                 }
             }
+            let cellSelection = params.cell_selection ?? (type == .marine ? .sea : .land)
             
             let pastDaysMax = (currentTimeHour0.timeIntervalSince1970 - historyStartDate.timeIntervalSince1970) / 86400
             let allowedRange = historyStartDate ..< currentTimeHour0.add(days: forecastDaysMax)
@@ -242,7 +255,7 @@ struct WeatherApiController {
                     let timezone = prepared.timezone
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
-                        let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
+                        let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options)
                         return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                     }
                     guard !readers.isEmpty else {
@@ -355,7 +368,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             }
         }
         if let hourlyVariables, let readerHourly {
-            let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+            let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly.modelDtSeconds
             let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
                 let (v, previousDay) = variable.variableAndPreviousDay
@@ -410,7 +423,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         guard let variables, let readerHourly else {
             return nil
         }
-        let hourlyDt = (params.temporal_resolution ?? .hourly).dtSeconds ?? readerHourly.modelDtSeconds
+        let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
         let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
         let members = 0..<domain.countEnsembleMember
@@ -627,6 +640,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     case bom_access_global
 
     case archive_best_match
+    case marine_best_match
     case era5_seamless
     case era5
     case cerra
@@ -696,6 +710,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
     
     case meteoswiss_icon_ch1_ensemble
     case meteoswiss_icon_ch2_ensemble
+    
+    case ewam
+    case gwam
+    case era5_ocean
+    case ecmwf_wam025
+    case ecmwf_wam025_ensemble
+    case ncep_gfswave025
+    case ncep_gfswave016
+    case ncep_gefswave025
+    case meteofrance_wave
+    case meteofrance_currents
     
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
     var remappedToEnsembleApi: Self {
@@ -1118,6 +1143,54 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return []
         case .ecmwf_ec46:
             return []
+        case .marine_best_match:
+            // let gwam = try IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let ewam = try await IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let mfcurrents = try await GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).map { reader -> any GenericReaderProtocol in
+                MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
+            }
+            let mfsst = try await GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let mfwave = try await GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).map { reader -> any GenericReaderProtocol in
+                MfWaveReader(reader: reader)
+            }
+            let waveModel: [(any GenericReaderProtocol)?]
+            if let update = try await MfWaveDomain.mfwave.getMetaJson(client: options.httpClient, logger: options.logger)?.lastRunAvailabilityTime, update <= Timestamp.now().subtract(hours: 26) {
+                // mf model outdated, use ECMWF
+                waveModel = [mfwave, try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+            } else {
+                // use mf wave
+                waveModel = [mfwave]
+            }
+            let readers: [(any GenericReaderProtocol)?] = [mfcurrents, mfsst, ewam] + waveModel
+            return readers.compactMap({ $0 })
+            /*
+            let ecmwfWam025 = try GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let readers: [(any GenericReaderProtocol)?] = [ewam, ecmwfWam025, gwam]
+            return readers.compactMap({$0})*/
+        case .ewam:
+            return try await IconWaveReader(domain: .ewam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .gwam:
+            return try await IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .era5_ocean:
+            return [try await Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+        case .ecmwf_wam025:
+            return try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ecmwf_wam025_ensemble:
+            return try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .meteofrance_wave:
+            return try await GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [MfWaveReader(reader: $0)] }) ?? []
+        case .meteofrance_currents:
+            let mfsst = try await GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let mfcurrents = try await GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).map { reader -> any GenericReaderProtocol in
+                MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: reader))
+            }
+            return [mfsst, mfcurrents].compactMap({ $0 })
+        case .ncep_gfswave025:
+            return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_gefswave025:
+            return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_gfswave016:
+            return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         }
     }
 
@@ -1317,6 +1390,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .ecmwf_ec46:
             return nil
+        case .marine_best_match:
+            return nil
+        case .ewam:
+            return nil
+        case .gwam:
+            return nil
+        case .era5_ocean:
+            return nil
+        case .ecmwf_wam025:
+            return nil
+        case .ecmwf_wam025_ensemble:
+            return nil
+        case .ncep_gfswave025:
+            return nil
+        case .ncep_gfswave016:
+            return nil
+        case .ncep_gefswave025:
+            return nil
+        case .meteofrance_wave:
+            return nil
+        case .meteofrance_currents:
+            return nil
         }
     }
 
@@ -1515,6 +1610,28 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return nil
         case .ecmwf_ec46:
             return nil
+        case .marine_best_match:
+            return nil
+        case .ewam:
+            return nil
+        case .gwam:
+            return nil
+        case .era5_ocean:
+            return nil
+        case .ecmwf_wam025:
+            return nil
+        case .ecmwf_wam025_ensemble:
+            return nil
+        case .ncep_gfswave025:
+            return nil
+        case .ncep_gfswave016:
+            return nil
+        case .ncep_gefswave025:
+            return nil
+        case .meteofrance_wave:
+            return nil
+        case .meteofrance_currents:
+            return nil
         }
     }
 
@@ -1552,6 +1669,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return MeteoSwissDomain.icon_ch2_ensemble.countEnsembleMember
         case .ecmwf_seasonal_seamless, .ecmwf_seas5, .ecmwf_ec46:
             return EcmwfSeasDomain.seas5.countEnsembleMember
+        case .ecmwf_wam025_ensemble:
+            return EcmwfDomain.wam025_ensemble.countEnsembleMember
+        case .ncep_gefswave025:
+            return GfsDomain.gfswave025_ens.countEnsembleMember
         default:
             return 1
         }

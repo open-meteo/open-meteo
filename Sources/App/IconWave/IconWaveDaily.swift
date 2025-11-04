@@ -1,4 +1,4 @@
-import Foundation
+/*import Foundation
 
 enum IconWaveVariableDaily: String, RawRepresentableString, DailyVariableCalculatable {
     case wave_height_max
@@ -42,3 +42,4 @@ enum IconWaveVariableDaily: String, RawRepresentableString, DailyVariableCalcula
         }
     }
 }
+*/
