@@ -57,12 +57,20 @@ public struct ForecastapiController: RouteCollection {
         )
         categoriesRoute.getAndPost("arpae", use: WeatherApiController(
             has15minutely: false,
+            
+            
             defaultModel: .arpae_cosmo_seamless).query
         )
 
         categoriesRoute.getAndPost("elevation", use: DemController().query)
         categoriesRoute.getAndPost("air-quality", use: CamsController().query)
-        categoriesRoute.getAndPost("seasonal", use: SeasonalForecastController().query)
+        categoriesRoute.getAndPost("seasonal", use: WeatherApiController(
+            has15minutely: false,
+            hasCurrentWeather: false,
+            defaultModel: .ecmwf_seasonal_seamless,
+            subdomain: "seasonal-api",
+            type: .seasonal
+        ).query)
         categoriesRoute.getAndPost("flood", use: GloFasController().query)
         categoriesRoute.getAndPost("climate", use: CmipController().query)
         categoriesRoute.getAndPost("marine", use: IconWaveController().query)
@@ -136,43 +144,53 @@ struct WeatherApiController {
             let forecastDaysMax: Int
             let forecastDayDefault: Int
             let historyStartDate: Timestamp
+            let temporalResolutionDefault: ApiTemporalResolution
             switch type {
             case .none:
                 forecastDaysMax = 217
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(1940, 1, 1)
+                temporalResolutionDefault = .hourly
             case .forecast:
                 forecastDaysMax = 16
                 forecastDayDefault = 7
                 historyStartDate = currentTimeHour0.subtract(days: 93)
+                temporalResolutionDefault = .hourly
             case .archive:
                 forecastDaysMax = 1
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(1940, 1, 1)
+                temporalResolutionDefault = .hourly
             case .historicalForecast:
                 forecastDaysMax = 16
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(2016, 1, 1)
+                temporalResolutionDefault = .hourly
             case .previousRuns:
                 forecastDaysMax = 16
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(2016, 1, 1)
+                temporalResolutionDefault = .hourly
             case .satellite:
                 forecastDaysMax = 1
                 forecastDayDefault = 1
                 historyStartDate = Timestamp(1983, 1, 1)
+                temporalResolutionDefault = .hourly
             case .singleRunsApi:
                 forecastDaysMax = 16
                 forecastDayDefault = 7
                 historyStartDate = Timestamp(2023, 1, 1)
+                temporalResolutionDefault = .hourly
             case .seasonal:
                 forecastDaysMax = 217
-                forecastDayDefault = 7
-                historyStartDate = Timestamp(2020, 1, 1)
+                forecastDayDefault = 183
+                historyStartDate = Timestamp(2025, 9, 1)
+                temporalResolutionDefault = .hourly_6
             case .ensemble:
                 forecastDaysMax = 36
                 forecastDayDefault = 7
                 historyStartDate = currentTimeHour0.subtract(days: 93)
+                temporalResolutionDefault = .hourly
             }
             let run = params.run
             switch type {
@@ -200,14 +218,19 @@ struct WeatherApiController {
             let paramsCurrent: [ForecastVariable]? = !hasCurrentWeather ? nil : params.current_weather == true ? defaultCurrentWeather : try ForecastVariable.load(commaSeparatedOptional: params.current)
             let paramsHourly = try ForecastVariable.load(commaSeparatedOptional: params.hourly)
             let paramsDaily = try ForecastVariableDaily.load(commaSeparatedOptional: params.daily)
+            let paramsWeekly = try Seas5Reader.WeeklyVariable.load(commaSeparatedOptional: params.weekly)
+            let paramsMonthly = try Seas5Reader.MonthlyVariable.load(commaSeparatedOptional: params.monthly)
             
             let nParamsHourly = paramsHourly?.count ?? 0
             let nParamsMinutely = paramsMinutely?.count ?? 0
             let nParamsCurrent = paramsCurrent?.count ?? 0
             let nParamsDaily = paramsDaily?.count ?? 0
-            let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember })
+            let nParamsWeekly = paramsWeekly?.count ?? 0
+            let nParamsMonthly = paramsMonthly?.count ?? 0
+            let nVariableNonEnsemble = (nParamsWeekly + nParamsMonthly) * domains.count
+            let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember }) + nVariableNonEnsemble
             let options = try params.readerOptions(for: req)
-            
+            let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
             
             let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
 
@@ -220,7 +243,7 @@ struct WeatherApiController {
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
                         let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: params.cell_selection ?? .land, options: options)
-                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime)
+                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                     }
                     guard !readers.isEmpty else {
                         throw ForecastApiError.noDataAvailableForThisLocation
@@ -229,8 +252,7 @@ struct WeatherApiController {
                     return .init(timezone: timezone, time: timeLocal, locationId: coordinates.locationId, results: readers)
                 }
             case .boundingBox(let bbox, dates: let dates, timezone: let timezone):
-                fatalError()
-                /*return try await domains.asyncFlatMap({ domain in
+                locations = try await domains.asyncFlatMap({ domain in
                     guard let grid = domain.genericDomain?.grid else {
                         throw ForecastApiError.generic(message: "Bounding box calls not supported for domain \(domain)")
                     }
@@ -240,58 +262,31 @@ struct WeatherApiController {
 
                     if dates.count == 0 {
                         let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: nil, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                        let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                         var locationId = -1
-                        return await gridpoionts.asyncMap( { gridpoint in
+                        return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
-                            return (locationId, timezone, time, [(domain, { () -> Self? in
-                                guard let reader = try await Self(domain: domain, gridpoint: gridpoint, options: options) else {
-                                    return nil
-                                }
-                                return reader
-                            })])
+                            let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     }
-
-                    return try await dates.asyncFlatMap({ date -> [(Int, TimezoneWithOffset, ForecastApiTimeRange, [(DomainProvider, () async throws -> Self?)])] in
+                    
+                    return try await dates.asyncFlatMap({ date -> [ForecastapiResult<MultiDomainsReader>.PerLocation] in
                         let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: date, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
+                        let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
                         var locationId = -1
-                        return await gridpoionts.asyncMap( { gridpoint in
+                        return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
-                            return (locationId, timezone, time, [(domain, { () -> Self? in
-                                guard let reader = try await Self(domain: domain, gridpoint: gridpoint, options: options) else {
-                                    return nil
-                                }
-                                return reader
-                            })])
+                            let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     })
-                })*/
+                })
             }
             
-            
-            /*let prepared = try await GenericReaderMulti<ForecastVariable, MultiDomains>.prepareReaders(domains: domains, params: params, options: options, currentTime: currentTime, forecastDayDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, pastDaysMax: pastDaysMax, allowedRange: allowedRange)
-
-            
-            
-            let locations: [ForecastapiResult<MultiDomainsReader>.PerLocation] = try await prepared.asyncMap { prepared in
-                let timezone = prepared.timezone
-                let time = prepared.time
-                let timeLocal = TimerangeLocal(range: time.dailyRead.range, utcOffsetSeconds: timezone.utcOffsetSeconds)
-                //let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: 3600 / 4), nTime: 1, dtSeconds: 3600 / 4)
-                
-                let readers: [MultiDomainsReader] = try await prepared.perModel.asyncCompactMap { readerAndDomain -> MultiDomainsReader? in
-                    guard let reader: GenericReaderMulti = try await readerAndDomain.reader() else {
-                        return nil
-                    }
-                    return MultiDomainsReader(reader: reader, params: params, run: run, time: time, timezone: timezone, currentTime: currentTime)
-                }
-                guard !readers.isEmpty else {
-                    throw ForecastApiError.noDataAvailableForThisLocation
-                }
-                return .init(timezone: timezone, time: timeLocal, locationId: prepared.locationId, results: readers)
-            }*/
-            
-            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: nil, monthlyVariables: nil, nVariablesTimesDomains: nVariables)
+            return ForecastapiResult(timeformat: params.timeformatOrDefault, results: locations, currentVariables: paramsCurrent, minutely15Variables: paramsMinutely, hourlyVariables: paramsHourly, sixHourlyVariables: nil, dailyVariables: paramsDaily, weeklyVariables: paramsWeekly, monthlyVariables: paramsMonthly, nVariablesTimesDomains: nVariables)
         }
     }
 }
@@ -339,6 +334,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let time: ForecastApiTimeRange
     let timezone: TimezoneWithOffset
     let currentTime: Timestamp
+    let temporalResolution: ApiTemporalResolution
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, sixHourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
         let members = 0..<domain.countEnsembleMember
@@ -777,6 +773,19 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             return (hourlyReader, daily, nil, nil)
         }
         
+    }
+    
+    func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<SeasonalVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<SeasonalVariableMonthly>)?) {
+        
+        switch self {
+        default:
+            guard let readers: any GenericReaderProtocol = try await getReader(gridpoint: gridpoint, options: options) else {
+                return (nil, nil, nil, nil)
+            }
+            let hourlyReader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: self, reader: [readers])
+            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable, MultiDomains>, ForecastVariableDaily>(reader: hourlyReader)
+            return (hourlyReader, daily, nil, nil)
+        }
     }
     
     

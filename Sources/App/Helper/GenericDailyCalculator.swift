@@ -116,7 +116,7 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
             guard let data = try await reader.get(variable: b, time: time) else {
                 return nil
             }
-            return DataAndUnit(data.data.mean(by: 24), data.unit)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
         case .sum(let variable):
             guard let data = try await reader.get(variable: variable, time: time) else {
                 return nil
