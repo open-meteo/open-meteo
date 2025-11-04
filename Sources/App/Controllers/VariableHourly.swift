@@ -705,3 +705,22 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         
     }
 }
+
+
+extension ForecastVariable {
+    var onlySingleMember: Bool {
+        switch self {
+        case .surface(let surface):
+            switch surface.variable {
+            case .terrestrial_radiation, .terrestrial_radiation_instant:
+                return true
+            default:
+                return false
+            }
+        case .pressure(_):
+            return false
+        case .height(_):
+            return false
+        }
+    }
+}

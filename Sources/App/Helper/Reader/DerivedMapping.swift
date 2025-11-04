@@ -214,3 +214,184 @@ extension GenericDeriverProtocol {
         }
     }
 }
+
+
+protocol GenericDeriverOptionalProtocol: GenericReaderOptionalProtocol {
+    associatedtype ReaderVariable: GenericVariableMixable
+    
+    var reader: any GenericReaderOptionalProtocol<ReaderVariable> {get}
+    func getDeriverMap(variable: VariableOpt) -> DerivedMapping<ReaderVariable>?
+}
+
+extension GenericDeriverOptionalProtocol {
+    var modelLat: Float {
+        reader.modelLat
+    }
+
+    var modelLon: Float {
+        reader.modelLon
+    }
+
+    var modelElevation: ElevationOrSea {
+        reader.modelElevation
+    }
+
+    var modelDtSeconds: Int {
+        reader.modelDtSeconds
+    }
+
+    var targetElevation: Float {
+        reader.targetElevation
+    }
+    
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.getStatic(type: type)
+    }
+    
+    func get(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        guard let mapping = getDeriverMap(variable: variable) else {
+            return nil
+        }
+        return try await get(variable: mapping, time: time)
+    }
+    
+    func prefetchData(variable: VariableOpt, time: TimerangeDtAndSettings) async throws -> Bool {
+        guard let mapping = getDeriverMap(variable: variable) else {
+            return false
+        }
+        return try await prefetchData(variable: mapping, time: time)
+    }
+    
+    fileprivate func get(variable: ReaderVariable?, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        guard let variable else {
+            return nil
+        }
+        return try await reader.get(variable: variable, time: time)
+    }
+    
+    fileprivate func get(mapping: DerivedMapping<ReaderVariable>.RawOrMapped, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        switch mapping {
+        case .raw(let variable):
+            return try await reader.get(variable: variable, time: time)
+        case .mapped(let derivedMapping):
+            return try await get(variable: derivedMapping, time: time)
+        }
+    }
+    
+    
+    fileprivate func get(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        switch variable {
+        case .direct(let variable):
+            return try await reader.get(variable: variable, time: time)
+        case .directShift24Hour(let variable):
+            return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .independent(let fn):
+            return fn(time)
+        case .one(let a, let fn):
+            guard let a = try await get(mapping: a, time: time) else {
+                return nil
+            }
+            return fn(a, time)
+        case .two(let a, let b, let fn):
+            guard
+                let a = try await get(mapping: a, time: time),
+                let b = try await get(mapping: b, time: time) else {
+                return nil
+            }
+            return fn(a, b, time)
+        case .three(let a, let b, let c, let fn):
+            guard
+                let a = try await get(mapping: a, time: time),
+                let b = try await get(mapping: b, time: time),
+                let c = try await get(mapping: c, time: time) else {
+                return nil
+            }
+            return fn(a, b, c, time)
+        case .four(let a, let b, let c, let d, let fn):
+            guard
+                let a = try await get(mapping: a, time: time),
+                let b = try await get(mapping: b, time: time),
+                let c = try await get(mapping: c, time: time),
+                let d = try await get(mapping: d, time: time) else {
+                return nil
+            }
+            return fn(a, b, c, d, time)
+        case .weatherCode(cloudcover: let cloudcover, precipitation: let precipitation, convectivePrecipitation: let convectivePrecipitation, snowfallCentimeters: let snowfallCentimeters, gusts: let gusts, cape: let cape, liftedIndex: let liftedIndex, visibilityMeters: let visibilityMeters, categoricalFreezingRain: let categoricalFreezingRain):
+            
+            guard
+                let cloudcover = try await get(mapping: cloudcover, time: time),
+                let snowfall = try await get(mapping: snowfallCentimeters, time: time),
+                let precipitation = try await reader.get(variable: precipitation, time: time) else {
+                return nil
+            }
+            
+            return DataAndUnit(WeatherCode.calculate(
+                cloudcover: cloudcover.data,
+                precipitation: precipitation.data,
+                convectivePrecipitation: try await get(variable: convectivePrecipitation, time: time)?.data,
+                snowfallCentimeters: snowfall.data,
+                gusts: try await get(variable: gusts, time: time)?.data,
+                cape: try await get(variable: cape, time: time)?.data,
+                liftedIndex: try await get(variable: liftedIndex, time: time)?.data,
+                visibilityMeters: try await get(variable: visibilityMeters, time: time)?.data,
+                categoricalFreezingRain: try await get(variable: categoricalFreezingRain, time: time)?.data,
+                modelDtSeconds: time.dtSeconds), .wmoCode
+            )
+        }
+    }
+    
+    fileprivate func prefetchData(mapping: DerivedMapping<ReaderVariable>.RawOrMapped, time: TimerangeDtAndSettings) async throws -> Bool {
+        switch mapping {
+        case .raw(let variable):
+            try await reader.prefetchData(variable: variable, time: time)
+        case .mapped(let derivedMapping):
+            try await prefetchData(variable: derivedMapping, time: time)
+        }
+    }
+    
+    fileprivate func prefetchData(variable: ReaderVariable?, time: TimerangeDtAndSettings) async throws -> Bool {
+        guard let variable else {
+            return false
+        }
+        return try await reader.prefetchData(variable: variable, time: time)
+    }
+    
+    fileprivate func prefetchData(variable: DerivedMapping<ReaderVariable>, time: TimerangeDtAndSettings) async throws -> Bool {
+        switch variable {
+        case .direct(let variable):
+            return try await prefetchData(variable: variable, time: time)
+        case .directShift24Hour(let variable):
+            return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
+        case .independent(_):
+            return true
+        case .one(let a, _):
+            return try await prefetchData(mapping: a, time: time)
+        case .two(let a, let b, _):
+            let a = try await prefetchData(mapping: a, time: time)
+            let b = try await prefetchData(mapping: b, time: time)
+            return a && b
+        case .three(let a, let b, let c, _):
+            let a = try await prefetchData(mapping: a, time: time)
+            let b = try await prefetchData(mapping: b, time: time)
+            let c = try await prefetchData(mapping: c, time: time)
+            return a && b && c
+        case .four(let a, let b, let c, let d, _):
+            let a = try await prefetchData(mapping: a, time: time)
+            let b = try await prefetchData(mapping: b, time: time)
+            let c = try await prefetchData(mapping: c, time: time)
+            let d = try await prefetchData(mapping: d, time: time)
+            return a && b && c && d
+        case .weatherCode(cloudcover: let cloudcover, precipitation: let precipitation, convectivePrecipitation: let convectivePrecipitation, snowfallCentimeters: let snowfallCentimeters, gusts: let gusts, cape: let cape, liftedIndex: let liftedIndex, visibilityMeters: let visibilityMeters, categoricalFreezingRain: let categoricalFreezingRain):
+            let a = try await prefetchData(mapping: cloudcover, time: time)
+            let b = try await prefetchData(mapping: snowfallCentimeters, time: time)
+            let c = try await prefetchData(variable: precipitation, time: time)
+            let _ = try await prefetchData(variable: convectivePrecipitation, time: time)
+            let _ = try await prefetchData(variable: gusts, time: time)
+            let _ = try await prefetchData(variable: cape, time: time)
+            let _ = try await prefetchData(variable: liftedIndex, time: time)
+            let _ = try await prefetchData(variable: visibilityMeters, time: time)
+            let _ = try await prefetchData(variable: categoricalFreezingRain, time: time)
+            return a && b && c
+        }
+    }
+}

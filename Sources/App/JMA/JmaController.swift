@@ -23,8 +23,6 @@ enum JmaVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case vapour_pressure_deficit
     case vapor_pressure_deficit
     case surface_pressure
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case weathercode
     case weather_code
     case snowfall
@@ -142,10 +140,6 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .surface_pressure:
                 try await prefetchData(raw: .pressure_msl, time: time)
                 try await prefetchData(raw: .temperature_2m, time: time)
-            case .terrestrial_radiation:
-                break
-            case .terrestrial_radiation_instant:
-                break
             case .dew_point_2m, .dewpoint_2m:
                 try await prefetchData(raw: .temperature_2m, time: time)
                 try await prefetchData(raw: .relative_humidity_2m, time: time)
@@ -236,14 +230,6 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let temperature = try await get(raw: .temperature_2m, time: time).data
                 let pressure = try await get(raw: .pressure_msl, time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
-            case .terrestrial_radiation:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            case .terrestrial_radiation_instant:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
             case .dew_point_2m, .dewpoint_2m:
                 let temperature = try await get(raw: .temperature_2m, time: time)
                 let rh = try await get(raw: .relative_humidity_2m, time: time)

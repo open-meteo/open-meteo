@@ -902,8 +902,6 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case cloudcover_mid
     case cloudcover_high
 
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation

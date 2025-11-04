@@ -312,7 +312,7 @@ struct WeatherApiController {
                     let time = try params.getTimerange2(timezone: timezone, current: currentTime, forecastDaysDefault: forecastDayDefault, forecastDaysMax: forecastDaysMax, startEndDate: prepared.startEndDate, allowedRange: allowedRange, pastDaysMax: pastDaysMax)
                     let readers: [MultiDomainsReader] = try await domains.asyncCompactMap { domain in
                         let r = try await domain.getReaders(lat: coordinates.latitude, lon: coordinates.longitude, elevation: coordinates.elevation, mode: cellSelection, options: options, biasCorrection: biasCorrection)
-                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                        return MultiDomainsReader(domain: domain, readerHourly: r.hourly.map(VariableHourlyDeriverHighLevel.init), readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                     }
                     guard !readers.isEmpty else {
                         throw ForecastApiError.noDataAvailableForThisLocation
@@ -336,7 +336,7 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly.map(VariableHourlyDeriverHighLevel.init), readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     }
@@ -348,7 +348,7 @@ struct WeatherApiController {
                         return try await gridpoionts.asyncMap( { gridpoint in
                             locationId += 1
                             let r = try await domain.getReaders(gridpoint: gridpoint, options: options)
-                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly, readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
+                            let readers = MultiDomainsReader(domain: domain, readerHourly: r.hourly.map(VariableHourlyDeriverHighLevel.init), readerDaily: r.daily, readerWeekly: r.weekly, readerMonthly: r.monthly, params: params, run: run, has15minutely: has15minutely, time: time, timezone: timezone, currentTime: currentTime, temporalResolution: temporalResolution)
                             return .init(timezone: timezone, time: timeLocal, locationId: locationId, results: [readers])
                         })
                     })
@@ -379,7 +379,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     //let reader: GenericReaderMulti<ForecastVariable, MultiDomains>
     let domain: MultiDomains
     
-    let readerHourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?
+    let readerHourly: VariableHourlyDeriverHighLevel?
     let readerDaily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?
     let readerWeekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?
     let readerMonthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?
@@ -406,8 +406,6 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
     let temporalResolution: ApiTemporalResolution
     
     func prefetch(currentVariables: [HourlyVariable]?, minutely15Variables: [HourlyVariable]?, hourlyVariables: [HourlyVariable]?, dailyVariables: [DailyVariable]?, weeklyVariables: [WeeklyVariable]?, monthlyVariables: [MonthlyVariable]?) async throws {
-        let members = 0..<domain.countEnsembleMember
-        
         if let currentVariables, let readerHourly {
             let currentTimeRange = TimerangeDt(start: currentTime.floor(toNearest: has15minutely ? 900 : 3600), nTime: 1, dtSeconds: has15minutely ? 900 : 3600)
             for variable in currentVariables {
@@ -417,6 +415,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         }
         if let minutely15Variables, let readerHourly {
             for variable in minutely15Variables {
+                let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
                 let (v, previousDay) = variable.variableAndPreviousDay
                 for member in members {
                     let _ = try await readerHourly.prefetchData(variable: v, time: time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
@@ -427,6 +426,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
             let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly.modelDtSeconds
             let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
             for variable in hourlyVariables {
+                let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
                 let (v, previousDay) = variable.variableAndPreviousDay
                 for member in members {
                     let _ = try await readerHourly.prefetchData(variable: v, time: timeHourlyRead.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run))
@@ -438,7 +438,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 /// Flood API uses a boolean flag to enable ensemble members for river_discharge
                 /// Also, flood API uses `ensembleMember` instead of `ensembleMemberLevel`, because members are stored in different files
                 let allMembersForRiverDischarge = variable == .river_discharge && params.ensemble
-                let members = allMembersForRiverDischarge ? 0..<51 : members
+                let members = allMembersForRiverDischarge ? 0..<51 : 0..<domain.countEnsembleMember
                 for member in members {
                     let _ = try await readerDaily.prefetchData(variable: variable, time: time.dailyRead.toSettings(
                         ensembleMember: allMembersForRiverDischarge ? member : nil,
@@ -489,10 +489,10 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         let hourlyDt = (params.temporal_resolution ?? temporalResolution).dtSeconds ?? readerHourly.modelDtSeconds
         let timeHourlyRead = time.hourlyRead.with(dtSeconds: hourlyDt)
         let timeHourlyDisplay = time.hourlyDisplay.with(dtSeconds: hourlyDt)
-        let members = 0..<domain.countEnsembleMember
-        
         return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
+            let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
+            
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = timeHourlyRead.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)
@@ -561,10 +561,10 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         guard let variables, let readerHourly else {
             return nil
         }
-        let members = 0..<domain.countEnsembleMember
         
         return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
+            let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)

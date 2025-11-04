@@ -19,8 +19,6 @@ enum MeteoSwissVariableDerivedSurface: String, CaseIterable, GenericVariableMixa
     case vapor_pressure_deficit
     case snowfall
     case surface_pressure
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case weather_code
     case is_day
     case showers
@@ -125,8 +123,6 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
             case .surface_pressure:
                 try await prefetchData(variable: .pressure_msl, time: time)
                 try await prefetchData(variable: .temperature_2m, time: time)
-            case .terrestrial_radiation, .terrestrial_radiation_instant:
-                break
             case .dew_point_2m:
                 try await prefetchData(variable: .temperature_2m, time: time)
                 try await prefetchData(variable: .relative_humidity_2m, time: time)
@@ -224,14 +220,6 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try await get(raw: .temperature_2m, time: time).data
                 let pressure = try await get(raw: .pressure_msl, time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
-            case .terrestrial_radiation:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            case .terrestrial_radiation_instant:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
             case .dew_point_2m:
                 let temperature = try await get(raw: .temperature_2m, time: time)
                 let rh = try await get(raw: .relative_humidity_2m, time: time)
