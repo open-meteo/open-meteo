@@ -223,11 +223,11 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             return DataAndUnit(max, .europeanAirQualityIndex)
         case .european_aqi_pm2_5:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
-            let pm2_5 = try await get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            let pm2_5 = try await get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
             return DataAndUnit(pm2_5.map(EuropeanAirQuality.indexPm2_5), .europeanAirQualityIndex)
         case .european_aqi_pm10:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
-            let pm10avg = try await get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            let pm10avg = try await get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
             return DataAndUnit(pm10avg.map(EuropeanAirQuality.indexPm10), .europeanAirQualityIndex)
         case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
             let no2 = try await get(raw: .nitrogen_dioxide, time: time).data
@@ -251,11 +251,11 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             return DataAndUnit(max, .usAirQualityIndex)
         case .us_aqi_pm2_5:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
-            let pm2_5 = try await get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            let pm2_5 = try await get(raw: .pm2_5, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
             return DataAndUnit(pm2_5.map(UnitedStatesAirQuality.indexPm2_5), .usAirQualityIndex)
         case .us_aqi_pm10:
             let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
-            let pm10avg = try await get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24)
+            let pm10avg = try await get(raw: .pm10, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
             return DataAndUnit(pm10avg.map(UnitedStatesAirQuality.indexPm10), .usAirQualityIndex)
         case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
             // need to convert from ugm3 to ppb
@@ -265,18 +265,18 @@ struct CamsReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             // need to convert from ugm3 to ppb
             let timeAhead = time.with(start: time.range.lowerBound.add(-8 * 3600))
             let o3 = try await get(raw: .ozone, time: timeAhead).data
-            let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8)
-            return DataAndUnit(zip(o3.dropFirst(8), o3avg).map({ UnitedStatesAirQuality.indexO3(o3: $0.0 / 1.96, o3_8h_mean: $0.1 / 1.96) }), .usAirQualityIndex)
+            let o3avg = o3.slidingAverageDroppingFirstDt(dt: 8 * 3600 / time.dtSeconds)
+            return DataAndUnit(zip(o3.dropFirst(8 * 3600 / time.dtSeconds), o3avg).map({ UnitedStatesAirQuality.indexO3(o3: $0.0 / 1.96, o3_8h_mean: $0.1 / 1.96) }), .usAirQualityIndex)
         case .us_aqi_sulphur_dioxide, .us_aqi_so2:
             // need to convert from ugm3 to ppb
             let timeAhead = time.with(start: time.range.lowerBound.add(-24 * 3600))
             let so2 = try await get(raw: .sulphur_dioxide, time: timeAhead).data
-            let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24)
-            return DataAndUnit(zip(so2.dropFirst(24), so2avg).map({ UnitedStatesAirQuality.indexSo2(so2: $0.0 / 2.62, so2_24h_mean: $0.1 / 2.62) }), .usAirQualityIndex)
+            let so2avg = so2.slidingAverageDroppingFirstDt(dt: 24 * 3600 / time.dtSeconds)
+            return DataAndUnit(zip(so2.dropFirst(24 * 3600 / time.dtSeconds), so2avg).map({ UnitedStatesAirQuality.indexSo2(so2: $0.0 / 2.62, so2_24h_mean: $0.1 / 2.62) }), .usAirQualityIndex)
         case .us_aqi_carbon_monoxide, .us_aqi_co:
             // need to convert from ugm3 to ppm
             let timeAhead = time.with(start: time.range.lowerBound.add(-8 * 3600))
-            let co = try await get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8)
+            let co = try await get(raw: .carbon_monoxide, time: timeAhead).data.slidingAverageDroppingFirstDt(dt: 8 * 3600 / time.dtSeconds)
             return DataAndUnit(co.map({ UnitedStatesAirQuality.indexCo(co_8h_mean: $0 / 1.15 / 1000) }), .usAirQualityIndex)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
