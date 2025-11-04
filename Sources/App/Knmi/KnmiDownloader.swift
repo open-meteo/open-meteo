@@ -157,7 +157,7 @@ struct KnmiDownload: AsyncCommand {
                 }
                 
                 switch shortName {
-                case "10u":
+                /*case "10u":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
                 case "10v":
@@ -168,7 +168,7 @@ struct KnmiDownload: AsyncCommand {
                     return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
                 case "100v":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
-                    return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                    return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)*/
                 case "ugst":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
@@ -178,15 +178,48 @@ struct KnmiDownload: AsyncCommand {
                 case "u":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     let level = Int(levelStr)!
-                    return try await windSpeedCalculatorPressure.ingest(.u(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                    if typeOfLevel == "heightAboveGround" {
+                        switch level {
+                        case 10:
+                            return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                        case 50:
+                            return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                        case 100:
+                            return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                        case 200:
+                            return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_200m, outDirection: .wind_direction_200m, writer: writer)
+                        case 300:
+                            return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_300m, outDirection: .wind_direction_300m, writer: writer)
+                        default:
+                            logger.info("Level not defined for wind speed: \(levelStr)")
+                        }
+                    } else {
+                        return try await windSpeedCalculatorPressure.ingest(.u(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                    }
                 case "v":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     let level = Int(levelStr)!
-                    return try await windSpeedCalculatorPressure.ingest(.v(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                    if typeOfLevel == "heightAboveGround" {
+                        switch level {
+                        case 10:
+                            return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                        case 50:
+                            return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                        case 100:
+                            return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)
+                        case 200:
+                            return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_200m, outDirection: .wind_direction_200m, writer: writer)
+                        case 300:
+                            return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_300m, outDirection: .wind_direction_300m, writer: writer)
+                        default:
+                            logger.info("Level not defined for wind speed: \(levelStr)")
+                        }
+                    } else {
+                        return try await windSpeedCalculatorPressure.ingest(.v(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                    }
                 default:
                     break
                 }
-                
 
                 if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
                     if !generateElevationFile && [KnmiVariableTemporary.elevation, .landmask].contains(temporary) {
