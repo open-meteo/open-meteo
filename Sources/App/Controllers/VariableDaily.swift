@@ -135,12 +135,9 @@ enum ForecastVariableDaily: String, DailyVariableCalculatable, GenericVariableMi
     var aggregation: DailyAggregation<ForecastVariable> {
         switch self {
         case .temperature_2m_max:
-            return .max(.surface(.init(.temperature_2m, 0)))
-            // Note: some models like best_match may not provide hourly temperature_2m_max correctly, because some models to not provide it
-            //return .maxTwo(intervalMax: .surface(.init(.temperature_2m_max, 0)), hourly: .surface(.init(.temperature_2m, 0)))
+            return .maxTwo(intervalMax: .surface(.init(.temperature_2m_max, 0)), hourly: .surface(.init(.temperature_2m, 0)))
         case .temperature_2m_min:
-            return .min(.surface(.init(.temperature_2m, 0)))
-            //return .minTwo(intervalMin: .surface(.init(.temperature_2m_min, 0)), hourly: .surface(.init(.temperature_2m, 0)))
+            return .minTwo(intervalMin: .surface(.init(.temperature_2m_min, 0)), hourly: .surface(.init(.temperature_2m, 0)))
         case .temperature_2m_mean:
             return .mean(.surface(.init(.temperature_2m, 0)))
         case .apparent_temperature_max:
