@@ -170,11 +170,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
-                    /// For weekly data, subtract 7 days, to make the timestamp start at a given week instead of end at a given week (forward definition)
-                    let time = isWeekly ? attributes.timestamp.add(days: -7) : attributes.timestamp
-                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
-                    let member = domain.dtSeconds > 24*3600 ? 0 : message.getLong(attribute: "perturbationNumber") ?? 0
-                    
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {
                     case .ec46:
@@ -188,6 +183,10 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         logger.info("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
                         return
                     }
+                    /// For weekly data, subtract 7 days, to make the timestamp start at a given week instead of end at a given week (forward definition)
+                    let time = isWeekly ? attributes.timestamp.add(days: -7) : attributes.timestamp
+                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
+                    let member = domain.dtSeconds > 24*3600 ? 0 : message.getLong(attribute: "perturbationNumber") ?? 0
                     if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
@@ -258,11 +257,6 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 // Download and process concurrently
                 try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
-                    /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
-                    let time = isMonthly ? monthTimestamp : attributes.timestamp
-                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
-                    let member = message.getLong(attribute: "perturbationNumber") ?? 0
-                    
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {
                     case .seas5:
@@ -284,6 +278,10 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         logger.debug("Could not find variable for name=\(attributes.shortName) level=\(attributes.levelStr)")
                         return
                     }
+                    /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
+                    let time = isMonthly ? monthTimestamp : attributes.timestamp
+                    var array2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
+                    let member = message.getLong(attribute: "perturbationNumber") ?? 0
                     if let fma = variable.multiplyAdd(dtSeconds: dtSecondActual) {
                         array2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                     }
