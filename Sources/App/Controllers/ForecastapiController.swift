@@ -628,7 +628,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
  
  Note Nov 2022: Use the term `seamless` instead of `mix`
  */
-enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixerDomain, Sendable {
+enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case best_match
 
     case gfs_seamless
@@ -882,66 +882,66 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             
         case .CMCC_CM2_VHR4:
             let reader = try await Cmip6Domain.CMCC_CM2_VHR4.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .FGOALS_f3_H:
             let reader = try await Cmip6Domain.FGOALS_f3_H.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .HiRAM_SIT_HR:
             let reader = try await Cmip6Domain.HiRAM_SIT_HR.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .MRI_AGCM3_2_S:
             let reader = try await Cmip6Domain.MRI_AGCM3_2_S.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .EC_Earth3P_HR:
             let reader = try await Cmip6Domain.EC_Earth3P_HR.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .MPI_ESM1_2_XR:
             let reader = try await Cmip6Domain.MPI_ESM1_2_XR.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .NICAM16_8S:
             let reader = try await Cmip6Domain.NICAM16_8S.makeReader(biasCorrection: biasCorrection, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
             
         case .flood_best_match:
             guard let reader = try await GloFasMixer(domains: [.seasonal, .consolidated, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .seamless_v3:
             guard let reader = try await GloFasMixer(domains: [.seasonalv3, .consolidatedv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .forecast_v3:
             guard let reader = try await GloFasMixer(domains: [.seasonalv3, .intermediatev3, .forecastv3], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .consolidated_v3:
             guard let reader = try await GloFasMixer(domains: [.consolidatedv3], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .seamless_v4:
             guard let reader = try await GloFasMixer(domains: [.seasonal, .consolidated, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .forecast_v4:
             guard let reader = try await GloFasMixer(domains: [.seasonal, .intermediate, .forecast], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
         case .consolidated_v4:
             guard let reader = try await GloFasMixer(domains: [.consolidated], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            return (nil, GenericReaderMulti<ForecastVariableDaily, MultiDomains>(domain: self, reader: [reader]), nil, nil)
+            return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
             
         default:
             let readers: [any GenericReaderProtocol] = try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let hourlyReader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: self, reader: readers)
-            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable, MultiDomains>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
+            let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: readers)
+            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
             return (hourlyReader, daily, nil, nil)
         }
         
@@ -954,8 +954,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, MultiDomainMixe
             guard let readers: any GenericReaderProtocol = try await getReader(gridpoint: gridpoint, options: options) else {
                 return (nil, nil, nil, nil)
             }
-            let hourlyReader = GenericReaderMulti<ForecastVariable, MultiDomains>(domain: self, reader: [readers])
-            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable, MultiDomains>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
+            let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: [readers])
+            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
             return (hourlyReader, daily, nil, nil)
         }
     }

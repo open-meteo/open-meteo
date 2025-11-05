@@ -1,21 +1,9 @@
 import Foundation
 
-protocol MultiDomainMixerDomain: RawRepresentableString, GenericDomainProvider {
-    var countEnsembleMember: Int { get }
-
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> [any GenericReaderProtocol]
-
-    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)?
-}
-
 /// Combine multiple independent weather models, that may not have given forecast variable
-struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainMixerDomain>: GenericReaderProvider, GenericReaderOptionalProtocol {
-
-    
+struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
     typealias VariableOpt = Variable
     let reader: [any GenericReaderProtocol]
-
-    let domain: Domain
 
     var modelLat: Float {
         reader.last?.modelLat ?? .nan
@@ -33,31 +21,12 @@ struct GenericReaderMulti<Variable: GenericVariableMixable, Domain: MultiDomainM
         reader.last?.modelElevation ?? .noData
     }
 
-    public init(domain: Domain, reader: [any GenericReaderProtocol]) {
+    public init(reader: [any GenericReaderProtocol]) {
         self.reader = reader
-        self.domain = domain
     }
     
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
         return try await reader.first?.getStatic(type: type)
-    }
-    
-
-    public init?(domain: Domain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws {
-        let reader = try await domain.getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        guard !reader.isEmpty else {
-            return nil
-        }
-        self.domain = domain
-        self.reader = reader
-    }
-
-    public init?(domain: Domain, gridpoint: Int, options: GenericReaderOptions) async throws {
-        guard let reader = try await domain.getReader(gridpoint: gridpoint, options: options) else {
-            return nil
-        }
-        self.domain = domain
-        self.reader = [reader]
     }
 
     func prefetchData(variables: [Variable], time: TimerangeDtAndSettings) async throws {
@@ -119,21 +88,6 @@ extension GenericReaderProtocol {
         return true
     }
 }
-
-
-protocol MultiDomainMixerDomainSameType<VariableHourly, VariableDaily, VariableWeekly, VariableMonthly>: RawRepresentableString, GenericDomainProvider {
-    associatedtype VariableHourly: GenericVariableMixable
-    associatedtype VariableDaily: GenericVariableMixable
-    associatedtype VariableWeekly: GenericVariableMixable
-    associatedtype VariableMonthly: GenericVariableMixable
-    var countEnsembleMember: Int { get }
-
-    func getReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], weekly: [any GenericReaderOptionalProtocol<VariableWeekly>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])
-
-    func getReader(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: [any GenericReaderOptionalProtocol<VariableHourly>], daily: [any GenericReaderOptionalProtocol<VariableDaily>], weekly: [any GenericReaderOptionalProtocol<VariableWeekly>], monthly: [any GenericReaderOptionalProtocol<VariableMonthly>])?
-}
-
-
 
 /// Combine multiple independent weather models, that may not have given forecast variable
 struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericReaderOptionalProtocol {
