@@ -231,7 +231,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let runMonth = run.toComponents().month
+        //let runMonth = run.toComponents().month
         let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
         let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
         let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
@@ -239,21 +239,24 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         for month in 0...6 {
             let monthTimestamp = run.toYearMonth().advanced(by: month).timestamp
-            let monthToDownload = (runMonth + month - 1) % 12 + 1
+            let monthYYYYMM = "\(monthTimestamp.toComponents().year.zeroPadded(len: 4))\(monthTimestamp.toComponents().month.zeroPadded(len: 2))"
+            //let monthToDownload = (runMonth + month - 1) % 12 + 1
             /// dtSeconds with the correct value for the corresponding month
             let dtSecondActual = isMonthly ? run.toYearMonth().advanced(by: month+1).timestamp.timeIntervalSince1970 - monthTimestamp.timeIntervalSince1970 : domain.dtSeconds
             for package in domain.downloadPackages {
-                if package == 1 && month == 6 {
+                /*if package == 1 && month == 6 {
                     continue
-                }
-                let file = "A\(package)L\(runMonth.zeroPadded(len: 2))010000\(monthToDownload.zeroPadded(len: 2))______1"
+                }*/
+                
+                let file = "\(package)_\(run.format_YYYYMMdd)T000000Z_\(monthYYYYMM)_m\((month+1).zeroPadded(len: 2)).bz2"
+                //let file = "A\(package)L\(runMonth.zeroPadded(len: 2))010000\(monthToDownload.zeroPadded(len: 2))______1"
                 let url = "\(server)\(file)"
                 
                 /// Single GRIB files contains multiple time-steps in mixed order
                 let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableAny>()
                 
                 // Download and process concurrently
-                try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
+                try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
                     /// For monthly files use the monthly timestamp. Valid time in GRIB is one month ahead
                     let time = isMonthly ? monthTimestamp : attributes.timestamp
@@ -318,31 +321,29 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
 extension EcmwfSeasDomain {
     /**
-     A1: 12h model levels N160 (only 6 months)
-     A2: 6h single levels O320
-     A3: 24h single levels O320
-     A4: 12h pressure levels N160
-     A5: monthly single level means O320
-     A6: monthly pressure level means N160
-     A7: monthly single level anomaly O320
-     A8: monthly pressure level anomalies N160
+     S1 SEAS5 6-hourly, mmsf_fc
+     S2 SEAS5 monthly, mmsa_em, msmm_em
+     S3 SEAS5 24-hourly, mmsf_fc
+     S4 SEAS5 24-hourly waves, wasf_fc
      */
-    var downloadPackages: [Int] {
+    var downloadPackages: [String] {
         switch self {
         case .seas5:
-            return [2]
+            return ["ope_s1_ifs-seas_od_mmsf_fc"]
         case .seas5_12hourly:
-            return [1, 4]
+            return []
         case .seas5_daily:
-            return [3]
+            return ["ope_s3_ifs-seas_od_mmsf_fc"]
         case .seas5_monthly_upper_level:
-            return [6, 8]
+            return []
         case .seas5_monthly:
-            return [5, 7]
+            return ["ope_s2_ifs-seas_od_mmsa_em", "ope_s2_ifs-seas_od_msmm_em"]
         case .ec46:
             return []
         case .ec46_weekly:
             return []
+        //case .seas5_waves_daily: // N160 grid msqs/cdww/dwi/pp1d/swh/mp1/mp2/mwp
+        //    return ["ope_s4_ifs-seas_od_wasf_fc"]
         }
     }
     
