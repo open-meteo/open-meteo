@@ -26,7 +26,6 @@ struct Bzip2AsyncDecompress<T: AsyncSequence>: AsyncSequence where T.Element == 
             self.iterator = iterator
             self.writebuffer = ByteBuffer()
             self.bz2 = bz_stream()
-            writebuffer.reserveCapacity(minimumWritableBytes: 4096)
 
             let error = BZ2_bzDecompressInit(&bz2, 0, 0)
             guard error == BZ_OK else {
@@ -38,12 +37,11 @@ struct Bzip2AsyncDecompress<T: AsyncSequence>: AsyncSequence where T.Element == 
             guard var compressed = try await self.iterator.next() else {
                 return nil
             }
-            writebuffer.moveReaderIndex(to: writebuffer.writerIndex)
+            writebuffer.clear(minimumCapacity: compressed.readableBytes * 4)
             bz2.avail_in = UInt32(compressed.readableBytes)
             return compressed.withUnsafeMutableReadableBytes({ compressed in
                 bz2.next_in = compressed.baseAddress?.assumingMemoryBound(to: CChar.self)
                 while true {
-                    writebuffer.reserveCapacity(minimumWritableBytes: writebuffer.writerIndex)
                     let ret = writebuffer.withUnsafeMutableWritableBytes({ out in
                         bz2.next_out = out.baseAddress?.assumingMemoryBound(to: CChar.self)
                         bz2.avail_out = UInt32(out.count)
@@ -56,6 +54,8 @@ struct Bzip2AsyncDecompress<T: AsyncSequence>: AsyncSequence where T.Element == 
                     if bz2.avail_out > 0 || ret == BZ_STREAM_END {
                         return writebuffer
                     }
+                    // Grow output buffer
+                    writebuffer.reserveCapacity(minimumWritableBytes: 128*1024)
                 }
             })
         }
