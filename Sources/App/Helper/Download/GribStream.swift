@@ -17,7 +17,7 @@ extension AsyncSequence where Self: Sendable, Element == ByteBuffer {
                     // repeat until GRIB header is found
                     guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                         guard let input = try await iterator.next() else {
-                            return // end of stream
+                            break // end of stream
                         }
                         guard buffer.readableBytes < 64 * 1024 else {
                             throw GribAsyncStreamError.didNotFindGibHeader
