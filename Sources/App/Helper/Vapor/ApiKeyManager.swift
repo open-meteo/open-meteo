@@ -159,7 +159,7 @@ extension Request {
         guard let limit = await ApiKeyManager.instance.getLimit(String.SubSequence(apikey)) else {
             throw ApiKeyManagerError.apiKeyInvalid
         }
-        let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api."]
+        let apiProfessionalApis = ["archive-api.", "climate-api.", "ensemble-api.", "historical-forecast-api.", "previous-runs-api.", "single-runs-api.", "satellite-api.", "seasonal-api."]
         if limit > 0 && limit < 5_000_000 && apiProfessionalApis.contains(where: {host.contains($0)}) {
             throw ApiKeyManagerError.apiProfessionalRequired
         }
