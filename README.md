@@ -42,37 +42,38 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 
 Apps:
 
-- [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
-- [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
-- [WeatherGraph](https://weathergraph.app) Apple Watch App
-- [Slideshow](https://slideshow.digital/) Digital Signage app for Android
-- [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
+- [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
+- [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
-- [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
-- [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
-- [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
-- [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) WeatherAI offers an intuitive user experience that makes checking the weather a breeze.
-- [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
-- [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
-- [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
-- [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
+- [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
+- [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
+- [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
+- [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
+- [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
+- [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
+- [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
+- [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
+- [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
+- [Overmorrow](https://github.com/bmaroti9/Overmorrow) A modern material design Android weather app.
+- [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
 - [QuickWeather](https://github.com/TylerWilliamson/QuickWeather) Fast, free, and open source Android app
 - [Rain](https://github.com/DarkMooNight/Rain) Free, open source, beautiful, minimal and fast weather app
-- [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
-- [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
+- [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
+- [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
+- [Slideshow](https://slideshow.digital/) Digital Signage app for Android
+- [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
-- [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
-- [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
-- [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
-- [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
-- [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
-- [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
-- [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
-- [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
-- [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
-- [Overmorrow](https://github.com/bmaroti9/Overmorrow) A modern material design Android weather app.
+- [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
+- [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
+- [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
+- [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) WeatherAI offers an intuitive user experience that makes checking the weather a breeze.
+- [WeatherGraph](https://weathergraph.app) Apple Watch App
+- [WeatherMaster](https://github.com/PranshulGG/WeatherMaster) A Weather app for android inspired by the Google Pixel weather app.
+- [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
+- [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
+- [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
 
 Repositories:
 
