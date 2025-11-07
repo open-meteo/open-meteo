@@ -87,8 +87,6 @@ enum IconSurfaceVariableDerived: String, CaseIterable, GenericVariableMixable {
     case snowfall
     case surface_pressure
     case surface_temperature
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case shortwave_radiation_instant
     case diffuse_radiation_instant
     case direct_radiation_instant

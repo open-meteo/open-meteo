@@ -339,10 +339,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
             case .surface_pressure:
                 try await prefetchData(raw: .pressure_msl, time: time)
                 try await prefetchData(raw: .temperature_2m, time: time)
-            case .terrestrial_radiation:
-                break
-            case .terrestrial_radiation_instant:
-                break
             case .shortwave_radiation_instant:
                 try await prefetchData(raw: .direct_radiation, time: time)
                 try await prefetchData(raw: .diffuse_radiation, time: time)
@@ -515,14 +511,6 @@ struct IconReader: GenericReaderDerived, GenericReaderProtocol {
                 let temperature = try await get(raw: .temperature_2m, time: time).data
                 let pressure = try await get(raw: .pressure_msl, time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
-            case .terrestrial_radiation:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            case .terrestrial_radiation_instant:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
             case .shortwave_radiation_instant:
                 let sw = try await get(derived: .surface(.shortwave_radiation), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)

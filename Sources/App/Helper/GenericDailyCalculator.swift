@@ -9,6 +9,8 @@ enum DailyAggregation<WeatherVariable> {
     case none
     case max(WeatherVariable)
     case min(WeatherVariable)
+    case maxTwo(intervalMax: WeatherVariable, hourly: WeatherVariable)
+    case minTwo(intervalMin: WeatherVariable, hourly: WeatherVariable)
     case mean(WeatherVariable)
     case sum(WeatherVariable)
     case radiationSum(WeatherVariable)
@@ -25,6 +27,10 @@ enum DailyAggregation<WeatherVariable> {
             return (weatherVariable, nil)
         case .min(let weatherVariable):
             return (weatherVariable, nil)
+        case .maxTwo(intervalMax: let a, hourly: let b):
+            return (a, b)
+        case .minTwo(intervalMin: let a, hourly: let b):
+            return (a, b)
         case .mean(let weatherVariable):
             return (weatherVariable, nil)
         case .sum(let weatherVariable):
@@ -41,6 +47,129 @@ enum DailyAggregation<WeatherVariable> {
     }
 }
 
+struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable: DailyVariableCalculatable>: GenericReaderOptionalProtocol where Reader.VariableOpt == DailyVariable.Variable, DailyVariable: GenericVariableMixable {
+    typealias VariableOpt = DailyVariable
+    let reader: Reader
+    
+    /// Workaround to enable or disable `maxTwo` or `minTwo` aggregations. `best_match` does not (yet) provide a correct temperature_2m_max that matches all local domains. It may only come from one global model.
+    let allowMinMaxTwoAggregations: Bool
+    
+    init(reader: Reader, allowMinMaxTwoAggregations: Bool) {
+        self.reader = reader
+        self.allowMinMaxTwoAggregations = allowMinMaxTwoAggregations
+    }
+    
+    var modelLat: Float {
+        reader.modelLat
+    }
+    
+    var modelLon: Float {
+        reader.modelLon
+    }
+    
+    var modelElevation: ElevationOrSea {
+        reader.modelElevation
+    }
+    
+    var targetElevation: Float {
+        reader.targetElevation
+    }
+    
+    var modelDtSeconds: Int {
+        reader.modelDtSeconds
+    }
+    
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        return try await reader.getStatic(type: type)
+    }
+    
+    func get(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        /// Max/Min require sampling to 1h data
+        let time1h = timeDaily.with(dtSeconds: 3600)
+        let timeModel = timeDaily.with(dtSeconds: reader.modelDtSeconds)
+        let stepsModel = 24 * 3600 / reader.modelDtSeconds
+
+        switch variable.aggregation {
+        case .none:
+            return nil
+        case .max(let variable):
+            guard let data = try await reader.get(variable: variable, time: time1h) else {
+                return nil
+            }
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .min(let variable):
+            guard let data = try await reader.get(variable: variable, time: time1h) else {
+                return nil
+            }
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .mean(let variable):
+            guard let data = try await reader.get(variable: variable, time: timeModel) else {
+                return nil
+            }
+            return DataAndUnit(data.data.mean(by: stepsModel), data.unit)
+        case .minTwo(let variable, let b):
+            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeModel) {
+                return DataAndUnit(data.data.min(by: stepsModel), data.unit)
+            }
+            guard let data = try await reader.get(variable: b, time: time1h) else {
+                return nil
+            }
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, let b):
+            if allowMinMaxTwoAggregations, let data = try await reader.get(variable: variable, time: timeModel) {
+                return DataAndUnit(data.data.max(by: stepsModel), data.unit)
+            }
+            guard let data = try await reader.get(variable: b, time: time1h) else {
+                return nil
+            }
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .sum(let variable):
+            guard let data = try await reader.get(variable: variable, time: timeModel) else {
+                return nil
+            }
+            return DataAndUnit(data.data.sum(by: stepsModel), data.unit)
+        case .radiationSum(let variable):
+            guard let data = try await reader.get(variable: variable, time: timeModel) else {
+                return nil
+            }
+            // 3600s only for hourly data of source
+            return DataAndUnit(data.data.map({ $0 * Float(reader.modelDtSeconds) / 1000000 }).sum(by: stepsModel).round(digits: 2), .megajoulePerSquareMetre)
+        case .precipitationHours(let variable):
+            guard let data = try await reader.get(variable: variable, time: timeModel) else {
+                return nil
+            }
+            return DataAndUnit(data.data.map({ $0 > 0.001 ? Float(reader.modelDtSeconds / 3600) : 0 }).sum(by: stepsModel), .hours)
+        case .dominantDirection(velocity: let velocity, direction: let direction):
+            guard let speed = try await reader.get(variable: velocity, time: timeModel)?.data,
+                  let direction = try await reader.get(variable: direction, time: timeModel)?.data else {
+                return nil
+            }
+            // vector addition
+            let u = zip(speed, direction).map(Meteorology.uWind).sum(by: stepsModel)
+            let v = zip(speed, direction).map(Meteorology.vWind).sum(by: stepsModel)
+            return DataAndUnit(Meteorology.windirectionFast(u: u, v: v), .degreeDirection)
+        case .dominantDirectionComponents(u: let u, v: let v):
+            guard let u = try await reader.get(variable: u, time: timeModel)?.data,
+                  let v = try await reader.get(variable: v, time: timeModel)?.data else {
+                return nil
+            }
+            return DataAndUnit(Meteorology.windirectionFast(u: u.sum(by: stepsModel), v: v.sum(by: stepsModel)), .degreeDirection)
+        }
+    }
+    
+    func prefetchData(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> Bool {
+        let time = timeDaily.with(dtSeconds: reader.modelDtSeconds)
+        if let v0 = variable.aggregation.variables.0 {
+            let _ = try await reader.prefetchData(variable: v0, time: time)
+        }
+        if let v1 = variable.aggregation.variables.1 {
+            let _ = try await reader.prefetchData(variable: v1, time: time)
+        }
+        return true
+    }
+    
+}
+
 /*extension GenericReaderMixable {
     func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDt) throws -> DataAndUnit? where V.Variable == MixingVar {
         let time = timeDaily.with(dtSeconds: 3600)
@@ -52,7 +181,7 @@ enum DailyAggregation<WeatherVariable> {
     }
 }*/
 
-extension GenericReaderProtocol {
+/*extension GenericReaderProtocol {
     func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit where V.Variable == MixingVar {
         let time = timeDaily.with(dtSeconds: 3600)
         switch variable.aggregation {
@@ -62,6 +191,12 @@ extension GenericReaderProtocol {
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.max(by: 24), data.unit)
         case .min(let variable):
+            let data = try await get(variable: variable, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, _):
+            let data = try await get(variable: variable, time: time).convertAndRound(params: params)
+            return DataAndUnit(data.data.max(by: 24), data.unit)
+        case .minTwo(let variable, _):
             let data = try await get(variable: variable, time: time).convertAndRound(params: params)
             return DataAndUnit(data.data.min(by: 24), data.unit)
         case .mean(let variable):
@@ -112,9 +247,9 @@ extension GenericReaderProtocol {
             try await prefetchData(variable: v1, time: time)
         }
     }
-}
+}*/
 
-extension GenericReaderMulti {
+/*extension GenericReaderMulti {
     func getDaily<V: DailyVariableCalculatable, Units: ApiUnitsSelectable>(variable: V, params: Units, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit? where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
 
@@ -131,6 +266,22 @@ extension GenericReaderMulti {
                 return nil
             }
             return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .minTwo(let variable, let b):
+            if let data = try await get(variable: variable, time: time) {
+                return DataAndUnit(data.data.min(by: 24), data.unit)
+            }
+            guard let data = try await get(variable: b, time: time) else {
+                return nil
+            }
+            return DataAndUnit(data.data.min(by: 24), data.unit)
+        case .maxTwo(let variable, let b):
+            if let data = try await get(variable: variable, time: time) {
+                return DataAndUnit(data.data.max(by: 24), data.unit)
+            }
+            guard let data = try await get(variable: b, time: time) else {
+                return nil
+            }
+            return DataAndUnit(data.data.mean(by: 24), data.unit)
         case .mean(let variable):
             guard let data = try await get(variable: variable, time: time)?.convertAndRound(params: params) else {
                 return nil
@@ -174,10 +325,10 @@ extension GenericReaderMulti {
         let time = timeDaily.with(dtSeconds: 3600)
         for variable in variables {
             if let v0 = variable.aggregation.variables.0 {
-                try await prefetchData(variable: v0, time: time)
+                let _ = try await prefetchData(variable: v0, time: time)
             }
             if let v1 = variable.aggregation.variables.1 {
-                try await prefetchData(variable: v1, time: time)
+                let _ = try await prefetchData(variable: v1, time: time)
             }
         }
     }
@@ -185,10 +336,11 @@ extension GenericReaderMulti {
     func prefetchData<V: DailyVariableCalculatable>(variable: V, time timeDaily: TimerangeDtAndSettings) async throws where V.Variable == Variable {
         let time = timeDaily.with(dtSeconds: 3600)
         if let v0 = variable.aggregation.variables.0 {
-            try await prefetchData(variable: v0, time: time)
+            let _ = try await prefetchData(variable: v0, time: time)
         }
         if let v1 = variable.aggregation.variables.1 {
-            try await prefetchData(variable: v1, time: time)
+            let _ = try await prefetchData(variable: v1, time: time)
         }
     }
 }
+*/

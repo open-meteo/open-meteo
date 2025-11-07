@@ -7,13 +7,13 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     case wave_direction
     case wave_height
     case wave_period
-    case wave_period_peak
+    case wave_peak_period
 
     var interpolation: ReaderInterpolation {
         switch self {
         case .wave_height:
             return .linear
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
             return .linearDegrees
@@ -24,7 +24,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return .metre
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return .seconds
         case .wave_direction:
             return .degreeDirection
@@ -37,7 +37,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return height
-        case .wave_period, .wave_period_peak:
+        case .wave_period, .wave_peak_period:
             return period
         case .wave_direction:
             return direction
@@ -69,7 +69,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return "swh" // Significant height of combined wind waves and swell
         case .wave_period:
             return "mwp"
-        case .wave_period_peak:
+        case .wave_peak_period:
             return "pp1d"
         }
     }
@@ -501,6 +501,30 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return nil
         }
     }
+    
+    static func from(shortName: String, levelhPa: Int) -> Self? {
+        return allCases.first(where: { variable in
+            if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
+                return true
+            }
+            if shortName == "max_i10fg" && variable == .wind_gusts_10m {
+                return true
+            }
+            if ["mx2t6", "max_2t", "mx2t3"].contains(shortName) && variable == .temperature_2m_max {
+                return true
+            }
+            if ["mn2t6", "min_2t", "mn2t3"].contains(shortName) && variable == .temperature_2m_min {
+                return true
+            }
+            if let level = variable.level {
+                if shortName == "z" && variable.gribName == "gh" && levelhPa == level {
+                    return true
+                }
+                return shortName == variable.gribName && levelhPa == level
+            }
+            return shortName == variable.gribName
+        })
+    }
 
     var gribName: String? {
         switch self {
@@ -878,8 +902,6 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case cloudcover_mid
     case cloudcover_high
 
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation

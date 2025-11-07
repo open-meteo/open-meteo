@@ -113,6 +113,7 @@ struct KmaDownload: AsyncCommand {
         return try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             let inMemory = VariablePerMemberStorage<KmaSurfaceVariable>()
+            let windSpeedCalculator = WindSpeedCalculator<KmaSurfaceVariable>()
             let fHHH = forecastHour.zeroPadded(len: 3)
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
@@ -139,11 +140,20 @@ struct KmaDownload: AsyncCommand {
                     return array2d
                 })
 
-                if [KmaSurfaceVariable.wind_speed_10m, .wind_direction_10m, .wind_speed_50m, .wind_direction_50m].contains(variable) {
-                    logger.info("Keep in memory \(variable) timestep \(timestamp.format_YYYYMMddHH)")
-                    await inMemory.set(variable: variable, timestamp: timestamp, member: 0, data: array2d.array)
-                    return
+                // Convert U/V wind components to speed and direction
+                switch variable {
+                case .wind_speed_10m:
+                    return try await windSpeedCalculator.ingest(.u(array2d.array), member: 0, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                case .wind_direction_10m:
+                    return try await windSpeedCalculator.ingest(.v(array2d.array), member: 0, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                case .wind_speed_50m:
+                    return try await windSpeedCalculator.ingest(.u(array2d.array), member: 0, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                case .wind_direction_50m:
+                    return try await windSpeedCalculator.ingest(.v(array2d.array), member: 0, outSpeed: .wind_speed_50m, outDirection: .wind_direction_50m, writer: writer)
+                default:
+                    break
                 }
+
                 switch domain {
                 case .gdps:
                     if [KmaSurfaceVariable.snowfall_water_equivalent_convective, .snowfall_water_equivalent].contains(variable) {
@@ -165,9 +175,6 @@ struct KmaDownload: AsyncCommand {
             }
             
             logger.info("Calculating wind speed, direction and snow")
-            // Convert U/V wind components to speed and direction
-            try await inMemory.calculateWindSpeed(u: .wind_speed_10m, v: .wind_direction_10m, outSpeedVariable: KmaSurfaceVariable.wind_speed_10m, outDirectionVariable: KmaSurfaceVariable.wind_direction_10m, writer: writer)
-            try await inMemory.calculateWindSpeed(u: .wind_speed_50m, v: .wind_direction_50m, outSpeedVariable: KmaSurfaceVariable.wind_speed_50m, outDirectionVariable: KmaSurfaceVariable.wind_direction_50m, writer: writer)
             switch domain {
             case .gdps:
                 // Snow is downloaded as large scale and convective. Sum up both

@@ -406,6 +406,133 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .potentialEvapotranspiration, previousDay: previousDay)
         case .snow_density:
             return .init(variable: .snowDensity, previousDay: previousDay)
+        case .wave_height:
+            return .init(variable: .waveHeight)
+        case .wave_period:
+            return .init(variable: .wavePeriod)
+        case .wave_direction:
+            return .init(variable: .waveDirection)
+        case .wind_wave_height:
+            return .init(variable: .windWaveHeight)
+        case .wind_wave_period:
+            return .init(variable: .windWavePeriod)
+        case .wind_wave_peak_period:
+            return .init(variable: .windWavePeakPeriod)
+        case .wind_wave_direction:
+            return .init(variable: .windWaveDirection)
+        case .swell_wave_height:
+            return .init(variable: .swellWaveHeight)
+        case .swell_wave_period:
+            return .init(variable: .swellWavePeriod)
+        case .swell_wave_peak_period:
+            return .init(variable: .swellWavePeakPeriod)
+        case .swell_wave_direction:
+            return .init(variable: .swellWaveDirection)
+        case .ocean_current_velocity:
+            return .init(variable: .oceanCurrentVelocity)
+        case .ocean_current_direction:
+            return .init(variable: .oceanCurrentDirection)
+        case .wave_peak_period:
+            return .init(variable: .wavePeriod)
+        case .sea_level_height_msl:
+            return .init(variable: .seaLevelHeightMsl)
+        case .invert_barometer_height:
+            return .init(variable: .invertBarometerHeight)
+        case .secondary_swell_wave_height:
+            return .init(variable: .secondarySwellWaveHeight)
+        case .secondary_swell_wave_period:
+            return .init(variable: .secondarySwellWavePeriod)
+        case .secondary_swell_wave_direction:
+            return .init(variable: .secondarySwellWaveDirection)
+        case .tertiary_swell_wave_height:
+            return .init(variable: .tertiarySwellWaveHeight)
+        case .tertiary_swell_wave_period:
+            return .init(variable: .tertiarySwellWavePeriod)
+        case .tertiary_swell_wave_direction:
+            return .init(variable: .tertiarySwellWaveDirection)
+        case .pm10:
+            return .init(variable: .pm10)
+        case .pm2_5:
+            return .init(variable: .pm2p5)
+        case .dust:
+            return .init(variable: .dust)
+        case .aerosol_optical_depth:
+            return .init(variable: .aerosolOpticalDepth)
+        case .carbon_monoxide:
+            return .init(variable: .carbonMonoxide)
+        case .nitrogen_dioxide:
+            return .init(variable: .nitrogenDioxide)
+        case .ammonia:
+            return .init(variable: .ammonia)
+        case .ozone:
+            return .init(variable: .ozone)
+        case .sulphur_dioxide:
+            return .init(variable: .sulphurDioxide)
+        case .alder_pollen:
+            return .init(variable: .alderPollen)
+        case .birch_pollen:
+            return .init(variable: .birchPollen)
+        case .grass_pollen:
+            return .init(variable: .grassPollen)
+        case .mugwort_pollen:
+            return .init(variable: .mugwortPollen)
+        case .olive_pollen:
+            return .init(variable: .olivePollen)
+        case .ragweed_pollen:
+            return .init(variable: .ragweedPollen)
+        case .formaldehyde:
+            return .init(variable: .formaldehyde)
+        case .glyoxal:
+            return .init(variable: .glyoxal)
+        case .non_methane_volatile_organic_compounds:
+            return .init(variable: .nonMethaneVolatileOrganicCompounds)
+        case .pm10_wildfires:
+            return .init(variable: .pm10Wildfires)
+        case .peroxyacyl_nitrates:
+            return .init(variable: .peroxyacylNitrates)
+        case .secondary_inorganic_aerosol:
+            return .init(variable: .secondaryInorganicAerosol)
+        case .residential_elementary_carbon:
+            return .init(variable: .residentialElementaryCarbon)
+        case .total_elementary_carbon:
+            return .init(variable: .totalElementaryCarbon)
+        case .pm2_5_total_organic_matter:
+            return .init(variable: .pm25TotalOrganicMatter)
+        case .sea_salt_aerosol:
+            return .init(variable: .seaSaltAerosol)
+        case .nitrogen_monoxide:
+            return .init(variable: .nitrogenMonoxide)
+        case .carbon_dioxide:
+            return .init(variable: .carbonDioxide)
+        case .methane:
+            return .init(variable: .methane)
+        case .european_aqi:
+            return .init(variable: .europeanAqi)
+        case .european_aqi_pm2_5:
+            return .init(variable: .europeanAqiPm2p5)
+        case .european_aqi_pm10:
+            return .init(variable: .europeanAqiPm10)
+        case .european_aqi_nitrogen_dioxide, .european_aqi_no2:
+            return .init(variable: .europeanAqiNitrogenDioxide)
+        case .european_aqi_ozone, .european_aqi_o3:
+            return .init(variable: .europeanAqiOzone)
+        case .european_aqi_sulphur_dioxide, .european_aqi_so2:
+            return .init(variable: .europeanAqiSulphurDioxide)
+        case .us_aqi:
+            return .init(variable: .usAqi)
+        case .us_aqi_pm2_5:
+            return .init(variable: .usAqiPm2p5)
+        case .us_aqi_pm10:
+            return .init(variable: .usAqiPm10)
+        case .us_aqi_nitrogen_dioxide, .us_aqi_no2:
+            return .init(variable: .usAqiNitrogenDioxide)
+        case .us_aqi_ozone, .us_aqi_o3:
+            return .init(variable: .usAqiOzone)
+        case .us_aqi_sulphur_dioxide, .us_aqi_so2:
+            return .init(variable: .usAqiSulphurDioxide)
+        case .us_aqi_carbon_monoxide, .us_aqi_co:
+            return .init(variable: .usAqiCarbonMonoxide)
+
         }
     }
 }
@@ -621,6 +748,68 @@ extension ForecastVariableDaily: FlatBuffersVariable {
             return .init(variable: .snowDepth, aggregation: .mean)
         case .snow_depth_max:
             return .init(variable: .snowDepth, aggregation: .maximum)
+        case .river_discharge:
+            return .init(variable: .riverDischarge)
+        case .river_discharge_mean:
+            return .init(variable: .riverDischarge, aggregation: .mean)
+        case .river_discharge_min:
+            return .init(variable: .riverDischarge, aggregation: .minimum)
+        case .river_discharge_max:
+            return .init(variable: .riverDischarge, aggregation: .maximum)
+        case .river_discharge_median:
+            return .init(variable: .riverDischarge, aggregation: .median)
+        case .river_discharge_p25:
+            return .init(variable: .riverDischarge, aggregation: .p25)
+        case .river_discharge_p75:
+            return .init(variable: .riverDischarge, aggregation: .p75)
+        case .wave_height_max:
+            return .init(variable: .waveHeight, aggregation: .maximum)
+        case .wind_wave_height_max:
+            return .init(variable: .windWaveHeight, aggregation: .maximum)
+        case .swell_wave_height_max:
+            return .init(variable: .swellWaveHeight, aggregation: .maximum)
+        case .wave_direction_dominant:
+            return .init(variable: .waveDirection, aggregation: .dominant)
+        case .wind_wave_direction_dominant:
+            return .init(variable: .windWaveDirection, aggregation: .dominant)
+        case .swell_wave_direction_dominant:
+            return .init(variable: .swellWaveDirection, aggregation: .dominant)
+        case .wave_period_max:
+            return .init(variable: .wavePeriod, aggregation: .maximum)
+        case .wind_wave_period_max:
+            return .init(variable: .windWavePeriod, aggregation: .maximum)
+        case .wind_wave_peak_period_max:
+            return .init(variable: .windWavePeakPeriod, aggregation: .maximum)
+        case .swell_wave_period_max:
+            return .init(variable: .swellWavePeriod, aggregation: .maximum)
+        case .swell_wave_peak_period_max:
+            return .init(variable: .swellWavePeakPeriod, aggregation: .maximum)
+        case .wind_direction_100m_dominant:
+            return .init(variable: .windDirection, aggregation: .dominant, altitude: 100)
+        case .wind_direction_200m_dominant:
+            return .init(variable: .windDirection, aggregation: .dominant, altitude: 200)
+        case .wind_speed_100m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 100)
+        case .wind_speed_100m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 100)
+        case .wind_speed_100m_min:
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 100)
+        case .wind_speed_200m_max:
+            return .init(variable: .windSpeed, aggregation: .maximum, altitude: 200)
+        case .wind_speed_200m_mean:
+            return .init(variable: .windSpeed, aggregation: .mean, altitude: 200)
+        case .wind_speed_200m_min:
+            return .init(variable: .windSpeed, aggregation: .minimum, altitude: 200)
+        case .sea_surface_temperature_min:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .minimum)
+        case .sea_surface_temperature_max:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .maximum)
+        case .sea_surface_temperature_mean:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .mean)
+        case .soil_temperature_100_to_255cm_mean:
+            return .init(variable: .soilTemperature, aggregation: .mean, depth: 100, depthTo: 255)
+        case .soil_moisture_100_to_255cm_mean:
+            return .init(variable: .soilMoisture, aggregation: .mean, depth: 100, depthTo: 255)
         }
     }
 }
@@ -815,8 +1004,69 @@ extension MultiDomains {
         case .meteoswiss_icon_ch2_ensemble:
             return .meteoswissIconCh2Ensemble
         case .jma_jaxa_mtg_fci:
-            // TODO register in SDK
-            return .jmaJaxaHimawari
+            return .jmaJaxaMtgFci
+        case .ecmwf_seasonal_seamless:
+            return .ecmwfSeasonalSeamless
+        case .ecmwf_seas5:
+            return .ecmwfSeas5
+        case .ecmwf_ec46:
+            return .ecmwfEc46
+        case .marine_best_match:
+            return .bestMatch
+        case .gwam:
+            return .gwam
+        case .ewam:
+            return .ewam
+        case .era5_ocean:
+            return .era5Ocean
+        case .ecmwf_wam025:
+            return .ecmwfWam025
+        case .ecmwf_wam025_ensemble:
+            return .ecmwfWam025Ensemble
+        case .meteofrance_wave:
+            return .meteofranceWave
+        case .meteofrance_currents:
+            return .meteofranceCurrents
+        case .ncep_gfswave025:
+            return .ncepGfswave025
+        case .ncep_gfswave016:
+            return .ncepGfswave016
+        case .ncep_gefswave025:
+            return .ncepGefswave025
+        case .air_quality_best_match:
+            return .bestMatch
+        case .cams_global:
+            return .camsGlobal
+        case .cams_europe:
+            return .camsEurope
+        case .CMCC_CM2_VHR4:
+            return .cmccCm2Vhr4
+        case .FGOALS_f3_H:
+            return .fgoalsF3H
+        case .HiRAM_SIT_HR:
+            return .hiramSitHr
+        case .MRI_AGCM3_2_S:
+            return .mriAgcm32S
+        case .EC_Earth3P_HR:
+            return .ecEarth3pHr
+        case .MPI_ESM1_2_XR:
+            return .mpiEsm12Xr
+        case .NICAM16_8S:
+            return .nicam168s
+        case .flood_best_match:
+            return .bestMatch
+        case .seamless_v3:
+            return .glofasSeamlessV3
+        case .forecast_v3:
+            return .glofasForecastV3
+        case .consolidated_v3:
+            return .glofasConsolidatedV3
+        case .seamless_v4:
+            return .glofasSeamlessV4
+        case .forecast_v4:
+            return .glofasForecastV4
+        case .consolidated_v4:
+            return .glofasConsolidatedV4
         }
     }
 }

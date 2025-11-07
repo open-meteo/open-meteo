@@ -105,6 +105,7 @@ struct MeteoSwissDownload: AsyncCommand {
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             let storage = VariablePerMemberStorage<MeteoSwissSurfaceVariable>()
+            let rhCalculator = RelativeHumidityCalculator(outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m)
             
             let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
@@ -154,7 +155,15 @@ struct MeteoSwissDownload: AsyncCommand {
                             }
                         }
                         
-                        if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m, .freezing_level_height, .snowfall_height, .shortwave_radiation, .relative_humidity_2m].contains(variable) {
+                        if variable == .temperature_2m {
+                            try await rhCalculator.ingest(.temperature(array2d), member: member, writer: writer)
+                        }
+                        if variable == .relative_humidity_2m {
+                            try await rhCalculator.ingest(.dewpoint(array2d), member: member, writer: writer)
+                            continue
+                        }
+                        
+                        if [MeteoSwissSurfaceVariable.direct_radiation, .temperature_2m, .freezing_level_height, .snowfall_height, .shortwave_radiation].contains(variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                             
                             try await storage.correctIconSnowfallHeight(snowfallHeight: .snowfall_height, temperature2m: .temperature_2m, domainElevation: domainElevation, writer: writer)
@@ -162,12 +171,9 @@ struct MeteoSwissDownload: AsyncCommand {
                             
                             /// Calculate global shortwave radiation from diffuse and direct components
                             try await storage.sumUpRemovingBoth(var1: MeteoSwissSurfaceVariable.shortwave_radiation, var2: MeteoSwissSurfaceVariable.direct_radiation, outVariable: MeteoSwissSurfaceVariable.shortwave_radiation, writer: writer)
-                            
-                            /// Calculate relative humidity from temperature and dew point
-                            try await storage.calculateRelativeHumidity(temperature: MeteoSwissSurfaceVariable.temperature_2m, dewpoint: MeteoSwissSurfaceVariable.relative_humidity_2m, outVariable: MeteoSwissSurfaceVariable.relative_humidity_2m, writer: writer)
                         }
                         
-                        if [MeteoSwissSurfaceVariable.freezing_level_height, .snowfall_height, .shortwave_radiation, .relative_humidity_2m].contains(variable) {
+                        if [MeteoSwissSurfaceVariable.freezing_level_height, .snowfall_height, .shortwave_radiation].contains(variable) {
                             continue
                         }
                         

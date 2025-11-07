@@ -128,7 +128,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
-        let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_period_peak]
+        let waveVariables = [EcmwfWaveVariable.wave_direction, .wave_height, .wave_period, .wave_peak_period]
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
@@ -204,6 +204,16 @@ struct DownloadEcmwfCommand: AsyncCommand {
         try domain.surfaceElevationFileOm.createDirectory()
         try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid)
     }
+    
+    struct ShortNameLevel: Hashable {
+        let shortName: String
+        let level: Int
+        
+        init(_ shortName: String, _ level: Int) {
+            self.shortName = shortName
+            self.level = level
+        }
+    }
 
     /// Download ECMWF ifs open data
     func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
@@ -218,7 +228,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
         }
         let timestamps = forecastHours.map { run.add(hours: $0) }
-        var deaverager = GribDeaverager()
+        let deaverager = GribDeaverager()
         
         let storeOnDisk = domain == .ifs025 || domain == .aifs025_single
 
@@ -237,23 +247,15 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 return []
             }
             let inMemory = VariablePerMemberStorage<EcmwfVariable>()
-
-            /// Relative humidity missing in AIFS
-            func calcRh(rh: EcmwfVariable, q: EcmwfVariable, t: EcmwfVariable, member: Int, hpa: Float) async throws {
-                guard await inMemory.get(variable: rh, timestamp: timestamp, member: member) == nil,
-                    let q = await inMemory.get(variable: q, timestamp: timestamp, member: member),
-                    let t = await inMemory.get(variable: t, timestamp: timestamp, member: member) else {
-                    return
-                }
-                let data = Meteorology.specificToRelativeHumidity(specificHumidity: q.data, temperature: t.data, pressure: .init(repeating: hpa, count: t.count))
-                try await writer.write(member: member, variable: rh, data: data)
-            }
-            let deaveragerScoped = await deaverager.copy()
+            let inMemory2 = VariablePerMemberStorage<ShortNameLevel>()
+            
+            let rhCalculator = RelativeHumidityCalculator(outVariable: EcmwfVariable.relative_humidity_2m)
+            let verticalVelocityCalculator = VerticalVelocityCalculator<EcmwfVariable>()
 
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
-                try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
+                try await curl.downloadEcmwfIndexed(url: url, concurrent: max(2, concurrent), isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
@@ -285,27 +287,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                     
-                    guard let variable = variables.first(where: { variable in
-                        if variable == .total_column_integrated_water_vapour && shortName == "tcwv" {
-                            return true
-                        }
-                        if shortName == "max_i10fg" && variable == .wind_gusts_10m {
-                            return true
-                        }
-                        if ["mx2t6", "max_2t", "mx2t3"].contains(shortName) && variable == .temperature_2m_max {
-                            return true
-                        }
-                        if ["mn2t6", "min_2t", "mn2t3"].contains(shortName) && variable == .temperature_2m_min {
-                            return true
-                        }
-                        if let level = variable.level {
-                            if shortName == "z" && variable.gribName == "gh" && levelhPa == level {
-                                return true
-                            }
-                            return shortName == variable.gribName && levelhPa == level
-                        }
-                        return shortName == variable.gribName
-                    }) else {
+                    guard let variable = EcmwfVariable.from(shortName: shortName, levelhPa: levelhPa) else {
                         print(
                             message.get(attribute: "name")!,
                             message.get(attribute: "shortName")!,
@@ -346,7 +328,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     }
                     
                     // Deaccumulate precipitation
-                    guard await deaveragerScoped.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                    guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                         return
                     }
                     
@@ -364,23 +346,52 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
-                    // For AIFS keep specific humidity and temperature in memory
-                    // geopotential (gh, z) and vertical velocity (w in Pa/s) for wind calculation
-                    if [EcmwfDomain.aifs025, .aifs025_single, .aifs025_ensemble].contains(domain) && ["t", "q", "w", "z", "gh"].contains(variable.gribName) {
-                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    // Calculate geometric vertical velocity
+                    if ["t", "w"].contains(shortName) {
+                        let level = Float(levelhPa)
+                        let vvVariable = EcmwfVariable.from(shortName: "w", levelhPa: levelhPa)!
+                        switch shortName {
+                        case "t":
+                            try await verticalVelocityCalculator.ingest(.temperature(grib2d.array), member: member, pressureLevel: level, outVariable: vvVariable, writer: writer)
+                        case "w":
+                            try await verticalVelocityCalculator.ingest(.omega(grib2d.array), member: member, pressureLevel: level, outVariable: vvVariable, writer: writer)
+                            return // do not store omega on disk
+                        default:
+                            break
+                        }
                     }
-                    if ["w", "q"].contains(variable.gribName) {
-                        // do not store specific humidity on disk
+                    
+                    // Calculate relative humidity for AIFS on pressure level
+                    if [EcmwfDomain.aifs025_single, .aifs025_ensemble].contains(domain) && ["t", "q"].contains(variable.gribName) {
+                        await inMemory2.set(variable: ShortNameLevel(shortName, levelhPa), timestamp: timestamp, member: member, data: grib2d.array)
+                        while let (t, q, member) = await inMemory2.getTwoRemoving(first: ShortNameLevel("t", levelhPa), second: ShortNameLevel("q", levelhPa), timestamp: timestamp) {
+                            let rh = zip(t.data, q.data).map { t, q in
+                                return Meteorology.specificToRelativeHumidity(specificHumidity: q, temperature: t, pressure: Float(levelhPa))
+                            }
+                            await inMemory.set(variable: .from(shortName: "r", levelhPa: levelhPa)!, timestamp: writer.time, member: member, data: Array2D(data: rh, nx: t.nx, ny: t.ny))
+                            try await writer.write(member: member, variable: EcmwfVariable.from(shortName: "r", levelhPa: levelhPa)!, data: rh)
+                        }
+                    }
+                    
+                    // Never write specific humidity
+                    if ["q"].contains(variable.gribName) {
                         return
                     }
-                    if variable == .temperature_2m {
+                    
+                    // Keep pressure level RH in memory for cloud cover calculation
+                    if variable.gribName == "r" && levelhPa > 10 {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
-                    if variable == .dew_point_2m {
-                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                        return
+                    if variable == .temperature_2m {
+                        try await rhCalculator.ingest(.temperature(grib2d.array), member: member, writer: writer)
                     }
+                    
+                    if variable == .dew_point_2m {
+                        try await rhCalculator.ingest(.dewpoint(grib2d.array), member: member, writer: writer)
+                        return // do not store dewpoint on disk
+                    }
+
                     // Keep precip in memory for probability
                     if domain.countEnsembleMember > 1 && variable == .precipitation {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
@@ -390,110 +401,63 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         // do not generate some database files for ensemble
                         return
                     }
-                    let skipHour0 = [.shortwave_radiation, .precipitation, .runoff].contains(variable)
-                    // Shortwave radiation and precipitation contain always 0 values for hour 0.
-                    if hour == 0 && skipHour0 {
-                        return
-                    }
                     //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     // Note: skipHour0 needs still to be set for solar interpolation
                     logger.info("Processing \(variable) member \(member) timestep \(timestamp.format_YYYYMMddHH)")
                     try await writer.write(member: member, variable: variable, data: grib2d.array.data)
                 }
             }
-            deaverager = deaveragerScoped
 
             // Calculate mid/low/high/total cloudocover
             logger.info("Calculating derived variables")
             for member in 0..<domain.countEnsembleMember {
-                /// calculate RH 2m from dewpoint. Only store RH on disk.
-                if let dewpoint = await inMemory.get(variable: .dew_point_2m, timestamp: timestamp, member: member)?.data,
-                   let temperature = await inMemory.get(variable: .temperature_2m, timestamp: timestamp, member: member)?.data {
-                    let rh = zip(temperature, dewpoint).map(Meteorology.relativeHumidity)
-                    try await writer.write(member: member, variable: EcmwfVariable.relative_humidity_2m, data: rh)
+                logger.info("Calculating cloud cover")
+                // 2025-10-13: added 100/150/600/400 hPa levels
+                guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
+                      let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
+                      let rh850 = await inMemory.get(variable: .relative_humidity_850hPa, timestamp: timestamp, member: member)?.data,
+                      let rh700 = await inMemory.get(variable: .relative_humidity_700hPa, timestamp: timestamp, member: member)?.data,
+                      let rh600 = await inMemory.get(variable: .relative_humidity_600hPa, timestamp: timestamp, member: member)?.data,
+                      let rh500 = await inMemory.get(variable: .relative_humidity_500hPa, timestamp: timestamp, member: member)?.data,
+                      let rh400 = await inMemory.get(variable: .relative_humidity_400hPa, timestamp: timestamp, member: member)?.data,
+                      let rh300 = await inMemory.get(variable: .relative_humidity_300hPa, timestamp: timestamp, member: member)?.data,
+                      let rh250 = await inMemory.get(variable: .relative_humidity_250hPa, timestamp: timestamp, member: member)?.data,
+                      let rh200 = await inMemory.get(variable: .relative_humidity_200hPa, timestamp: timestamp, member: member)?.data,
+                      let rh150 = await inMemory.get(variable: .relative_humidity_150hPa, timestamp: timestamp, member: member)?.data,
+                      let rh100 = await inMemory.get(variable: .relative_humidity_100hPa, timestamp: timestamp, member: member)?.data,
+                      let rh50 = await inMemory.get(variable: .relative_humidity_50hPa, timestamp: timestamp, member: member)?.data else {
+                    logger.warning("Pressure level relative humidity unavailable")
+                    continue
                 }
-
-                // Relative humidity missing in AIFS
-                if await !writer.contains(variable: EcmwfVariable.relative_humidity_1000hPa, member: member) {
-                    logger.info("Calculating relative humidity")
-                    try await calcRh(rh: .relative_humidity_1000hPa, q: .specific_humidity_1000hPa, t: .temperature_1000hPa, member: member, hpa: 1000)
-                    try await calcRh(rh: .relative_humidity_925hPa, q: .specific_humidity_925hPa, t: .temperature_925hPa, member: member, hpa: 925)
-                    try await calcRh(rh: .relative_humidity_850hPa, q: .specific_humidity_850hPa, t: .temperature_850hPa, member: member, hpa: 850)
-                    try await calcRh(rh: .relative_humidity_700hPa, q: .specific_humidity_700hPa, t: .temperature_700hPa, member: member, hpa: 700)
-                    try await calcRh(rh: .relative_humidity_600hPa, q: .specific_humidity_600hPa, t: .temperature_600hPa, member: member, hpa: 600)
-                    try await calcRh(rh: .relative_humidity_500hPa, q: .specific_humidity_500hPa, t: .temperature_500hPa, member: member, hpa: 500)
-                    try await calcRh(rh: .relative_humidity_400hPa, q: .specific_humidity_400hPa, t: .temperature_400hPa, member: member, hpa: 400)
-                    try await calcRh(rh: .relative_humidity_300hPa, q: .specific_humidity_300hPa, t: .temperature_300hPa, member: member, hpa: 300)
-                    try await calcRh(rh: .relative_humidity_250hPa, q: .specific_humidity_250hPa, t: .temperature_250hPa, member: member, hpa: 250)
-                    try await calcRh(rh: .relative_humidity_200hPa, q: .specific_humidity_200hPa, t: .temperature_200hPa, member: member, hpa: 200)
-                    try await calcRh(rh: .relative_humidity_150hPa, q: .specific_humidity_150hPa, t: .temperature_150hPa, member: member, hpa: 150)
-                    try await calcRh(rh: .relative_humidity_100hPa, q: .specific_humidity_100hPa, t: .temperature_100hPa, member: member, hpa: 100)
-                    try await calcRh(rh: .relative_humidity_50hPa, q: .specific_humidity_50hPa, t: .temperature_50hPa, member: member, hpa: 50)
+                /// low clouds (surface - 3km): 1000/925/850
+                let cloudcoverLow = zip(rh1000, zip(rh925, rh850)).map {
+                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 1000),
+                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 925),
+                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 850)))
                 }
-
-                if await !writer.contains(variable: EcmwfVariable.cloud_cover, member: member) {
-                    logger.info("Calculating cloud cover")
-                    // 2025-10-13: added 100/150/600/400 hPa levels
-                    guard let rh1000 = await inMemory.get(variable: .relative_humidity_1000hPa, timestamp: timestamp, member: member)?.data,
-                          let rh925 = await inMemory.get(variable: .relative_humidity_925hPa, timestamp: timestamp, member: member)?.data,
-                          let rh850 = await inMemory.get(variable: .relative_humidity_850hPa, timestamp: timestamp, member: member)?.data,
-                          let rh700 = await inMemory.get(variable: .relative_humidity_700hPa, timestamp: timestamp, member: member)?.data,
-                          let rh600 = await inMemory.get(variable: .relative_humidity_600hPa, timestamp: timestamp, member: member)?.data,
-                          let rh500 = await inMemory.get(variable: .relative_humidity_500hPa, timestamp: timestamp, member: member)?.data,
-                          let rh400 = await inMemory.get(variable: .relative_humidity_400hPa, timestamp: timestamp, member: member)?.data,
-                          let rh300 = await inMemory.get(variable: .relative_humidity_300hPa, timestamp: timestamp, member: member)?.data,
-                          let rh250 = await inMemory.get(variable: .relative_humidity_250hPa, timestamp: timestamp, member: member)?.data,
-                          let rh200 = await inMemory.get(variable: .relative_humidity_200hPa, timestamp: timestamp, member: member)?.data,
-                          let rh150 = await inMemory.get(variable: .relative_humidity_150hPa, timestamp: timestamp, member: member)?.data,
-                          let rh100 = await inMemory.get(variable: .relative_humidity_100hPa, timestamp: timestamp, member: member)?.data,
-                          let rh50 = await inMemory.get(variable: .relative_humidity_50hPa, timestamp: timestamp, member: member)?.data else {
-                        logger.warning("Pressure level relative humidity unavailable")
-                        continue
-                    }
-                    /// low clouds (surface - 3km): 1000/925/850
-                    let cloudcoverLow = zip(rh1000, zip(rh925, rh850)).map {
-                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0, pressureHPa: 1000),
-                                   max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 925),
-                                       Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 850)))
-                    }
-                    /// mid clouds (3 km - 8km): 700/600/500/400
-                    let cloudcoverMid = zip(zip(rh700, rh600), zip(rh500, rh400)).map {
-                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 700),
-                            max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 600),
-                                   max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 500),
-                                       Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 400))))
-                    }
-                    /// high clouds (>8 km): 300/250/200/150/100/50
-                    let cloudcoverHigh = zip(zip(rh300, rh250), zip(zip(rh200, rh150), zip(rh100, rh50))).map {
-                        return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 300),
-                                max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 250),
-                                    max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.0, pressureHPa: 200),
-                                        max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.1, pressureHPa: 150),
-                                            max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.0, pressureHPa: 100),
-                                                Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.1, pressureHPa: 50))))))
-                    }
-                    let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
-                    
-                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow)
-                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid)
-                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh)
-                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
+                /// mid clouds (3 km - 8km): 700/600/500/400
+                let cloudcoverMid = zip(zip(rh700, rh600), zip(rh500, rh400)).map {
+                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 700),
+                        max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 600),
+                               max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0, pressureHPa: 500),
+                                   Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1, pressureHPa: 400))))
                 }
+                /// high clouds (>8 km): 300/250/200/150/100/50
+                let cloudcoverHigh = zip(zip(rh300, rh250), zip(zip(rh200, rh150), zip(rh100, rh50))).map {
+                    return max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.0, pressureHPa: 300),
+                            max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.0.1, pressureHPa: 250),
+                                max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.0, pressureHPa: 200),
+                                    max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.0.1, pressureHPa: 150),
+                                        max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.0, pressureHPa: 100),
+                                            Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.1, pressureHPa: 50))))))
+                }
+                let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
+                
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow)
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid)
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh)
+                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
             }
-            
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_1000hPa, temperature: .temperature_1000hPa, pressureLevel: 1000, outVariable: EcmwfVariable.vertical_velocity_1000hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_925hPa, temperature: .temperature_925hPa, pressureLevel: 925, outVariable: EcmwfVariable.vertical_velocity_925hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_850hPa, temperature: .temperature_850hPa, pressureLevel: 850, outVariable: EcmwfVariable.vertical_velocity_850hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_700hPa, temperature: .temperature_700hPa, pressureLevel: 700, outVariable: EcmwfVariable.vertical_velocity_700hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_600hPa, temperature: .temperature_600hPa, pressureLevel: 600, outVariable: EcmwfVariable.vertical_velocity_600hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_500hPa, temperature: .temperature_500hPa, pressureLevel: 500, outVariable: EcmwfVariable.vertical_velocity_500hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_400hPa, temperature: .temperature_400hPa, pressureLevel: 400, outVariable: EcmwfVariable.vertical_velocity_400hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_300hPa, temperature: .temperature_300hPa, pressureLevel: 300, outVariable: EcmwfVariable.vertical_velocity_300hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_250hPa, temperature: .temperature_250hPa, pressureLevel: 250, outVariable: EcmwfVariable.vertical_velocity_250hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_200hPa, temperature: .temperature_200hPa, pressureLevel: 200, outVariable: EcmwfVariable.vertical_velocity_200hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_150hPa, temperature: .temperature_150hPa, pressureLevel: 150, outVariable: EcmwfVariable.vertical_velocity_150hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_100hPa, temperature: .temperature_100hPa, pressureLevel: 100, outVariable: EcmwfVariable.vertical_velocity_100hPa, writer: writer)
-            try await inMemory.verticalVelocityPressureToGeometric(omega: .vertical_velocity_50hPa, temperature: .temperature_50hPa, pressureLevel: 50, outVariable: EcmwfVariable.vertical_velocity_50hPa, writer: writer)
 
             if let writerProbabilities {
                 logger.info("Calculating precipitation probability")

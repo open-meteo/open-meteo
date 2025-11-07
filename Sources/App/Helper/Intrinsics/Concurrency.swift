@@ -1,4 +1,5 @@
 import Foundation
+import AsyncAlgorithms
 
 /*extension Optional {
     func asyncMap<T>(
@@ -97,15 +98,49 @@ extension Sequence where Element: Sendable {
 
 extension Sequence where Element: Sendable, Self: Sendable {
     /// Execute a closure for each element concurrently and return a new value
-    /// Returns an `AsyncStream` to process in a pipeline
+    /// Returns an `AsyncThrowingChannel` to process in a pipeline and propagate back pressure
     /// `nConcurrent` limits the number of concurrent tasks
     /// Note: Results are ordered which may have a performance penalty
     func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
-    ) -> AsyncThrowingStream<T, Error> {
+    ) -> AsyncThrowingChannel<T, Error> {
         assert(nConcurrent > 0)
-        return AsyncThrowingStream<T, Error> { continuation in
+        
+        let stream = AsyncThrowingChannel<T, Error>()
+        _ = Task {
+            do {
+                try await withThrowingTaskGroup(of: (Int, T).self) { group in
+                    var results = [Int: T]()
+                    var pos = 0
+                    for (index, element) in self.enumerated() {
+                        if index >= nConcurrent, let result = try await group.next() {
+                            results[result.0] = result.1
+                            while let nextReturn = results.removeValue(forKey: pos) {
+                                pos += 1
+                                await stream.send(nextReturn)
+                            }
+                        }
+                        group.addTask {
+                            return (index, try await body(element))
+                        }
+                    }
+                    while let result = try await group.next() {
+                        results[result.0] = result.1
+                        while let nextReturn = results.removeValue(forKey: pos) {
+                            pos += 1
+                            await stream.send(nextReturn)
+                        }
+                    }
+                    stream.finish()
+                }
+            } catch {
+                stream.fail(error)
+            }
+        }
+        return stream
+        // Version below does not support backpressure
+        /*return AsyncThrowingStream<T, Error> { continuation in
             let task = Task {
                 do {
                     try await withThrowingTaskGroup(of: (Int, T).self) { group in
@@ -139,7 +174,7 @@ extension Sequence where Element: Sendable, Self: Sendable {
             continuation.onTermination = { _ in
                 task.cancel()
             }
-        }
+        }*/
     }
     
     

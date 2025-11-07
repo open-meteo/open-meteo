@@ -18,8 +18,6 @@ enum NbmVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case vapour_pressure_deficit
     case rain
     case showers
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case weathercode
     case weather_code
     case is_day
@@ -154,10 +152,6 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
             case .rain:
                 try await prefetchData(raw: .surface(.precipitation), time: time)
                 try await prefetchData(raw: .surface(.snowfall), time: time)
-            case .terrestrial_radiation:
-                break
-            case .terrestrial_radiation_instant:
-                break
             case .dew_point_2m:
                 try await prefetchData(raw: .surface(.temperature_2m), time: time)
                 try await prefetchData(raw: .surface(.relative_humidity_2m), time: time)
@@ -234,12 +228,6 @@ struct NbmReader: GenericReaderDerived, GenericReaderProtocol {
                 let precipitation = try await get(raw: .surface(.precipitation), time: time).data
                 let rain = zip(precipitation, snow_fall).map({ $0 - $1 })
                 return DataAndUnit(rain, .millimetre)
-            case .terrestrial_radiation:
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            case .terrestrial_radiation_instant:
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
             case .dew_point_2m:
                 let temperature = try await get(raw: .surface(.temperature_2m), time: time)
                 let rh = try await get(raw: .surface(.relative_humidity_2m), time: time)

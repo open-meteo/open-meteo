@@ -5,7 +5,7 @@ enum HttpResponseSHA256VerifierError: Error {
     case checksumMismatch
 }
 
-extension AsyncSequence where Element == ByteBuffer {
+extension AsyncSequence where Self: Sendable, Element == ByteBuffer {
     /// Check the checksum of a byte stream. Throw at the end of the stream. If no checksum is provided, do nothing
     func sha256verify(_ checksum: String?) -> HttpResponseSHA256Verifier<Self> {
         return HttpResponseSHA256Verifier(sequence: self, checksum: checksum)
@@ -13,7 +13,7 @@ extension AsyncSequence where Element == ByteBuffer {
 }
 
 /// Check the checksum of a byte stream. Throw at the end of the stream. If no checksum is provided, do nothing
-struct HttpResponseSHA256Verifier<T: AsyncSequence>: AsyncSequence where T.Element == ByteBuffer {
+struct HttpResponseSHA256Verifier<T: AsyncSequence>: Sendable, AsyncSequence where T: Sendable, T.Element == ByteBuffer {
     public typealias Element = AsyncIterator.Element
 
     let sequence: T

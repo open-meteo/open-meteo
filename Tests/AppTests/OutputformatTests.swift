@@ -12,6 +12,7 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
 
     typealias DailyVariable = ForecastVariableDaily
 
+    typealias WeeklyVariable = ForecastVariableDaily
     typealias MonthlyVariable = ForecastVariableDaily
 
     var flatBufferModel: OpenMeteoSdk.openmeteo_sdk_Model {
@@ -34,8 +35,8 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         nil
     }
 
-    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, sixHourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [MonthlyVariable]?) async throws {
-
+    func prefetch(currentVariables: [App.ForecastVariable]?, minutely15Variables: [App.ForecastVariable]?, hourlyVariables: [App.ForecastVariable]?, dailyVariables: [App.ForecastVariableDaily]?, weeklyVariables: [App.ForecastVariableDaily]?, monthlyVariables: [App.ForecastVariableDaily]?) async throws {
+        
     }
 
     func current(variables: [App.ForecastVariable]?) async throws -> App.ApiSectionSingle<App.ForecastVariable>? {
@@ -50,10 +51,6 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             ApiColumn(variable: .surface(.init(.temperature_2m, 0)), unit: .celsius, variables: [.float(.init(repeating: 20, count: 48))]),
             ApiColumn(variable: .surface(.init(.windspeed_10m, 0)), unit: .kilometresPerHour, variables: [.float(.init(repeating: 10, count: 48))])
         ])
-    }
-
-    func sixHourly(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
-        nil
     }
 
     func minutely15(variables: [App.ForecastVariable]?) async throws -> App.ApiSection<App.ForecastVariable>? {
@@ -73,6 +70,9 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             ApiColumn(variable: .cloud_cover_mean, unit: .percentage, variables: [.float(.init(repeating: 10, count: 2))])
         ])
     }
+    func weekly(variables: [WeeklyVariable]?) async throws -> ApiSection<WeeklyVariable>? {
+        return nil
+    }
 
     static func makeData(timeformat: Timeformat, locationCount: Int) -> ForecastapiResult<Self>  {
         let res = DummyDataProvider()
@@ -85,8 +85,8 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
             currentVariables: [.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))],
             minutely15Variables: nil,
             hourlyVariables: [.surface(.init(.temperature_2m, 0)), .surface(.init(.windspeed_100m, 0))],
-            sixHourlyVariables: nil,
             dailyVariables: [.temperature_2m_mean, .windspeed_10m_mean],
+            weeklyVariables: [],
             monthlyVariables: [.apparent_temperature_mean, .cloud_cover_mean]
         )
         return data
@@ -400,8 +400,10 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         let xlsx = await drainData(try data.response(format: .xlsx(timestamp: Timestamp(2022, 7, 13), locationInformation: .section))).sha256
         #expect(xlsx == "6efa5ee262cef5073ef5fb27f05beb235db21db163eca31c4b4175b0c96d9b03")
 
-        let flatbuffers = await drainData(try data.response(format: .flatbuffers(fixedGenerationTime: 12))).sha256
-        #expect(flatbuffers == "319106d7379e730b1f83dcf4e86a79cb25f1dbf25518a402aacfe0efcb2c1039")
+        let flatbuffers = await drainData(try data.response(format: .flatbuffers(fixedGenerationTime: 12)))
+        //print(flatbuffers.hex)
+        #expect(flatbuffers.count == 912)
+        #expect(flatbuffers.sha256 == "319106d7379e730b1f83dcf4e86a79cb25f1dbf25518a402aacfe0efcb2c1039")
     }
 
     /// Test output formats for 2 locations
@@ -672,8 +674,10 @@ struct DummyDataProvider: ModelFlatbufferSerialisable {
         let xlsx = await drainData(try data.response(format: .xlsx(timestamp: Timestamp(2022, 7, 13), locationInformation: .section))).sha256
         #expect(xlsx == "6e30672c1461d2b1c4196f860e311cb742957392acd66c0e63b76f9c0656d3ce")
 
-        let flatbuffers = await drainData(try data.response(format: .flatbuffers(fixedGenerationTime: 12))).sha256
-        #expect(flatbuffers == "3b7d3373403f4ccf5f0cb530ec486d80518fd8f784c055df3383c667cb2378ff")
+        let flatbuffers = await drainData(try data.response(format: .flatbuffers(fixedGenerationTime: 12)))
+        //print(flatbuffers.hex)
+        #expect(flatbuffers.count == 1840)
+        #expect(flatbuffers.sha256 == "3b7d3373403f4ccf5f0cb530ec486d80518fd8f784c055df3383c667cb2378ff")
     }
 
     @Test func xlsxWriter() throws {

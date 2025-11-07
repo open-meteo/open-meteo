@@ -49,8 +49,6 @@ enum EcmwfEcdpsIfsVariableDerived: String, GenericVariableMixable {
     case cloudcover_high
 
     case sunshine_duration
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation_instant
@@ -217,14 +215,6 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             return try await get(raw: .cloud_cover_mid, time: time)
         case .cloudcover_high:
             return try await get(raw: .cloud_cover_high, time: time)
-        case .terrestrial_radiation:
-            /// Use center averaged
-            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-            return DataAndUnit(solar, .wattPerSquareMetre)
-        case .terrestrial_radiation_instant:
-            /// Use center averaged
-            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-            return DataAndUnit(solar, .wattPerSquareMetre)
         case .shortwave_radiation_instant:
             let sw = try await get(raw: .shortwave_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
@@ -361,8 +351,6 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
 
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) async throws {
         switch derived {
-        case .terrestrial_radiation, .terrestrial_radiation_instant:
-            break
         case .shortwave_radiation_instant:
             try await prefetchData(raw: .shortwave_radiation, time: time)
         case .diffuse_radiation_instant:

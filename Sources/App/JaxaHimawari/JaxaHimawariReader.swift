@@ -1,8 +1,6 @@
 import Foundation
 
 enum JaxaHimawariVariableDerived: String, GenericVariableMixable {
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case direct_normal_irradiance
     case direct_normal_irradiance_instant
     case direct_radiation
@@ -50,12 +48,6 @@ struct JaxaHimawariReader: GenericReaderDerived, GenericReaderProtocol {
 
     func get(derived: Derived, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         switch derived {
-        case .terrestrial_radiation:
-            let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-            return DataAndUnit(solar, .wattPerSquareMetre)
-        case .terrestrial_radiation_instant:
-            let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-            return DataAndUnit(solar, .wattPerSquareMetre)
         case .shortwave_radiation_instant:
             let sw = try await get(raw: .shortwave_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
@@ -103,8 +95,6 @@ struct JaxaHimawariReader: GenericReaderDerived, GenericReaderProtocol {
 
     func prefetchData(derived: Derived, time: TimerangeDtAndSettings) async throws {
         switch derived {
-        case .terrestrial_radiation, .terrestrial_radiation_instant:
-            break
         case .shortwave_radiation_instant, .direct_radiation, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation_instant, .diffuse_radiation, .diffuse_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant, .sunshine_duration:
             try await prefetchData(raw: .shortwave_radiation, time: time)
         }

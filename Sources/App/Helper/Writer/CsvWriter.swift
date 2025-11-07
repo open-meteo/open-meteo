@@ -37,9 +37,6 @@ extension ForecastapiResult {
                     try await location.hourly(variables: variables.hourlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {
-                    try await location.sixHourly(variables: variables.sixHourlyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
-                }
-                for location in results {
                     try await location.daily(variables: variables.dailyVariables)?.writeCsv(into: &b, timeformat: timeformat, utc_offset_seconds: location.utc_offset_seconds, location_id: multiLocation ? location.locationId : nil)
                 }
                 for location in results {

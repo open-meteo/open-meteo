@@ -6,6 +6,14 @@ enum Meteorology {
     @inlinable static func windspeed(u: Float, v: Float) -> Float {
         return sqrt(u * u + v * v)
     }
+    
+    // Calculate wind speed and adjust level using logarithmic wind power law
+    @inlinable static func windspeed(u: [Float], v: [Float], levelFrom: Float, levelTo: Float) -> [Float] {
+        let factor = Self.scaleWindFactor(from: levelFrom, to: levelTo)
+        return zip(u,v).map {
+            sqrt($0*$0 + $1*$1) * factor
+        }
+    }
 
     /// Calculate wind direction in degrees
     // @inlinable static func windirection(u: Float, v: Float) -> Float {
@@ -157,7 +165,7 @@ enum Meteorology {
         return max(esat - ea, 0)
     }
 
-    /// Factor that need to be applied to scale wind from onee level to another. Only valid for altitude below 100 meters.
+    /// Factor that need to be applied to scale wind from one level to another. Only valid for altitude below 100 meters.
     /// http://www.fao.org/3/x0490e/x0490e07.htm
     public static func scaleWindFactor(from: Float, to: Float) -> Float {
         let factorFrom = 4.87 / (log(67.8 * from - 5.42))
@@ -187,16 +195,22 @@ enum Meteorology {
     public static func specificToRelativeHumidity(specificHumidity: [Float], temperature: [Float], pressure: [Float]) -> [Float] {
         return zip(temperature, zip(specificHumidity, pressure)).map {
             let (temp, (qair, press)) = $0
-
-            let β = Float(17.625)
-            let λ = Float(243.04)
-
-            /// saturation vapor pressure at air temperature Thr. (kPa)
-            let es = 6.112 * exp((β * temp) / (temp + λ))
-            let e = qair / 1000 * press * 100 / (0.378 * qair / 1000 + 0.622)
-            let rh = e / es
-            return max(min(rh, 100), 0)
+            return Self.specificToRelativeHumidity(specificHumidity: qair, temperature: temp, pressure: press)
         }
+    }
+    
+    /// Calculate relative humidity. All variables should be on the same level
+    /// https://cran.r-project.org/web/packages/humidity/vignettes/humidity-measures.html
+    /// humudity in g/kg, temperature in celsius, pressure in hPa
+    @inlinable public static func specificToRelativeHumidity(specificHumidity: Float, temperature: Float, pressure: Float) -> Float {
+        let β = Float(17.625)
+        let λ = Float(243.04)
+
+        /// saturation vapor pressure at air temperature Thr. (kPa)
+        let es = 6.112 * exp((β * temperature) / (temperature + λ))
+        let e = specificHumidity / 1000 * pressure * 100 / (0.378 * specificHumidity / 1000 + 0.622)
+        let rh = e / es
+        return max(min(rh, 100), 0)
     }
 
     /// Calculate relative humidity and correct sea level pressure to surface pressure.

@@ -100,6 +100,21 @@ enum Cmip6Domain: String, RawRepresentableString, CaseIterable, GenericDomain {
     /// https://gmd.copernicus.org/articles/12/4999/2019/gmd-12-4999-2019.pdf
     /// Disabled because uses 360 days
     // case HadGEM3_GC31_HM
+    
+    func makeReader(biasCorrection: Bool, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> any GenericReaderProtocol {
+        if biasCorrection {
+            guard let reader = try await Cmip6BiasCorrectorEra5Seamless(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                throw ForecastApiError.noDataAvailableForThisLocation
+            }
+            return Cmip6ReaderPostBiasCorrected(reader: reader, domain: self)
+        } else {
+            guard let reader = try await GenericReader<Cmip6Domain, Cmip6Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                throw ForecastApiError.noDataAvailableForThisLocation
+            }
+            let reader2 = Cmip6ReaderPreBiasCorrection(reader: reader, domain: self)
+            return Cmip6ReaderPostBiasCorrected(reader: reader2, domain: self)
+        }
+    }
 
     var soureName: String {
         switch self {

@@ -60,7 +60,7 @@ final class Curl: Sendable {
         Environment.get("HTTP_CACHE")
     }
 
-    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 16, retryUnauthorized: Bool = false) {
+    public init(logger: Logger, client: HTTPClient, deadLineHours: Double = 3, readTimeout: Int = 5 * 60, retryError4xx: Bool = true, waitAfterLastModified: TimeInterval? = nil, waitAfterLastModifiedBeforeDownload: TimeInterval? = nil, headers: [(String, String)] = .init(), chunkSizeMB: Int = 8, retryUnauthorized: Bool = false) {
         self.logger = logger
         self.deadline = Date().addingTimeInterval(TimeInterval(deadLineHours * 3600))
         self.retryError4xx = retryError4xx

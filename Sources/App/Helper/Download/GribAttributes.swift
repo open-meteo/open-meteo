@@ -39,6 +39,7 @@ struct GribAttributes {
         case hybrid
         case isobaricLayer // ItaliaMeteo ARPAE
         case depthBelowLand // ItaliaMeteo ARPAE
+        case mostUnstableParcel // EC46 MUCAPE
         case unknown // only KMA
     }
 

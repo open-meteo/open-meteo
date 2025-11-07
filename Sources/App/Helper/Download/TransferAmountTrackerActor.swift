@@ -1,6 +1,6 @@
 import Vapor
 
-extension AsyncSequence where Element == ByteBuffer {
+extension AsyncSequence where Self: Sendable, Element == ByteBuffer {
     /// Get tracker to print and track transfer rates
     func tracker(_ tracker: TransferAmountTrackerActor) -> TransferAmountTrackerStream<Self> {
         return TransferAmountTrackerStream(sequence: self, tracker: tracker)
@@ -35,7 +35,7 @@ final actor TransferAmountTrackerActor {
 }
 
 /// Sum up transfered amount and print statistics every couple of seconds
-struct TransferAmountTrackerStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteBuffer {
+struct TransferAmountTrackerStream<T: AsyncSequence>: Sendable, AsyncSequence where T.Element == ByteBuffer, T: Sendable {
     public typealias Element = AsyncIterator.Element
 
     let sequence: T

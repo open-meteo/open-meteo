@@ -24,8 +24,6 @@ enum GemVariableDerivedSurface: String, CaseIterable, GenericVariableMixable {
     case vapor_pressure_deficit
     case vapour_pressure_deficit
     case surface_pressure
-    case terrestrial_radiation
-    case terrestrial_radiation_instant
     case snowfall
     case rain
     case weathercode
@@ -123,10 +121,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .surface_pressure:
                 try await prefetchData(raw: .surface(.pressure_msl), time: time)
                 try await prefetchData(raw: .surface(.temperature_2m), time: time)
-            case .terrestrial_radiation:
-                break
-            case .terrestrial_radiation_instant:
-                break
             case .diffuse_radiation, .diffuse_radiation_instant, .direct_normal_irradiance, .direct_normal_irradiance_instant, .direct_radiation, .direct_radiation_instant, .global_tilted_irradiance, .global_tilted_irradiance_instant, .shortwave_radiation_instant:
                 try await prefetchData(raw: .surface(.shortwave_radiation), time: time)
             case .snowfall:
@@ -234,14 +228,6 @@ struct GemReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 let temperature = try await get(raw: .surface(.temperature_2m), time: time).data
                 let pressure = try await get(raw: .surface(.pressure_msl), time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
-            case .terrestrial_radiation:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
-            case .terrestrial_radiation_instant:
-                /// Use center averaged
-                let solar = Zensun.extraTerrestrialRadiationInstant(latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(solar, .wattPerSquareMetre)
             case .shortwave_radiation_instant:
                 let sw = try await get(raw: .surface(.shortwave_radiation), time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
