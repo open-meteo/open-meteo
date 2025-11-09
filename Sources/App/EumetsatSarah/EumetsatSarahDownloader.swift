@@ -81,7 +81,7 @@ struct EumetsatSarahDownload: AsyncCommand {
         if !FileManager.default.fileExists(atPath: metaDataFile) {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             let url = "https://public.cmsaf.dwd.de/data/perm/auxilliary_data/AuxilaryData_SARAH-3.nc"
-            try await api.curl.download(url: url, toFile: metaDataFile, bzip2Decode: false)
+            try await api.curl.download(url: url, toFile: metaDataFile)
         }
         guard let meta: (elevation: [Float], landMask: [Int8], timeDifference: [Double]) = try NetCDF.open(path: metaDataFile, allowUpdate: false).map({ nc in
             guard let elevation = try nc.getVariable(name: "altitude")?.asType(Float.self)?.read() else {

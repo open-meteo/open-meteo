@@ -114,7 +114,7 @@ struct KnmiDownload: AsyncCommand {
             fatalError("Could not decode meta response")
         }
 
-        let handles = try await curl.withGribStream(url: metaData.temporaryDownloadUrl, bzip2Decode: false) { stream in
+        let handles = try await curl.withGribStream(url: metaData.temporaryDownloadUrl) { stream in
             let previous = GribDeaverager()
             let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
             let windSpeedCalculator = WindSpeedCalculator<KnmiSurfaceVariable>(trueNorth: trueNorth)

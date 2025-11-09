@@ -5,7 +5,7 @@ import CHelper
 
 extension Curl {
     /// Download all grib files and return an array of grib messages
-    func downloadGrib(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> [GribMessage] {
+    func downloadGrib(url: String, bzip2Decode: Bzip2Decode = .none, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> [GribMessage] {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
 
@@ -29,13 +29,19 @@ extension Curl {
                 let contentLength = try response.contentLength()
                 let checksum = response.headers["x-amz-meta-sha256"].first
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
-                if bzip2Decode {
-                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decompressBzip2().decodeGrib() {
+                switch bzip2Decode {
+                case .none:
+                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
                     }
-                } else {
-                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decodeGrib() {
+                case .parallel:
+                    for try await m in try response.body.tracker(tracker).sha256verify(checksum).decompressBzip2Parallel().decodeGrib() {
+                        try Task.checkCancellation()
+                        messages.append(m)
+                    }
+                case .singleThreaded:
+                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decompressBzip2SingleThreaded().decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
                     }
@@ -54,14 +60,14 @@ extension Curl {
     }
     
     /// Stream GRIB messages. Does not restart stream on error
-    func getGribStream(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> AnyAsyncSequence<GribMessage> {
+    func getGribStream(url: String, bzip2Decode: Bzip2Decode = .none, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws -> AnyAsyncSequence<GribMessage> {
         return try await self.withGribStream(url: url, bzip2Decode: bzip2Decode, nConcurrent: nConcurrent, deadLineHours: deadLineHours, headers: headers) {
             return $0
         }.eraseToAnyAsyncSequence()
     }
 
     /// Stream GRIB messages. The grib stream might be restarted on error.
-    func withGribStream<T>(url: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+    func withGribStream<T>(url: String, bzip2Decode: Bzip2Decode = .none, range: String? = nil, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
 
@@ -87,10 +93,14 @@ extension Curl {
                 let contentLength = try response.contentLength()
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 let result: T
-                if bzip2Decode {
-                    result = try await body(response.body.tracker(tracker).decompressBzip2().decodeGrib().eraseToAnyAsyncSequence())
-                } else {
+                switch bzip2Decode {
+                    
+                case .none:
                     result = try await body(response.body.tracker(tracker).decodeGrib().eraseToAnyAsyncSequence())
+                case .parallel:
+                    result = try await body(response.body.tracker(tracker).decompressBzip2Parallel().decodeGrib().eraseToAnyAsyncSequence())
+                case .singleThreaded:
+                    result = try await body(response.body.tracker(tracker).decompressBzip2SingleThreaded().decodeGrib().eraseToAnyAsyncSequence())
                 }
                 let trackerTransfered = await tracker.transfered
                 await totalBytesTransfered.add(trackerTransfered)

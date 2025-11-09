@@ -45,7 +45,7 @@ extension Curl {
         }
         let ranges = index.indexToRange()
         return ranges.mapStream(nConcurrent: 1, body: {
-            range in try await self.downloadGrib(url: url, bzip2Decode: false, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
+            range in try await self.downloadGrib(url: url, range: range.range, minSize: range.minSize, nConcurrent: concurrent)
         }).flatMap({ $0.mapStream(nConcurrent: 1, body: { $0 }) }).eraseToAnyAsyncSequence()
     }
 
@@ -133,7 +133,7 @@ extension Curl {
                     if inventory.matches.isEmpty {
                         continue
                     }
-                    let messages = try await downloadGrib(url: url, bzip2Decode: false, range: inventory.range, minSize: inventory.minSize)
+                    let messages = try await downloadGrib(url: url, range: inventory.range, minSize: inventory.minSize)
 
                     if messages.count != inventory.matches.count {
                         logger.error("Grib reader did not get all matched variables. Matches count \(inventory.matches.count). Grib count \(messages.count)")

@@ -271,7 +271,7 @@ final class Curl: Sendable {
         // try FileManager.default.deleteFiles(direcotry: cacheDirectory, olderThan: Date().addingTimeInterval(-2*24*3600))
         let cacheFile = cacheDirectory + "/" + (url + (range ?? "")).sha256
         if !FileManager.default.fileExists(atPath: cacheFile) {
-            try await self.download(url: url, toFile: cacheFile, bzip2Decode: false, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
+            try await self.download(url: url, toFile: cacheFile, range: range, minSize: minSize, cacheDirectory: nil, nConcurrent: 1, headers: headers)
         }
 
         guard let data = try FileHandle(forReadingAtPath: cacheFile)?.readToEnd() else {
@@ -287,10 +287,16 @@ final class Curl: Sendable {
         headers.add(name: "content-length", value: "\(data.count)")
         return HTTPClientResponse(status: .ok, headers: headers, body: .bytes(ByteBuffer(data: data)))
     }
+    
+    enum Bzip2Decode {
+        case none
+        case parallel
+        case singleThreaded
+    }
 
     /// Use http-async http client to download and store to file. If the file already exists, it will be deleted before
     /// Data is first downloaded to a tempoary tilde file and then moved to its final location atomically
-    func download(url: String, toFile: String, bzip2Decode: Bool, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws {
+    func download(url: String, toFile: String, bzip2Decode: Bzip2Decode = .none, range: String? = nil, minSize: Int? = nil, cacheDirectory: String? = Curl.cacheDirectory, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = []) async throws {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         let fileTemp = "\(toFile)~"
@@ -304,10 +310,13 @@ final class Curl: Sendable {
                 try FileManager.default.removeItemIfExists(at: fileTemp)
                 let contentLength = try response.contentLength() ?? minSize
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
-                if bzip2Decode {
-                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
-                } else {
+                switch bzip2Decode {
+                case .none:
                     try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
+                case .parallel:
+                    try await response.body.tracker(tracker).decompressBzip2Parallel().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
+                case .singleThreaded:
+                    try await response.body.tracker(tracker).decompressBzip2SingleThreaded().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
                 await totalBytesTransfered.add(tracker.transfered)
@@ -321,7 +330,7 @@ final class Curl: Sendable {
 
     /// Use http-async http client to download
     /// `minSize` retry download if file is too small. Happens a lot with NOAA servers while files are uploaded while downloaded
-    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bool = false, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], quiet: Bool = false) async throws -> ByteBuffer {
+    func downloadInMemoryAsync(url: String, range: String? = nil, minSize: Int?, bzip2Decode: Bzip2Decode = .none, nConcurrent: Int = 1, deadLineHours: Double? = nil, headers: [(String, String)] = [], quiet: Bool = false) async throws -> ByteBuffer {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
         while true {
@@ -336,13 +345,19 @@ final class Curl: Sendable {
                     buffer.reserveCapacity(contentLength)
                 }
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
-                if bzip2Decode {
-                    for try await fragement in response.body.tracker(tracker).decompressBzip2() {
+                switch bzip2Decode {
+                case .none:
+                    for try await fragement in response.body.tracker(tracker) {
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }
-                } else {
-                    for try await fragement in response.body.tracker(tracker) {
+                case .parallel:
+                    for try await fragement in try response.body.tracker(tracker).decompressBzip2Parallel() {
+                        try Task.checkCancellation()
+                        buffer.writeImmutableBuffer(fragement)
+                    }
+                case .singleThreaded:
+                    for try await fragement in response.body.tracker(tracker).decompressBzip2SingleThreaded() {
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }

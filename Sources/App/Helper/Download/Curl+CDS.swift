@@ -179,7 +179,7 @@ extension Curl {
     func withCdsApi<Query: Encodable, T>(dataset: String, query: Query, apikey: String, server: String = "https://cds.climate.copernicus.eu/api", body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
         let results = try await waitForCdsJob(job: job, apikey: apikey, server: server)
-        let result = try await withGribStream(url: results.asset.value.href, bzip2Decode: false, body: body)
+        let result = try await withGribStream(url: results.asset.value.href, body: body)
         try await cleanupCdsApiJob(job: job, apikey: apikey, server: server)
         return result
     }
@@ -190,7 +190,7 @@ extension Curl {
     func downloadCdsApi<Query: Encodable>(dataset: String, query: Query, apikey: String, server: String = "https://cds.climate.copernicus.eu/api", destinationFile: String) async throws {
         let job = try await startCdsApiJob(dataset: dataset, query: query, apikey: apikey, server: server)
         let results = try await waitForCdsJob(job: job, apikey: apikey, server: server)
-        try await download(url: results.asset.value.href, toFile: destinationFile, bzip2Decode: false, minSize: results.asset.value.size)
+        try await download(url: results.asset.value.href, toFile: destinationFile, minSize: results.asset.value.size)
         try await cleanupCdsApiJob(job: job, apikey: apikey, server: server)
     }
 

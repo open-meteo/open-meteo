@@ -1353,7 +1353,7 @@ extension Curl {
         for (i,server) in servers.enumerated() {
             do {
                 let url = "\(server)\(uri)"
-                try await download(url: url, toFile: toFile, bzip2Decode: false)
+                try await download(url: url, toFile: toFile)
                 break
             } catch CurlError.downloadFailed(let code) {
                 if code == .notFound && i != servers.count-1 {

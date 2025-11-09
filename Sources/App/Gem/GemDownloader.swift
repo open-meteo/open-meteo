@@ -109,7 +109,7 @@ struct GemDownload: AsyncCommand {
         /// HGT file is not available for analysis in HRDPS
         let hour: Int = domain == .gem_hrdps_continental ? 1 : 0
         let terrainUrl = domain.getUrl(run: run, hour: hour, gribName: terrainGribName, server: server)
-        let message = try await curl.downloadGrib(url: terrainUrl, bzip2Decode: false)[0]
+        let message = try await curl.downloadGrib(url: terrainUrl)[0]
         try grib2d.load(message: message)
         if domain == .gem_global_ensemble {
             // Only ensemble model is shifted by 180° and uses geopotential
@@ -122,7 +122,7 @@ struct GemDownload: AsyncCommand {
             let gribName = domain == .gem_hrdps_continental ? "LAND_Sfc" : "LAND_SFC_0"
             let landmaskUrl = domain.getUrl(run: run, hour: 0, gribName: gribName, server: server)
             var landmask: Array2D?
-            for message in try await curl.downloadGrib(url: landmaskUrl, bzip2Decode: false) {
+            for message in try await curl.downloadGrib(url: landmaskUrl) {
                 try grib2d.load(message: message)
                 landmask = grib2d.array
             }
@@ -187,7 +187,7 @@ struct GemDownload: AsyncCommand {
                 let storePrecipitation = VariablePerMemberStorage<GemSurfaceVariable>()
 
                 do {
-                    for message in try await curl.downloadGrib(url: url, bzip2Decode: false, deadLineHours: deadLineHours) {
+                    for message in try await curl.downloadGrib(url: url, deadLineHours: deadLineHours) {
                         let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                         // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                         // fatalError()

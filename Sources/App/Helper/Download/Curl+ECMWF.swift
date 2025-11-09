@@ -19,7 +19,7 @@ extension Curl {
     func withEcmwfApi<T>(query: any Encodable, email: String, apikey: String, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let job = try await startEcmwfApiJob(query: query, email: email, apikey: apikey)
         let gribUrl = try await waitForEcmwfJob(job: job, email: email, apikey: apikey)
-        let result = try await withGribStream(url: gribUrl, bzip2Decode: false, body: body)
+        let result = try await withGribStream(url: gribUrl, body: body)
         try await cleanupEcmwfApiJob(job: job, email: email, apikey: apikey)
         return result
     }
@@ -31,7 +31,7 @@ extension Curl {
     func downloadEcmwfApi(query: any Encodable, email: String, apikey: String, destinationFile: String) async throws {
         let job = try await startEcmwfApiJob(query: query, email: email, apikey: apikey)
         let gribUrl = try await waitForEcmwfJob(job: job, email: email, apikey: apikey)
-        try await download(url: gribUrl, toFile: destinationFile, bzip2Decode: false)
+        try await download(url: gribUrl, toFile: destinationFile)
         try await cleanupEcmwfApiJob(job: job, email: email, apikey: apikey)
     }
 

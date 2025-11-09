@@ -105,7 +105,7 @@ struct JmaDownload: AsyncCommand {
 
         let handles = try await filesToDownload.asyncFlatMap { filename -> [GenericVariableHandle] in
             let url = "\(server)\(filename)"
-            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
+            return try await curl.withGribStream(url: url, nConcurrent: concurrent) { stream in
                 let deaveragerScoped = await deaverager.copy()
                 let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in

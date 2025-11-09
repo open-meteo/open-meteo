@@ -8,13 +8,13 @@ fileprivate enum CurlNetCdfError: Error {
 
 extension Curl {
     /// Download all grib files and return an array of grib messages
-    func downloadNetCdf(url: String, file: String, ncVariable: String, bzip2Decode: Bool, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> Group {
+    func downloadNetCdf(url: String, file: String, ncVariable: String, minSize: Int? = nil, nConcurrent: Int = 1, deadLineHours: Double? = nil) async throws -> Group {
         let deadline = deadLineHours.map { Date().addingTimeInterval(TimeInterval($0 * 3600)) } ?? deadline
         let timeout = TimeoutTracker(logger: logger, deadline: deadline)
 
         while true {
             // Start the download and wait for the header
-            try await download(url: url, toFile: file, bzip2Decode: bzip2Decode, minSize: minSize, nConcurrent: nConcurrent, deadLineHours: deadLineHours)
+            try await download(url: url, toFile: file, bzip2Decode: .none, minSize: minSize, nConcurrent: nConcurrent, deadLineHours: deadLineHours)
 
             // If NetCDF open fails, retry
             // Can happen for truncated files while downloading

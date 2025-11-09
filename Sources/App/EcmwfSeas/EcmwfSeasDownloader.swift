@@ -168,7 +168,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableAny>()
                 
                 // Download and process concurrently
-                try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
+                try await curl.getGribStream(url: url, bzip2Decode: .parallel, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {
@@ -255,7 +255,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 let inMemoryAccumulated = VariablePerMemberStorage<EcmwfSeasVariableAny>()
                 
                 // Download and process concurrently
-                try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
+                try await curl.getGribStream(url: url, bzip2Decode: .parallel, nConcurrent: concurrent, deadLineHours: 4).foreachConcurrent(nConcurrent: concurrent) { message in
                     let attributes = try message.getAttributes()
                     let variable: (any EcmwfSeasVariable)?
                     switch domain {

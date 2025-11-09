@@ -85,16 +85,14 @@ struct DownloadBomCommand: AsyncCommand {
             _ = try await curl.downloadNetCdf(
                 url: "\(base)sfc/topog.nc",
                 file: topogFile,
-                ncVariable: "topog",
-                bzip2Decode: false
+                ncVariable: "topog"
             )
         }
         if !FileManager.default.fileExists(atPath: lndMaskFile) {
             _ = try await curl.downloadNetCdf(
                 url: "\(base)sfc/lnd_mask.nc",
                 file: lndMaskFile,
-                ncVariable: "lnd_mask",
-                bzip2Decode: false
+                ncVariable: "lnd_mask"
             )
         }
 
@@ -135,16 +133,14 @@ struct DownloadBomCommand: AsyncCommand {
                 _ = try await curl.downloadNetCdf(
                     url: "\(base)an/ml/\(variable).nc",
                     file: analysisFile,
-                    ncVariable: variable,
-                    bzip2Decode: false
+                    ncVariable: variable
                 )
             }
             if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
                 _ = try await curl.downloadNetCdf(
                     url: "\(base)fc/ml/\(variable).nc",
                     file: forecastFile,
-                    ncVariable: variable,
-                    bzip2Decode: false
+                    ncVariable: variable
                 )
             }
         }
@@ -230,8 +226,7 @@ struct DownloadBomCommand: AsyncCommand {
                     _ = try await curl.downloadNetCdf(
                         url: url,
                         file: forecastFile,
-                        ncVariable: variable.name,
-                        bzip2Decode: false
+                        ncVariable: variable.name
                     )
                 }
                 guard let omVariable = variable.om else {
@@ -364,16 +359,14 @@ struct DownloadBomCommand: AsyncCommand {
                 _ = try await curl.downloadNetCdf(
                     url: "\(base)an/sfc/\(variable.name).nc",
                     file: analysisFile,
-                    ncVariable: variable.name,
-                    bzip2Decode: false
+                    ncVariable: variable.name
                 )
             }
             if !skipFilesIfExisting || !FileManager.default.fileExists(atPath: forecastFile) {
                 _ = try await curl.downloadNetCdf(
                     url: "\(base)fc/sfc/\(variable.name).nc",
                     file: forecastFile,
-                    ncVariable: variable.name,
-                    bzip2Decode: false
+                    ncVariable: variable.name
                 )
             }
             guard let omVariable = variable.om else {

@@ -94,7 +94,7 @@ struct GloFasDownloader: AsyncCommand {
             let memberUrlStr = nMembers <= 1 ? "" : "_\(member)"
             let remote = "https://\(user):\(password)@aux.ecmwf.int/ecpds/data/file/CEMS_Flood_Glofas/\(directory)/\(run.format_YYYYMMdd)/dis_\(run.format_YYYYMMddHH)\(memberUrlStr).grib"
 
-            return try await curl.withGribStream(url: remote, bzip2Decode: false, nConcurrent: concurrent) { messages in
+            return try await curl.withGribStream(url: remote, nConcurrent: concurrent) { messages in
                 return try await messages.mapStream(nConcurrent: concurrent) { message -> GenericVariableHandle? in
                     let attributes = try message.getAttributes()
                     let member = Int(message.get(attribute: "number")!)!

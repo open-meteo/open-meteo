@@ -25,12 +25,12 @@ struct CdoHelper: Sendable {
     // Uncompress bz2, reproject to regular grid and read into memory
     func downloadAndRemap(_ url: String) async throws -> [(message: GribMessage, data: Array2D)] {
         guard let cdo else {
-            return try await curl.downloadGrib(url: url, bzip2Decode: true).map { message in
+            return try await curl.downloadGrib(url: url, bzip2Decode: .singleThreaded).map { message in
                 return (message, Array2D(data: try message.getDouble().map(Float.init), nx: grid.nx, ny: grid.ny))
             }
         }
         /// Nearest neighbour interpolation
-        let messages = try await curl.downloadGrib(url: url, bzip2Decode: true)
+        let messages = try await curl.downloadGrib(url: url, bzip2Decode: .singleThreaded)
         return try messages.map { message in
             let source = try message.getDouble()
             let destination = cdo.mapping.map { src in
@@ -79,7 +79,7 @@ struct CdoIconGlobal {
         
         if !fm.fileExists(atPath: weightsFile) {
             let remoteFile = "https://openmeteo.s3.amazonaws.com/data/\(domain.domainRegistry.rawValue)/static/cdo_weights.nc"
-            try await curl.download(url: remoteFile, toFile: weightsFile, bzip2Decode: false)
+            try await curl.download(url: remoteFile, toFile: weightsFile)
         }
         guard let src_address = try NetCDF.open(path: weightsFile, allowUpdate: false)?.getVariable(name: "src_address")?.asType(Int32.self)?.read() else {
             fatalError("could not open weights file")

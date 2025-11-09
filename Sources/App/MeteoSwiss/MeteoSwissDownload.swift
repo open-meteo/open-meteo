@@ -131,7 +131,7 @@ struct MeteoSwissDownload: AsyncCommand {
                     ))
                 }
                 for url in urls {
-                    for message in try await curl.downloadGrib(url: url, bzip2Decode: false) {
+                    for message in try await curl.downloadGrib(url: url) {
                         let stepRange = try message.getOrThrow(attribute: "stepRange")
                         let stepType = try message.getOrThrow(attribute: "stepType")
                         let rawData = try message.getFloats()
@@ -222,7 +222,7 @@ struct MeteoSwissDownload: AsyncCommand {
             fatalError("Could not find horizontal constants URL in assets")
         }
         let curl = Curl(logger: logger, client: client)
-        let horizontalConstants = try await curl.downloadGrib(url: horizontalConstantsUrl, bzip2Decode: false)
+        let horizontalConstants = try await curl.downloadGrib(url: horizontalConstantsUrl)
         var latitudes: [Float]? = nil
         var longitudes: [Float]? = nil
         var landmask: [Float]? = nil

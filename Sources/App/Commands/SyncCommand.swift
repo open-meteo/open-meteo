@@ -243,7 +243,7 @@ struct SyncCommand: AsyncCommand {
                     .with(last_run_availability_time: .now())
                     .writeTo(path: localFile)
             } else {
-                try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
+                try await curl.download(url: client.url.string, toFile: localFile, deadLineHours: 0.5)
             }
             await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
         }

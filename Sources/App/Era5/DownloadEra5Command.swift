@@ -243,9 +243,9 @@ struct DownloadEra5Command: AsyncCommand {
                 //let lsm = "https://confluence.ecmwf.int/download/attachments/140385202/lsm_1279l4_0.1x0.1.grb?version=1&modificationDate=1567525024201&api=v2&download=true"
                 let soilType = "https://confluence.ecmwf.int/download/attachments/140385202/slt.grib?version=1&modificationDate=1634824634152&api=v2&download=true"
                 let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
-                try await curl.download(url: z, toFile: tempDownloadGribFile, bzip2Decode: false)
-                //try await curl.download(url: lsm, toFile: tempDownloadGribFile2!, bzip2Decode: false)
-                try await curl.download(url: soilType, toFile: tempDownloadGribFile3!, bzip2Decode: false)
+                try await curl.download(url: z, toFile: tempDownloadGribFile)
+                //try await curl.download(url: lsm, toFile: tempDownloadGribFile2!)
+                try await curl.download(url: soilType, toFile: tempDownloadGribFile3!)
             case .cerra:
                 struct Query: Encodable {
                     let product_type = "analysis"

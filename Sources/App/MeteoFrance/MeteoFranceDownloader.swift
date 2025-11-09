@@ -117,7 +117,7 @@ struct MeteoFranceDownload: AsyncCommand {
         let subsetGrid = domain.mfSubsetGrid
         let url = "https://public-api.meteofrance.fr/public/\(domain.family.rawValue)/1.0/wcs/\(domain.mfApiName)-WCS/GetCoverage?service=WCS&version=2.0.1&coverageid=GEOMETRIC_HEIGHT__GROUND_OR_WATER_SURFACE___\(runTime)\(subsetGrid)&subset=time(0)&format=application%2Fwmo-grib"
 
-        let message = try await curl.downloadGrib(url: url, bzip2Decode: false)[0]
+        let message = try await curl.downloadGrib(url: url)[0]
         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
         try grib2d.load(message: message)
         if domain.isGlobal {
@@ -200,7 +200,7 @@ struct MeteoFranceDownload: AsyncCommand {
 
             let url = "https://public-api.meteofrance.fr/public/DPStatsPEARPEGE/v1/models/PEARP-EUROPE/grids/\(domain.mfApiGridName)/groups/RRP1/productStatsPEARP?referencetime=\(run.iso8601_YYYY_MM_dd_HH_mm):00Z&time=\(f3)H&format=grib2"
 
-            return try await curl.withGribStream(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
+            return try await curl.withGribStream(url: url, headers: [("apikey", apikey.randomElement() ?? "")]) { stream in
                 // process sequentialy, as precipitation need to be in order for deaveraging
                 let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
                 for try await message in stream {
@@ -280,7 +280,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 let windSpeedCalculator = WindSpeedCalculator<MeteoFranceSurfaceVariable>(trueNorth: nil)
                 
-                try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
+                try await curl.downloadGrib(url: useGovServer ? urlGov : url, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
 
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
@@ -521,7 +521,7 @@ struct MeteoFranceDownload: AsyncCommand {
                 /// Use a new HTTP client with new connections for every request
                 let client = application.makeNewHttpClient()
                 let curl = Curl(logger: logger, client: client, deadLineHours: deadLineHours, waitAfterLastModified: TimeInterval(2 * 60))
-                let message = try await curl.downloadGrib(url: url, bzip2Decode: false, headers: [("apikey", apikey.randomElement() ?? "")])[0]
+                let message = try await curl.downloadGrib(url: url, headers: [("apikey", apikey.randomElement() ?? "")])[0]
 
                 // try message.debugGrid(grid: grid, flipLatidude: true, shift180Longitude: true)
                 // message.dumpAttributes()

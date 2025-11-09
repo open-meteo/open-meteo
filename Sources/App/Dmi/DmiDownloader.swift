@@ -100,7 +100,7 @@ struct DmiDownload: AsyncCommand {
             // let url = "https://download.dmi.dk/public/opendata/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
             let url = "https://dmi-opendata.s3-eu-north-1.amazonaws.com/forecastdata/\(dataset)/\(dataset)_\(run.iso8601_YYYY_MM_dd_HHmm)00Z_\(t.iso8601_YYYY_MM_dd_HHmm)00Z.grib"
 
-            return try await curl.withGribStream(url: url, bzip2Decode: false) { stream in
+            return try await curl.withGribStream(url: url) { stream in
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
