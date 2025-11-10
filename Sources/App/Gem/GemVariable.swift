@@ -177,6 +177,58 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             case .snow_depth:
                 return "SNOD_Sfc"
             }
+        case .gem_hrdps_west:
+            // HRDPS West uses TGL (Time Grid Level) instead of AGL
+            switch self {
+            case .temperature_2m:
+                return "TMP_TGL_2"
+            case .temperature_40m:
+                return "TMP_TGL_40"
+            case .temperature_80m:
+                return "TMP_TGL_80"
+            case .temperature_120m:
+                return "TMP_TGL_120"
+            case .relative_humidity_2m:
+                return "RH_TGL_2"
+            case .cloud_cover:
+                return "TCDC_SFC_0"
+            case .pressure_msl:
+                return "PRMSL_MSL_0"
+            case .shortwave_radiation:
+                return "DSWRF_SFC_0"
+            case .wind_speed_10m:
+                return "WIND_TGL_10"
+            case .wind_direction_10m:
+                return "WDIR_TGL_10"
+            case .wind_speed_40m:
+                return "WIND_TGL_40"
+            case .wind_direction_40m:
+                return "WDIR_TGL_40"
+            case .wind_speed_80m:
+                return "WIND_TGL_80"
+            case .wind_direction_80m:
+                return "WDIR_TGL_80"
+            case .wind_speed_120m:
+                return "WIND_TGL_120"
+            case .wind_direction_120m:
+                return "WDIR_TGL_120"
+            case .wind_gusts_10m:
+                return "GUST_TGL_10"
+            case .showers:
+                return nil
+            case .snowfall_water_equivalent:
+                return "SDWE_SFC_0"
+            case .soil_temperature_0_to_10cm:
+                return nil // Not available in HRDPS West
+            case .soil_moisture_0_to_10cm:
+                return "SOILW_DBLY_10"
+            case .precipitation:
+                return "APCP_SFC_0"
+            case .cape:
+                return nil // Not available in HRDPS West
+            case .snow_depth:
+                return "SNOD_SFC_0"
+            }
         case .gem_global_ensemble:
             switch self {
             case .relative_humidity_2m:
@@ -240,22 +292,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
 
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
-    }
-
-    /// If this variable is winddirection, return the counterpater windspeed variable. Used to calculate data while downloading
-    var winddirectionCounterPartVariable: Self? {
-        switch self {
-        case .wind_direction_10m:
-            return .wind_speed_10m
-        case .wind_direction_40m:
-            return .wind_speed_40m
-        case .wind_direction_80m:
-            return .wind_speed_80m
-        case .wind_direction_120m:
-            return .wind_speed_120m
-        default:
-            return nil
-        }
     }
 
     var scalefactor: Float {
@@ -438,7 +474,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
         return (rawValue, 0)
     }
     func gribName(domain: GemDomain) -> String? {
-        let isbl = (domain == .gem_hrdps_continental || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
+        let isbl = (domain == .gem_hrdps_continental || domain == .gem_hrdps_west || domain == .gem_global_ensemble) ? "ISBL_\(level.zeroPadded(len: 4))" : "ISBL_\(level)"
         switch variable {
         case .temperature:
             return "TMP_\(isbl)"
@@ -462,7 +498,7 @@ struct GemPressureVariable: PressureVariableRespresentable, GemVariableDownloada
             return true
         }
         // Since 2003-05-16, upper level geopotenial is missing for hour 46...
-        if domain == .gem_hrdps_continental && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
+        if (domain == .gem_hrdps_continental || domain == .gem_hrdps_west) && hour == 46 && variable == .geopotential_height && [175, 200].contains(level) {
             return false
         }
         if hour >= 171 && hour % 6 != 0 && variable == .relative_humidity {
