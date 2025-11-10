@@ -24,20 +24,24 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
             Task {
                 defer { semaphore.signal() }
                 let data = fn.availableData
-                if data.count > 0 {
-                    await channelOut.send(ByteBuffer(data: data))
+                guard data.count > 0 else {
+                    fn.readabilityHandler = nil
+                    return
                 }
+                await channelOut.send(ByteBuffer(data: data))
             }
             semaphore.wait()
         }
         let dataIn = AsyncIteratorBoxed<Self>(self)
         stdinPipe.fileHandleForWriting.writeabilityHandler = { fn in
             let semaphore = DispatchSemaphore(value: 0)
+            let finished = Atomic(false)
             Task {
                 defer { semaphore.signal() }
                 do {
                     guard let data = try await dataIn.next() else {
-                        try fn.close()
+                        finished.store(true, ordering: .relaxed)
+                        fn.writeabilityHandler = nil
                         return
                     }
                     try fn.write(contentsOf: data.readableBytesView)
@@ -47,6 +51,13 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
                 }
             }
             semaphore.wait()
+            if finished.load(ordering: .relaxed) {
+                Task {
+                    // On linux, handle must be closed after writeabilityHandler
+                    // If close() is called during the handler, it just gets stuck
+                    try fn.close()
+                }
+            }
         }
         let process = Process()
         process.executableURL = URL(fileURLWithPath: path)
