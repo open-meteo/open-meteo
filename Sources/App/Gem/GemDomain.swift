@@ -97,9 +97,9 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             // every 6 hours
             return t.add(-2 * 3600).floor(toNearest: 6 * 3600)
         case .gem_hrdps_west:
-            // Delay of ~7 hours to init (experimental data)
+            // Delay of 06:27 hours to init (experimental data)
             // every 12 hours
-            return t.add(-7 * 3600).floor(toNearest: 12 * 3600)
+            return t.add(-6 * 3600).floor(toNearest: 12 * 3600)
         case .gem_global_ensemble:
             return t.add(-3 * 3600).floor(toNearest: 12 * 3600)
         }

@@ -31,6 +31,7 @@ This document lists all required cronjobs to download data. However, downloading
 55 * * * * /usr/local/bin/openmeteo-api download-nbm nbm_conus > ~/log/nbm_conus.log 2>&1 || cat ~/log/nbm_conus.log
 
 # GEM
+25 6,18 * * * /usr/local/bin/openmeteo-api download-gem gem_hrdps_west > ~/log/gem_hrdps_west.log 2>&1 || cat ~/log/gem_hrdps_west.log
 7 3,9,15,21 * * * /usr/local/bin/openmeteo-api download-gem gem_hrdps_continental > ~/log/gem_hrdps_continental.log 2>&1 || cat ~/log/gem_hrdps_continental.log
 47 2,8,14,20 * * * /usr/local/bin/openmeteo-api download-gem gem_regional > ~/log/gem_regional.log 2>&1 || cat ~/log/gem_regional.log
 39 3,15 * * * /usr/local/bin/openmeteo-api download-gem gem_global > ~/log/gem_global.log 2>&1 || cat ~/log/gem_global.log
