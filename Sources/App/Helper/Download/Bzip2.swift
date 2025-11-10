@@ -64,7 +64,8 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
         process.arguments = ["--decompress", "--stdout" /*, "-n", "8"*/]
         process.standardOutput = stdoutPipe
         process.standardInput = stdinPipe
-        process.terminationHandler = { process in
+        process.terminationHandler = { _ in
+            process.terminationHandler = nil
             guard process.terminationStatus == 0 else {
                 channelOut.fail(Bzip2Error.processFailed(code: process.terminationStatus))
                 return
