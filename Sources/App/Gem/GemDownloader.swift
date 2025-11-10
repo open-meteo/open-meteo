@@ -86,7 +86,7 @@ struct GemDownload: AsyncCommand {
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
-        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadS3Bucket: signature.uploadS3Bucket, concurrent: signature.concurrent)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -145,13 +145,11 @@ struct GemDownload: AsyncCommand {
     }
 
     /// Download data and store as compressed files for each timestep
-    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GemDomain, variables: [any GemVariableDownloadable], run: Timestamp, server: String?, uploadS3Bucket: String?, concurrent: Int?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let deadLineHours = (domain == .gem_global_ensemble || domain == .gem_global) ? 11 : 5.0
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours) // 12 hours and 6 hours interval so we let 1 hour for data conversion
         let isEnsemble = domain.countEnsembleMember > 1
-        
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
         let deaverager = GribDeaverager()
@@ -171,19 +169,19 @@ struct GemDownload: AsyncCommand {
             }
             /// Keep wind vectors in memory to calculate wind speed / direction for ensemble
             ///
-            var inMemory = [GemSurfaceVariableMember: [Float]]()
+            let windCalculator = WindSpeedCalculator<GemSurfaceVariable>()
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
 
-            for variable in variables {
+            try await variables.foreachConcurrent(nConcurrent: concurrent ?? 1) { variable in
                 guard let gribName = variable.gribName(domain: domain) else {
-                    continue
+                    return
                 }
                 if hour == 0 && variable.skipHour0 {
-                    continue
+                    return
                 }
                 if !variable.includedFor(hour: hour, domain: domain) {
-                    continue
+                    return
                 }
                 let url = domain.getUrl(run: run, hour: hour, gribName: gribName, server: server)
                 // snowfall file might be missing. Ignore any issues here
@@ -198,7 +196,7 @@ struct GemDownload: AsyncCommand {
                         let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                         // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: true)
                         // fatalError()
-                        try grib2d.load(message: message)
+                        var grib2d = try message.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                         if domain == .gem_global_ensemble {
                             // Only ensemble model is shifted by 180°
                             grib2d.array.shift180Longitudee()
@@ -220,22 +218,18 @@ struct GemDownload: AsyncCommand {
 
                         // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
                         if domain == .gem_global_ensemble, let variable = variable as? GemSurfaceVariable {
-                            // keep wind speed in memory, which actually contains wind U-component
-                            if [.wind_speed_10m, .wind_speed_40m, .wind_speed_80m, .wind_speed_120m].contains(variable) {
-                                inMemory[.init(variable, member)] = grib2d.array.data
+                            switch variable {
+                            case .wind_speed_10m:
+                                try await windCalculator.ingest(.u(grib2d.array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
                                 continue
-                            }
-                            // keep precipitation to calculate probabilitties later
-                            if [.precipitation].contains(variable) {
+                            case .wind_direction_10m:
+                                try await windCalculator.ingest(.v(grib2d.array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
+                                continue
+                            case .precipitation:
+                                // keep precipitation to calculate probabilities later
                                 await storePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                            }
-                            if let windspeedVariable = variable.winddirectionCounterPartVariable {
-                                guard let u = inMemory[.init(windspeedVariable, member)] else {
-                                    fatalError("Wind speed calculation requires \(windspeedVariable) to download")
-                                }
-                                let windspeed = zip(u, grib2d.array.data).map(Meteorology.windspeed)
-                                try await writer.write(member: member, variable: windspeedVariable, data: windspeed)
-                                grib2d.array.data = Meteorology.windirectionFast(u: u, v: grib2d.array.data)
+                            default:
+                                break
                             }
                         }
                         try await writer.write(member: member, variable: variable, data: grib2d.array.data)

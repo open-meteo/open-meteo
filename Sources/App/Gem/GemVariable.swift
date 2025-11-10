@@ -294,22 +294,6 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
         return (rawValue, 0)
     }
 
-    /// If this variable is winddirection, return the counterpater windspeed variable. Used to calculate data while downloading
-    var winddirectionCounterPartVariable: Self? {
-        switch self {
-        case .wind_direction_10m:
-            return .wind_speed_10m
-        case .wind_direction_40m:
-            return .wind_speed_40m
-        case .wind_direction_80m:
-            return .wind_speed_80m
-        case .wind_direction_120m:
-            return .wind_speed_120m
-        default:
-            return nil
-        }
-    }
-
     var scalefactor: Float {
         switch self {
         case .temperature_2m:
