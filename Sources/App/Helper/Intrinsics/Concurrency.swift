@@ -104,10 +104,23 @@ extension Sequence where Element: Sendable, Self: Sendable {
     func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
-    ) -> AsyncThrowingChannel<T, Error> {
+    ) -> AsyncThrowingMapSequence<AsyncBufferSequence<AsyncChannel<Task<T, any Error>>>, T> {
         assert(nConcurrent > 0)
-        
-        let stream = AsyncThrowingChannel<T, Error>()
+        let stream = AsyncChannel<Task<T, any Error>>()
+        _ = Task {
+            for element in self {
+                await stream.send(Task {
+                    return try await body(element)
+                })
+            }
+            stream.finish()
+        }
+        let res = stream.buffer(policy: .bounded(nConcurrent)).map { task in
+            return try await task.value
+        }
+        return res
+        // Version below does not immediately return data
+        /*let stream = AsyncThrowingChannel<T, Error>()
         _ = Task {
             do {
                 try await withThrowingTaskGroup(of: (Int, T).self) { group in
@@ -138,7 +151,7 @@ extension Sequence where Element: Sendable, Self: Sendable {
                 stream.fail(error)
             }
         }
-        return stream
+        return stream*/
         // Version below does not support backpressure
         /*return AsyncThrowingStream<T, Error> { continuation in
             let task = Task {
@@ -215,9 +228,27 @@ extension AsyncSequence where Element: Sendable, Self: Sendable {
     func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
-    ) -> AsyncThrowingStream<T, Error> {
+    ) -> AsyncThrowingMapSequence<AsyncBufferSequence<AsyncThrowingChannel<Task<T, any Error>, any Error>>, T> {
         assert(nConcurrent > 0)
-        return AsyncThrowingStream<T, Error> { continuation in
+        let stream = AsyncThrowingChannel<Task<T, any Error>, Error>()
+        _ = Task {
+            do {
+                for try await element in self {
+                    await stream.send(Task {
+                        return try await body(element)
+                    })
+                }
+                stream.finish()
+            } catch {
+                stream.fail(error)
+            }
+        }
+        let res = stream.buffer(policy: .bounded(nConcurrent)).map { task in
+            return try await task.value
+        }
+        return res
+        // Version below does not send elements immediately
+        /*return AsyncThrowingStream<T, Error> { continuation in
             let task = Task {
                 do {
                     try await withThrowingTaskGroup(of: (Int, T).self) { group in
@@ -254,7 +285,7 @@ extension AsyncSequence where Element: Sendable, Self: Sendable {
             continuation.onTermination = { _ in
                 task.cancel()
             }
-        }
+        }*/
     }
     
     /// Execute a closure for each element concurrently
