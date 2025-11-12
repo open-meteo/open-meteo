@@ -5,6 +5,7 @@ import CHelper
 import NIOCore
 import NIOFileSystem
 import SwiftParallelBzip2
+import Synchronization
 
 enum CurlError: Error {
     // case noGribMessagesMatch
@@ -36,8 +37,10 @@ final class Curl: Sendable {
     /// Retry 4xx errors
     let retryError4xx: Bool
 
-    /// Number of bytes of how much data was transfered
-    let totalBytesTransfered = TotalBytesTransfered()
+    /// Number of bytes of how much data was transferred
+    let totalBytesTransfered = Atomic(0)
+    
+    let startTime = DispatchTime.now()
 
     /// If set, sleep for a specified amount of time on top of the `last-modified` response header. This way, we keep a constant delay to realtime updates -> reduce download errors
     let waitAfterLastModified: TimeInterval?
@@ -75,7 +78,7 @@ final class Curl: Sendable {
     }
 
     public func printStatistics() async {
-        await totalBytesTransfered.printStatistics(logger: logger)
+        logger.info("Finished downloading \(totalBytesTransfered.load(ordering: .relaxed).bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
 
     /// Retry download start as many times until deadline is reached. As soon as the HTTP header is sucessfully returned, this function returns the HTTPClientResponse which can then be used to stream data
@@ -252,7 +255,7 @@ final class Curl: Sendable {
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }
-                    await self.totalBytesTransfered.add(buffer.readableBytes)
+                    self.totalBytesTransfered.add(buffer.readableBytes, ordering: .relaxed)
                     if let minSize = minSize, buffer.readableBytes < minSize {
                         throw CurlError.sizeTooSmall
                     }
@@ -304,14 +307,14 @@ final class Curl: Sendable {
                 let lastModified = response.headers.lastModified?.value
                 try FileManager.default.removeItemIfExists(at: fileTemp)
                 let contentLength = try response.contentLength() ?? minSize
-                let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     try await response.body.tracker(tracker).decodeBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
                 } else {
                     try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
                 try FileManager.default.moveFileOverwrite(from: fileTemp, to: toFile)
-                await totalBytesTransfered.add(tracker.transfered)
+                totalBytesTransfered.add(tracker.transfered.load(ordering: .relaxed), ordering: .relaxed)
                 try await response.waitAfterLastModified(logger: logger, wait: waitAfterLastModified)
                 return
             } catch {
@@ -336,7 +339,7 @@ final class Curl: Sendable {
                 if let contentLength {
                     buffer.reserveCapacity(contentLength)
                 }
-                let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
+                let tracker = TransferAmountTracker(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
                     for try await fragement in response.body.tracker(tracker).decodeBzip2() {
                         try Task.checkCancellation()
@@ -348,7 +351,7 @@ final class Curl: Sendable {
                         buffer.writeImmutableBuffer(fragement)
                     }
                 }
-                await totalBytesTransfered.add(tracker.transfered)
+                totalBytesTransfered.add(tracker.transfered.load(ordering: .relaxed), ordering: .relaxed)
                 if let minSize = minSize, buffer.readableBytes < minSize {
                     throw CurlError.sizeTooSmall
                 }
@@ -447,22 +450,6 @@ extension HTTPClientResponse {
             }
             try await Task.sleep(nanoseconds: UInt64(delta * 1_000_000_000))
         }
-    }
-}
-
-/// Track total bytes transfered
-final actor TotalBytesTransfered {
-    var bytes: Int = 0
-
-    /// start time of downloading
-    let startTime = DispatchTime.now()
-
-    public func add(_ n: Int) {
-        self.bytes += n
-    }
-
-    public func printStatistics(logger: Logger) {
-        logger.info("Finished downloading \(bytes.bytesHumanReadable) in \(startTime.timeElapsedPretty())")
     }
 }
 
