@@ -104,21 +104,15 @@ extension Sequence where Element: Sendable, Self: Sendable {
     func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
-    ) -> AsyncThrowingMapSequence<AsyncBufferSequence<AsyncChannel<Task<T, any Error>>>, T> {
+    ) -> AsyncThrowingMapSequence<AsyncBufferSequence<AsyncMapSequence<AsyncSyncSequence<Self>, Task<T, any Error>>>, T> {
         assert(nConcurrent > 0)
-        let stream = AsyncChannel<Task<T, any Error>>()
-        _ = Task {
-            for element in self {
-                await stream.send(Task {
-                    return try await body(element)
-                })
-            }
-            stream.finish()
+        
+        return self.async.map { element in
+            Task { try await body(element) }
+        }.buffer(policy: .bounded(nConcurrent)).map { task in
+            try await task.value
         }
-        let res = stream.buffer(policy: .bounded(nConcurrent)).map { task in
-            return try await task.value
-        }
-        return res
+        
         // Version below does not immediately return data
         /*let stream = AsyncThrowingChannel<T, Error>()
         _ = Task {
@@ -228,25 +222,14 @@ extension AsyncSequence where Element: Sendable, Self: Sendable {
     func mapStream<T: Sendable>(
         nConcurrent: Int,
         body: @escaping @Sendable (Element) async throws -> T
-    ) -> AsyncThrowingMapSequence<AsyncBufferSequence<AsyncThrowingChannel<Task<T, any Error>, any Error>>, T> {
+    ) -> AsyncThrowingMapSequence<AsyncBufferSequence<AsyncMapSequence<Self, Task<T, any Error>>>, T> {
         assert(nConcurrent > 0)
-        let stream = AsyncThrowingChannel<Task<T, any Error>, Error>()
-        _ = Task {
-            do {
-                for try await element in self {
-                    await stream.send(Task {
-                        return try await body(element)
-                    })
-                }
-                stream.finish()
-            } catch {
-                stream.fail(error)
-            }
+        
+        return self.map { element in
+            Task { try await body(element) }
+        }.buffer(policy: .bounded(nConcurrent)).map { task in
+            try await task.value
         }
-        let res = stream.buffer(policy: .bounded(nConcurrent)).map { task in
-            return try await task.value
-        }
-        return res
         // Version below does not send elements immediately
         /*return AsyncThrowingStream<T, Error> { continuation in
             let task = Task {
