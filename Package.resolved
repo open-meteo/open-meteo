@@ -1,5 +1,5 @@
 {
-  "originHash" : "0722bf639a9ea56ef48074008cd17286a10d5df8cef99030e47f583b05d973d5",
+  "originHash" : "e53d2be6c8dbd212d26851cda892ef7665f76b46a9ce43af34356b27f711b41b",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -293,8 +293,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftParallelBzip2",
       "state" : {
-        "revision" : "0e13f73a2584e7b0f0424d3c296d499b9c0a3c8a",
-        "version" : "0.0.5"
+        "revision" : "4795df9026c0767f76a8ad034166f470b0df5caa",
+        "version" : "0.0.6"
       }
     },
     {
