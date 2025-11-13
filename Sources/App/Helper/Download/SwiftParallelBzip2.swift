@@ -18,28 +18,9 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
      Decode an bzip2 encoded stream of ByteBuffer to a stream of decoded blocks. Throws on invalid data.
      `bufferPolicy` can be used to limit buffering of decoded blocks. Defaults to 4 decoded blocks in the output channel
      */
-    public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncMapSequence<Bzip2AsyncStream<Self>, ByteBuffer> {
-        return Bzip2AsyncStream(sequence: self).map { decoder in
-            //Task {
-                Lbzip2.decode(decoder)
-                var out = ByteBuffer()
-                // Reserve the maximum output block size
-                out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(9*100_000)) { ptr in
-                    var outsize: Int = ptr.count
-                    guard Lbzip2.emit(decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
-                        // Emit should not fail because enough output capacity is available
-                        fatalError("emit failed")
-                    }
-                    return ptr.count - outsize
-                }
-                decoder_free(decoder)
-                decoder.deallocate()
-                //            guard decoder.crc == headerCrc else {
-                //                throw SwiftParallelBzip2Error.blockCRCMismatch
-                //            }
-                //print("emit \(out.readableBytes) bytes")
-                return out
-            //}
+    public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncThrowingMapSequence<Bzip2AsyncStream<Self>, ByteBuffer> {
+        return Bzip2AsyncStream(sequence: self).map { task in
+            return try await task.value
         }
     }
 }
@@ -86,7 +67,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             }
         }
 
-        public func next() async throws -> UnsafeMutablePointer<decoder_state>? {
+        public func next() async throws -> Task<ByteBuffer, any Error>? {
             if bitstream.data == nil {
                 let bs100k = try await parseFileHeader()
                 parser_init(&parser, bs100k, 0)
@@ -104,10 +85,29 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             } catch {
                 decoder_free(decoder)
             }
-            return decoder
-//            return Task {
-//
-//            }
+            return Task {
+                Lbzip2.decode(decoder)
+                var out = ByteBuffer()
+                // Reserve the maximum output block size
+                out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
+                    var outsize: Int = ptr.count
+                    guard Lbzip2.emit(decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
+                        // Emit should not fail because enough output capacity is available
+                        fatalError("emit failed")
+                    }
+                    return ptr.count - outsize
+                }
+                guard decoder.pointee.crc == headerCrc else {
+                    throw SwiftParallelBzip2Error.blockCRCMismatch
+                }
+                decoder_free(decoder)
+                decoder.deallocate()
+                //print("emit \(out.readableBytes) bytes")
+                return out
+                //            return Task {
+                //
+                //            }
+            }
         }
     }
 
@@ -117,5 +117,9 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
 }
 
 extension Bzip2AsyncStream: Sendable where T: Sendable {
+    
+}
+
+extension UnsafeMutablePointer: @unchecked @retroactive Sendable {
     
 }
