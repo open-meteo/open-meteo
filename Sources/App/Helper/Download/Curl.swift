@@ -4,7 +4,6 @@ import AsyncHTTPClient
 import CHelper
 import NIOCore
 import NIOFileSystem
-import SwiftParallelBzip2
 import Synchronization
 
 enum CurlError: Error {
