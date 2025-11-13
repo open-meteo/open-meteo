@@ -68,24 +68,18 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         public func next() async throws -> ByteBuffer? {
             if bitstream.data == nil {
                 let bs100k = try await parseFileHeader()
-                print("parser init")
                 parser_init(&parser, bs100k, 0)
             }
-            print("parse")
             guard let headerCrc = try await parse(parser: &parser) else {
                 return nil
             }
-            print("retrieve")
             let decoder = Bz2Decoder(headerCrc: headerCrc, bs100k: parser.bs100k)
             while try await retrieve(decoder: &decoder.decoder) {
                 try await more()
             }
-            print("decode")
 //            return Task {
                 decoder.decode()
-            print("emit")
                 let res = try decoder.emit()
-            print("done")
             return res
 //            }
         }

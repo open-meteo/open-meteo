@@ -49,14 +49,10 @@ extension decoder_state: @retroactive @unchecked Sendable {
 
 extension Bzip2AsyncStream.AsyncIterator {
     func parseFileHeader() async throws -> Int32 {
-        print("parseFileHeader start")
         guard var firstData = try await iterator.next() else {
-            print("parseFileHeader next() failed")
             throw SwiftParallelBzip2Error.unexpectedEndOfStream
         }
-        print("parseFileHeader write buff")
         buffer.writeBuffer(&firstData)
-        print("parseFileHeader readInteger")
         guard let head: Int32 = buffer.readInteger() else {
             throw SwiftParallelBzip2Error.unexpectedEndOfStream
         }
@@ -64,7 +60,6 @@ extension Bzip2AsyncStream.AsyncIterator {
             throw SwiftParallelBzip2Error.invalidBzip2Header
         }
         let bs100k = head - 0x425A6830
-        print("parseFileHeader bs100k \(bs100k)")
         return bs100k
     }
     
