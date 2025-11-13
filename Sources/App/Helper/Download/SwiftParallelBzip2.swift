@@ -19,8 +19,28 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
      `bufferPolicy` can be used to limit buffering of decoded blocks. Defaults to 4 decoded blocks in the output channel
      */
     public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncThrowingMapSequence<Bzip2AsyncStream<Self>, ByteBuffer> {
-        return Bzip2AsyncStream(sequence: self).map { task in
-            return try await task.value
+        return Bzip2AsyncStream(sequence: self).map { decoder in
+            Lbzip2.decode(decoder)
+            var out = ByteBuffer()
+            // Reserve the maximum output block size
+            out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(9*100_000)) { ptr in
+                var outsize: Int = ptr.count
+                guard Lbzip2.emit(decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
+                    // Emit should not fail because enough output capacity is available
+                    fatalError("emit failed")
+                }
+                return ptr.count - outsize
+            }
+//            guard decoder.pointee.crc == headerCrc else {
+//                throw SwiftParallelBzip2Error.blockCRCMismatch
+//            }
+            decoder_free(decoder)
+            decoder.deallocate()
+            //print("emit \(out.readableBytes) bytes")
+            return out
+            //            return Task {
+            //
+            //            }
         }
     }
 }
@@ -67,7 +87,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             }
         }
 
-        public func next() async throws -> Task<ByteBuffer, any Error>? {
+        public func next() async throws -> UnsafeMutablePointer<decoder_state>? {
             if bitstream.pointee.data == nil {
                 guard var firstData = try! await iterator.next() else {
                     throw SwiftParallelBzip2Error.unexpectedEndOfStream
@@ -97,29 +117,8 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 decoder_free(decoder)
                 decoder.deallocate()
             }
-            return Task {
-                Lbzip2.decode(decoder)
-                var out = ByteBuffer()
-                // Reserve the maximum output block size
-                out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
-                    var outsize: Int = ptr.count
-                    guard Lbzip2.emit(decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
-                        // Emit should not fail because enough output capacity is available
-                        fatalError("emit failed")
-                    }
-                    return ptr.count - outsize
-                }
-                guard decoder.pointee.crc == headerCrc else {
-                    throw SwiftParallelBzip2Error.blockCRCMismatch
-                }
-                decoder_free(decoder)
-                decoder.deallocate()
-                //print("emit \(out.readableBytes) bytes")
-                return out
-                //            return Task {
-                //
-                //            }
-            }
+            return decoder
+
         }
         deinit {
             bitstream.deallocate()
