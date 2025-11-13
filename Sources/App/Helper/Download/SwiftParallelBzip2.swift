@@ -42,6 +42,8 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
 
         fileprivate init(iterator: T.AsyncIterator) {
             self.iterator = iterator
+            bitstream.initialize(to: Lbzip2.bitstream(live: 0, buff: 0, block: nil, data: nil, limit: nil, eof: false))
+            parser.initialize(to: parser_state(state: 0, bs100k: 0, stored_crc: 0, computed_crc: 0, stream_mode: 0))
             
 //            bitstream.live = 0
 //            bitstream.buff = 0
@@ -75,6 +77,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             }
             let bs100k = parser.pointee.bs100k
             let decoder = UnsafeMutablePointer<decoder_state>.allocate(capacity: 1)
+            decoder.initialize(to: decoder_state(internal_state: nil, rand: false, bwt_idx: 0, block_size: 0, crc: 0, ftab: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), tt: nil, rle_state: 0, rle_crc: 0, rle_index: 0, rle_avail: 0, rle_char: 0, rle_prev: 0))
             decoder_init(decoder)
             do {
                 while try await retrieve(decoder: decoder) {
