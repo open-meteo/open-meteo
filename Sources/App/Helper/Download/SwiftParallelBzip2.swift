@@ -18,10 +18,8 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
      Decode an bzip2 encoded stream of ByteBuffer to a stream of decoded blocks. Throws on invalid data.
      `bufferPolicy` can be used to limit buffering of decoded blocks. Defaults to 4 decoded blocks in the output channel
      */
-    public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncThrowingMapSequence<Bzip2AsyncStream<Self>, ByteBuffer> {
-        return Bzip2AsyncStream(sequence: self).map { fn in
-            return try fn()
-        }
+    public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncBufferSequence<Bzip2AsyncStream<Self>> {
+        return Bzip2AsyncStream(sequence: self).buffer(policy: bufferPolicy)
     }
 }
 
@@ -43,21 +41,8 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         fileprivate init(iterator: T.AsyncIterator) {
             self.iterator = iterator
         }
-        
-//        func more() async throws {
-//            guard let next = try! await iterator.next() else {
-//                bitstream.pointee.eof = true
-//                return
-//            }
-//            buffer = consume next
-//            // make sure to align readable bytes to 4 bytes
-//            let remaining = buffer.readableBytes % 4
-//            if remaining != 0 {
-//                buffer.writeRepeatingByte(0, count: 4-remaining)
-//            }
-//        }
 
-        public func next() async throws -> (() throws -> (ByteBuffer))? {
+        public func next() async throws -> ByteBuffer? {
             var headerCrc: UInt32 = 0
             var header = header()
             while true {
@@ -79,7 +64,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 case FINISH:
                     return nil
                 case MORE:
-                    guard let next = try! await iterator.next() else {
+                    guard let next = try await iterator.next() else {
                         bitstream.eof = true
                         continue
                     }
@@ -121,7 +106,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                     case Lbzip2.OK:
                         break
                     case Lbzip2.MORE:
-                        guard let next = try! await iterator.next() else {
+                        guard let next = try await iterator.next() else {
                             bitstream.eof = true
                             continue
                         }
@@ -140,7 +125,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             } catch {
                 decoder_free(&decoder)
             }
-            return {
+            //return {
                 Lbzip2.decode(&decoder)
                 var out = ByteBuffer()
                 // Reserve the maximum output block size
@@ -158,7 +143,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 decoder_free(&decoder)
                 //print("emit \(out.readableBytes) bytes")
                 return out
-            }
+            //}
 
         }
     }
