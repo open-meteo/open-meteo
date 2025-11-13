@@ -52,31 +52,97 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
 //            bitstream.eof = false
         }
         
-        func more() async throws {
-            guard let next = try! await iterator.next() else {
-                bitstream.pointee.eof = true
-                return
-            }
-            buffer = consume next
-            
-            // make sure to align readable bytes to 4 bytes
-            let remaining = buffer.readableBytes % 4
-            if remaining != 0 {
-                buffer.writeRepeatingByte(0, count: 4-remaining)
-            }
-        }
+//        func more() async throws {
+//            guard let next = try! await iterator.next() else {
+//                bitstream.pointee.eof = true
+//                return
+//            }
+//            buffer = consume next
+//            // make sure to align readable bytes to 4 bytes
+//            let remaining = buffer.readableBytes % 4
+//            if remaining != 0 {
+//                buffer.writeRepeatingByte(0, count: 4-remaining)
+//            }
+//        }
 
         public func next() async throws -> (() throws -> (ByteBuffer))? {
-            guard let headerCrc = try await parse(parser: parser) else {
-                return nil
+            var headerCrc: UInt32 = 0
+            outer: while true {
+            var header = header()
+            while true {
+                let parserReturn = buffer.readWithUnsafeReadableBytes { ptr in
+                    bitstream.pointee.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
+                    bitstream.pointee.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
+                    var garbage: UInt32 = 0
+                    let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.parse(parser, &header, bitstream, &garbage)))
+                    assert(garbage < 32)
+                    assert(bitstream.pointee.data <= bitstream.pointee.limit)
+                    let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.pointee.data)) ?? 0
+                    //print("parser bytesRead \(bytesRead)")
+                    return (bytesRead, ret)
+                }
+                switch parserReturn {
+                case OK:
+                    headerCrc = header.crc
+                    break outer
+                case FINISH:
+                    return nil
+                case MORE:
+                    guard let next = try! await iterator.next() else {
+                        bitstream.pointee.eof = true
+                        continue
+                    }
+                    buffer = consume next
+                    // make sure to align readable bytes to 4 bytes
+                    let remaining = buffer.readableBytes % 4
+                    if remaining != 0 {
+                        buffer.writeRepeatingByte(0, count: 4-remaining)
+                    }
+                case ERR_HEADER:
+                    throw SwiftParallelBzip2Error.invalidStreamHeader
+                case ERR_STRMCRC:
+                    throw SwiftParallelBzip2Error.streamCRCMismatch
+                case ERR_EOF:
+                    throw SwiftParallelBzip2Error.streamCRCMismatch
+                default:
+                    throw SwiftParallelBzip2Error.unexpectedParserError(parserReturn.rawValue)
+                }
+                }
             }
             let bs100k = parser.pointee.bs100k
             let decoder = UnsafeMutablePointer<decoder_state>.allocate(capacity: 1)
             decoder.initialize(to: decoder_state(internal_state: nil, rand: false, bwt_idx: 0, block_size: 0, crc: 0, ftab: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), tt: nil, rle_state: 0, rle_crc: 0, rle_index: 0, rle_avail: 0, rle_char: 0, rle_prev: 0))
             decoder_init(decoder)
             do {
-                while try! await retrieve(decoder: decoder) {
-                    try await more()
+                while true {
+                    let ret = buffer.readWithUnsafeReadableBytes { ptr in
+                        bitstream.pointee.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
+                        bitstream.pointee.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
+                        //print("Bitstream IN \(bitstream.data!) \(bitstream.limit!)")
+                        let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.retrieve(decoder, bitstream)))
+                        assert(bitstream.pointee.data <= bitstream.pointee.limit)
+                        //print("Bitstream OUT \(bitstream.data!) \(bitstream.limit!)")
+                        let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.pointee.data)) ?? 0
+                        //print("retrieve bytesRead \(bytesRead) ret=\(ret)")
+                        return (bytesRead, ret)
+                    }
+                    switch ret {
+                    case Lbzip2.OK:
+                        break
+                    case Lbzip2.MORE:
+                        guard let next = try! await iterator.next() else {
+                            bitstream.pointee.eof = true
+                            continue
+                        }
+                        buffer = consume next
+                        // make sure to align readable bytes to 4 bytes
+                        let remaining = buffer.readableBytes % 4
+                        if remaining != 0 {
+                            buffer.writeRepeatingByte(0, count: 4-remaining)
+                        }
+                    default:
+                        throw SwiftParallelBzip2Error.unexpectedDecoderError(ret.rawValue)
+                    }
                 }
             } catch {
                 decoder_free(decoder)
