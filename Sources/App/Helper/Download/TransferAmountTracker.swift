@@ -93,9 +93,12 @@ struct TransferAmountTrackerStream<T: AsyncSequence>: Sendable, AsyncSequence wh
         }
 
         public func next() async throws -> ByteBuffer? {
+            print("TransferAmountTrackerStream next")
             guard let data = try await self.iterator.next() else {
+                print("TransferAmountTrackerStream next failed") 
                 return nil
             }
+            print("TransferAmountTrackerStream next done")
             tracker.add(data.readableBytes)
             return data
         }

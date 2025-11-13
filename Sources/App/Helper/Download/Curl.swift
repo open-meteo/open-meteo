@@ -164,6 +164,7 @@ final class Curl: Sendable {
                 if let minSize = minSize, let contentLength = try response.contentLength(), contentLength < minSize {
                     throw CurlError.sizeTooSmall
                 }
+                print("return response")
                 return response
             } catch {
                 if !self.retryError4xx, case CurlError.downloadFailed(code: let status) = error, (400..<500).contains(status.code), status.code != 401 {
