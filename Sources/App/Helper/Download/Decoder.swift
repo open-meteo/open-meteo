@@ -48,9 +48,6 @@ import NIOCore
 //}
 
 extension Bzip2AsyncStream.AsyncIterator {
-    func parseFileHeader() async throws -> Int32 {
-
-    }
     
     /// Return true until all data is available
     func retrieve(decoder: UnsafeMutablePointer<decoder_state>) async throws -> Bool {
