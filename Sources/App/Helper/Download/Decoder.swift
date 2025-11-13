@@ -49,18 +49,7 @@ import NIOCore
 
 extension Bzip2AsyncStream.AsyncIterator {
     func parseFileHeader() async throws -> Int32 {
-        guard var firstData = try await iterator.next() else {
-            throw SwiftParallelBzip2Error.unexpectedEndOfStream
-        }
-        buffer.writeBuffer(&firstData)
-        guard let head: Int32 = buffer.readInteger() else {
-            throw SwiftParallelBzip2Error.unexpectedEndOfStream
-        }
-        guard head >= 0x425A6830 + 1 && head <= 0x425A6830 + 9 else {
-            throw SwiftParallelBzip2Error.invalidBzip2Header
-        }
-        let bs100k = head - 0x425A6830
-        return bs100k
+
     }
     
     /// Return true until all data is available

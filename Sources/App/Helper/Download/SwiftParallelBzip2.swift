@@ -69,7 +69,17 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
 
         public func next() async throws -> Task<ByteBuffer, any Error>? {
             if bitstream.pointee.data == nil {
-                let bs100k = try await parseFileHeader()
+                guard var firstData = try await iterator.next() else {
+                    throw SwiftParallelBzip2Error.unexpectedEndOfStream
+                }
+                buffer.writeBuffer(&firstData)
+                guard let head: Int32 = buffer.readInteger() else {
+                    throw SwiftParallelBzip2Error.unexpectedEndOfStream
+                }
+                guard head >= 0x425A6830 + 1 && head <= 0x425A6830 + 9 else {
+                    throw SwiftParallelBzip2Error.invalidBzip2Header
+                }
+                let bs100k = head - 0x425A6830
                 parser_init(parser, bs100k, 0)
             }
             guard let headerCrc = try await parse(parser: parser) else {
