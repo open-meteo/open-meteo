@@ -54,7 +54,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         }
         
         func more() async throws {
-            guard let next = try await iterator.next() else {
+            guard let next = try! await iterator.next() else {
                 bitstream.pointee.eof = true
                 return
             }
@@ -69,10 +69,10 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
 
         public func next() async throws -> Task<ByteBuffer, any Error>? {
             if bitstream.pointee.data == nil {
-                guard var firstData = try await iterator.next() else {
+                guard var firstData = try! await iterator.next() else {
                     throw SwiftParallelBzip2Error.unexpectedEndOfStream
                 }
-                buffer.writeBuffer(&firstData)
+                buffer = consume firstData
                 guard let head: Int32 = buffer.readInteger() else {
                     throw SwiftParallelBzip2Error.unexpectedEndOfStream
                 }
@@ -82,7 +82,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 let bs100k = head - 0x425A6830
                 parser_init(parser, bs100k, 0)
             }
-            guard let headerCrc = try await parse(parser: parser) else {
+            guard let headerCrc = try! await parse(parser: parser) else {
                 return nil
             }
             let bs100k = parser.pointee.bs100k
@@ -90,7 +90,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             decoder.initialize(to: decoder_state(internal_state: nil, rand: false, bwt_idx: 0, block_size: 0, crc: 0, ftab: (0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0), tt: nil, rle_state: 0, rle_crc: 0, rle_index: 0, rle_avail: 0, rle_char: 0, rle_prev: 0))
             decoder_init(decoder)
             do {
-                while try await retrieve(decoder: decoder) {
+                while try! await retrieve(decoder: decoder) {
                     try await more()
                 }
             } catch {
