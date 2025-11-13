@@ -2,46 +2,46 @@ import Foundation
 import Lbzip2
 import NIOCore
 
-
-final class Bz2Decoder {
-    var decoder = decoder_state()
-    let headerCrc: UInt32
-    let bs100k: Int32
-    
-    public init(headerCrc: UInt32, bs100k: Int32) {
-        decoder_init(&decoder)
-        self.headerCrc = headerCrc
-        self.bs100k = bs100k
-    }
-    
-    func decode() {
-        // Decode can now run in a different thread
-        // Decoder does not need buffered input data anymore
-        Lbzip2.decode(&decoder)
-    }
-    
-    func emit() throws -> ByteBuffer {
-        var out = ByteBuffer()
-        // Reserve the maximum output block size
-        out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
-            var outsize: Int = ptr.count
-            guard Lbzip2.emit(&decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
-                // Emit should not fail because enough output capacity is available
-                fatalError("emit failed")
-            }
-            return ptr.count - outsize
-        }
-        guard decoder.crc == headerCrc else {
-            throw SwiftParallelBzip2Error.blockCRCMismatch
-        }
-        //print("emit \(out.readableBytes) bytes")
-        return out
-    }
-    
-    deinit {
-        decoder_free(&decoder)
-    }
-}
+//
+//final class Bz2Decoder {
+//    var decoder = decoder_state()
+//    let headerCrc: UInt32
+//    let bs100k: Int32
+//    
+//    public init(headerCrc: UInt32, bs100k: Int32) {
+//        decoder_init(&decoder)
+//        self.headerCrc = headerCrc
+//        self.bs100k = bs100k
+//    }
+//    
+//    func decode() {
+//        // Decode can now run in a different thread
+//        // Decoder does not need buffered input data anymore
+//        Lbzip2.decode(&decoder)
+//    }
+//    
+//    func emit() throws -> ByteBuffer {
+//        var out = ByteBuffer()
+//        // Reserve the maximum output block size
+//        out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
+//            var outsize: Int = ptr.count
+//            guard Lbzip2.emit(&decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
+//                // Emit should not fail because enough output capacity is available
+//                fatalError("emit failed")
+//            }
+//            return ptr.count - outsize
+//        }
+//        guard decoder.crc == headerCrc else {
+//            throw SwiftParallelBzip2Error.blockCRCMismatch
+//        }
+//        //print("emit \(out.readableBytes) bytes")
+//        return out
+//    }
+//    
+//    deinit {
+//        decoder_free(&decoder)
+//    }
+//}
 
 //extension decoder_state: @retroactive @unchecked Sendable {
 //    
@@ -64,12 +64,12 @@ extension Bzip2AsyncStream.AsyncIterator {
     }
     
     /// Return true until all data is available
-    func retrieve(decoder: inout decoder_state) async throws -> Bool {
+    func retrieve(decoder: UnsafeMutablePointer<decoder_state>) async throws -> Bool {
         let ret = buffer.readWithUnsafeReadableBytes { ptr in
             bitstream.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
             bitstream.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
             //print("Bitstream IN \(bitstream.data!) \(bitstream.limit!)")
-            let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.retrieve(&decoder, &bitstream)))
+            let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.retrieve(decoder, &bitstream)))
             assert(bitstream.data <= bitstream.limit)
             //print("Bitstream OUT \(bitstream.data!) \(bitstream.limit!)")
             let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0

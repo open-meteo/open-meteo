@@ -19,28 +19,21 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
      `bufferPolicy` can be used to limit buffering of decoded blocks. Defaults to 4 decoded blocks in the output channel
      */
     public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncMapSequence<Bzip2AsyncStream<Self>, ByteBuffer> {
-        return Bzip2AsyncStream(sequence: self).map { a in
+        return Bzip2AsyncStream(sequence: self).map { decoder in
             //Task {
-                var decoder = decoder_state()
-            decoder.internal_state = a.internal_state
-            decoder.rand = a.rand
-            decoder.bwt_idx = a.bwt_idx
-            decoder.block_size = a.block_size
-            decoder.crc = decoder.crc
-            decoder.ftab = a.ftab
-            decoder.tt = a.tt
-                Lbzip2.decode(&decoder)
+                Lbzip2.decode(decoder)
                 var out = ByteBuffer()
                 // Reserve the maximum output block size
                 out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(9*100_000)) { ptr in
                     var outsize: Int = ptr.count
-                    guard Lbzip2.emit(&decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
+                    guard Lbzip2.emit(decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
                         // Emit should not fail because enough output capacity is available
                         fatalError("emit failed")
                     }
                     return ptr.count - outsize
                 }
-                decoder_free(&decoder)
+                decoder_free(decoder)
+                decoder.deallocate()
                 //            guard decoder.crc == headerCrc else {
                 //                throw SwiftParallelBzip2Error.blockCRCMismatch
                 //            }
@@ -93,7 +86,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             }
         }
 
-        public func next() async throws -> (internal_state: OpaquePointer?, rand: Bool, bwt_idx: UInt32, block_size: UInt32, crc: UInt32, ftab: (UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32, UInt32), tt: UnsafeMutablePointer<UInt32>?)? {
+        public func next() async throws -> UnsafeMutablePointer<decoder_state>? {
             if bitstream.data == nil {
                 let bs100k = try await parseFileHeader()
                 parser_init(&parser, bs100k, 0)
@@ -102,17 +95,16 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 return nil
             }
             let bs100k = parser.bs100k
-            var decoder = decoder_state()
-            decoder_init(&decoder)
+            let decoder = UnsafeMutablePointer<decoder_state>.allocate(capacity: 1)
+            decoder_init(decoder)
             do {
-                while try await retrieve(decoder: &decoder) {
+                while try await retrieve(decoder: decoder) {
                     try await more()
                 }
             } catch {
-                decoder_free(&decoder)
+                decoder_free(decoder)
             }
-            let a = (internal_state: decoder.internal_state, rand: decoder.rand, bwt_idx: decoder.bwt_idx, block_size: decoder.block_size, crc: decoder.crc, ftab: decoder.ftab, tt: decoder.tt)
-            return a
+            return decoder
 //            return Task {
 //
 //            }
