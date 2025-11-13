@@ -43,9 +43,9 @@ final class Bz2Decoder {
     }
 }
 
-extension decoder_state: @retroactive @unchecked Sendable {
-    
-}
+//extension decoder_state: @retroactive @unchecked Sendable {
+//    
+//}
 
 extension Bzip2AsyncStream.AsyncIterator {
     func parseFileHeader() async throws -> Int32 {
