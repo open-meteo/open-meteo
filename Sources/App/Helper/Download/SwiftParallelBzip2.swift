@@ -18,8 +18,10 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
      Decode an bzip2 encoded stream of ByteBuffer to a stream of decoded blocks. Throws on invalid data.
      `bufferPolicy` can be used to limit buffering of decoded blocks. Defaults to 4 decoded blocks in the output channel
      */
-    public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> Bzip2AsyncStream<Self> {
-        return Bzip2AsyncStream(sequence: self)
+    public func decodeBzip2(bufferPolicy: AsyncBufferSequencePolicy = .bounded(4)) -> AsyncThrowingMapSequence<Bzip2AsyncStream<Self>, ByteBuffer> {
+        return Bzip2AsyncStream(sequence: self).map { task in
+            return try await task.value
+        }
     }
 }
 
@@ -34,26 +36,24 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
     public final class AsyncIterator: AsyncIteratorProtocol {
         /// Collect enough bytes to decompress a single message
         var iterator: T.AsyncIterator
-        var bitstream: bitstream
-        var buffer: ByteBuffer
-        var parser: parser_state = parser_state()
+        let bitstream: UnsafeMutablePointer<bitstream> = .allocate(capacity: 1)
+        var buffer: ByteBuffer = ByteBuffer()
+        let parser: UnsafeMutablePointer<parser_state> = .allocate(capacity: 1)
 
         fileprivate init(iterator: T.AsyncIterator) {
             self.iterator = iterator
-            self.bitstream = Lbzip2.bitstream()
-            self.buffer = ByteBuffer()
             
-            bitstream.live = 0
-            bitstream.buff = 0
-            bitstream.block = nil
-            bitstream.data = nil
-            bitstream.limit = nil
-            bitstream.eof = false
+//            bitstream.live = 0
+//            bitstream.buff = 0
+//            bitstream.block = nil
+//            bitstream.data = nil
+//            bitstream.limit = nil
+//            bitstream.eof = false
         }
         
         func more() async throws {
             guard let next = try await iterator.next() else {
-                bitstream.eof = true
+                bitstream.pointee.eof = true
                 return
             }
             buffer = consume next
@@ -65,15 +65,15 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             }
         }
 
-        public func next() async throws ->  ByteBuffer? {
-            if bitstream.data == nil {
+        public func next() async throws -> Task<ByteBuffer, any Error>? {
+            if bitstream.pointee.data == nil {
                 let bs100k = try await parseFileHeader()
-                parser_init(&parser, bs100k, 0)
+                parser_init(parser, bs100k, 0)
             }
-            guard let headerCrc = try await parse(parser: &parser) else {
+            guard let headerCrc = try await parse(parser: parser) else {
                 return nil
             }
-            let bs100k = parser.bs100k
+            let bs100k = parser.pointee.bs100k
             let decoder = UnsafeMutablePointer<decoder_state>.allocate(capacity: 1)
             decoder_init(decoder)
             do {
@@ -82,8 +82,9 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 }
             } catch {
                 decoder_free(decoder)
+                decoder.deallocate()
             }
-//            return Task {
+            return Task {
                 Lbzip2.decode(decoder)
                 var out = ByteBuffer()
                 // Reserve the maximum output block size
@@ -105,7 +106,10 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 //            return Task {
                 //
                 //            }
-//            }
+            }
+        }
+        deinit {
+            bitstream.deallocate()
         }
     }
 

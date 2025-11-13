@@ -66,13 +66,13 @@ extension Bzip2AsyncStream.AsyncIterator {
     /// Return true until all data is available
     func retrieve(decoder: UnsafeMutablePointer<decoder_state>) async throws -> Bool {
         let ret = buffer.readWithUnsafeReadableBytes { ptr in
-            bitstream.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
-            bitstream.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
+            bitstream.pointee.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
+            bitstream.pointee.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
             //print("Bitstream IN \(bitstream.data!) \(bitstream.limit!)")
-            let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.retrieve(decoder, &bitstream)))
-            assert(bitstream.data <= bitstream.limit)
+            let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.retrieve(decoder, bitstream)))
+            assert(bitstream.pointee.data <= bitstream.pointee.limit)
             //print("Bitstream OUT \(bitstream.data!) \(bitstream.limit!)")
-            let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0
+            let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.pointee.data)) ?? 0
             //print("retrieve bytesRead \(bytesRead) ret=\(ret)")
             return (bytesRead, ret)
         }
@@ -86,7 +86,7 @@ extension Bzip2AsyncStream.AsyncIterator {
         }
     }
     
-    func parse(parser: inout parser_state) async throws -> UInt32? {
+    func parse(parser: UnsafeMutablePointer<parser_state>)async throws -> UInt32? {
         /* Parse stream headers until a compressed block or end of stream is reached.
 
            Possible return codes:
@@ -104,13 +104,13 @@ extension Bzip2AsyncStream.AsyncIterator {
             var header = header()
             parserLoop: while true {
                 let parserReturn = buffer.readWithUnsafeReadableBytes { ptr in
-                    bitstream.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
-                    bitstream.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
+                    bitstream.pointee.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
+                    bitstream.pointee.limit = ptr.baseAddress?.advanced(by: ptr.count).assumingMemoryBound(to: UInt32.self)
                     var garbage: UInt32 = 0
-                    let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.parse(&parser, &header, &bitstream, &garbage)))
+                    let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.parse(parser, &header, bitstream, &garbage)))
                     assert(garbage < 32)
-                    assert(bitstream.data <= bitstream.limit)
-                    let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0
+                    assert(bitstream.pointee.data <= bitstream.pointee.limit)
+                    let bytesRead = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.pointee.data)) ?? 0
                     //print("parser bytesRead \(bytesRead)")
                     return (bytesRead, ret)
                 }
