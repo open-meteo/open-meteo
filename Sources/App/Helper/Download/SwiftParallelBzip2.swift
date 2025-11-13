@@ -75,14 +75,33 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             guard let headerCrc = try await parse(parser: &parser) else {
                 return nil
             }
-            let decoder = Bz2Decoder(headerCrc: headerCrc, bs100k: parser.bs100k)
-            while try await retrieve(decoder: &decoder.decoder) {
-                try await more()
+            let bs100k = parser.bs100k
+            var decoder = decoder_state()
+            do {
+                while try await retrieve(decoder: &decoder) {
+                    try await more()
+                }
+            } catch {
+                decoder_free(&decoder)
             }
             return Task {
-                decoder.decode()
-                let res = try decoder.emit()
-            return res
+                Lbzip2.decode(&decoder)
+                var out = ByteBuffer()
+                // Reserve the maximum output block size
+                out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
+                    var outsize: Int = ptr.count
+                    guard Lbzip2.emit(&decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
+                        // Emit should not fail because enough output capacity is available
+                        fatalError("emit failed")
+                    }
+                    return ptr.count - outsize
+                }
+                decoder_free(&decoder)
+                guard decoder.crc == headerCrc else {
+                    throw SwiftParallelBzip2Error.blockCRCMismatch
+                }
+                //print("emit \(out.readableBytes) bytes")
+                return out
             }
         }
     }
