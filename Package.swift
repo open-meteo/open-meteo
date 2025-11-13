@@ -35,7 +35,7 @@ let package = Package(
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/curl-swift.git", from: "1.0.1"),
-        .package(url: "https://github.com/patrick-zippenfenig/SwiftParallelBzip2", from: "0.0.6"),
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftParallelBzip2", branch: "main"),
         //.package(url: "/Users/patrick/Documents/curl-swift", branch: "main"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),

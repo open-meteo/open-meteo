@@ -7,7 +7,7 @@ final class TransferAmountTracker: Sendable {
     let transferedLastPrint = Atomic(0)
     let printDelta: Double = 20
     let startTime = Date()
-    let lastPrint = Atomic(TimeInterval(0))
+    let lastPrint = Atomic(Date().timeIntervalSince1970)
     let logger: Logger
     let totalSize: Int?
     let name: String
