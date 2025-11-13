@@ -96,6 +96,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             }
             let bs100k = parser.bs100k
             var decoder = decoder_state()
+            decoder_init(&decoder)
             do {
                 while try await retrieve(decoder: &decoder) {
                     try await more()
@@ -103,6 +104,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             } catch {
                 decoder_free(&decoder)
             }
+            //let a = (decoder.internal_state, decoder.rand, decoder.bwt_idx, decoder.block_size, decoder.crc, decoder.crc, decoder.ftab, decoder.tt)
             return decoder
 //            return Task {
 //
