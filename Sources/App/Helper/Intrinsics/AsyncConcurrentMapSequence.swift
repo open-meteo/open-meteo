@@ -23,7 +23,7 @@ public struct AsyncConcurrentAsyncMapSequence<T: AsyncSequence, R>: AsyncSequenc
         }
 
         mutating public func next() async throws -> R? {
-            guard tasks != nil else {
+            if tasks == nil {
                 // fill initial task list
                 var tasks = Deque<Task<R, any Error>>(minimumCapacity: nConcurrent)
                 for _ in 0..<nConcurrent {
@@ -35,7 +35,6 @@ public struct AsyncConcurrentAsyncMapSequence<T: AsyncSequence, R>: AsyncSequenc
                     })
                 }
                 self.tasks = tasks
-                return try await self.next()
             }
             guard tasks?.isEmpty == false else {
                 return nil // all tasks completed
@@ -98,7 +97,7 @@ public struct AsyncConcurrentMapSequence<T: AsyncSequence, R>: AsyncSequence whe
         }
 
         mutating public func next() async throws -> R? {
-            guard tasks != nil else {
+            if tasks == nil {
                 // fill initial task list
                 var tasks = Deque<Task<R, any Error>>(minimumCapacity: nConcurrent)
                 for _ in 0..<nConcurrent {
@@ -110,7 +109,6 @@ public struct AsyncConcurrentMapSequence<T: AsyncSequence, R>: AsyncSequence whe
                     })
                 }
                 self.tasks = tasks
-                return try await self.next()
             }
             guard tasks?.isEmpty == false else {
                 return nil // all tasks completed
