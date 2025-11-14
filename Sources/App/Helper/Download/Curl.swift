@@ -5,7 +5,6 @@ import CHelper
 import NIOCore
 import NIOFileSystem
 import Synchronization
-import SwiftParallelBzip2
 
 enum CurlError: Error {
     // case noGribMessagesMatch

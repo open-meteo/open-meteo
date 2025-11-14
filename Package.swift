@@ -35,7 +35,6 @@ let package = Package(
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
         //.package(url: "https://github.com/open-meteo/sdk.git", branch: "add_ecmwf_long_window"),
         .package(url: "https://github.com/patrick-zippenfenig/curl-swift.git", from: "1.0.1"),
-        .package(url: "https://github.com/patrick-zippenfenig/SwiftParallelBzip2", from: "0.0.8"),
         //.package(url: "/Users/patrick/Documents/curl-swift", branch: "main"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
@@ -57,7 +56,7 @@ let package = Package(
                 .product(name: "NIOCore", package: "swift-nio"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 "CHelper",
-                .product(name: "SwiftParallelBzip2", package: "SwiftParallelBzip2"),
+                .target(name: "Lbzip2"),
                 .product(name: "OmFileFormat", package: "om-file-format"),
                 .product(name: "curl-swift", package: "curl-swift"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
@@ -73,6 +72,9 @@ let package = Package(
             name: "CZlib",
             pkgConfig: "z",
             providers: [.brew(["zlib"]), .apt(["libz-dev"])]
+        ),
+        .target(
+            name: "Lbzip2"
         ),
         .target(
             name: "CHelper",
