@@ -62,7 +62,6 @@ let package = Package(
                 .product(name: "curl-swift", package: "curl-swift"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
                 "CZlib",
-                "CBz2lib"
             ] + (enableParquet ? [
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
@@ -74,11 +73,6 @@ let package = Package(
             name: "CZlib",
             pkgConfig: "z",
             providers: [.brew(["zlib"]), .apt(["libz-dev"])]
-        ),
-        .systemLibrary(
-            name: "CBz2lib",
-            pkgConfig: "bz2",
-            providers: [.brew(["bzip2"]), .apt(["libbz2-dev"])]
         ),
         .target(
             name: "CHelper",

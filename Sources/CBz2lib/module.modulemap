@@ -1,5 +1,0 @@
-module CBz2lib [system] {
-  header "shim.h"
-  link "bz2"
-  export *
-}

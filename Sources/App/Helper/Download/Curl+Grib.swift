@@ -1,7 +1,7 @@
 import Foundation
 @preconcurrency import SwiftEccodes
 import CHelper
-
+import SwiftParallelBzip2
 
 extension Curl {
     /// Download all grib files and return an array of grib messages
@@ -30,7 +30,7 @@ extension Curl {
                 let checksum = response.headers["x-amz-meta-sha256"].first
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decompressBzip2().decodeGrib() {
+                    for try await m in response.body.tracker(tracker).sha256verify(checksum).decodeBzip2().decodeGrib() {
                         try Task.checkCancellation()
                         messages.append(m)
                     }
@@ -88,7 +88,7 @@ extension Curl {
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 let result: T
                 if bzip2Decode {
-                    result = try await body(response.body.tracker(tracker).decompressBzip2().decodeGrib().eraseToAnyAsyncSequence())
+                    result = try await body(response.body.tracker(tracker).decodeBzip2().decodeGrib().eraseToAnyAsyncSequence())
                 } else {
                     result = try await body(response.body.tracker(tracker).decodeGrib().eraseToAnyAsyncSequence())
                 }

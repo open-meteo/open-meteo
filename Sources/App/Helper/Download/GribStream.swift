@@ -1,6 +1,5 @@
 import Foundation
 import NIO
-import CBz2lib
 @preconcurrency import SwiftEccodes
 import Logging
 
