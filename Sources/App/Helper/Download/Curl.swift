@@ -4,7 +4,6 @@ import AsyncHTTPClient
 import CHelper
 import NIOCore
 import NIOFileSystem
-import SwiftParallelBzip2
 
 enum CurlError: Error {
     // case noGribMessagesMatch
@@ -306,7 +305,7 @@ final class Curl: Sendable {
                 let contentLength = try response.contentLength() ?? minSize
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    try await response.body.tracker(tracker).decodeBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
+                    try await response.body.tracker(tracker).decompressBzip2().saveTo(file: fileTemp, size: nil, modificationDate: lastModified, logger: logger)
                 } else {
                     try await response.body.tracker(tracker).saveTo(file: fileTemp, size: contentLength, modificationDate: lastModified, logger: logger)
                 }
@@ -338,7 +337,7 @@ final class Curl: Sendable {
                 }
                 let tracker = TransferAmountTrackerActor(logger: logger, totalSize: contentLength)
                 if bzip2Decode {
-                    for try await fragement in response.body.tracker(tracker).decodeBzip2() {
+                    for try await fragement in response.body.tracker(tracker).decompressBzip2() {
                         try Task.checkCancellation()
                         buffer.writeImmutableBuffer(fragement)
                     }

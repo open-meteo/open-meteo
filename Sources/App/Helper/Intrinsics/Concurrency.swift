@@ -95,6 +95,108 @@ extension Sequence where Element: Sendable {
         }
     }
 }
+
+extension Sequence where Element: Sendable, Self: Sendable {
+    /// Execute a closure for each element concurrently and return a new value
+    /// Returns an `AsyncThrowingChannel` to process in a pipeline and propagate back pressure
+    /// `nConcurrent` limits the number of concurrent tasks
+    /// Note: Results are ordered which may have a performance penalty
+    func mapStream<T: Sendable>(
+        nConcurrent: Int,
+        body: @escaping @Sendable (Element) async throws -> T
+    ) -> AsyncThrowingChannel<T, Error> {
+        assert(nConcurrent > 0)
+        
+        let stream = AsyncThrowingChannel<T, Error>()
+        _ = Task {
+            do {
+                try await withThrowingTaskGroup(of: (Int, T).self) { group in
+                    var results = [Int: T]()
+                    var pos = 0
+                    for (index, element) in self.enumerated() {
+                        if index >= nConcurrent, let result = try await group.next() {
+                            results[result.0] = result.1
+                            while let nextReturn = results.removeValue(forKey: pos) {
+                                pos += 1
+                                await stream.send(nextReturn)
+                            }
+                        }
+                        group.addTask {
+                            return (index, try await body(element))
+                        }
+                    }
+                    while let result = try await group.next() {
+                        results[result.0] = result.1
+                        while let nextReturn = results.removeValue(forKey: pos) {
+                            pos += 1
+                            await stream.send(nextReturn)
+                        }
+                    }
+                    stream.finish()
+                }
+            } catch {
+                stream.fail(error)
+            }
+        }
+        return stream
+        // Version below does not support backpressure
+        /*return AsyncThrowingStream<T, Error> { continuation in
+            let task = Task {
+                do {
+                    try await withThrowingTaskGroup(of: (Int, T).self) { group in
+                        var results = [Int: T]()
+                        var pos = 0
+                        for (index, element) in self.enumerated() {
+                            if index >= nConcurrent, let result = try await group.next() {
+                                results[result.0] = result.1
+                                while let nextReturn = results.removeValue(forKey: pos) {
+                                    pos += 1
+                                    continuation.yield(nextReturn)
+                                }
+                            }
+                            group.addTask {
+                                return (index, try await body(element))
+                            }
+                        }
+                        while let result = try await group.next() {
+                            results[result.0] = result.1
+                            while let nextReturn = results.removeValue(forKey: pos) {
+                                pos += 1
+                                continuation.yield(nextReturn)
+                            }
+                        }
+                        continuation.finish()
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }*/
+    }
+    
+    
+    /// Execute a closure for each element sequentially and return a new value
+    /// Returns an `AsyncStream` to process in a pipeline
+    /*func mapStream<T: Sendable>(
+        _ body: @escaping (Element) throws -> T
+    ) -> AsyncThrowingStream<T, Error> {
+        return AsyncThrowingStream<T, Error> { continuation in
+            do {
+                for (index, element) in self.enumerated() {
+                    let result = try body(element)
+                    continuation.yield(result)
+                }
+                continuation.finish()
+            } catch {
+                continuation.finish(throwing: error)
+            }
+        }
+    }*/
+}
+
 extension AsyncSequence {
     func collect() async rethrows -> [Element] {
         var results = [Element]()
@@ -106,6 +208,55 @@ extension AsyncSequence {
 }
 
 extension AsyncSequence where Element: Sendable, Self: Sendable {
+    /// Execute a closure for each element concurrently and return a new value
+    /// Returns an `AsyncStream` to process in a pipeline
+    /// `nConcurrent` limits the number of concurrent tasks
+    /// Note: Results are ordered which may have a performance penalty
+    func mapStream<T: Sendable>(
+        nConcurrent: Int,
+        body: @escaping @Sendable (Element) async throws -> T
+    ) -> AsyncThrowingStream<T, Error> {
+        assert(nConcurrent > 0)
+        return AsyncThrowingStream<T, Error> { continuation in
+            let task = Task {
+                do {
+                    try await withThrowingTaskGroup(of: (Int, T).self) { group in
+                        var results = [Int: T]()
+                        var readerIndex = 0
+                        var writerIndex = 0
+                        for try await element in self {
+                            if writerIndex >= nConcurrent, let result = try await group.next() {
+                                results[result.0] = result.1
+                                while let nextReturn = results.removeValue(forKey: readerIndex) {
+                                    readerIndex += 1
+                                    continuation.yield(nextReturn)
+                                }
+                            }
+                            let indexCopy = writerIndex
+                            group.addTask {
+                                return (indexCopy, try await body(element))
+                            }
+                            writerIndex += 1
+                        }
+                        while let result = try await group.next() {
+                            results[result.0] = result.1
+                            while let nextReturn = results.removeValue(forKey: readerIndex) {
+                                readerIndex += 1
+                                continuation.yield(nextReturn)
+                            }
+                        }
+                        continuation.finish()
+                    }
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+    
     /// Execute a closure for each element concurrently
     /// `nConcurrent` limits the number of concurrent tasks
     func foreachConcurrent(
