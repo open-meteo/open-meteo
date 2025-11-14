@@ -142,7 +142,6 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             guard decoder.pointee.crc == headerCrc else {
                 throw SwiftParallelBzip2Error.blockCRCMismatch
             }
-            decoder_free(decoder)
             //print("emit \(out.readableBytes) bytes")
             return out
             //}
