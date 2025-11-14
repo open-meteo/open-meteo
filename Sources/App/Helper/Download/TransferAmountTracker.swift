@@ -84,7 +84,7 @@ struct TransferAmountTrackerStream<T: AsyncSequence>: Sendable, AsyncSequence wh
     }
 
     public final class AsyncIterator: AsyncIteratorProtocol {
-        private var tracker: TransferAmountTracker
+        private let tracker: TransferAmountTracker
         private var iterator: T.AsyncIterator
 
         fileprivate init(tracker: TransferAmountTracker, iterator: T.AsyncIterator) {
