@@ -1,7 +1,7 @@
 import Foundation
 @preconcurrency import SwiftEccodes
 import CHelper
-import SwiftParallelBzip2
+//import SwiftParallelBzip2
 
 
 extension Curl {
