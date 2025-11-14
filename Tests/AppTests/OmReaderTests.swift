@@ -108,7 +108,7 @@ import OmFileFormat
         })
     }
 
-    /* Crashes since swift 6.2.1 on linux  @Test func blockCacheConcurrent() async throws {
+    @Test func blockCacheConcurrent() async throws {
         let url = "https://openmeteo.s3.amazonaws.com/data/dwd_icon_d2_eps/static/HSURF.om"
         let readFn = try await OmHttpReaderBackend(client: .shared, logger: .init(label: "logger"), url: url)!
         let file = "cache64k50_2.bin"
@@ -122,7 +122,7 @@ import OmFileFormat
 
         let value2 = try await read.readConcurrent(range: [0..<257, 511..<513])
         #expect(value2[123] == 1218)
-    }*/
+    }
 
     /*func testRemoteFileManager() async throws {
         let value = try await RemoteFileManager.instance.with(file: .staticFile(domain: .dwd_icon_d2_eps, variable: "HSURF", chunk: nil), client: .shared, logger: .init(label: "")) { reader in
