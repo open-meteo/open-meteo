@@ -30,6 +30,7 @@ let package = Package(
         .package(url: "https://github.com/vapor/vapor.git", from: "4.89.0"),
         .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
         .package(url: "https://github.com/apple/swift-numerics", from: "1.0.0"),
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftParallelBzip2", from: "0.0.8"),
         .package(url: "https://github.com/open-meteo/sdk.git", from: "1.23.0"),
         .package(url: "https://github.com/open-meteo/om-file-format.git", revision: "6631ab874603b8a36da8c6ce6372b31b1b98c32a"), // Because unsafe C flags are set, tagged releases cannot be used
         // .package(path: "../openmeteo-sdk-fork"),  // local forked version
@@ -54,6 +55,7 @@ let package = Package(
                 .product(name: "SwiftTimeZoneLookup", package: "SwiftTimeZoneLookup"),
                 .product(name: "SwiftEccodes", package: "SwiftEccodes"),
                 .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "SwiftParallelBzip2", package: "SwiftParallelBzip2"),
                 .product(name: "_NIOFileSystem", package: "swift-nio"),
                 "CHelper",
                 .product(name: "OmFileFormat", package: "om-file-format"),
