@@ -136,9 +136,13 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 // repeat until GRIB header is found
                 guard let seek = buffer.withUnsafeReadableBytes(GribAsyncStreamHelper.seekGrib) else {
                     guard let input = try await self.iterator.next() else {
+                        guard buffer.readableBytes < 64 * 1024 else {
+                            throw GribAsyncStreamError.didNotFindGibHeader
+                        }
                         return nil
                     }
-                    guard buffer.readableBytes < 64 * 1024 else {
+                    // IFS HRES WAM files have the section 3 header at the end of the message (8 MB)
+                    guard buffer.readableBytes < 8 * 1024 * 1024 else {
                         throw GribAsyncStreamError.didNotFindGibHeader
                     }
                     buffer.writeImmutableBuffer(input)

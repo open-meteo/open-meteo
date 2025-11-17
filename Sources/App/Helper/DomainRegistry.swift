@@ -82,6 +82,7 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_aifs025
     case ecmwf_aifs025_single
     case ecmwf_aifs025_ensemble
+    case ecmwf_wam
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ecmwf_ifs_analysis
@@ -196,7 +197,9 @@ enum DomainRegistry: String, CaseIterable {
         case .copernicus_dem90:
             return Dem90()
         case .ecmwf_ifs:
-            return CdsDomain.ecmwf_ifs
+            return EcmwfEcpdsDomain.ifs
+        case .ecmwf_wam:
+            return EcmwfEcpdsDomain.wam
         case .ecmwf_ifs_analysis_long_window:
             return CdsDomain.ecmwf_ifs_analysis_long_window
         case .ecmwf_ifs_analysis:

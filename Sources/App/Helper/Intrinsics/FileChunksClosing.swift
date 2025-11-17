@@ -5,15 +5,32 @@ struct FileChunksClosing: AsyncSequence {
     let handle: ReadFileHandle
     let chunkLength: ByteCount
     
-    struct Iterator: AsyncIteratorProtocol {
+    final class Iterator: AsyncIteratorProtocol {
         let handle: ReadFileHandle
         var chunks: FileChunks.AsyncIterator
-        mutating func next() async throws -> ByteBuffer? {
+        var closed = false
+        func next() async throws -> ByteBuffer? {
             guard let chunk = try await chunks.next() else {
                 try await handle.close()
+                closed = true
                 return nil
             }
             return chunk
+        }
+        
+        init(handle: ReadFileHandle, chunks: FileChunks.AsyncIterator) {
+            self.handle = handle
+            self.chunks = chunks
+        }
+        
+        deinit {
+            if closed == true {
+                return
+            }
+            let handle = self.handle
+            _ = Task {
+                try await handle.close()
+            }
         }
     }
     
