@@ -261,6 +261,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             }
             return handles
         }
+        try await uploadTask?.value
         await curl.printStatistics()
         return handles
     }
@@ -326,6 +327,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             }
             return handles
         }
+        try await uploadTask?.value
         await curl.printStatistics()
         return handles
     }
