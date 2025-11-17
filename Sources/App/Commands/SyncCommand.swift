@@ -222,8 +222,8 @@ struct SyncCommand: AsyncCommand {
         
         let totalBytes = toDownload.reduce(0, { $0 + $1.fileSize })
         logger.info("Downloading \(toDownload.count) files (\(totalBytes.bytesHumanReadable))")
-        let progress = TransferAmountTrackerActor(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
-        let curlStartBytes = await curl.totalBytesTransfered.bytes
+        let progress = TransferAmountTracker(logger: logger, totalSize: totalBytes, name: "\(model.rawValue) \(toDownload.count) files")
+        let curlStartBytes = curl.totalBytesTransfered.load(ordering: .relaxed)
         try await toDownload.foreachConcurrent(nConcurrent: concurrent) { download in
             var client = ClientRequest(url: URI("\(server)\(download.name)"))
             if apikey != nil {
@@ -245,9 +245,9 @@ struct SyncCommand: AsyncCommand {
             } else {
                 try await curl.download(url: client.url.string, toFile: localFile, bzip2Decode: false, deadLineHours: 0.5)
             }
-            await progress.set(curl.totalBytesTransfered.bytes - curlStartBytes)
+            progress.set(curl.totalBytesTransfered.load(ordering: .relaxed) - curlStartBytes)
         }
-        await progress.finish()
+        progress.finish()
         await curl.printStatistics()
     }
 

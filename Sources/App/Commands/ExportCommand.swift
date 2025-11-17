@@ -335,7 +335,7 @@ struct ExportCommand: AsyncCommand {
         
         // Calculate daily normals
         if let normals {
-            let progress = TransferAmountTrackerActor(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
+            let progress = TransferAmountTracker(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
             let normalsCalculator = DailyNormalsCalculator(years: normals.years, normalsWidthInYears: normals.width)
             let nTimeNormals = normalsCalculator.timeBins.count * 365
             // properties.setDataPageSize(nTimeNormals*4)
@@ -404,11 +404,11 @@ struct ExportCommand: AsyncCommand {
                 for try await chunk in stream {
                     for (rows, gridpoint, latitude, longitude, elevation) in chunk {
                         try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
-                        await progress.add(time.count * 4 * variables.count)
+                        progress.add(time.count * 4 * variables.count)
                     }
                 }
                 try writer.flush(closeFile: true)
-                await progress.finish()
+                progress.finish()
             } catch {
                 logger.report(error: error)
                 // Always close file before throwing errors
@@ -419,7 +419,7 @@ struct ExportCommand: AsyncCommand {
         }
 
         logger.info("Writing data. Total raw size \((points.count * time.count * 4 * variables.count).bytesHumanReadable)")
-        let progress = TransferAmountTrackerActor(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
+        let progress = TransferAmountTracker(logger: logger, totalSize: points.count * time.count * 4 * variables.count, name: "Processed")
         let timestamps64 = time.map({ Int64($0.timeIntervalSince1970) })
 
         /// Interpolate data from one grid to another and perform bias correction
@@ -483,11 +483,11 @@ struct ExportCommand: AsyncCommand {
             for try await chunk in stream {
                 for (rows, gridpoint, latitude, longitude, elevation) in chunk {
                     try writer.add(data: rows, variables: variables.map(\.rawValue), timestamps: timestamps64, location: gridpoint, latitude: latitude, longitude: longitude, elevation: elevation)
-                    await progress.add(time.count * 4 * variables.count)
+                    progress.add(time.count * 4 * variables.count)
                 }
             }
             try writer.flush(closeFile: true)
-            await progress.finish()
+            progress.finish()
         } catch {
             logger.report(error: error)
             try writer.forceCloseFile()
