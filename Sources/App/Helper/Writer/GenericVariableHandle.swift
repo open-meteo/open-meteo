@@ -71,7 +71,7 @@ struct GenericVariableHandle: Sendable {
         }
 
         if generateTimeSeries, let uploadS3Bucket = uploadS3Bucket {
-            try domain.domainRegistry.syncToS3(
+            try await domain.domainRegistry.syncToS3(
                 logger: logger,
                 bucket: uploadS3Bucket,
                 variables: uploadS3OnlyProbabilities ? [ProbabilityVariable.precipitation_probability] : nil
@@ -87,7 +87,7 @@ struct GenericVariableHandle: Sendable {
             
             /// Only upload to S3 if not ensemble domain. Ensemble domains set `uploadS3OnlyProbabilities`
             if !uploadS3OnlyProbabilities, let uploadS3Bucket {
-                try domain.domainRegistry.syncToS3(
+                try await domain.domainRegistry.syncToS3(
                     logger: logger,
                     bucket: uploadS3Bucket,
                     variables: nil

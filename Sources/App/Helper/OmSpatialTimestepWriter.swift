@@ -188,7 +188,9 @@ actor OmSpatialTimestepWriter {
         // Upload to AWS S3
         // The single OM file will be uploaded + meta JSON files
         if let uploadS3Bucket {
-            for (bucket, profile) in domain.domainRegistry.parseBucket(uploadS3Bucket) {
+            let domain = domain
+            let run = run
+            try await domain.domainRegistry.parseBucket(uploadS3Bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
                 let destDomain = "s3://\(bucket)/data_spatial/\(domain.domainRegistry.rawValue)/"
                 let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
                 let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
