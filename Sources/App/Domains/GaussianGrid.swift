@@ -18,7 +18,7 @@ struct GaussianGrid: Gridable {
         var count: Int {
             switch self {
             case .o1280, .o320:
-                // o128 = 6599680
+                // o1280 = 6599680
                 // o320 = 421120
                 return 4 * latitudeLines * (latitudeLines + 9)
             case .n320:
