@@ -230,7 +230,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let timestamps = forecastHours.map { run.add(hours: $0) }
         let deaverager = GribDeaverager()
         
-        let storeOnDisk = domain == .ifs025 || domain == .aifs025_single
+        let storeOnDisk = domain == .ifs025 || domain == .aifs025_single || domain == .wam025
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600

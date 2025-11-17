@@ -93,7 +93,12 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
     case swell_wave_direction
 
     var storePreviousForecast: Bool {
-        return false
+        switch self {
+        case .wave_height, .wave_period, .wave_direction:
+            return true
+        default:
+            return false
+        }
     }
 
     var isElevationCorrectable: Bool {
