@@ -724,6 +724,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case copernicus_cerra
     case copernicus_era5_land
     case copernicus_era5_ensemble
+    case ecmwf_wam
     case ecmwf_ifs
     case ecmwf_ifs_analysis
     case ecmwf_ifs_analysis_long_window
@@ -1149,6 +1150,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             //return [try await Era5Factory.makeReader(domain: .ecmwf_ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
             let ifsHres: (any GenericReaderProtocol)? = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities, ifsHres].compactMap({ $0 })
+        case .ecmwf_wam:
+            let wam: (any GenericReaderProtocol)? = try await GenericReader<EcmwfEcpdsDomain, EcmwfEcdpsWamVariable>(domain: .wam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            return [wam].compactMap({ $0 })
         case .cma_grapes_global:
             return try await CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global:
@@ -1421,7 +1425,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .cerra, .copernicus_cerra:
             return CdsDomain.cerra
         case .ecmwf_ifs:
-            return CdsDomain.ecmwf_ifs
+            return EcmwfEcpdsDomain.ifs
+        case .ecmwf_wam:
+            return EcmwfEcpdsDomain.wam
         case .cma_grapes_global:
             return CmaDomain.grapes_global
         case .bom_access_global:
@@ -1671,6 +1677,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await CerraReader(domain: .cerra, gridpoint: gridpoint, options: options)
         case .ecmwf_ifs:
             return try await Era5Factory.makeReader(domain: .ecmwf_ifs, gridpoint: gridpoint, options: options)
+        case .ecmwf_wam:
+            return try await GenericReader<EcmwfEcpdsDomain, EcmwfEcdpsWamVariable>(domain: .wam, position: gridpoint, options: options)
         case .cma_grapes_global:
             return try await CmaReader(domain: .grapes_global, gridpoint: gridpoint, options: options)
         case .bom_access_global:
