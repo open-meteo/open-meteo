@@ -1069,6 +1069,9 @@ extension MultiDomains {
             return .glofasForecastV4
         case .consolidated_v4:
             return .glofasConsolidatedV4
+        case .ecmwf_wam:
+            // TODO register HRES WAM
+            return .ecmwfWam025
         }
     }
 }

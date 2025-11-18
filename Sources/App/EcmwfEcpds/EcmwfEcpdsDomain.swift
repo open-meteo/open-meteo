@@ -1,6 +1,7 @@
 /// ECMWF weather models directly retrieved via ECPDS delivery
 enum EcmwfEcpdsDomain: String, GenericDomain {
     case ifs
+    case wam
 
     func getDownloadForecastSteps(run: Int) -> [Int] {
         switch run {
@@ -14,6 +15,8 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
         switch self {
         case .ifs:
             return .ecmwf_ifs
+        case .wam:
+            return .ecmwf_wam
         }
     }
 
@@ -31,7 +34,7 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
 
     var omFileLength: Int {
         switch self {
-        case .ifs:
+        case .ifs, .wam:
             // 15 days forecast, 1-hourly data.
             // Must be `24 * 21` for compatibility reasons from old IFS HRES data
             return 24 * 21 // 504
@@ -40,28 +43,28 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
 
     var dtSeconds: Int {
         switch self {
-        case .ifs:
+        case .ifs, .wam:
             return 3600
         }
     }
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .ifs:
+        case .ifs, .wam:
             return 6 * 3600
         }
     }
 
     var grid: any Gridable {
         switch self {
-        case .ifs:
+        case .ifs, .wam:
             return GaussianGrid(type: .o1280)
         }
     }
 
     var countEnsembleMember: Int {
         switch self {
-        case .ifs:
+        case .ifs, .wam:
             return 1
         }
     }
@@ -73,7 +76,7 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     var lastRun: Timestamp {
         let t = Timestamp.now()
         switch self {
-        case .ifs:
+        case .ifs, .wam:
             // https://confluence.ecmwf.int/display/DAC/Dissemination+schedule
             // IFS has a delay of 5:45
             // the last step being available at 7:34 (0z/12z) or 6:27 (6z/18z)

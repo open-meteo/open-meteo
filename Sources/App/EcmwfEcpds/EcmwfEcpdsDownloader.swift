@@ -23,9 +23,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
 
-        @Option(name: "only-variables")
-        var onlyVariables: String?
-
         @Option(name: "upload-s3-bucket", help: "Upload open-meteo database to an S3 bucket after processing")
         var uploadS3Bucket: String?
 
@@ -48,7 +45,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
 
         let logger = context.application.logger
 
-        let variables = try EcmwfEcdpsIfsVariable.load(commaSeparatedOptional: signature.onlyVariables) ?? EcmwfEcdpsIfsVariable.allCases
         let nConcurrent = signature.concurrent ?? 2
         guard let server = signature.server else {
             fatalError("Parameter server is required")
@@ -57,7 +53,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil)
+                let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
@@ -65,7 +61,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         //try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
-        let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
     }
 
@@ -128,7 +124,11 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, variables: [EcmwfEcdpsIfsVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        if domain == .wam {
+            return try await downloadEcmwfWam(application: application, domain: domain, server: server, run: run, concurrent: concurrent, maxForecastHour: maxForecastHour, uploadS3Bucket: uploadS3Bucket)
+        }
+        
         let logger = application.logger
         // Note 2025-10-08 0z: The delivery for the last forecast hours took more than 4 hours caused by a retry.
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6, retryUnauthorized: false)
@@ -143,6 +143,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         let deaverager = GribDeaverager()
         
         let storeOnDisk = true
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
@@ -154,9 +156,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
 
-            if variables.isEmpty {
-                return []
-            }
             let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
             let file = hour == 0 ? 11 : 1
             let prefix = run.hour % 12 == 0 ? "D" : "S"
@@ -253,9 +252,82 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 )
             }*/
             
-            let completed = i == timestamps.count - 1
-            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let completed = i == timestamps.count - 1            
+            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
+            try await uploadTask?.value
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await writerProbabilities?.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            }
+            return handles
         }
+        try await uploadTask?.value
+        await curl.printStatistics()
+        return handles
+    }
+    
+    
+    /// Download wave model
+    func downloadEcmwfWam(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp, concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+        let logger = application.logger
+        // Note 2025-10-08 0z: The delivery for the last forecast hours took more than 4 hours caused by a retry.
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: 6, retryUnauthorized: false)
+        Process.alarm(seconds: 6 * 3600 + 600)
+        defer { Process.alarm(seconds: 0) }
+
+        var forecastHours = domain.getDownloadForecastSteps(run: run.hour)
+        if let maxForecastHour {
+            forecastHours = forecastHours.filter({ $0 <= maxForecastHour })
+        }
+        let timestamps = forecastHours.map { run.add(hours: $0) }
+        let storeOnDisk = true
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
+
+        let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
+            let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+            logger.info("Downloading hour \(hour)")
+            
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
+
+            let stream = run.hour % 12 == 0 ? "wave" : "scwv"
+            // ope_d2_ifs-ens-cf_od_scwv_fc_20251116T180000Z_20251116T180000Z_0h.bz2
+            // ope_d2_ifs-ens-cf_od_wave_fc_20251109T000000Z_20251109T000000Z_0h.bz2
+            let url = "\(server)ope_d2_ifs-ens-cf_od_\(stream)_fc_\(run.iso8601_YYYYMMddTHHmm)00Z_\(timestamp.iso8601_YYYYMMddTHHmm)00Z_\(hour)h.bz2"
+            
+            try await curl.getGribStream(url: url, bzip2Decode: true, nConcurrent: concurrent).foreachConcurrent(nConcurrent: concurrent) { message in
+                guard let shortName = message.get(attribute: "shortName"),
+                      let unit = message.get(attribute: "units"),
+                      let stepRange = message.get(attribute: "stepRange"),
+                      let stepType = message.get(attribute: "stepType") else {
+                    fatalError("could not get step range or type")
+                }
+                if shortName == "lsm" {
+                    return
+                }
+                let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
+                guard let variable = EcmwfEcdpsWamVariable.allCases.first(where: {$0.gribCode == shortName}) else {
+                    logger.warning("Could not map variable \(shortName)")
+                    return
+                }
+                // logger.info("Processing \(variable)")
+                var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                try grib2d.load(message: message)
+                grib2d.array.flipLatitude()
+                
+                logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
+                try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+            }
+            
+            let completed = i == timestamps.count - 1
+            let handles = try await writer.finalise()
+            try await uploadTask?.value
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            }
+            return handles
+        }
+        try await uploadTask?.value
         await curl.printStatistics()
         return handles
     }

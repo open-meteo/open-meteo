@@ -93,7 +93,12 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
     case swell_wave_direction
 
     var storePreviousForecast: Bool {
-        return false
+        switch self {
+        case .wave_height, .wave_period, .wave_direction:
+            return true
+        default:
+            return false
+        }
     }
 
     var isElevationCorrectable: Bool {
@@ -248,12 +253,3 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
 
 
 typealias IconWaveReader = GenericReader<IconWaveDomain, IconWaveVariable>
-
-struct IconWaveMixer: GenericReaderMixer {
-    let reader: [IconWaveReader]
-
-    static func makeReader(domain: IconWaveDomain, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> IconWaveReader? {
-        return try await IconWaveReader(domain: domain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-    }
-}
-

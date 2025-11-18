@@ -82,6 +82,7 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_aifs025
     case ecmwf_aifs025_single
     case ecmwf_aifs025_ensemble
+    case ecmwf_wam
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
     case ecmwf_ifs_analysis
@@ -196,7 +197,9 @@ enum DomainRegistry: String, CaseIterable {
         case .copernicus_dem90:
             return Dem90()
         case .ecmwf_ifs:
-            return CdsDomain.ecmwf_ifs
+            return EcmwfEcpdsDomain.ifs
+        case .ecmwf_wam:
+            return EcmwfEcpdsDomain.wam
         case .ecmwf_ifs_analysis_long_window:
             return CdsDomain.ecmwf_ifs_analysis_long_window
         case .ecmwf_ifs_analysis:
@@ -446,7 +449,7 @@ extension DomainRegistry {
     }
     
     /// Upload all data to a specified S3 bucket
-    func syncToS3(logger: Logger, bucket: String, variables: [GenericVariable]?) throws {
+    func syncToS3(logger: Logger, bucket: String, variables: [GenericVariable]?) async throws {
         let dir = rawValue
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
@@ -457,10 +460,10 @@ extension DomainRegistry {
                 if !FileManager.default.fileExists(atPath: src) {
                     continue
                 }
-                for (bucket, profile) in parseBucket(bucket) {
+                try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
                     if variable.contains("_previous_day") && bucket == "openmeteo" {
                         // do not upload data from past days yet
-                        continue
+                        return
                     }
                     try Process.awsSync(
                         src: src,
@@ -472,7 +475,7 @@ extension DomainRegistry {
             logger.info("AWS upload completed in \(startTimeAws.timeElapsedPretty())")
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
-            for (bucket, profile) in parseBucket(bucket) {
+            try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
                 let exclude = bucket == "openmeteo" ? ["*~", "*_previous_day*"] : ["*~"]
                 logger.info("AWS upload to bucket \(bucket)")
                 let startTimeAws = DispatchTime.now()
