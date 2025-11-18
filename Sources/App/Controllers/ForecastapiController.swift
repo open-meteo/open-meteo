@@ -953,6 +953,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         switch self {
+        case .meteofrance_currents:
+            // same grid, but different time resolution and variables
+            let mfsst: any GenericReaderProtocol = try await GenericReader<MfWaveDomain, MfSSTVariable>(domain: .mfsst, position: gridpoint, options: options)
+            let mfcurrents: any GenericReaderProtocol = MfCurrentReader(reader: GenericReaderCached<MfWaveDomain, MfCurrentReader.Variable>(reader: try await GenericReader<MfWaveDomain, MfCurrentReader.Variable>(domain: .mfcurrents, position: gridpoint, options: options)))
+            let hourlyReader = GenericReaderMulti<ForecastVariable>(reader: [mfsst, mfcurrents])
+            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourlyReader, allowMinMaxTwoAggregations: false)
+            return (hourlyReader, daily, nil, nil)
+            
         default:
             guard let readers: any GenericReaderProtocol = try await getReader(gridpoint: gridpoint, options: options) else {
                 return (nil, nil, nil, nil)
@@ -1331,7 +1339,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gwam:
             return try await IconWaveReader(domain: .gwam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .era5_ocean:
-            return [try await Era5Factory.makeReader(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)]
+            return try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_wam025:
             return try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: EcmwfDomain.wam025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_wam025_ensemble:
@@ -1575,25 +1583,25 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .marine_best_match:
             return nil
         case .ewam:
-            return nil
+            return IconWaveDomain.ewam
         case .gwam:
-            return nil
+            return IconWaveDomain.gwam
         case .era5_ocean:
-            return nil
+            return CdsDomain.era5_ocean
         case .ecmwf_wam025:
-            return nil
+            return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:
-            return nil
+            return EcmwfDomain.wam025_ensemble
         case .ncep_gfswave025:
-            return nil
+            return GfsDomain.gfswave025
         case .ncep_gfswave016:
-            return nil
+            return GfsDomain.gfswave016
         case .ncep_gefswave025:
-            return nil
+            return GfsDomain.gfswave025_ens
         case .meteofrance_wave:
-            return nil
+            return MfWaveDomain.mfwave
         case .meteofrance_currents:
-            return nil
+            return MfWaveDomain.mfcurrents
         case .air_quality_best_match:
             return nil
         case .cams_global:
@@ -1809,25 +1817,25 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .marine_best_match:
             return nil
         case .ewam:
-            return nil
+            return try await GenericReader<IconWaveDomain, IconWaveVariable>(domain: .ewam, position: gridpoint, options: options)
         case .gwam:
-            return nil
+            return try await GenericReader<IconWaveDomain, IconWaveVariable>(domain: .gwam, position: gridpoint, options: options)
         case .era5_ocean:
-            return nil
+            return try await GenericReader<CdsDomain, Era5Variable>(domain: .era5_ocean, position: gridpoint, options: options)
         case .ecmwf_wam025:
-            return nil
+            return try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: .wam025, position: gridpoint, options: options)
         case .ecmwf_wam025_ensemble:
-            return nil
+            return try await GenericReader<EcmwfDomain, EcmwfWaveVariable>(domain: .wam025_ensemble, position: gridpoint, options: options)
         case .ncep_gfswave025:
-            return nil
+            return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025, position: gridpoint, options: options)
         case .ncep_gfswave016:
-            return nil
+            return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave016, position: gridpoint, options: options)
         case .ncep_gefswave025:
-            return nil
+            return try await GenericReader<GfsDomain, GfsWaveVariable>(domain: .gfswave025_ens, position: gridpoint, options: options)
         case .meteofrance_wave:
-            return nil
+            return try await GenericReader<MfWaveDomain, MfWaveVariable>(domain: .mfwave, position: gridpoint, options: options)
         case .meteofrance_currents:
-            return nil
+            return nil // defined in the upper function
         case .air_quality_best_match:
             return nil
         case .cams_global:
