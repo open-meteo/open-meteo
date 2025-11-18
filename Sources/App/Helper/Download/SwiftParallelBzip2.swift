@@ -241,11 +241,18 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 case .none:
                     guard var data = try await iterator.next() else {
                         await pointer.setNext(.eof)
-                        break
+                        return
                     }
-                    // make sure to align readable bytes to 4 bytes
-                    let remaining = data.readableBytes % 4
-                    data.reserveCapacity(minimumWritableBytes: 4-remaining)
+                    // Make sure to get a 32 bit aligned buffer length
+                    while data.readableBytes % 4 != 0 {
+                        guard var next = try await iterator.next() else {
+                            let remaining = data.readableBytes % 4
+                            data.reserveCapacity(minimumWritableBytes: 4-remaining)
+                            await pointer.setNext(.next(BufferLinkedList(buffer: data, next: .eof)))
+                            return
+                        }
+                        data.writeBuffer(&next)
+                    }
                     let next = BufferLinkedList(buffer: data, next: .none)
                     await pointer.setNext(.next(next))
                     pointer = next
@@ -268,9 +275,19 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 guard var data = try await iterator.next() else {
                     throw SwiftParallelBzip2Error.unexpectedEndOfStream
                 }
-                // make sure to align readable bytes to 4 bytes
-                let remaining = data.readableBytes % 4
-                data.reserveCapacity(minimumWritableBytes: 4-remaining)
+                
+                // Make sure to get a 32 bit aligned buffer length
+                var eof = false
+                while data.readableBytes % 4 != 0 {
+                    guard var next = try await iterator.next() else {
+                        let remaining = data.readableBytes % 4
+                        data.reserveCapacity(minimumWritableBytes: 4-remaining)
+                        eof = true
+                        break
+                    }
+                    data.writeBuffer(&next)
+                }
+                
                 guard let head: Int32 = data.getInteger(at: data.readerIndex) else {
                     throw SwiftParallelBzip2Error.unexpectedEndOfStream
                 }
@@ -280,7 +297,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 bs100k = head - 0x425A6830
                 
                 self.offset = 4
-                self.buffers = BufferLinkedList(buffer: data, next: .none)
+                self.buffers = BufferLinkedList(buffer: data, next: eof ? .eof : .none)
             }
             
             // ensure at least 1mb of data available in the buffers chain
@@ -367,14 +384,22 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 //var decoder = decoder
                 Lbzip2.decode(&decoder)
                 var out = ByteBuffer()
-                // Reserve the maximum output block size
-                out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
-                    var outsize: Int = ptr.count
-                    guard Lbzip2.emit(&decoder, ptr.baseAddress, &outsize) == Lbzip2.OK.rawValue else {
-                        // Emit should not fail because enough output capacity is available
-                        fatalError("emit failed")
+                while true {
+                    var ret = Lbzip2.OK
+                    out.writeWithUnsafeMutableBytes(minimumWritableBytes: Int(bs100k*100_000)) { ptr in
+                        var outsize: Int = ptr.count
+                        ret = Lbzip2.error(rawValue: UInt32(Lbzip2.emit(&decoder, ptr.baseAddress, &outsize)))
+                        return (ptr.count - outsize)
                     }
-                    return ptr.count - outsize
+                    switch ret {
+                    case OK:
+                        break
+                    case MORE:
+                        continue
+                    default:
+                        return .error(SwiftParallelBzip2Error.unexpectedDecoderError(ret.rawValue), startBlock: start, startBs: startBitstream, startOffset: startOffset)
+                    }
+                    break
                 }
                 
                 guard decoder.crc == headerCrc else {
