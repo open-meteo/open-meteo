@@ -102,6 +102,7 @@ fileprivate extension UnsafeRawPointer {
 
 enum GribAsyncStreamError: Error {
     case didNotFindGibHeader
+    case unexpectedEndOfFile
 }
 
 /**
@@ -152,8 +153,7 @@ struct GribAsyncStream<T: AsyncSequence>: AsyncSequence where T.Element == ByteB
                 // Repeat until enough data is available
                 while buffer.readableBytes < seek.offset + seek.length {
                     guard let input = try await self.iterator.next() else {
-                        // If EOF is reached before message length, still try to decode it with eccodes
-                        continue
+                        throw GribAsyncStreamError.unexpectedEndOfFile
                     }
                     buffer.writeImmutableBuffer(input)
                 }

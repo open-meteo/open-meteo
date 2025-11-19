@@ -24,11 +24,10 @@ extension AsyncSequence where Element == ByteBuffer, Self: Sendable {
 }
 
 final actor BufferLinkedList {
-    let buffer: ByteBuffer
-    var next: Entry
+    var value: Entry
     
     var eof: Bool {
-        switch next {
+        switch value {
         case .eof:
             return true
         default:
@@ -38,17 +37,16 @@ final actor BufferLinkedList {
     
     enum Entry {
         case none
-        case next(BufferLinkedList)
+        case next(ByteBuffer, BufferLinkedList)
         case eof
     }
     
-    init(buffer: ByteBuffer, next: Entry) {
-        self.buffer = buffer
-        self.next = next
+    init(value: Entry) {
+        self.value = value
     }
     
-    func setNext(_ next: Entry) -> Void {
-        self.next = next
+    func setValue(_ value: Entry) -> Void {
+        self.value = value
     }
     
 
@@ -58,20 +56,15 @@ struct DecodeReturn: Sendable {
     let decoded: ByteBuffer
     let crc: UInt32
     
-    /// Points to block after MAGIC+CRC
-    let startBlock: BufferLinkedList
-    let startBs: bitstream
-    let startOffset: Int
-    
     // Points to end of data (before next MAGIC+CRC)
-    let endBs: bitstream
-    let endBlock: BufferLinkedList
-    let endOffset: Int
+    let bitstream: bitstream
+    let buffers: BufferLinkedList
+    let buffer: ByteBuffer
 }
 
 enum DecodeReturnOrError: Sendable {
     case decoded(DecodeReturn)
-    case error(Error, startBlock: BufferLinkedList, startBs: bitstream, startOffset: Int)
+    case error(Error, crc: UInt32)
 }
 
 /**
@@ -88,9 +81,8 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         /// Collect enough bytes to decompress a single message
         var iterator: AsyncJobIterator
         var parser: parser_state = parser_state()
-        var offset: Int? = nil
-        var bitstream: bitstream? = nil
-        var pointer: BufferLinkedList? = nil
+        var nextCrc: UInt32? = nil
+        var finished = false
 
         fileprivate init(iterator: AsyncJobIterator) {
             self.iterator = iterator
@@ -98,14 +90,17 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         
         /// Return the next decoded block
         public func next() async throws -> ByteBuffer? {
-            guard let d = try await iterator.next() else {
+            if finished {
                 return nil
+            }
+            guard let d = try await iterator.next() else {
+                throw SwiftParallelBzip2Error.unexpectedEndOfStream
             }
             
             switch d {
             case .decoded(let d):
-                if let pointer, let bitstream, let offset {
-                    guard pointer.buffer == d.startBlock.buffer, bitstream.data == d.startBs.data, offset == d.startOffset else {
+                if let nextCrc {
+                    guard nextCrc == d.crc else {
                         fatalError("got a block that doesn't match the one we were parsing")
                     }
                 } else {
@@ -115,39 +110,41 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 
                 /// Take the end pointer and move it forward by MAGIC+CRC
                 /// The CRC is the next block. Not the current
-                var pointer = d.endBlock
-                var bitstream = d.endBs
-                var offset = d.endOffset
+                var pointer = d.buffers
+                var bitstream = d.bitstream
+                var buffer = d.buffer
                 
                 // move stored offset by MAGIC+CRC
                 parser.state = 2// Lbzip2.BLOCK_MAGIC_1
                 while true {
                     let eof = await pointer.eof
-                    let parserReturn = pointer.buffer.withUnsafeReadableBytes { ptr in
-                        bitstream.data = ptr.baseAddress?.advanced(by: offset).assumingMemoryBound(to: UInt32.self)
+                    var header = header()
+                    let parserReturn = buffer.readWithUnsafeReadableBytes { ptr in
+                        bitstream.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
                         bitstream.limit = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self).advanced(by: (ptr.count + 4 - 1) / 4)
                         bitstream.eof = eof
                         var garbage: UInt32 = 0
-                        var header = header()
                         let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.parse(&parser, &header, &bitstream, &garbage)))
                         assert(garbage < 32)
                         assert(bitstream.data <= bitstream.limit)
-                        offset = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0
-                        return ret
+                        let bytesRead = Swift.min(ptr.count, ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0)
+                        return (bytesRead, ret)
                     }
                     switch parserReturn {
                     case OK:
+                        nextCrc = header.crc
                         break
                     case FINISH:
                         // Correct end of stream
+                        finished = true
                         return d.decoded
                     case MORE:
-                        switch await pointer.next {
+                        switch await pointer.value {
                         case .none:
                             fatalError("Parser returned .MORE but not buffered data avaiable")
-                        case .next(let bufferLinkedList):
+                        case .next(let next, let bufferLinkedList):
                             pointer = bufferLinkedList
-                            offset = 0
+                            buffer = next
                         case .eof:
                             fatalError("Parser returned .MORE but EOF reached")
                         }
@@ -163,18 +160,11 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                     }
                     break
                 }
-                self.offset = offset
-                self.pointer = pointer
-                self.bitstream = bitstream
                 return d.decoded
-                
-                
-            case .error(let error, let startBlock, let startBs, let startOffset):
-                if let pointer, let bitstream, let offset {
-                    guard pointer.buffer == startBlock.buffer, bitstream.data == startBs.data, startOffset == offset else {
-                        // GOT bogus block, ignoring
-                        return try await next()
-                    }
+            case .error(let error, let crc):
+                if let nextCrc, nextCrc != crc {
+                    // GOT bogus block, ignoring
+                    return try await next()
                 }
                 throw error
             }
@@ -186,8 +176,8 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         /// Collect enough bytes to decompress a single message
         var iterator: T.AsyncIterator
         var bitstream = Lbzip2.bitstream(live: 0, buff: 0, block: nil, data: nil, limit: nil, eof: false)
-        var offset: Int = 0
-        var buffers: BufferLinkedList? = nil
+        var buffers = BufferLinkedList(value: .none)
+        var buffer = ByteBuffer()
         var bs100k: Int32 = 0
         
         var tasks: CircularBuffer<Task<DecodeReturnOrError, Never>>? = nil
@@ -230,17 +220,17 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
             return result
         }
         
-        func ensure(readableBytes: Int, pointer: BufferLinkedList) async throws {
+        func ensure(current: ByteBuffer, readableBytes: Int, pointer: BufferLinkedList) async throws {
             var pointer = pointer
-            var available = pointer.buffer.readableBytes
+            var available = current.readableBytes
             while true {
                 if available >= readableBytes {
                     return
                 }
-                switch await pointer.next {
+                switch await pointer.value {
                 case .none:
                     guard var data = try await iterator.next() else {
-                        await pointer.setNext(.eof)
+                        await pointer.setValue(.eof)
                         return
                     }
                     // Make sure to get a 32 bit aligned buffer length
@@ -248,18 +238,18 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                         guard var next = try await iterator.next() else {
                             let remaining = data.readableBytes % 4
                             data.reserveCapacity(minimumWritableBytes: 4-remaining)
-                            await pointer.setNext(.next(BufferLinkedList(buffer: data, next: .eof)))
+                            await pointer.setValue(.next(data, .init(value: .eof)))
                             return
                         }
                         data.writeBuffer(&next)
                     }
-                    let next = BufferLinkedList(buffer: data, next: .none)
-                    await pointer.setNext(.next(next))
+                    let next = BufferLinkedList(value: .none)
+                    await pointer.setValue(.next(data, next))
                     pointer = next
-                    available += next.buffer.readableBytes
-                case .next(let next):
+                    available += data.readableBytes
+                case .next(let nextBuffer, let next):
                     pointer = next
-                    available += next.buffer.readableBytes
+                    available += nextBuffer.readableBytes
                 case .eof:
                     return
                 }
@@ -269,7 +259,7 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
         /// Decode the next block and return a closure to decode it
         /// The closure can be executed concurrently
         func decodeNext() async throws -> (@Sendable () async -> DecodeReturnOrError)? {
-            if buffers == nil {
+            if bs100k == 0 {
                 // build linked list of buffers and read the file header
                 // Parse BZIP2 file header and get block size
                 guard var data = try await iterator.next() else {
@@ -277,12 +267,11 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 }
                 
                 // Make sure to get a 32 bit aligned buffer length
-                var eof = false
                 while data.readableBytes % 4 != 0 {
                     guard var next = try await iterator.next() else {
                         let remaining = data.readableBytes % 4
                         data.reserveCapacity(minimumWritableBytes: 4-remaining)
-                        eof = true
+                        await buffers.setValue(.eof)
                         break
                     }
                     data.writeBuffer(&next)
@@ -295,57 +284,49 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                     throw SwiftParallelBzip2Error.invalidBzip2Header
                 }
                 bs100k = head - 0x425A6830
-                
-                self.offset = 4
-                self.buffers = BufferLinkedList(buffer: data, next: eof ? .eof : .none)
+                self.buffer = data
             }
             
             // ensure at least 1mb of data available in the buffers chain
-            guard let start = buffers else {
-                fatalError()
-            }
-            try await ensure(readableBytes: 1024*1024 + offset, pointer: start)
-            var pointer = start
+            try await ensure(current: buffer, readableBytes: 1024*1024, pointer: buffers)
             
             // Scan for block MAGIC number and BLOCK CRC
             var headerCrc: UInt32 = 0
+            var scanState: UInt32 = 0
             while true {
-                let eof = await pointer.eof
-                let scanReturn = pointer.buffer.withUnsafeReadableBytes( { ptr in
-                    bitstream.data = ptr.baseAddress?.advanced(by: offset).assumingMemoryBound(to: UInt32.self)
+                let eof = await buffers.eof
+                let scanReturn = buffer.readWithUnsafeReadableBytes( { ptr in
+                    bitstream.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
                     bitstream.limit = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self).advanced(by: (ptr.count + 4 - 1) / 4)
                     bitstream.eof = eof
-                    let ret = Lbzip2.error(rawValue: UInt32(scan(&bitstream, 0, &headerCrc)))
+                    
+                    let ret = Lbzip2.error(rawValue: UInt32(scan(&bitstream, 0, &headerCrc, &scanState)))
                     assert(bitstream.data <= bitstream.limit)
-                    offset = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0
-                    return ret
+                    let bytesRead = Swift.min(ptr.count, ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0)
+                    //print("bytes read \(bytesRead)")
+                    return (bytesRead, ret)
                 })
                 if scanReturn == OK {
                     break
                 }
-                switch await pointer.next {
+                switch await buffers.value {
                 case .none:
                     throw SwiftParallelBzip2Error.didNotFoundBlockHeader
-                case .next(let bufferLinkedList):
-                    pointer = bufferLinkedList
-                    offset = 0
+                case .next(let next, let bufferLinkedList):
+                    buffers = bufferLinkedList
+                    buffer = next
                 case .eof:
                     // Print potential EOS
                     return nil
                 }
             }
-            self.buffers = pointer
-            
-            try await ensure(readableBytes: 1024*1024 + offset, pointer: pointer)
-            
+            try await ensure(current: buffer, readableBytes: 1024*1024, pointer: buffers)
+                        
             // Bitstream points to beginning of data, spawn task and process it
-            return { [bitstream, pointer, offset, headerCrc, bs100k] in
-                let startBitstream = bitstream
+            return { [bitstream, buffers, buffer, headerCrc, bs100k] in
                 var bitstream = bitstream
-                let startOffset = offset
-                let startPointer = pointer
-                var offset = offset
-                var pointer = pointer
+                var pointer = buffers
+                var buffer = buffer
                 
                 var decoder = decoder_state()
                 decoder_init(&decoder)
@@ -354,29 +335,29 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                 }
                 while true {
                     let eof = await pointer.eof
-                    let ret = pointer.buffer.withUnsafeReadableBytes { ptr in
-                        bitstream.data = ptr.baseAddress?.advanced(by: offset).assumingMemoryBound(to: UInt32.self)
+                    let ret = buffer.readWithUnsafeReadableBytes { ptr in
+                        bitstream.data = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self)
                         bitstream.limit = ptr.baseAddress?.assumingMemoryBound(to: UInt32.self).advanced(by: (ptr.count + 4 - 1) / 4)
                         bitstream.eof = eof
                         let ret = Lbzip2.error(rawValue: UInt32(Lbzip2.retrieve(&decoder, &bitstream)))
                         assert(bitstream.data <= bitstream.limit)
-                        offset = ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0
-                        return ret
+                        let bytesRead = Swift.min(ptr.count, ptr.baseAddress?.distance(to: UnsafeRawPointer(bitstream.data)) ?? 0)
+                        return (bytesRead, ret)
                     }
                     switch ret {
                     case Lbzip2.OK:
                         break
                     case Lbzip2.MORE:
-                        switch await pointer.next {
+                        switch await pointer.value {
                         case .none, .eof:
-                            return .error(SwiftParallelBzip2Error.unexpectedEndOfStream, startBlock: start, startBs: startBitstream, startOffset: startOffset)
-                        case .next(let bufferLinkedList):
+                            return .error(SwiftParallelBzip2Error.unexpectedEndOfStream, crc: headerCrc)
+                        case .next(let next, let bufferLinkedList):
                             pointer = bufferLinkedList
-                            offset = 0
+                            buffer = next
                         }
                         continue
                     default:
-                        return .error(SwiftParallelBzip2Error.unexpectedDecoderError(ret.rawValue), startBlock: start, startBs: startBitstream, startOffset: startOffset)
+                        return .error(SwiftParallelBzip2Error.unexpectedDecoderError(ret.rawValue), crc: headerCrc)
                     }
                     break
                 }
@@ -397,18 +378,18 @@ public struct Bzip2AsyncStream<T: AsyncSequence>: AsyncSequence where T.Element 
                     case MORE:
                         continue
                     default:
-                        return .error(SwiftParallelBzip2Error.unexpectedDecoderError(ret.rawValue), startBlock: start, startBs: startBitstream, startOffset: startOffset)
+                        return .error(SwiftParallelBzip2Error.unexpectedDecoderError(ret.rawValue), crc: headerCrc)
                     }
                     break
                 }
                 
                 guard decoder.crc == headerCrc else {
-                    return .error(SwiftParallelBzip2Error.blockCRCMismatch, startBlock: startPointer, startBs: startBitstream, startOffset: startOffset)
+                    return .error(SwiftParallelBzip2Error.blockCRCMismatch, crc: headerCrc)
                 }
                 
                 // bitstream is now at end of data block
                 // next data is either BLOCK MAGIC+CRC or STREAM EOS MAGIC+CRC
-                return .decoded(DecodeReturn(decoded: out, crc: decoder.crc, startBlock: startPointer, startBs: startBitstream, startOffset: startOffset, endBs: bitstream, endBlock: pointer, endOffset: offset))
+                return .decoded(DecodeReturn(decoded: out, crc: decoder.crc, bitstream: bitstream, buffers: pointer, buffer: buffer))
             }
         }
     }

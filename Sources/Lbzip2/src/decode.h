@@ -72,7 +72,7 @@ extern uint32_t crc_table[256];
 void parser_init(struct parser_state *ps, int bs100k, int stream_mode);
 int parse(struct parser_state *ps, struct header *hd, struct bitstream *bs,
           unsigned *garbage);
-int scan(struct bitstream *bs, unsigned skip, unsigned* crc);
+int scan(struct bitstream *bs, unsigned skip, unsigned* crc, unsigned* state);
 
 void decoder_init(struct decoder_state *ds);
 void decoder_free(struct decoder_state *ds);

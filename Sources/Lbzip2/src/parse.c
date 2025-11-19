@@ -279,10 +279,20 @@ parse(struct parser_state *restrict ps, struct header *restrict hd,
      MORE - block header magic was not found
 */
 int
-scan(struct bitstream *bs, unsigned skip, unsigned* crc)
+scan(struct bitstream *bs, unsigned skip, unsigned* crc, unsigned* state)
 {
-  unsigned state = 0;
+  //unsigned state = 0;
   const uint32_t *data, *limit;
+    
+    // Previous execution was unable to read 32 bit crc
+    if (*state == ACCEPT) {
+        if (bits_need(bs, 32) == OK) {
+          *crc = bits_peek(bs, 32);
+          bits_dump(bs, 32);
+          return OK;
+        }
+        return MORE;
+    }
 
   if (skip > bs->live) {
     skip -= bs->live;
@@ -295,21 +305,21 @@ scan(struct bitstream *bs, unsigned skip, unsigned* crc)
   }
 
 again:
-  assert(state < ACCEPT);
+  assert(*state < ACCEPT);
   while (bs->live > 0) {
     unsigned bit = bits_peek(bs, 1);
 
     bits_dump(bs, 1);
-    state = mini_dfa[state][bit];
+    *state = mini_dfa[*state][bit];
 
-    if (state == ACCEPT) {
+    if (*state == ACCEPT) {
       if (bits_need(bs, 32) == OK) {
         *crc = bits_peek(bs, 32);
         bits_dump(bs, 32);
         return OK;
       }
       else {
-        bits_consume(bs);
+        //DO NOT reset bitstream bits_consume(bs);
         return MORE;
       }
     }
@@ -319,17 +329,17 @@ again:
   limit = bs->limit;
 
   while (data < limit) {
-    unsigned bt_state = state;
+    unsigned bt_state = *state;
     uint32_t word = *data;
 
     word = ntohl(word);
-    state = big_dfa[state][word >> 24];
-    state = big_dfa[state][(uint8_t)(word >> 16)];
-    state = big_dfa[state][(uint8_t)(word >> 8)];
-    state = big_dfa[state][(uint8_t)word];
+    *state = big_dfa[*state][word >> 24];
+    *state = big_dfa[*state][(uint8_t)(word >> 16)];
+    *state = big_dfa[*state][(uint8_t)(word >> 8)];
+    *state = big_dfa[*state][(uint8_t)word];
 
-    if (unlikely(state == ACCEPT)) {
-      state = bt_state;
+    if (unlikely(*state == ACCEPT)) {
+      *state = bt_state;
       bs->data = data;
       (void)bits_need(bs, 1u);
       goto again;
