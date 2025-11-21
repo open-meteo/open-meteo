@@ -84,9 +84,13 @@ actor OmSpatialTimestepWriter {
         return writer
     }
     
+    func contains(member: Int, variable: GenericVariable) -> Bool {
+        return variables.contains(where: { "\($0.variable)" == "\(variable)" && $0.member == member})
+    }
+    
     /// Write a single variable to the file
     func write(member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
-        if variables.contains(where: { "\($0.variable)" == "\(variable)" && $0.member == member}) {
+        if contains(member: member, variable: variable) {
             return
         }
         
