@@ -732,6 +732,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_100hPa, .specific_humidity_150hPa, .specific_humidity_50hPa:
             return (1000, 0)
         case .shortwave_radiation: return (1 / Float(dtSeconds), 0) // joules to watt
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            return (100, 0)
         default:
             return nil
         }
