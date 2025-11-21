@@ -451,12 +451,14 @@ struct DownloadEcmwfCommand: AsyncCommand {
                                         max(Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.0, pressureHPa: 100),
                                             Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0.1.1.1, pressureHPa: 50))))))
                 }
-                let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
                 
                 try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_low, data: cloudcoverLow)
                 try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_mid, data: cloudcoverMid)
                 try await writer.write(member: member, variable: EcmwfVariable.cloud_cover_high, data: cloudcoverHigh)
-                try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
+                if await !writer.contains(member: member, variable: EcmwfVariable.cloud_cover) {
+                    let cloudcover = Meteorology.cloudCoverTotal(low: cloudcoverLow, mid: cloudcoverMid, high: cloudcoverHigh)
+                    try await writer.write(member: member, variable: EcmwfVariable.cloud_cover, data: cloudcover)
+                }
             }
 
             if let writerProbabilities {

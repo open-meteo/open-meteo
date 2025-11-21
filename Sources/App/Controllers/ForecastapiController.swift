@@ -98,7 +98,8 @@ public struct ForecastapiController: RouteCollection {
         ).query)
         categoriesRoute.getAndPost("ensemble", use: WeatherApiController(
             defaultModel: .ncep_gefs_seamless,
-            subdomain: "ensemble-api").query
+            subdomain: "ensemble-api",
+            type: .ensemble).query
         )
     }
 }
