@@ -90,12 +90,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
      12 = Freezing drizzle (i.e. supercooled drizzle which freezes on contact with the ground and other surfaces)
      */
     case precipitation_type
-    /// only in AIFS025_single
     case snowfall_water_equivalent
     /// only in AIFS025_single
     case showers
     /// only in aifs
     case dew_point_2m
+    case snow_depth_water_equivalent
     case runoff
     case soil_temperature_0_to_7cm
     case soil_temperature_7_to_28cm
@@ -268,7 +268,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// If true, download
     var includeInEnsemble: DownloadOrProcess? {
         switch self {
-        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa, .snowfall_water_equivalent:
+        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa, .snowfall_water_equivalent, .snow_depth_water_equivalent:
             return .downloadAndProcess
         case .dew_point_2m, .relative_humidity_925hPa, .relative_humidity_1000hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_500hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_600hPa, .relative_humidity_400hPa, .relative_humidity_150hPa, .relative_humidity_100hPa, .relative_humidity_50hPa:
             return .downloadOnly
@@ -298,7 +298,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     var unit: SiUnit {
         switch self {
         case .precipitation_type: return .dimensionless
-        case .precipitation, .snowfall_water_equivalent, .showers, .runoff: return .millimetre
+        case .precipitation, .snowfall_water_equivalent, .showers, .runoff, .snow_depth_water_equivalent: return .millimetre
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .surface_temperature: return .celsius
         case .geopotential_height_1000hPa, .geopotential_height_925hPa, .geopotential_height_850hPa, .geopotential_height_700hPa, .geopotential_height_600hPa, .geopotential_height_500hPa, .geopotential_height_400hPa, .geopotential_height_300hPa, .geopotential_height_250hPa, .geopotential_height_200hPa, .geopotential_height_150hPa, .geopotential_height_100hPa, .geopotential_height_50hPa: return .metre
         case .wind_v_component_1000hPa, .wind_v_component_925hPa, .wind_v_component_850hPa, .wind_v_component_700hPa, .wind_v_component_600hPa, .wind_v_component_500hPa, .wind_v_component_400hPa, .wind_v_component_300hPa, .wind_v_component_250hPa, .wind_v_component_200hPa, .wind_v_component_150hPa, .wind_v_component_100hPa, .wind_v_component_50hPa, .wind_u_component_1000hPa, .wind_u_component_925hPa, .wind_u_component_850hPa, .wind_u_component_600hPa, .wind_u_component_700hPa, .wind_u_component_500hPa, .wind_u_component_400hPa, .wind_u_component_300hPa, .wind_u_component_250hPa, .wind_u_component_200hPa, .wind_u_component_150hPa, .wind_u_component_100hPa, .wind_u_component_50hPa: return .metrePerSecond
@@ -343,7 +343,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// pressure level in hPa or meter in the grib files
     var level: Int? {
         switch self {
-        case .precipitation, .precipitation_type, .snowfall_water_equivalent, .showers, .runoff: return nil
+        case .precipitation, .precipitation_type, .snowfall_water_equivalent, .showers, .runoff, .snow_depth_water_equivalent: return nil
         case .soil_temperature_0_to_7cm: return 1
         case .soil_temperature_7_to_28cm: return 2
         case .soil_temperature_28_to_100cm: return 3
@@ -531,6 +531,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .precipitation_type: return "ptype"
         case .precipitation: return "tp"
         case .snowfall_water_equivalent: return "sf"
+        case .snow_depth_water_equivalent: return "sd"
         case .showers: return "cp"
         case .runoff: return "ro"
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return "sot" // sot?
@@ -677,7 +678,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     var scalefactor: Float {
         switch self {
         case .precipitation_type: return 1
-        case .precipitation, .snowfall_water_equivalent, .showers, .runoff: return 10
+        case .precipitation, .snowfall_water_equivalent, .showers, .runoff, .snow_depth_water_equivalent: return 10
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 20
         case .surface_temperature: return 20
         case .geopotential_height_1000hPa, .geopotential_height_925hPa, .geopotential_height_850hPa, .geopotential_height_700hPa, .geopotential_height_600hPa, .geopotential_height_500hPa, .geopotential_height_400hPa, .geopotential_height_300hPa, .geopotential_height_250hPa, .geopotential_height_200hPa, .geopotential_height_150hPa, .geopotential_height_100hPa, .geopotential_height_50hPa: return 1
@@ -723,7 +724,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return (1, -273.15)
         case .pressure_msl:
             return (1 / 100, 0)
-        case .precipitation, .showers, .snowfall_water_equivalent, .runoff:
+        case .precipitation, .showers, .snowfall_water_equivalent, .runoff, .snow_depth_water_equivalent:
             if domain == .aifs025_single || domain == .aifs025_ensemble {
                 // AIFS Single is already kg/m2
                 return (1, 0)
