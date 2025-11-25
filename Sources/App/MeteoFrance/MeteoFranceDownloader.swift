@@ -1,6 +1,7 @@
 import Foundation
 import Vapor
 import OmFileFormat
+import SwiftEccodes
 
 /**
 Meteofrance Arome, Arpge downloader
@@ -240,9 +241,6 @@ struct MeteoFranceDownload: AsyncCommand {
      - There is no GRIB inventory, so we have to download the entire GRIB file
      */
     func download3(application: Application, domain: MeteoFranceDomain, run: Timestamp, /*upperLevel: Bool,*/ useGovServer: Bool, maxForecastHour: Int?, uploadS3Bucket: String?, packages: [String]?) async throws -> [GenericVariableHandle] {
-        guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
-            fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
-        }
         let logger = application.logger
         let deadLineHours = domain.timeoutHours
         Process.alarm(seconds: Int(deadLineHours + 0.5) * 3600)
@@ -280,8 +278,17 @@ struct MeteoFranceDownload: AsyncCommand {
                 let inMemoryPrecip = VariablePerMemberStorage<MfVariablePrecipTemporary>()
                 let windSpeedCalculator = WindSpeedCalculator<MeteoFranceSurfaceVariable>(trueNorth: nil)
                 
-                try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: useGovServer ? 4 : 1, headers: [("apikey", apikey.randomElement() ?? "")]).foreachConcurrent(nConcurrent: 1) { message in
-
+                let messages: AnyAsyncSequence<GribMessage>
+                if useGovServer {
+                    messages = try await curl.getGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: 4)
+                } else {
+                    guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
+                        fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
+                    }
+                    // Have to download entire file before processing, because MF API does not allow range requests
+                    messages = try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: 1, headers: [("apikey", apikey.randomElement() ?? "")]).mapStream(nConcurrent: 1){$0}.eraseToAnyAsyncSequence()
+                }
+                try await messages.foreachConcurrent(nConcurrent: 1) { message in
                     guard let shortName = message.get(attribute: "shortName"),
                           let stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType"),
