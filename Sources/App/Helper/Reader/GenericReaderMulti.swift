@@ -58,10 +58,14 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
                 data = d.data
                 unit = d.unit
             } else {
-                data?.integrateIfNaN(d.data)
-            }
-            if data?.containsNaN() == false {
-                break
+                if let unit, [.wmoCode, .dimensionless].contains(unit) {
+                    data?.integrateIfNaN(d.data)
+                } else {
+                    data?.integrateIfNaNSmooth(d.data)
+                }
+                if data?.containsNaN() == false {
+                    break
+                }
             }
         }
         guard let data, let unit else {
@@ -142,10 +146,14 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
                 data = d.data
                 unit = d.unit
             } else {
-                data?.integrateIfNaN(d.data)
-            }
-            if data?.containsNaN() == false {
-                break
+                if let unit, [.wmoCode, .dimensionless].contains(unit) {
+                    data?.integrateIfNaN(d.data)
+                } else {
+                    data?.integrateIfNaNSmooth(d.data)
+                }
+                if data?.containsNaN() == false {
+                    break
+                }
             }
         }
         guard let data, let unit else {
