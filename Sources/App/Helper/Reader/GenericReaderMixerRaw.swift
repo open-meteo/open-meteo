@@ -116,7 +116,7 @@ extension Array where Element == Float {
     mutating func integrateIfNaNSmooth(_ other: [Float]) {
         assert(self.count == other.count)
         let width = 3
-        var stepsSinceNaN: Int = 0
+        var stepsSinceNaN: Int = width
         for x in other.indices.reversed() {
             stepsSinceNaN += 1
             if other[x].isNaN {
