@@ -193,6 +193,20 @@ import Testing
 
         // print(zip(solfac,solfac2).map(-))
     }
+    
+    @Test func integrateIfNaN() {
+        var a: [Float] = [0,1,2,3,4,5,6,.nan,.nan,.nan]
+        a.integrateIfNaN([.nan,.nan,0,0,0,0,0,7,8,9])
+        #expect(a == [0,1,2,3,4,5,6,7,8,9])
+        
+        a = [0,0,0,0,.nan,.nan,.nan,.nan,.nan]
+        a.integrateIfNaN([.nan,.nan,0,0,2,2,2,2,2])
+        #expect(a == [0,0,0,0,2,2,2,2,2])
+        
+        a = [0,0,0,0,0,.nan,.nan,.nan,.nan]
+        a.integrateIfNaNSmooth([3,3,3,3,3,3,3,3,3])
+        #expect(a == [0,0,0.75,1.5,2.25,3,3,3,3])
+    }
 }
 
 /// Predicate for comparing two arrays of Float with accuracy, handling NaN.

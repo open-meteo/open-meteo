@@ -91,10 +91,14 @@ extension GenericReaderMixerRaw {
                 data = d.data
                 unit = d.unit
             } else {
-                data?.integrateIfNaN(d.data)
-            }
-            if data?.containsNaN() == false {
-                break
+                if let unit, [.wmoCode, .dimensionless].contains(unit) {
+                    data?.integrateIfNaN(d.data)
+                } else {
+                    data?.integrateIfNaNSmooth(d.data)
+                }
+                if data?.containsNaN() == false {
+                    break
+                }
             }
         }
         guard let data, let unit else {
@@ -108,7 +112,29 @@ extension VariableOrDerived: GenericVariableMixable where Raw: GenericVariableMi
 }
 
 extension Array where Element == Float {
+    // Integrate another array if the current array has NaN values and smooth over 3 timesteps
+    mutating func integrateIfNaNSmooth(_ other: [Float]) {
+        assert(self.count == other.count)
+        let width = 3
+        var stepsSinceNaN: Int = 0
+        for x in other.indices.reversed() {
+            stepsSinceNaN += 1
+            if other[x].isNaN {
+                continue
+            }
+            if self[x].isNaN {
+                stepsSinceNaN = 0
+                self[x] = other[x]
+                continue
+            }
+            if stepsSinceNaN > width {
+                continue
+            }
+            self[x] = (other[x] * (Float(width + 1 - stepsSinceNaN)) + self[x] * Float(stepsSinceNaN)) / Float(width+1)
+        }
+    }
     mutating func integrateIfNaN(_ other: [Float]) {
+        assert(self.count == other.count)
         for x in other.indices {
             if other[x].isNaN || !self[x].isNaN {
                 continue
@@ -117,6 +143,7 @@ extension Array where Element == Float {
         }
     }
     mutating func integrateIfNaNDeltaCoded(_ other: [Float]) {
+        assert(self.count == other.count)
         for x in other.indices {
             if other[x].isNaN || !self[x].isNaN {
                 continue
