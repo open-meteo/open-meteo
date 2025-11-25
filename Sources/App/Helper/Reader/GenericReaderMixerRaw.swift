@@ -96,9 +96,9 @@ extension GenericReaderMixerRaw {
                 } else {
                     data?.integrateIfNaNSmooth(d.data)
                 }
-                if data?.containsNaN() == false {
-                    break
-                }
+            }
+            if data?.containsNaN() == false {
+                break
             }
         }
         guard let data, let unit else {
