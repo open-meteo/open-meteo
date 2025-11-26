@@ -1,5 +1,6 @@
 import Foundation
 import OmFileFormat
+import OrderedCollections
 
 public protocol Gridable: Sendable {
     var nx: Int { get }
@@ -13,6 +14,54 @@ public protocol Gridable: Sendable {
     associatedtype SliceType: Sequence<Int>
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
+
+    /// Grid mapping name according to CF conventions
+    /// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
+    var cfProjectionParameters: any CfProjectionConvertible { get }
+}
+
+extension Gridable {
+    var gridBounds: GridBounds {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return GridBounds(lat_bounds: sw.latitude...ne.latitude, lon_bounds: sw.longitude...ne.longitude)
+    }
+}
+
+public enum GridMappingName: String, Codable, Sendable {
+    case lambertConformalConic = "lambert_conformal_conic"
+    case lambertAzimuthalEqualArea = "lambert_azimuthal_equal_area"
+    case stereographic = "stereographic"
+    case rotatedLatLon = "rotated_latitude_longitude"
+    case latitudeLongitude = "latitude_longitude"
+
+    var proj4Name: String {
+        switch self {
+        case .lambertConformalConic:
+            return "lcc"
+        case .lambertAzimuthalEqualArea:
+            return "laea"
+        case .stereographic:
+            return "stere"
+        case .rotatedLatLon:
+            // This is a tiny hack to correctly support rotated lat/lon grids
+            // They are generally defined as a oblique spherical projection,
+            // where the projection to be used needs to be specified via the
+            // +o_proj parameter. There is no real equivalent to the o_proj
+            // parameter in the CF conventions.
+            // https://proj.org/en/stable/operations/projections/ob_tran.html
+            // https://cfconventions.org/cf-conventions/cf-conventions.html#_rotated_pole
+            return "ob_tran +o_proj=longlat"
+        case .latitudeLongitude:
+            return "longlat"
+        }
+    }
+}
+
+
+public struct GridBounds: Equatable, Codable, Sendable {
+    let lat_bounds: ClosedRange<Float>
+    let lon_bounds: ClosedRange<Float>
 }
 
 public struct GridPoint2DFraction {

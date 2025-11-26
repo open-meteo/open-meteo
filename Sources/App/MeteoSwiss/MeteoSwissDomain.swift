@@ -83,8 +83,8 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             return ProjectionGrid(
                 nx: 1089,
                 ny: 705,
-                latitudeProjectionOrigion: -4.06,
-                longitudeProjectionOrigion: -6.46,
+                latitudeProjectionOrigin: -4.06,
+                longitudeProjectionOrigin: -6.46,
                 dx: dx,
                 dy: dy,
                 projection: projection
@@ -94,8 +94,8 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             return ProjectionGrid(
                 nx: 545,
                 ny: 353,
-                latitudeProjectionOrigion: -4.06,
-                longitudeProjectionOrigion: -6.46,
+                latitudeProjectionOrigin: -4.06,
+                longitudeProjectionOrigin: -6.46,
                 dx: dx,
                 dy: dy,
                 projection: projection
