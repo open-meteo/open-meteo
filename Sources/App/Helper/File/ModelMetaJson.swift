@@ -103,7 +103,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
                 .nt: domain.omFileLength
             ],
             grid_mapping_name: domain.grid.cfProjectionParameters.gridMappingName,
-            grid_mapping_parameters: domain.grid.cfProjectionParameters.gridMappingAttributes,
+            grid_mapping_parameters: domain.grid.cfProjectionParameters.toCfAttributes(),
             grid_bounds: domain.grid.gridBounds,
             proj_string: domain.grid.cfProjectionParameters.toProj4String()
         )

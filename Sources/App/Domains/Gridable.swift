@@ -17,7 +17,7 @@ public protocol Gridable: Sendable {
 
     /// Grid mapping name according to CF conventions
     /// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
-    var cfProjectionParameters: CfProjectionParameters { get }
+    var cfProjectionParameters: any CfProjectionConvertible { get }
 }
 
 extension Gridable {
@@ -28,7 +28,7 @@ extension Gridable {
     }
 }
 
-enum GridMappingName: String, Codable {
+public enum GridMappingName: String, Codable, Sendable {
     case lambertConformalConic = "lambert_conformal_conic"
     case lambertAzimuthalEqualArea = "lambert_azimuthal_equal_area"
     case stereographic = "stereographic"

@@ -9,8 +9,8 @@ struct RotatedLatLonProjection: Projectable {
     /// Rotation around z-axis
     let ϕ: Float
 
-    var cfProjectionParameters: CfProjectionParameters {
-        CfProjectionParameters.rotatedLatitudeLongitude(
+    var cfProjectionParameters: any CfProjectionConvertible {
+        RotatedLatitudeLongitudeParameters(
             gridNorthPoleLatitude: -(θ.radiansToDegrees - 90),
             gridNorthPoleLongitude: 0,
             northPoleGridLongitude: ϕ.radiansToDegrees

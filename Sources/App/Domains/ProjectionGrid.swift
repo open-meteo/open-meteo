@@ -4,7 +4,7 @@ protocol Projectable: Sendable {
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float)
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float)
 
-    var cfProjectionParameters: CfProjectionParameters { get }
+    var cfProjectionParameters: any CfProjectionConvertible { get }
 }
 
 struct ProjectionGrid<Projection: Projectable>: Gridable {
@@ -17,7 +17,7 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     /// In metres
     let dy: Float
 
-    var cfProjectionParameters: CfProjectionParameters {
+    var cfProjectionParameters: any CfProjectionConvertible {
         self.projection.cfProjectionParameters
     }
 

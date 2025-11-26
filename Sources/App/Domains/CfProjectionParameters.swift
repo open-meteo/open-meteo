@@ -1,7 +1,7 @@
 import OrderedCollections
 
 // CF Convention attribute names enumeration
-enum CfAttributeName: String, CaseIterable, Codable {
+public enum CfAttributeName: String, CaseIterable, Codable, Sendable {
     case latitudeOfProjectionOrigin = "latitude_of_projection_origin"
     case longitudeOfProjectionOrigin = "longitude_of_projection_origin"
     case longitudeOfCentralMeridian = "longitude_of_central_meridian"
@@ -52,7 +52,9 @@ enum Proj4Parameter: String, CaseIterable {
 }
 
 
-protocol CfProjectionConvertible: Sendable {
+/// Grid mapping name according to CF conventions
+/// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
+public protocol CfProjectionConvertible: Sendable {
     var gridMappingName: GridMappingName { get }
     func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float>
 
@@ -74,28 +76,6 @@ extension CfProjectionConvertible {
         proj4String += " +units=m +datum=WGS84 +no_defs +type=crs"
 
         return proj4String
-    }
-}
-
-/// Grid mapping name according to CF conventions
-/// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
-public struct CfProjectionParameters: Sendable {
-    let projection: any CfProjectionConvertible
-
-    init(projection: any CfProjectionConvertible) {
-        self.projection = projection
-    }
-
-    var gridMappingName: GridMappingName {
-        projection.gridMappingName
-    }
-
-    var gridMappingAttributes: OrderedDictionary<CfAttributeName, Float> {
-        projection.toCfAttributes()
-    }
-
-    func toProj4String() -> String {
-        projection.toProj4String()
     }
 }
 
@@ -219,78 +199,5 @@ struct LatitudeLongitudeParameters: CfProjectionConvertible {
     func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
         // No additional parameters needed for regular lat/lon
         return [:]
-    }
-}
-
-
-// MARK: - Convenience Factory Methods
-
-extension CfProjectionParameters {
-
-    static func lambertConformalConic(
-        standardParallel: Float,
-        longitudeOfCentralMeridian: Float,
-        latitudeOfProjectionOrigin: Float,
-        falseEasting: Float? = nil,
-        falseNorthing: Float? = nil,
-        earthRadius: Float? = nil
-    ) -> CfProjectionParameters {
-        let params = LambertConformalConicParameters(
-            standardParallel: standardParallel,
-            longitudeOfCentralMeridian: longitudeOfCentralMeridian,
-            latitudeOfProjectionOrigin: latitudeOfProjectionOrigin,
-            falseEasting: falseEasting,
-            falseNorthing: falseNorthing,
-            earthRadius: earthRadius
-        )
-        return CfProjectionParameters(projection: params)
-    }
-
-    static func lambertAzimuthalEqualArea(
-        longitudeOfProjectionOrigin: Float,
-        latitudeOfProjectionOrigin: Float,
-        falseEasting: Float? = nil,
-        falseNorthing: Float? = nil,
-        earthRadius: Float? = nil
-    ) -> CfProjectionParameters {
-        let params = LambertAzimuthalEqualAreaParameters(
-            longitudeOfProjectionOrigin: longitudeOfProjectionOrigin,
-            latitudeOfProjectionOrigin: latitudeOfProjectionOrigin,
-            falseEasting: falseEasting,
-            falseNorthing: falseNorthing,
-            earthRadius: earthRadius
-        )
-        return CfProjectionParameters(projection: params)
-    }
-
-    static func stereographic(
-        straightVerticalLongitudeFromPole: Float,
-        latitudeOfProjectionOrigin: Float,
-        earthRadius: Float? = nil
-    ) -> CfProjectionParameters {
-        let params = StereographicParameters(
-            straightVerticalLongitudeFromPole: straightVerticalLongitudeFromPole,
-            latitudeOfProjectionOrigin: latitudeOfProjectionOrigin,
-            earthRadius: earthRadius
-        )
-        return CfProjectionParameters(projection: params)
-    }
-
-    static func rotatedLatitudeLongitude(
-        gridNorthPoleLatitude: Float,
-        gridNorthPoleLongitude: Float,
-        northPoleGridLongitude: Float? = nil
-    ) -> CfProjectionParameters {
-        let params = RotatedLatitudeLongitudeParameters(
-            gridNorthPoleLatitude: gridNorthPoleLatitude,
-            gridNorthPoleLongitude: gridNorthPoleLongitude,
-            northPoleGridLongitude: northPoleGridLongitude
-        )
-        return CfProjectionParameters(projection: params)
-    }
-
-    static func latitudeLongitude() -> CfProjectionParameters {
-        let params = LatitudeLongitudeParameters()
-        return CfProjectionParameters(projection: params)
     }
 }

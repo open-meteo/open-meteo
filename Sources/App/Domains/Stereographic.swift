@@ -15,8 +15,8 @@ struct StereographicProjection: Projectable {
     /// Radius of Earth in meters
     var R: Float
 
-    var cfProjectionParameters: CfProjectionParameters {
-        CfProjectionParameters.stereographic(
+    var cfProjectionParameters: any CfProjectionConvertible {
+        StereographicParameters(
             straightVerticalLongitudeFromPole: λ0.radiansToDegrees,
             latitudeOfProjectionOrigin: sinϕ1.radiansToDegrees,
             earthRadius: R

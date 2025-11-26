@@ -6,7 +6,7 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
     let ϕ1: Float
     let R: Float
 
-    let cfProjectionParameters: CfProjectionParameters
+    let cfProjectionParameters: any CfProjectionConvertible
 
     /*
      λ0 central longitude
@@ -14,7 +14,7 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
      radius of earth
      */
     init(λ0 λ0_dec: Float, ϕ1 ϕ1_dec: Float, radius: Float = 6371229) {
-        self.cfProjectionParameters = CfProjectionParameters.lambertAzimuthalEqualArea(
+        self.cfProjectionParameters = LambertAzimuthalEqualAreaParameters(
             longitudeOfProjectionOrigin: λ0_dec,
             latitudeOfProjectionOrigin: ϕ1_dec,
             falseEasting: 0,

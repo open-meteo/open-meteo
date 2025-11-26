@@ -3,7 +3,9 @@ import Foundation
 /// Native grid for ECMWF IFS O1280
 struct GaussianGrid: Gridable {
     // TODO: GaussianGrid is a special case we will have to treat differently...
-    let cfProjectionParameters = CfProjectionParameters.latitudeLongitude()
+    var cfProjectionParameters: any CfProjectionConvertible {
+        LatitudeLongitudeParameters()
+    }
 
     enum GridType {
         case o1280

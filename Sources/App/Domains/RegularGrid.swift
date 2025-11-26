@@ -9,7 +9,9 @@ struct RegularGrid: Gridable {
     let dy: Float
     let searchRadius: Int
 
-    let cfProjectionParameters = CfProjectionParameters.latitudeLongitude()
+    var cfProjectionParameters: any CfProjectionConvertible {
+        LatitudeLongitudeParameters()
+    }
 
     public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
         self.nx = nx
