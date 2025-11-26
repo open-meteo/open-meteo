@@ -202,8 +202,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return ProjectionGrid(
                 nx: 1330,
                 ny: 1180,
-                latitudeProjectionOrigion: 5.308595 + (1180 * -0.00899),  // Bottom-left
-                longitudeProjectionOrigion: -22.18489,
+                latitudeProjectionOrigin: 5.308595 + (1180 * -0.00899),  // Bottom-left
+                longitudeProjectionOrigin: -22.18489,
                 dx: 0.00899,
                 dy: 0.00899,
                 projection: RotatedLatLonProjection(latitude: 33.443381, longitude: 86.463574)

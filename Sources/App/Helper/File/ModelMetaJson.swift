@@ -96,6 +96,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             // data_start_time: 0,
             data_end_time: end.timeIntervalSince1970,
             update_interval_seconds: domain.updateIntervalSeconds,
+            chunk_time_length: domain.omFileLength,
             chunk_file_dimensions: [
                 .nx: domain.grid.nx,
                 .ny: domain.grid.ny,
@@ -121,6 +122,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             temporal_resolution_seconds: temporal_resolution_seconds,
             data_end_time: data_end_time,
             update_interval_seconds: update_interval_seconds,
+            chunk_time_length: chunk_time_length,
             chunk_file_dimensions: chunk_file_dimensions,
             grid_mapping_name: grid_mapping_name,
             grid_mapping_parameters: grid_mapping_parameters,

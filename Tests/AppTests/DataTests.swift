@@ -477,8 +477,8 @@ import Vapor
         #expect(pos.longitude == -24.95)
 
         let bologna = grid.findPoint(lat: 45.45, lon: 11.35)!
-        XCTAssertEqual(bologna % grid.nx, 363) // x
-        XCTAssertEqual(bologna / grid.nx, 265) // y
+        #expect(bologna % grid.nx == 363) // x
+        #expect(bologna / grid.nx == 265) // y
     }
 
     /**
@@ -599,7 +599,7 @@ import Vapor
 
     @Test func stereographicIconMCH1() {
         let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
-        let grid = ProjectionGrid(nx: Int((6.86+4.83)/0.01+1), ny: Int((4.46+3.39)/0.01+1), latitudeProjectionOrigion: -4.46, longitudeProjectionOrigion: -6.86, dx: 0.01, dy: 0.01, projection: projection)
+        let grid = ProjectionGrid(nx: Int((6.86+4.83)/0.01+1), ny: Int((4.46+3.39)/0.01+1), latitudeProjectionOrigin: -4.46, longitudeProjectionOrigin: -6.86, dx: 0.01, dy: 0.01, projection: projection)
 
         #expect(grid.nx == 1170)
         #expect(grid.ny == 786)
