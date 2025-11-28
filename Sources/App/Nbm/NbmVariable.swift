@@ -79,7 +79,7 @@ enum NbmSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .wind_direction_10m, .wind_direction_80m:
             return .linearDegrees
         case .cloud_cover:
-            return .linear
+            return .hermite(bounds: 0...100)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
         case .precipitation, .snowfall_water_equivalent:
