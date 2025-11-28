@@ -278,7 +278,7 @@ enum ItaliaMeteoArpaeSurfaceVariable: String, CaseIterable, GenericVariable, Gen
         case .cloud_cover:
             return .hermite(bounds: 0...100)
         case .cloud_cover_low:
-            return ..hermite(bounds: 0...100)
+            return .hermite(bounds: 0...100)
         case .cloud_cover_mid:
             return .hermite(bounds: 0...100)
         case .cloud_cover_high:
