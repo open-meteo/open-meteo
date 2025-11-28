@@ -439,7 +439,19 @@ struct GfsDownload: AsyncCommand {
                     if let variable = variable.variable as? GfsSurfaceVariable, variable == .precipitation {
                         await storePrecipMembers.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
-
+                    
+                    /// Somehow cloud cover ranges from -0.5 to 100.5
+                    if let variable = variable.variable as? GfsSurfaceVariable, [.cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high].contains(variable) {
+                        for i in grib2d.array.data.indices {
+                            if grib2d.array.data[i] > 100 {
+                                grib2d.array.data[i] = 100
+                            }
+                            if grib2d.array.data[i] < 0 {
+                                grib2d.array.data[i] = 0
+                            }
+                        }
+                    }
+                    
                     if domain == .gfs013 && variable.variable as? GfsSurfaceVariable == .pressure_msl {
                         // do not write pressure to disk
                         continue
