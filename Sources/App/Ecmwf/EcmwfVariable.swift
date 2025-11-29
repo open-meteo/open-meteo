@@ -734,6 +734,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return (1000, 0)
         case .shortwave_radiation: return (1 / Float(dtSeconds), 0) // joules to watt
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            if domain == .aifs025_single || domain == .aifs025_ensemble {
+                // AIFS Single is already %
+                return (1, 0)
+            }
             return (100, 0)
         default:
             return nil
