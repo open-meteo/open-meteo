@@ -1,4 +1,5 @@
 import Foundation
+import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
 struct GaussianGrid: Gridable {
@@ -149,6 +150,85 @@ struct GaussianGrid: Gridable {
 
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Slice? {
         return Slice(type: type, bb: bb)
+    }
+    
+    
+    /// Find point, preferably in sea
+    /// O1280 implementation: For every latitude line, the x-ranges are calculated to read elevation data. Overlapping range that wrap on 0° longitude are merged to reduce IO
+    func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        
+        let latitudeLines = type.latitudeLines
+        let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
+        let y = (Int(round(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy))) + 2 * latitudeLines) % (2 * latitudeLines)
+        
+        let yrange = (y - searchRadius..<y + searchRadius + 1).clamped(to: 0..<2*latitudeLines)
+        
+        let width = 2*searchRadius + 1
+        
+        /// List of 3x3 gridpoints we want to read in linear 1D array index
+        /// `x` wraps at 0° longitude
+        var gridpoints: [Int] = []
+        var distances: [Float] = []
+        gridpoints.reserveCapacity(width * width)
+        distances.reserveCapacity(width * width)
+        for y in yrange {
+            let nx = nxOf(y: y)
+            let dx = 360 / Float(nx)
+            let x = Int(round(lon / dx))
+            let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
+
+            /// If x wraps over 0° longitude, start at an offset to get a strictly increasing grid-point list
+            let start = max(0, searchRadius - x)
+            for i in 0..<width {
+                let i = (i + start) % width
+                gridpoints.append(integral(y: y) + (x + i - searchRadius + 2*nx) % nx)
+                let pointLon = Float(x + i) * dx
+                distances.append(pow(pointLat - lat, 2) + pow(pointLon - lon, 2))
+            }
+        }
+        
+        var start = 0
+        /// Read grid elevation from list of gridpoints that might be consecutive
+        /// -999 marks sea points, therefore  elevation matching will naturally avoid those
+        var elevationSurrounding = [Float](repeating: .nan, count: gridpoints.count)
+        for i in gridpoints.indices {
+            // if next one is not increasing by one, read it
+            let lastIteration = i == gridpoints.count - 1
+            if lastIteration || gridpoints[i] != gridpoints[i + 1] - 1 {
+                // read data from start to end
+                print("read gridpoints \(gridpoints[start])..<\(gridpoints[i]+1) offset \(start)")
+                try await elevationFile.read(
+                    into: &elevationSurrounding,
+                    range: [0..<1, UInt64(gridpoints[start])..<UInt64(gridpoints[i]+1)],
+                    intoCubeOffset: [0, UInt64(start)],
+                    intoCubeDimension: [1, UInt64(gridpoints.count)]
+                )
+                start = i+1
+            }
+        }
+        
+        print(gridpoints)
+        print(distances)
+        print(elevationSurrounding)
+
+
+        var minDistance = Float(9999999)
+        var minPosition = -1
+        for i in elevationSurrounding.indices {
+            if elevationSurrounding[i].isNaN {
+                continue
+            }
+            let distance = distances[i]
+            if elevationSurrounding[i] <= -999 && distance < minDistance {
+                minDistance = distance
+                minPosition = gridpoints[i]
+            }
+        }
+        guard minPosition >= 0 else {
+            //return nil ? only land
+            return (gridpoints[4], .sea)
+        }
+        return (minPosition, .sea)
     }
 }
 

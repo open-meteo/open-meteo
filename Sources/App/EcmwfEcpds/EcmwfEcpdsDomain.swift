@@ -21,7 +21,10 @@ enum EcmwfEcpdsDomain: String, GenericDomain {
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .ifs, .wam:
+            return .ecmwf_ifs
+        }
     }
 
     var hasYearlyFiles: Bool {

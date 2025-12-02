@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import Vapor
 // import NIOFileSystem
+import VaporTesting
 
 @Suite struct DataTests {
     init() {
@@ -10,6 +11,25 @@ import Vapor
         let projectHome = String(#filePath[...#filePath.range(of: "/Tests/")!.lowerBound])
         FileManager.default.changeCurrentDirectoryPath(projectHome)
         #endif
+    }
+    
+    @Test func gaussianGridSeaMatch() async throws {
+        try await withApp { app in
+            guard let elevationFile = await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger) else {
+                Issue.record("Could not get elevation file")
+                return
+            }
+            let grid = GaussianGrid(type: .o1280)
+            // Longitude 0° wraps on x axis
+            let a = try await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile)!
+            #expect(a.gridpoint == 543884)
+            
+            let b = try await grid.findPointInSea(lat: 53.647546, lon: 0.1, elevationFile: elevationFile)!
+            #expect(b.gridpoint == 543884)
+            
+            let c = try await grid.findPointInSea(lat: 53.647546, lon: -0.1, elevationFile: elevationFile)!
+            #expect(c.gridpoint == 543884)
+        }
     }
 
     @Test func aggregation() {
