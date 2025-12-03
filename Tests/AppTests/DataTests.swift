@@ -15,10 +15,7 @@ import VaporTesting
     
     @Test func gaussianGridSeaMatch() async throws {
         try await withApp { app in
-            guard let elevationFile = await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger) else {
-                Issue.record("Could not get elevation file")
-                return
-            }
+            let elevationFile = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
             let grid = GaussianGrid(type: .o1280)
             // Longitude 0° wraps on x axis
             let a = try await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile)!
@@ -534,6 +531,13 @@ import VaporTesting
      */
     @Test func ecmwfIfsGrid() {
         let grid = GaussianGrid(type: .o1280)
+        
+        /// In the middle of 2 latitude lines. Only evaluating one latitude line would not be correct.
+        /// Because the Gaussian grid is basically a shifted triangle strip, both lines need to be evaluated
+        let x = grid.findPointXY(lat: 53.63797, lon: 45)
+        #expect(x.x == 261)
+        #expect(x.y == 517)
+        
         #expect(grid.nxOf(y: 0) == 20)
         #expect(grid.nxOf(y: 1) == 24)
         #expect(grid.nxOf(y: 1280 - 1) == 5136)

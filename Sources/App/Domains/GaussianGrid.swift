@@ -136,16 +136,37 @@ struct GaussianGrid: Gridable {
     }
 
     func findPoint(lat: Float, lon: Float) -> Int? {
+        let (x, y) = findPointXY(lat: lat, lon: lon)
+        return integral(y: y) + x
+    }
+    
+    /// Need to evaluate two latitude lines to find the nearest grid-cell.
+    func findPointXY(lat: Float, lon: Float) -> (x: Int, y: Int) {
         let latitudeLines = type.latitudeLines
 
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
-        let y = (Int(round(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy))) + 2 * latitudeLines) % (2 * latitudeLines)
+        let y = (Int(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy)) + 2 * latitudeLines) % (2 * latitudeLines)
 
         let nx = nxOf(y: y)
+        let nxUpper = nxOf(y: y+1)
+        
         let dx = 360 / Float(nx)
+        let dxUpper = 360 / Float(nxUpper)
 
-        let x = (Int(round(lon / dx)) + nx) % nx
-        return integral(y: y) + x
+        let x = Int(round(lon / dx))
+        let xUpper = Int(round(lon / dxUpper))
+        
+        let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
+        let pointLon = Float(x) * dx
+        let pointLatUpper = Float(latitudeLines - (y+1) - 1) * dy + dy / 2
+        let pointLonUpper = Float(xUpper) * dxUpper
+        
+        let distance = abs(pointLat - lat) + abs(pointLon - lon)
+        let distanceUpper = abs(pointLatUpper - lat) + abs(pointLonUpper - lon)
+        
+        //print("distance: \(distance), distanceUpper: \(distanceUpper), lat: \(pointLat), latUpper \(pointLatUpper) latMean: \((pointLat + pointLatUpper)/2)")
+        
+        return distance < distanceUpper ? ((x + nx) % nx, y) : ((xUpper + nxUpper) % nxUpper, y+1)
     }
 
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Slice? {
@@ -153,24 +174,32 @@ struct GaussianGrid: Gridable {
     }
     
     
+    
     /// Find point, preferably in sea
-    /// O1280 implementation: For every latitude line, the x-ranges are calculated to read elevation data. Overlapping range that wrap on 0° longitude are merged to reduce IO
+    /// O1280 implementation: For every latitude line, the x-ranges are calculated to read elevation data. Effectively reads 3x3 elevation information, but considers the Gaussian grid point staggering. Overlapping ranges that wrap on 0° longitude are merged to reduce IO.
     func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
         
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
-        let y = (Int(round(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy))) + 2 * latitudeLines) % (2 * latitudeLines)
         
-        let yrange = (y - searchRadius..<y + searchRadius + 1).clamped(to: 0..<2*latitudeLines)
+        let (centerX, centerY) = findPointXY(lat: lat, lon: lon)
+        let centerGridpoint = integral(y: centerY) + centerX
+        let centerElevation = try await readFromStaticFile(gridpoint: centerGridpoint, file: elevationFile)
+        if centerElevation <= -999 {
+            print("centerGridpoint: \(centerGridpoint), centerElevation: \(centerElevation)")
+            return (centerGridpoint, .sea)
+        }
         
+        
+        let yrange = (centerY - searchRadius..<centerY + searchRadius + 1).clamped(to: 0..<2*latitudeLines)
         let width = 2*searchRadius + 1
         
         /// List of 3x3 gridpoints we want to read in linear 1D array index
         /// `x` wraps at 0° longitude
         var gridpoints: [Int] = []
         var distances: [Float] = []
-        gridpoints.reserveCapacity(width * width)
-        distances.reserveCapacity(width * width)
+        gridpoints.reserveCapacity(yrange.count * width)
+        distances.reserveCapacity(yrange.count * width)
         for y in yrange {
             let nx = nxOf(y: y)
             let dx = 360 / Float(nx)
