@@ -145,7 +145,8 @@ struct GaussianGrid: Gridable {
         let latitudeLines = type.latitudeLines
 
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
-        let y = (Int(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy)) + 2 * latitudeLines) % (2 * latitudeLines)
+        // Note `-2` because later we add +1
+        let y = max(0, min(2*latitudeLines-2, Int(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy))))
 
         let nx = nxOf(y: y)
         let nxUpper = nxOf(y: y+1)
@@ -173,23 +174,11 @@ struct GaussianGrid: Gridable {
         return Slice(type: type, bb: bb)
     }
     
-    
-    
-    /// Find point, preferably in sea
-    /// O1280 implementation: For every latitude line, the x-ranges are calculated to read elevation data. Effectively reads 3x3 elevation information, but considers the Gaussian grid point staggering. Overlapping ranges that wrap on 0° longitude are merged to reduce IO.
-    func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+    /// Get a list of grid points surrounding a coordinate. Used to find sea grid points of optimize for land grid cells
+    func getSurroundingGridpoints(centerY: Int, lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoints: [Int], elevations: [Float], distances: [Float]) {
         
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
-        
-        let (centerX, centerY) = findPointXY(lat: lat, lon: lon)
-        let centerGridpoint = integral(y: centerY) + centerX
-        let centerElevation = try await readFromStaticFile(gridpoint: centerGridpoint, file: elevationFile)
-        if centerElevation <= -999 {
-            print("centerGridpoint: \(centerGridpoint), centerElevation: \(centerElevation)")
-            return (centerGridpoint, .sea)
-        }
-        
         
         let yrange = (centerY - searchRadius..<centerY + searchRadius + 1).clamped(to: 0..<2*latitudeLines)
         let width = 2*searchRadius + 1
@@ -203,31 +192,32 @@ struct GaussianGrid: Gridable {
         for y in yrange {
             let nx = nxOf(y: y)
             let dx = 360 / Float(nx)
-            let x = Int(round(lon / dx))
+            let xCenter = Int(round(lon / dx))
             let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
 
             /// If x wraps over 0° longitude, start at an offset to get a strictly increasing grid-point list
-            let start = max(0, searchRadius - x)
+            let start = max(0, searchRadius - xCenter)
             for i in 0..<width {
                 let i = (i + start) % width
-                gridpoints.append(integral(y: y) + (x + i - searchRadius + 2*nx) % nx)
-                let pointLon = Float(x + i) * dx
-                distances.append(pow(pointLat - lat, 2) + pow(pointLon - lon, 2))
+                let x = xCenter + i - searchRadius
+                gridpoints.append(integral(y: y) + (x + 2*nx) % nx)
+                let pointLon = Float(x) * dx
+                distances.append(abs(pointLat - lat) + abs(pointLon - lon))
             }
         }
         
         var start = 0
         /// Read grid elevation from list of gridpoints that might be consecutive
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
-        var elevationSurrounding = [Float](repeating: .nan, count: gridpoints.count)
+        var elevation = [Float](repeating: .nan, count: gridpoints.count)
         for i in gridpoints.indices {
             // if next one is not increasing by one, read it
             let lastIteration = i == gridpoints.count - 1
             if lastIteration || gridpoints[i] != gridpoints[i + 1] - 1 {
                 // read data from start to end
-                print("read gridpoints \(gridpoints[start])..<\(gridpoints[i]+1) offset \(start)")
+//                print("read gridpoints \(gridpoints[start])..<\(gridpoints[i]+1) offset \(start)")
                 try await elevationFile.read(
-                    into: &elevationSurrounding,
+                    into: &elevation,
                     range: [0..<1, UInt64(gridpoints[start])..<UInt64(gridpoints[i]+1)],
                     intoCubeOffset: [0, UInt64(start)],
                     intoCubeDimension: [1, UInt64(gridpoints.count)]
@@ -236,26 +226,37 @@ struct GaussianGrid: Gridable {
             }
         }
         
-        print(gridpoints)
-        print(distances)
-        print(elevationSurrounding)
-
-
-        var minDistance = Float(9999999)
+        return (gridpoints, elevation, distances)
+    }
+    
+    /// Find point, preferably in sea
+    /// O1280 implementation: For every latitude line, the x-ranges are calculated to read elevation data. Effectively reads 3x3 elevation information, but considers the Gaussian grid point staggering. Overlapping ranges that wrap on 0° longitude are merged to reduce IO.
+    func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        
+        let (centerX, centerY) = findPointXY(lat: lat, lon: lon)
+        let centerPoint = integral(y: centerY) + centerX
+        let centerElevation = try await readFromStaticFile(gridpoint: centerPoint, file: elevationFile)
+        if centerElevation <= -999 {
+            return (centerPoint, .sea)
+        }
+        let (points, elevations, distances) = try await getSurroundingGridpoints(centerY: centerY, lat: lat, lon: lon, elevationFile: elevationFile)
+        var minDistance = Float(9999)
         var minPosition = -1
-        for i in elevationSurrounding.indices {
-            if elevationSurrounding[i].isNaN {
+        for i in elevations.indices {
+            if elevations[i].isNaN {
                 continue
             }
             let distance = distances[i]
-            if elevationSurrounding[i] <= -999 && distance < minDistance {
+            if elevations[i] <= -999 && distance < minDistance {
                 minDistance = distance
-                minPosition = gridpoints[i]
+                minPosition = points[i]
             }
         }
         guard minPosition >= 0 else {
-            //return nil ? only land
-            return (gridpoints[4], .sea)
+            if centerElevation.isNaN {
+                return (centerPoint, .noData)
+            }
+            return (centerPoint, .elevation(centerElevation))
         }
         return (minPosition, .sea)
     }
@@ -274,9 +275,9 @@ extension GaussianGrid.Slice: Sequence {
     func makeIterator() -> SliceIterator {
         let latitudeLines = type.latitudeLines
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
-        let y1 = (Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy / 2) / dy))) + 2 * latitudeLines) % (2 * latitudeLines)
-        let y2 = (Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy / 2) / dy))) + 2 * latitudeLines) % (2 * latitudeLines)
-
+        let y1 = Swift.max(0, Swift.min(2*latitudeLines-1, Int(round(Float(latitudeLines) - 1 - ((bb.latitude.upperBound - dy / 2) / dy)))))
+        let y2 = Swift.max(0, Swift.min(2*latitudeLines-1, Int(round(Float(latitudeLines) - 1 - ((bb.latitude.lowerBound - dy / 2) / dy)))))
+                  
         let nx = type.nxOf(y: y1)
         let dx = 360 / Float(nx)
         let x1 = (Int(round(bb.longitude.lowerBound / dx)) + nx) % nx

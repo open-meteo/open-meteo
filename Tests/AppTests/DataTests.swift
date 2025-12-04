@@ -18,14 +18,29 @@ import VaporTesting
             let elevationFile = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
             let grid = GaussianGrid(type: .o1280)
             // Longitude 0° wraps on x axis
-            let a = try await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile)!
+            let center = grid.findPointXY(lat: 53.647546, lon: 0)
+            #expect(center.x == 0)
+            #expect(center.y == 516)
+            let aa = try await grid.getSurroundingGridpoints(centerY: center.y, lat: 53.647546, lon: 0, elevationFile: elevationFile)
+            #expect(aa.gridpoints == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
+            #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
+            #expect(aa.distances.isSimilar([0.09586334, 0.26894027, 0.26894027, 0.025562286, 0.19830701, 0.19830701, 0.044734955, 0.21714875, 0.21714875], accuracy: 0.001))
+            
+            let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
             #expect(a.gridpoint == 543884)
             
-            let b = try await grid.findPointInSea(lat: 53.647546, lon: 0.1, elevationFile: elevationFile)!
-            #expect(b.gridpoint == 543884)
+            // Nearest point already is sea
+            let b = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0.1, elevationFile: elevationFile))
+            #expect(b.gridpoint == 541801)
             
-            let c = try await grid.findPointInSea(lat: 53.647546, lon: -0.1, elevationFile: elevationFile)!
+            let c = try #require(await grid.findPointInSea(lat: 53.647546, lon: -0.1, elevationFile: elevationFile))
             #expect(c.gridpoint == 543884)
+            
+            let d = try #require(await grid.findPointInSea(lat: 90, lon: 0, elevationFile: elevationFile))
+            #expect(d.gridpoint == 0)
+            
+            let e = try #require(await grid.findPointInSea(lat: -90, lon: 342, elevationFile: elevationFile))
+            #expect(e.gridpoint == 6599680-1)
         }
     }
 
@@ -537,6 +552,18 @@ import VaporTesting
         let x = grid.findPointXY(lat: 53.63797, lon: 45)
         #expect(x.x == 261)
         #expect(x.y == 517)
+        
+        let pos2 = grid.findPointXY(lat: 19.229, lon: 233.723 - 360)
+        #expect(pos2.x == 2625)
+        #expect(pos2.y == 1006)
+        
+        let pos3 = grid.findPointXY(lat: 90+1, lon: 342)
+        #expect(pos3.x == 19)
+        #expect(pos3.y == 0)
+        
+        let pos4 = grid.findPointXY(lat: -90-1, lon: 342)
+        #expect(pos4.x == 19)
+        #expect(pos4.y == 2559)
         
         #expect(grid.nxOf(y: 0) == 20)
         #expect(grid.nxOf(y: 1) == 24)
