@@ -24,7 +24,7 @@ import VaporTesting
             let aa = try await grid.getSurroundingGridpoints(centerY: center.y, lat: 53.647546, lon: 0, elevationFile: elevationFile)
             #expect(aa.gridpoints == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
             #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
-            #expect(aa.distances.isSimilar([0.09586334, 0.26894027, 0.26894027, 0.025562286, 0.19830701, 0.19830701, 0.044734955, 0.21714875, 0.21714875], accuracy: 0.001))
+            #expect(aa.distances.isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
             
             let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
             #expect(a.gridpoint == 543884)
@@ -41,6 +41,19 @@ import VaporTesting
             
             let e = try #require(await grid.findPointInSea(lat: -90, lon: 342, elevationFile: elevationFile))
             #expect(e.gridpoint == 6599680-1)
+            
+            /// Uri: 3 points are very close, but one point has a better elevation matching. Other 6 points, may have better elevation, but are more than 20 km away
+            /// Use elevation AND distance weighted grid cell selection
+            let f = try #require(await grid.findPointTerrainOptimised(lat: 46.876004, lon: 8.663721, elevation: 600, elevationFile: elevationFile))
+            #expect(f.gridpoint == 760163)
+            
+            /// Zermatt: Hopeless at 9 km resolution. Model is always around 3000m
+            let g = try #require(await grid.findPointTerrainOptimised(lat: 46.021498, lon: 7.748033, elevation: 1620, elevationFile: elevationFile))
+            #expect(g.gridpoint == 795074)
+            
+            /// Cuxhaven at the sea. Center is sea grid point. 
+            let h = try #require(await grid.findPointTerrainOptimised(lat: 53.890130, lon: 8.671630, elevation: 5, elevationFile: elevationFile))
+            #expect(h.gridpoint == 537694)
         }
     }
 
@@ -564,6 +577,10 @@ import VaporTesting
         let pos4 = grid.findPointXY(lat: -90-1, lon: 342)
         #expect(pos4.x == 19)
         #expect(pos4.y == 2559)
+        
+        let pos5 = grid.findPointXY(lat: -19.229, lon: 233.723 - 360)
+        #expect(pos5.x == 2625)
+        #expect(pos5.y == 1553)
         
         #expect(grid.nxOf(y: 0) == 20)
         #expect(grid.nxOf(y: 1) == 24)

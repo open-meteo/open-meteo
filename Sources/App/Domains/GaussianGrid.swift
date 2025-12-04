@@ -140,16 +140,18 @@ struct GaussianGrid: Gridable {
         return integral(y: y) + x
     }
     
-    /// Need to evaluate two latitude lines to find the nearest grid-cell.
+    /// Find closest grid points for a given coordinate.
+    /// Need to evaluate two latitude lines to find the nearest grid-cell, because Gaussian grids are a triangle strip
     func findPointXY(lat: Float, lon: Float) -> (x: Int, y: Int) {
         let latitudeLines = type.latitudeLines
 
         let dy = Float(180) / (2 * Float(latitudeLines) + 0.5)
-        // Note `-2` because later we add +1
+        // Note: Limited by `-2` because later we add +1, otherwise it would be `-1`
         let y = max(0, min(2*latitudeLines-2, Int(Float(latitudeLines) - 1 - ((lat - dy / 2) / dy))))
+        let yUpper = y + 1
 
         let nx = nxOf(y: y)
-        let nxUpper = nxOf(y: y+1)
+        let nxUpper = nxOf(y: yUpper)
         
         let dx = 360 / Float(nx)
         let dxUpper = 360 / Float(nxUpper)
@@ -159,15 +161,13 @@ struct GaussianGrid: Gridable {
         
         let pointLat = Float(latitudeLines - y - 1) * dy + dy / 2
         let pointLon = Float(x) * dx
-        let pointLatUpper = Float(latitudeLines - (y+1) - 1) * dy + dy / 2
+        let pointLatUpper = Float(latitudeLines - yUpper - 1) * dy + dy / 2
         let pointLonUpper = Float(xUpper) * dxUpper
         
-        let distance = abs(pointLat - lat) + abs(pointLon - lon)
-        let distanceUpper = abs(pointLatUpper - lat) + abs(pointLonUpper - lon)
+        let distance = pow(pointLat - lat, 2) + pow(pointLon - lon, 2)
+        let distanceUpper = pow(pointLatUpper - lat, 2) + pow(pointLonUpper - lon, 2)
         
-        //print("distance: \(distance), distanceUpper: \(distanceUpper), lat: \(pointLat), latUpper \(pointLatUpper) latMean: \((pointLat + pointLatUpper)/2)")
-        
-        return distance < distanceUpper ? ((x + nx) % nx, y) : ((xUpper + nxUpper) % nxUpper, y+1)
+        return distance < distanceUpper ? ((x + nx) % nx, y) : ((xUpper + nxUpper) % nxUpper, yUpper)
     }
 
     func findBox(boundingBox bb: BoundingBoxWGS84) -> Slice? {
@@ -202,7 +202,7 @@ struct GaussianGrid: Gridable {
                 let x = xCenter + i - searchRadius
                 gridpoints.append(integral(y: y) + (x + 2*nx) % nx)
                 let pointLon = Float(x) * dx
-                distances.append(abs(pointLat - lat) + abs(pointLon - lon))
+                distances.append(pow(pointLat - lat, 2) + pow(pointLon - lon, 2))
             }
         }
         
@@ -215,7 +215,6 @@ struct GaussianGrid: Gridable {
             let lastIteration = i == gridpoints.count - 1
             if lastIteration || gridpoints[i] != gridpoints[i + 1] - 1 {
                 // read data from start to end
-//                print("read gridpoints \(gridpoints[start])..<\(gridpoints[i]+1) offset \(start)")
                 try await elevationFile.read(
                     into: &elevation,
                     range: [0..<1, UInt64(gridpoints[start])..<UInt64(gridpoints[i]+1)],
@@ -259,6 +258,48 @@ struct GaussianGrid: Gridable {
             return (centerPoint, .elevation(centerElevation))
         }
         return (minPosition, .sea)
+    }
+    
+    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)? {
+        
+        let (centerX, centerY) = findPointXY(lat: lat, lon: lon)
+        let centerPoint = integral(y: centerY) + centerX
+        let centerElevation = try await readFromStaticFile(gridpoint: centerPoint, file: elevationFile)
+        let deltaCenter = abs(centerElevation - elevation )
+        if deltaCenter <= 100 {
+            return (centerPoint, .elevation(elevation))
+        }
+        let (points, elevations, distances) = try await getSurroundingGridpoints(centerY: centerY, lat: lat, lon: lon, elevationFile: elevationFile)
+        var minDelta = Float(9999)
+        var minPosition = -1
+        var minElevation = Float.nan
+        for i in elevations.indices {
+            if elevations[i].isNaN || elevations[i] <= -999 {
+                continue
+            }
+            let distanceKm = sqrt(distances[i])*111
+            /// For every 1km in distance, the elevation must be 20 m better
+            let distancePenalty = distanceKm * 20
+            let delta = abs(elevations[i] - elevation) + distancePenalty
+            //print("point \(points[i]) elevation \(elevations[i]) delta \(delta) distance ~\(distanceKm) km, penalty \(distancePenalty) m")
+            if delta < minDelta {
+                minDelta = delta
+                minPosition = points[i]
+                minElevation = elevations[i]
+            }
+        }
+        /// only sea points or elevation is hugely off -> just use center
+        if minDelta > 1500 {
+            minElevation = centerElevation
+            minPosition = centerPoint
+        }
+        if minElevation.isNaN {
+            return nil
+        }
+        if minElevation <= -999 {
+            return (minPosition, .sea)
+        }
+        return (minPosition, .elevation(minElevation))
     }
 }
 
