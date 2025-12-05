@@ -14,7 +14,7 @@ extension ClosedRange where Element == Timestamp {
     func toRange(dt: Int) -> TimerangeDt {
         let roundedStart = lowerBound.floor(toNearest: dt)
         let roundedEnd = upperBound.floor(toNearest: dt)
-        TimerangeDt(range: roundedStart ..< roundedEnd.add(dt), dtSeconds: dt)
+        return TimerangeDt(range: roundedStart ..< roundedEnd.add(dt), dtSeconds: dt)
     }
 }
 
