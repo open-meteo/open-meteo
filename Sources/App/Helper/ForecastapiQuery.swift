@@ -10,8 +10,11 @@ struct ApiQueryStartEndRanges {
 
 extension ClosedRange where Element == Timestamp {
     /// Convert closed range to an openrange with delta time in seconds
+    /// Rounds the start and end times to the nearest dt boundary to ensure proper alignment
     func toRange(dt: Int) -> TimerangeDt {
-        TimerangeDt(range: lowerBound ..< upperBound.add(dt), dtSeconds: dt)
+        let roundedStart = lowerBound.floor(toNearest: dt)
+        let roundedEnd = upperBound.floor(toNearest: dt)
+        return TimerangeDt(range: roundedStart ..< roundedEnd.add(dt), dtSeconds: dt)
     }
 }
 
