@@ -244,13 +244,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     /// Generated while downloading
     case relative_humidity_2m
 
-    enum DownloadOrProcess {
-        /// Only download the selected variable, bu to not create a om database
-        case downloadOnly
-        /// Download and reate database
-        case downloadAndProcess
-    }
-
     var storePreviousForecast: Bool {
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
@@ -265,17 +258,6 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         }
     }
 
-    /// If true, download
-    var includeInEnsemble: DownloadOrProcess? {
-        switch self {
-        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa, .snowfall_water_equivalent, .snow_depth_water_equivalent:
-            return .downloadAndProcess
-        case .dew_point_2m, .relative_humidity_925hPa, .relative_humidity_1000hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_500hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_600hPa, .relative_humidity_400hPa, .relative_humidity_150hPa, .relative_humidity_100hPa, .relative_humidity_50hPa:
-            return .downloadOnly
-        default: return nil
-        }
-    }
-
     var isElevationCorrectable: Bool {
         switch self {
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_max, .temperature_2m_min:
@@ -285,7 +267,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         }
     }
 
-    static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
+    static let pressure_levels = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
 
     var omFileName: (file: String, level: Int) {
         return (nameInFiles, 0)
