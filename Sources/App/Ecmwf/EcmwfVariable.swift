@@ -686,7 +686,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     var scalefactor: Float {
         switch self {
         case .precipitation_type: return 1
-        case .precipitation, .snowfall_water_equivalent, .showers, .runoff, .snow_depth_water_equivalent: return 10
+        case .precipitation, .snowfall_water_equivalent, .showers, .runoff: return 10
+        case .snow_depth_water_equivalent: return 1 // 1mm resolution
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 20
         case .surface_temperature: return 20
         case .geopotential_height_1000hPa, .geopotential_height_925hPa, .geopotential_height_850hPa, .geopotential_height_700hPa, .geopotential_height_600hPa, .geopotential_height_500hPa, .geopotential_height_400hPa, .geopotential_height_300hPa, .geopotential_height_250hPa, .geopotential_height_200hPa, .geopotential_height_150hPa, .geopotential_height_100hPa, .geopotential_height_50hPa: return 1
