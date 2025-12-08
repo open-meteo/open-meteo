@@ -84,7 +84,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .wind_speed_10m:
             return 10
         case .snow_depth_water_equivalent:
-            return 10
+            return 1
         case .wind_direction_10m:
             return 1
         case .visibility:

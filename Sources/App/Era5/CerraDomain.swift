@@ -474,7 +474,7 @@ enum CerraVariable: String, CaseIterable, GenericVariable {
         case .wind_direction_100m: return 0.5
         case .albedo: return 1
         case .snow_depth: return 100 // 1cm res
-        case .snow_depth_water_equivalent: return 10 // 0.1mm res
+        case .snow_depth_water_equivalent: return 1 // 1mm res
         }
     }
 

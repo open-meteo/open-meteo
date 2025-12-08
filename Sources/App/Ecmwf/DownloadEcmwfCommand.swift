@@ -3,64 +3,6 @@ import OmFileFormat
 import Vapor
 import SwiftNetCDF
 
-/**
-per run storage:
-- No interpolated timesteps!
-- hour 0 missing for some params
-
-single timestep
-- [40x40] chunk size
-- data_run/ecmwf_ifs025/2025/04/17/00:00Z/temperature_2m/H000.om
-- data_run/ecmwf_ifs025/2025/04/17/00:00Z/H000/temperature_2m.om (can start single S3 sync afterwards)
-- pro: realtime access
-- pro: irregular timesteps are well represented
-- pro: maps usage, although run needs to be selected and hour needs wired client side calculations
-- pro: able to thin out data afterwards
-- con: lots of small files -> need efficient and reliable s3 sync
-- con: very inefficient to read timeseries -> luckily usually less than ~120 steps
-- issue: how to index files for maps? S3 listing!?!?
-- 24h aggregations for maps?
-- 250 TB per 1 year data!!!!
- 
- all variables in one file per timestep?
- - data_run/ecmwf_ifs025/2025/04/17/00:00Z/20250423060000.om
- - pro: prevent small files -> faster upload -> better disk utilisation (36MB ifs025 file per step)
- - pro: slightly faster to fetch multiple vars like U/V wind
- - pro: could integrate nicer metadata (close to CF)
- - con: need to download pressure+surface at the same time
- - con: code refactor required
- - con: users do not see whats inside
- - con: redistribution always gets all data
- - con: cannot download single variables afterwards
-
-total run:
-- [10x10x20] chunk size
-- data_run/ecmwf_ifs025/2025/07/17/00:00Z/temperature_2m.om
-- pro: timeseries read half decent
-- con: less good for maps
-- con: no realtime write, larger delay
-
-Continuous Maps:
-- [40x40] chunks
-- data_spatial/ecmwf_ifs025/temperature_2m/2025/07/17/H00:00.om
-- data_spatial/ecmwf_ifs025/2025/07/17/00:00/temperature_2m.om
-- data_spatial/ecmwf_ifs025_daily/temperature_2m_maximum/2025/07/10.om
-- pro: overwrite parts
-- consider: lower resolutions inside the file, e.g. 1440x720 to 720x360 (only makes sense if files are large)
-- consider: daily aggregations (precip sum, wind max)
-- consider: interpolated steps
-- 10 TB per 1 year data (including all pressure levels)
- 
- maps alternative continue using time chunks:
- - data_spatial/ecmwf_ifs025/temperature_2m/chunk_1234.om
- - inefficient, because has to upload unmodified data again
- - pro: larger files
-
-test:
-- file size single step temperature_2m with 40x40 chunk
-- file size multi step
- [10x10x20] chunk size
-**/
 
 /**
  Download from
@@ -122,9 +64,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         let isWave = domain == .wam025 || domain == .wam025_ensemble
 
         let onlyVariables = try EcmwfVariable.load(commaSeparatedOptional: signature.onlyVariables)
-        let ensembleVariables = EcmwfVariable.allCases.filter({ $0.includeInEnsemble != nil })
-        let defaultVariables = domain.isEnsemble ? ensembleVariables : EcmwfVariable.allCases
-        let variables = onlyVariables ?? defaultVariables
+        let variables = onlyVariables ?? EcmwfVariable.allCases
         let nConcurrent = signature.concurrent ?? 1
         let base = signature.server ?? "https://data.ecmwf.int/forecasts/"
 
@@ -395,11 +335,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     // Keep precip in memory for probability
                     if domain.countEnsembleMember > 1 && variable == .precipitation {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                    }
-                    
-                    if domain.isEnsemble && variable.includeInEnsemble != .downloadAndProcess {
-                        // do not generate some database files for ensemble
-                        return
                     }
                     //let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: grib2d.array.data)
                     // Note: skipHour0 needs still to be set for solar interpolation

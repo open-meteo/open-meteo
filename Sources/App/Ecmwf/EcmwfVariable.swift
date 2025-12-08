@@ -8,12 +8,13 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     case wave_height
     case wave_period
     case wave_peak_period
+    case wave_mean_zero_crossing_period // Mean zero-crossing wave period
 
     var interpolation: ReaderInterpolation {
         switch self {
         case .wave_height:
             return .linear
-        case .wave_period, .wave_peak_period:
+        case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
             return .linearDegrees
@@ -24,7 +25,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return .metre
-        case .wave_period, .wave_peak_period:
+        case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return .seconds
         case .wave_direction:
             return .degreeDirection
@@ -37,7 +38,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return height
-        case .wave_period, .wave_peak_period:
+        case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return period
         case .wave_direction:
             return direction
@@ -71,6 +72,8 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return "mwp"
         case .wave_peak_period:
             return "pp1d"
+        case .wave_mean_zero_crossing_period:
+            return "mp2"
         }
     }
 }
@@ -235,21 +238,22 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     case wind_gusts_10m
 
-    // Cloudcover is calculated while downloading
     case cloud_cover
-    case cloud_cover_low
+    case cloud_cover_low // Cloudcover low/mid/high are calculated while downloading
     case cloud_cover_mid
     case cloud_cover_high
 
     /// Generated while downloading
     case relative_humidity_2m
-
-    enum DownloadOrProcess {
-        /// Only download the selected variable, bu to not create a om database
-        case downloadOnly
-        /// Download and reate database
-        case downloadAndProcess
-    }
+    
+    case ocean_u_current
+    case ocean_v_current
+    
+    case sea_ice_thickness
+    case sea_level_height_msl
+    
+    // Since End of 2025, "snow albedo" is available. It always show 85% for non snow. If albedo should be added, calculate it 1-ssrd/ssr
+    
 
     var storePreviousForecast: Bool {
         switch self {
@@ -260,19 +264,9 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .shortwave_radiation: return true
         case .wind_v_component_10m, .wind_u_component_10m: return true
         case .wind_v_component_100m, .wind_u_component_100m: return true
+        case .ocean_u_current, .ocean_v_current: return true
         // case .weather_code: return true
         default: return false
-        }
-    }
-
-    /// If true, download
-    var includeInEnsemble: DownloadOrProcess? {
-        switch self {
-        case .precipitation, .runoff, .soil_temperature_0_to_7cm, .soil_moisture_0_to_7cm, .soil_moisture_7_to_28cm, .surface_temperature, .relative_humidity_2m, .shortwave_radiation, .cape, .pressure_msl, .wind_v_component_10m, .wind_v_component_100m, .wind_u_component_10m, .wind_u_component_100m, .wind_gusts_10m, .temperature_2m, .cloud_cover, .temperature_500hPa, .temperature_850hPa, .geopotential_height_500hPa, .geopotential_height_850hPa, .snowfall_water_equivalent, .snow_depth_water_equivalent:
-            return .downloadAndProcess
-        case .dew_point_2m, .relative_humidity_925hPa, .relative_humidity_1000hPa, .relative_humidity_850hPa, .relative_humidity_700hPa, .relative_humidity_500hPa, .relative_humidity_300hPa, .relative_humidity_250hPa, .relative_humidity_200hPa, .relative_humidity_600hPa, .relative_humidity_400hPa, .relative_humidity_150hPa, .relative_humidity_100hPa, .relative_humidity_50hPa:
-            return .downloadOnly
-        default: return nil
         }
     }
 
@@ -285,7 +279,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         }
     }
 
-    static let pressure_levels = [1000, 925, 850, 700, 500, 300, 250, 200, 50]
+    static let pressure_levels = [1000, 925, 850, 700, 600, 500, 400, 300, 250, 200, 150, 100, 50]
 
     var omFileName: (file: String, level: Int) {
         return (nameInFiles, 0)
@@ -309,6 +303,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         case .wind_v_component_10m: return .metrePerSecond
         case .wind_u_component_10m: return .metrePerSecond
+        case .ocean_u_current, .ocean_v_current: return .metrePerSecond
         case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_150hPa, .specific_humidity_100hPa, .specific_humidity_50hPa: return .gramPerKilogram
         case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return .celsius
         /*case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return .perSecond
@@ -337,6 +332,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return .metrePerSecond
         case .wind_gusts_10m:
             return .metrePerSecond
+        case .sea_ice_thickness:
+            return .metre
+        case .sea_level_height_msl:
+            return .metre
         }
     }
 
@@ -499,6 +498,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return nil
         case .wind_gusts_10m:
             return nil
+        case .ocean_u_current, .ocean_v_current: return nil
+        case .sea_ice_thickness, .sea_level_height_msl: return nil
         }
     }
     
@@ -672,13 +673,22 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return "100u"
         case .wind_gusts_10m:
             return "10fg"
+        case .ocean_u_current:
+            return "sve" // east wards
+        case .ocean_v_current:
+            return "svn" // north wards
+        case .sea_ice_thickness:
+            return "sithick"
+        case .sea_level_height_msl:
+            return "zos"
         }
     }
 
     var scalefactor: Float {
         switch self {
         case .precipitation_type: return 1
-        case .precipitation, .snowfall_water_equivalent, .showers, .runoff, .snow_depth_water_equivalent: return 10
+        case .precipitation, .snowfall_water_equivalent, .showers, .runoff: return 10
+        case .snow_depth_water_equivalent: return 1 // 1mm resolution
         case .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm: return 20
         case .surface_temperature: return 20
         case .geopotential_height_1000hPa, .geopotential_height_925hPa, .geopotential_height_850hPa, .geopotential_height_700hPa, .geopotential_height_600hPa, .geopotential_height_500hPa, .geopotential_height_400hPa, .geopotential_height_300hPa, .geopotential_height_250hPa, .geopotential_height_200hPa, .geopotential_height_150hPa, .geopotential_height_100hPa, .geopotential_height_50hPa: return 1
@@ -715,6 +725,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return 1
         case .wind_gusts_10m:
             return 10
+        case .ocean_u_current, .ocean_v_current:
+            return 20 // 0.05 ms (~0.1 knots)
+        case .sea_ice_thickness:
+            return 100 // 1cm res
+        case .sea_level_height_msl:
+            return 100 // 1cm res
         }
     }
 
