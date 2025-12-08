@@ -238,9 +238,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     case wind_gusts_10m
 
-    // Cloudcover is calculated while downloading
     case cloud_cover
-    case cloud_cover_low
+    case cloud_cover_low // Cloudcover low/mid/high are calculated while downloading
     case cloud_cover_mid
     case cloud_cover_high
 
@@ -252,6 +251,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
     
     case sea_ice_thickness
     case sea_level_height_msl
+    
+    // Since End of 2025, "snow albedo" is available. It always show 85% for non snow. If albedo should be added, calculate it 1-ssrd/ssr
     
 
     var storePreviousForecast: Bool {
