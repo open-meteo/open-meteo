@@ -13,6 +13,9 @@ public protocol Gridable: Sendable {
     associatedtype SliceType: Sequence<Int>
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
+    
+    func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
+    func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
 }
 
 public struct GridPoint2DFraction {
@@ -21,7 +24,7 @@ public struct GridPoint2DFraction {
     let yFraction: Float
 }
 
-enum ElevationOrSea {
+public enum ElevationOrSea {
     case noData
     case sea
     case landWithoutElevation

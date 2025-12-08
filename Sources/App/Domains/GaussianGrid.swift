@@ -289,12 +289,9 @@ struct GaussianGrid: Gridable {
             }
         }
         /// only sea points or elevation is hugely off -> just use center
-        if minDelta > 1500 {
+        if minElevation.isNaN || minDelta > 1500 {
             minElevation = centerElevation
             minPosition = centerPoint
-        }
-        if minElevation.isNaN {
-            return nil
         }
         if minElevation <= -999 {
             return (minPosition, .sea)

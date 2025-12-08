@@ -13,7 +13,7 @@ import VaporTesting
         #endif
     }
     
-    @Test func gaussianGridSeaMatch() async throws {
+    @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridSeaMatch() async throws {
         try await withApp { app in
             let elevationFile = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
             let grid = GaussianGrid(type: .o1280)
