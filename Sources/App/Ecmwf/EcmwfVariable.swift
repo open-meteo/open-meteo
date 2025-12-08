@@ -8,12 +8,13 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
     case wave_height
     case wave_period
     case wave_peak_period
+    case wave_mean_zero_crossing_period // Mean zero-crossing wave period
 
     var interpolation: ReaderInterpolation {
         switch self {
         case .wave_height:
             return .linear
-        case .wave_period, .wave_peak_period:
+        case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return .hermite(bounds: 0...Float.infinity)
         case .wave_direction:
             return .linearDegrees
@@ -24,7 +25,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return .metre
-        case .wave_period, .wave_peak_period:
+        case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return .seconds
         case .wave_direction:
             return .degreeDirection
@@ -37,7 +38,7 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
         switch self {
         case .wave_height:
             return height
-        case .wave_period, .wave_peak_period:
+        case .wave_period, .wave_peak_period, .wave_mean_zero_crossing_period:
             return period
         case .wave_direction:
             return direction
@@ -71,6 +72,8 @@ enum EcmwfWaveVariable: String, CaseIterable, EcmwfVariableDownloadable, Generic
             return "mwp"
         case .wave_peak_period:
             return "pp1d"
+        case .wave_mean_zero_crossing_period:
+            return "mp2"
         }
     }
 }
