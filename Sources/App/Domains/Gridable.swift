@@ -154,31 +154,42 @@ extension Gridable {
         let xrange = (x - searchRadius..<x + searchRadius + 1).clamped(to: 0..<nx)
         let yrange = (y - searchRadius..<y + searchRadius + 1).clamped(to: 0..<ny)
 
-        // TODO find a solution to reuse buffers inside read... maybe allocate buffers in a pool per eventloop?
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
         let elevationSurrounding = try await elevationFile.read(range: [yrange.toUInt64(), xrange.toUInt64()])
-
-        if elevationSurrounding[elevationSurrounding.count / 2] <= -999 {
+        let centerElevation = elevationSurrounding[elevationSurrounding.count / 2]
+        if centerElevation <= -999 {
             return (center, .sea)
         }
-
+        var minDistance = Float(9999)
+        var minPosition = -1
         for i in elevationSurrounding.indices {
             if elevationSurrounding[i].isNaN {
                 continue
             }
-            if elevationSurrounding[i] <= -999 {
-                let dx = i % xrange.count - (x - xrange.lowerBound)
-                let dy = i / xrange.count - (y - yrange.lowerBound)
-                let gridpoint = (y + dy) * nx + (x + dx)
-                return (gridpoint, .sea)
+            let x = xrange.lowerBound + i % xrange.count
+            let y = yrange.lowerBound + i / xrange.count
+            let distance = distanceSquared(
+                x: x,
+                y: y,
+                lat: lat,
+                lon: lon
+            )
+            if elevationSurrounding[i] <= -999 && distance < minDistance {
+                minDistance = distance
+                minPosition = y * nx + x
             }
         }
-
-        // all land, take center
-        if elevationSurrounding[elevationSurrounding.count / 2].isNaN {
-            return nil
+        guard minPosition >= 0 else {
+            if centerElevation.isNaN {
+                return (y * nx + x, .noData)
+            }
+            if centerElevation >= 9000 {
+                // land, but no data
+                return (y * nx + x, .landWithoutElevation)
+            }
+            return (y * nx + x, .elevation(centerElevation))
         }
-        return (center, .elevation(elevationSurrounding[elevationSurrounding.count / 2]))
+        return (minPosition, .sea)
     }
 
     /// Return distance squared of a coordinate to a grid point
@@ -201,50 +212,58 @@ extension Gridable {
         /// -999 marks sea points, therefore  elevation matching will naturally avoid those
         let elevationSurrounding = try await elevationFile.read(range: [yrange.toUInt64(), xrange.toUInt64()])
 
-        let deltaCenter = abs(elevationSurrounding[elevationSurrounding.count / 2] - elevation )
+        let centerElevation = elevationSurrounding[elevationSurrounding.count / 2]
+        let deltaCenter = abs(centerElevation - elevation )
         if deltaCenter <= 100 {
             return (center, .elevation(elevationSurrounding[elevationSurrounding.count / 2]))
         }
 
         var minDelta = deltaCenter
-        var minPos = elevationSurrounding.count / 2
+        var minPosition = elevationSurrounding.count / 2
+        var minElevation = Float.nan
+        
         for i in elevationSurrounding.indices {
             if elevationSurrounding[i].isNaN || elevationSurrounding[i] <= -999 {
                 continue
             }
-            /// 9999 is used in satellite datasets to mark land locations, use closest grid-cell, regardless of terrain elevation
-            /// Ideally we store elevation and sea mark separately, but this would require large refactoring
-            let delta = elevationSurrounding[i] >= 9999 ? distanceSquared(
-                x: xrange.lowerBound + i % xrange.count,
-                y: yrange.lowerBound + i / xrange.count,
+            let x = xrange.lowerBound + i % xrange.count
+            let y = yrange.lowerBound + i / xrange.count
+            let distanceSquared = distanceSquared(
+                x: x,
+                y: y,
                 lat: lat,
                 lon: lon
-            ) : abs(elevationSurrounding[i] - elevation)
+            )
+            let distanceKm = sqrt(distanceSquared)*111
+            /// For every 1km in distance, the elevation must be 20 m better
+            let distancePenalty = distanceKm * 20
+            /// 9999 is used in satellite datasets to mark land locations, use closest grid-cell, regardless of terrain elevation
+            /// Ideally we store elevation and sea mark separately, but this would require large refactoring
+            let delta = (elevationSurrounding[i] >= 9999 ? 0 : abs(elevationSurrounding[i] - elevation)) + distancePenalty
             if delta < minDelta {
                 minDelta = delta
-                minPos = i
+                minPosition = y * nx + x
+                minElevation = elevationSurrounding[i]
             }
         }
 
         /// only sea points or elevation ish hugly off -> just use center
-        if minDelta > 900 {
-            minPos = elevationSurrounding.count / 2
+        if minElevation.isNaN || minDelta > 1500 {
+            minPosition = y * nx + x
+            minElevation = centerElevation
         }
 
-        let dx = minPos % xrange.count - (x - xrange.lowerBound)
-        let dy = minPos / xrange.count - (y - yrange.lowerBound)
-        let gridpoint = (y + dy) * nx + (x + dx)
-        if elevationSurrounding[minPos].isNaN {
+        if minElevation.isNaN {
             return nil
         }
-        if elevationSurrounding[minPos] <= -999 {
-            return (gridpoint, .sea)
+        if minElevation <= -999 {
+            return (minPosition, .sea)
         }
-        if elevationSurrounding[minPos] >= 9999 {
+        if minElevation >= 9999 {
             /// 9999 marks land points in satellite datasets
-            return (gridpoint, .landWithoutElevation)
+            return (minPosition, .landWithoutElevation)
         }
-        return (gridpoint, .elevation(elevationSurrounding[minPos]))
+        return (minPosition, .elevation(minElevation))
     }
 }
 

@@ -56,6 +56,35 @@ import VaporTesting
             #expect(h.gridpoint == 537694)
         }
     }
+    
+    @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func iconD2GridFindPoint() async throws {
+        try await withApp { app in
+            let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let grid = IconDomains.iconD2.grid
+            // Longitude 0° wraps on x axis
+            
+            let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
+            #expect(a.gridpoint == 635642)
+            
+            let b = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0.1, elevationFile: elevationFile))
+            #expect(b.gridpoint == 635646)
+            
+            let c = try #require(await grid.findPointInSea(lat: 53.647546, lon: -0.1, elevationFile: elevationFile))
+            #expect(c.gridpoint == 635637)
+            
+            /// Uri, but higher elevation than grid cell -> use neighbor
+            let f = try #require(await grid.findPointTerrainOptimised(lat: 46.876004, lon: 8.663721, elevation: 850, elevationFile: elevationFile))
+            #expect(f.gridpoint == 226619)
+            
+            /// Zermatt: 1600m surface, but request 2000m
+            let g = try #require(await grid.findPointTerrainOptimised(lat: 46.021498, lon: 7.748033, elevation: 2000, elevationFile: elevationFile))
+            #expect(g.gridpoint == 173115)
+            
+            /// Cuxhaven at the sea. Center is sea grid point.
+            let h = try #require(await grid.findPointTerrainOptimised(lat: 53.900130, lon: 8.651630, elevation: 5, elevationFile: elevationFile))
+            #expect(h.gridpoint == 650655)
+        }
+    }
 
     @Test func aggregation() {
         let values: [Float] = [1,2,3,4,5,6]
