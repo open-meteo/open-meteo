@@ -240,7 +240,7 @@ extension Gridable {
             /// 9999 is used in satellite datasets to mark land locations, use closest grid-cell, regardless of terrain elevation
             /// Ideally we store elevation and sea mark separately, but this would require large refactoring
             let delta = (elevationSurrounding[i] >= 9999 ? 0 : abs(elevationSurrounding[i] - elevation)) + distancePenalty
-            if delta < minDelta {
+            if delta < minDelta && distanceKm < 50 {
                 minDelta = delta
                 minPosition = y * nx + x
                 minElevation = elevationSurrounding[i]
