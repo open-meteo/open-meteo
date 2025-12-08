@@ -243,6 +243,13 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
 
     /// Generated while downloading
     case relative_humidity_2m
+    
+    case ocean_u_current
+    case ocean_v_current
+    
+    case sea_ice_thickness
+    case sea_level_height_msl
+    
 
     var storePreviousForecast: Bool {
         switch self {
@@ -253,6 +260,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .shortwave_radiation: return true
         case .wind_v_component_10m, .wind_u_component_10m: return true
         case .wind_v_component_100m, .wind_u_component_100m: return true
+        case .ocean_u_current, .ocean_v_current: return true
         // case .weather_code: return true
         default: return false
         }
@@ -291,6 +299,7 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
         case .wind_v_component_10m: return .metrePerSecond
         case .wind_u_component_10m: return .metrePerSecond
+        case .ocean_u_current, .ocean_v_current: return .metrePerSecond
         case .specific_humidity_1000hPa, .specific_humidity_925hPa, .specific_humidity_850hPa, .specific_humidity_700hPa, .specific_humidity_600hPa, .specific_humidity_500hPa, .specific_humidity_400hPa, .specific_humidity_300hPa, .specific_humidity_250hPa, .specific_humidity_200hPa, .specific_humidity_150hPa, .specific_humidity_100hPa, .specific_humidity_50hPa: return .gramPerKilogram
         case .temperature_2m, .temperature_2m_max, .temperature_2m_min: return .celsius
         /*case .relative_vorticity_1000hPa, .relative_vorticity_925hPa, .relative_vorticity_850hPa, .relative_vorticity_700hPa, .relative_vorticity_600hPa, .relative_vorticity_500hPa, .relative_vorticity_400hPa, .relative_vorticity_300hPa, .relative_vorticity_250hPa, .relative_vorticity_200hPa, .relative_vorticity_100hPa, .relative_vorticity_50hPa: return .perSecond
@@ -319,6 +328,10 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return .metrePerSecond
         case .wind_gusts_10m:
             return .metrePerSecond
+        case .sea_ice_thickness:
+            return .metre
+        case .sea_level_height_msl:
+            return .metre
         }
     }
 
@@ -481,6 +494,8 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return nil
         case .wind_gusts_10m:
             return nil
+        case .ocean_u_current, .ocean_v_current: return nil
+        case .sea_ice_thickness, .sea_level_height_msl: return nil
         }
     }
     
@@ -654,6 +669,14 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return "100u"
         case .wind_gusts_10m:
             return "10fg"
+        case .ocean_u_current:
+            return "sve" // east wards
+        case .ocean_v_current:
+            return "svn" // north wards
+        case .sea_ice_thickness:
+            return "sithick"
+        case .sea_level_height_msl:
+            return "zos"
         }
     }
 
@@ -697,6 +720,12 @@ enum EcmwfVariable: String, CaseIterable, Hashable, EcmwfVariableDownloadable, G
             return 1
         case .wind_gusts_10m:
             return 10
+        case .ocean_u_current, .ocean_v_current:
+            return 20 // 0.05 ms (~0.1 knots)
+        case .sea_ice_thickness:
+            return 100 // 1cm res
+        case .sea_level_height_msl:
+            return 100 // 1cm res
         }
     }
 
