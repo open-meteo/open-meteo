@@ -235,8 +235,8 @@ extension Gridable {
                 lon: lon
             )
             let distanceKm = sqrt(distanceSquared)*111
-            /// For every 1km in distance, the elevation must be 20 m better
-            let distancePenalty = distanceKm * 20
+            /// For every 1km in distance, the elevation must be 30 m better
+            let distancePenalty = distanceKm * 30
             /// 9999 is used in satellite datasets to mark land locations, use closest grid-cell, regardless of terrain elevation
             /// Ideally we store elevation and sea mark separately, but this would require large refactoring
             let delta = (elevationSurrounding[i] >= 9999 ? 0 : abs(elevationSurrounding[i] - elevation)) + distancePenalty

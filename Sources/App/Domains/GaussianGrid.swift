@@ -278,8 +278,8 @@ struct GaussianGrid: Gridable {
                 continue
             }
             let distanceKm = sqrt(distances[i])*111
-            /// For every 1km in distance, the elevation must be 20 m better
-            let distancePenalty = distanceKm * 20
+            /// For every 1km in distance, the elevation must be 30 m better
+            let distancePenalty = distanceKm * 30
             let delta = abs(elevations[i] - elevation) + distancePenalty
             //print("point \(points[i]) elevation \(elevations[i]) delta \(delta) distance ~\(distanceKm) km, penalty \(distancePenalty) m")
             if delta < minDelta && distanceKm < 50 {
