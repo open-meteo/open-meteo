@@ -188,8 +188,10 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     var levels: [Int] {
         switch self {
         case .gfs05_ens:
-            /// Smaler selection, same as ECMWF IFS04
-            return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
+            /// a files: 10,50,100,200,250,300,400,500,700,850,925,1000
+            /// b files: 1,2,3,5,7,20,30,70,150,350,450,550,600,750,800,900,950,975
+            /// ecmwf open data: 50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000
+            return [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
         case .gfs025_ens:
             return []
         case .gfs013:

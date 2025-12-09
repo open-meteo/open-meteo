@@ -121,7 +121,7 @@ extension VariablePerMemberStorage {
         let handles = self.data.filter({ $0.key.variable == precipitationVariable })
         let nMember = handles.count
         guard nMember > 1, dtHoursOfCurrentStep > 0 else {
-            print("skip nMember=\(nMember), dtHoursOfCurrentStep=\(dtHoursOfCurrentStep)")
+            //print("skip nMember=\(nMember), dtHoursOfCurrentStep=\(dtHoursOfCurrentStep)")
             return
         }
 
