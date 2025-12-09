@@ -163,13 +163,13 @@ enum GfsSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
         case .temperature_100m:
             return .hermite(bounds: nil)
         case .cloud_cover:
-            return .linear
+            return .hermite(bounds: 0...100)
         case .cloud_cover_low:
-            return .linear
+            return .hermite(bounds: 0...100)
         case .cloud_cover_mid:
-            return .linear
+            return .hermite(bounds: 0...100)
         case .cloud_cover_high:
-            return .linear
+            return .hermite(bounds: 0...100)
         case .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:

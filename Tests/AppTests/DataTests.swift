@@ -3,6 +3,7 @@ import Foundation
 import Testing
 import Vapor
 // import NIOFileSystem
+import VaporTesting
 
 @Suite struct DataTests {
     init() {
@@ -10,6 +11,79 @@ import Vapor
         let projectHome = String(#filePath[...#filePath.range(of: "/Tests/")!.lowerBound])
         FileManager.default.changeCurrentDirectoryPath(projectHome)
         #endif
+    }
+    
+    @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridSeaMatch() async throws {
+        try await withApp { app in
+            let elevationFile = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let grid = GaussianGrid(type: .o1280)
+            // Longitude 0° wraps on x axis
+            let center = grid.findPointXY(lat: 53.647546, lon: 0)
+            #expect(center.x == 0)
+            #expect(center.y == 516)
+            let aa = try await grid.getSurroundingGridpoints(centerY: center.y, lat: 53.647546, lon: 0, elevationFile: elevationFile)
+            #expect(aa.gridpoints == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
+            #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
+            #expect(aa.distances.isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
+            
+            let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
+            #expect(a.gridpoint == 543884)
+            
+            // Nearest point already is sea
+            let b = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0.1, elevationFile: elevationFile))
+            #expect(b.gridpoint == 541801)
+            
+            let c = try #require(await grid.findPointInSea(lat: 53.647546, lon: -0.1, elevationFile: elevationFile))
+            #expect(c.gridpoint == 543884)
+            
+            let d = try #require(await grid.findPointInSea(lat: 90, lon: 0, elevationFile: elevationFile))
+            #expect(d.gridpoint == 0)
+            
+            let e = try #require(await grid.findPointInSea(lat: -90, lon: 342, elevationFile: elevationFile))
+            #expect(e.gridpoint == 6599680-1)
+            
+            /// Uri: 3 points are very close, but one point has a better elevation matching. Other 6 points, may have better elevation, but are more than 20 km away
+            /// Use elevation AND distance weighted grid cell selection
+            let f = try #require(await grid.findPointTerrainOptimised(lat: 46.876004, lon: 8.663721, elevation: 600, elevationFile: elevationFile))
+            #expect(f.gridpoint == 760163)
+            
+            /// Zermatt: Hopeless at 9 km resolution. Model is always around 3000m
+            let g = try #require(await grid.findPointTerrainOptimised(lat: 46.021498, lon: 7.748033, elevation: 1620, elevationFile: elevationFile))
+            #expect(g.gridpoint == 795074)
+            
+            /// Cuxhaven at the sea. Center is sea grid point. 
+            let h = try #require(await grid.findPointTerrainOptimised(lat: 53.890130, lon: 8.671630, elevation: 5, elevationFile: elevationFile))
+            #expect(h.gridpoint == 537694)
+        }
+    }
+    
+    @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func iconD2GridFindPoint() async throws {
+        try await withApp { app in
+            let elevationFile = try #require(await IconDomains.iconD2.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let grid = IconDomains.iconD2.grid
+            // Longitude 0° wraps on x axis
+            
+            let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
+            #expect(a.gridpoint == 635642)
+            
+            let b = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0.1, elevationFile: elevationFile))
+            #expect(b.gridpoint == 635646)
+            
+            let c = try #require(await grid.findPointInSea(lat: 53.647546, lon: -0.1, elevationFile: elevationFile))
+            #expect(c.gridpoint == 635637)
+            
+            /// Uri, but higher elevation than grid cell -> use neighbor
+            let f = try #require(await grid.findPointTerrainOptimised(lat: 46.876004, lon: 8.663721, elevation: 850, elevationFile: elevationFile))
+            #expect(f.gridpoint == 226619)
+            
+            /// Zermatt: 1600m surface, but request 2000m
+            let g = try #require(await grid.findPointTerrainOptimised(lat: 46.021498, lon: 7.748033, elevation: 2000, elevationFile: elevationFile))
+            #expect(g.gridpoint == 173115)
+            
+            /// Cuxhaven at the sea. Center is sea grid point.
+            let h = try #require(await grid.findPointTerrainOptimised(lat: 53.900130, lon: 8.651630, elevation: 5, elevationFile: elevationFile))
+            #expect(h.gridpoint == 650655)
+        }
     }
 
     @Test func aggregation() {
@@ -514,6 +588,29 @@ import Vapor
      */
     @Test func ecmwfIfsGrid() {
         let grid = GaussianGrid(type: .o1280)
+        
+        /// In the middle of 2 latitude lines. Only evaluating one latitude line would not be correct.
+        /// Because the Gaussian grid is basically a shifted triangle strip, both lines need to be evaluated
+        let x = grid.findPointXY(lat: 53.63797, lon: 45)
+        #expect(x.x == 261)
+        #expect(x.y == 517)
+        
+        let pos2 = grid.findPointXY(lat: 19.229, lon: 233.723 - 360)
+        #expect(pos2.x == 2625)
+        #expect(pos2.y == 1006)
+        
+        let pos3 = grid.findPointXY(lat: 90+1, lon: 342)
+        #expect(pos3.x == 19)
+        #expect(pos3.y == 0)
+        
+        let pos4 = grid.findPointXY(lat: -90-1, lon: 342)
+        #expect(pos4.x == 19)
+        #expect(pos4.y == 2559)
+        
+        let pos5 = grid.findPointXY(lat: -19.229, lon: 233.723 - 360)
+        #expect(pos5.x == 2625)
+        #expect(pos5.y == 1553)
+        
         #expect(grid.nxOf(y: 0) == 20)
         #expect(grid.nxOf(y: 1) == 24)
         #expect(grid.nxOf(y: 1280 - 1) == 5136)

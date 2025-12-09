@@ -110,15 +110,17 @@ enum IconWaveVariable: String, CaseIterable, GenericVariable, GenericVariableMix
     }
     
     func availableFor(domain: IconWaveDomain) -> Bool {
-        guard domain == .gwam else {
-            return true
-        }
-        switch self {
-        case .wave_height, .wave_direction:
-            return true
-        default:
-            return false
-        }
+        // All parameters for GWAM available again since December 2025
+        return true
+//        guard domain == .gwam else {
+//            return true
+//        }
+//        switch self {
+//        case .wave_height, .wave_direction:
+//            return true
+//        default:
+//            return false
+//        }
     }
 
     /// Name used on the dwd open data server

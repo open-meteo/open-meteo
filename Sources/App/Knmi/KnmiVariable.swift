@@ -93,7 +93,7 @@ enum KnmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariable
         case .temperature_50m, .temperature_100m, .temperature_200m, .temperature_300m:
             return 20
         case .snow_depth_water_equivalent:
-            return 10
+            return 1
         case .wind_direction_10m, .wind_direction_50m, .wind_direction_100m, .wind_direction_200m, .wind_direction_300m:
             return 1
         case .visibility:

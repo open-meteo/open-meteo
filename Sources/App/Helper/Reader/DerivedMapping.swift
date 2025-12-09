@@ -48,7 +48,7 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
             return nil
         }
         return .two(.raw(u), .raw(v), {u, v, _ in
-            return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .metrePerSecond)
+            return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
         })
     }
 }

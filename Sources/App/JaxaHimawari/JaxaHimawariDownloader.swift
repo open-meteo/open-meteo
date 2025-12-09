@@ -149,8 +149,8 @@ struct JaxaHimawariDownload: AsyncCommand {
             logger.info("Downloading \(variable) \(run.iso8601_YYYY_MM_dd_HH_mm)")
             let c = run.toComponents()
             let path: String
-            /// For whatever reason, H08 is used again after 2025-10-11 at 15:20
-            let satellite: String = run >= Timestamp(2022, 12, 13) && run <= Timestamp(2025,10,11,15,20) ? "H09" : "H08"
+            /// For whatever reason, H08 is used again after 2025-10-11 at 15:20 until 2025-11-26 4:40
+            let satellite: String = (run >= Timestamp(2022, 12, 13) && run <= Timestamp(2025,10,11,15,20)) || run >= Timestamp(2025,11,26,4,50) ? "H09" : "H08"
             switch domain {
             case .himawari_10min, .himawari_70e_10min:
                 path = "/pub/himawari/L2/PAR/021/\(c.year)\(c.mm)/\(c.dd)/\(run.hh)/\(satellite)_\(run.format_YYYYMMdd)_\(run.hh)\(run.mm)_RFL021_FLDK.0\(domain.grid.nx)_02401.nc"

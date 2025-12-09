@@ -240,7 +240,7 @@ struct WeatherApiController {
             case .climate:
                 forecastDaysMax = 14
                 forecastDayDefault = 7
-                historyStartDate = Timestamp(2013, 1, 1)
+                historyStartDate = Timestamp(1950, 1, 1)
                 temporalResolutionDefault = .hourly
             case .flood:
                 forecastDaysMax = 366

@@ -27,6 +27,26 @@ import VaporTesting
         #expect(b?.prettyString() == "2024-02-03T00:00 to 2024-02-03T03:00 (1-hourly)")
     }
 
+    @Test func timeAlignmentMinutely15() throws {
+        // Test that unaligned timestamps are properly rounded to 15-minute boundaries
+        let start = Timestamp(2025, 12, 03, 0, 20)  // 00:20 should round down to 00:15
+        let end = Timestamp(2025, 12, 03, 1, 42)    // 01:42 should round down to 01:30
+
+        let range = (start...end)
+        let timerangeDt = range.toRange(dt: 900)  // 900 seconds = 15 minutes
+
+        // Start should be rounded to nearest 15-minute boundary (00:15)
+        #expect(timerangeDt.range.lowerBound.hour == 0)
+        #expect(timerangeDt.range.lowerBound.minute == 15)
+
+        // Verify that all timestamps in the sequence are properly aligned
+        let timestamps = Array(timerangeDt)
+        for timestamp in timestamps {
+            let minute = timestamp.minute
+            #expect(minute % 15 == 0, "All timestamps should be aligned to 15-minute boundaries, got \(timestamp.iso8601_YYYY_MM_dd_HH_mm)")
+        }
+    }
+
     @Test func parseApiParamsGET() async throws {
         try await withApp { app in
             let url = URI(string: "/forecast?latitude=52.52&longitude=13.41&timezone=auto")
