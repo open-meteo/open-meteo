@@ -121,7 +121,7 @@ struct KnmiDownload: AsyncCommand {
             let inMemoryAccumulated = VariablePerMemberStorage<KnmiSurfaceVariable>()
             let windSpeedCalculator = WindSpeedCalculator<KnmiSurfaceVariable>(trueNorth: trueNorth)
             let windSpeedCalculatorPressure = WindSpeedCalculator<KnmiPressureVariable>(trueNorth: trueNorth)
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+            let writerMultistep = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
 
             // process sequentialy, as precipitation need to be in order for deaveraging
             try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
@@ -147,7 +147,7 @@ struct KnmiDownload: AsyncCommand {
                 /// NOTE: KNMI does not seem to set this field. Only way to decode member number would be file name which is not accessible while streaming
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
-                let writer = try await writer.getWriter(time: timestamp)
+                let writer = try await writerMultistep.getWriter(time: timestamp)
 
                 /// NL nest has 100,200,300 hPa levels.... not sure what the point is with those levels
                 if domain == .harmonie_arome_netherlands && typeOfLevel == "isobaricInhPa" {
@@ -292,7 +292,7 @@ struct KnmiDownload: AsyncCommand {
                         }
                         let count = await inMemoryAccumulated.data.count
                         logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
-                        try await writer.write(member: member, variable: variable, data: data.data)
+                        try await writerMultistep.write(time: time, member: member, variable: variable, data: data.data)
                     }
                     return
                 }
@@ -303,7 +303,7 @@ struct KnmiDownload: AsyncCommand {
             if generateElevationFile {
                 try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
             }
-            return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+            return try await writerMultistep.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles
