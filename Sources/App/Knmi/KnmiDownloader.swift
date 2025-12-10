@@ -47,11 +47,11 @@ struct KnmiDownload: AsyncCommand {
         case landmask
         case elevation
 
-        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> Self? {
-            switch (shortName, typeOfLevel, levelStr) {
-            case ("z", "heightAboveGround", "0"):
+        static func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String, indicatorOfParameter: Int) -> Self? {
+            switch (indicatorOfParameter, typeOfLevel, levelStr) {
+            case (6, "heightAboveGround", "0"):
                 return .elevation
-            case ("lsm", "heightAboveGround", "0"):
+            case (81, "heightAboveGround", "0"):
                 return .landmask
             default:
                 return nil
@@ -115,17 +115,19 @@ struct KnmiDownload: AsyncCommand {
         }
 
         let handles = try await curl.withGribStream(url: metaData.temporaryDownloadUrl, bzip2Decode: false) { stream in
-            let previous = GribDeaverager()
+            let deaverager = GribDeaverager()
             let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
+            /// Single GRIB files contains multiple time-steps in mixed order
+            let inMemoryAccumulated = VariablePerMemberStorage<KnmiSurfaceVariable>()
             let windSpeedCalculator = WindSpeedCalculator<KnmiSurfaceVariable>(trueNorth: trueNorth)
             let windSpeedCalculatorPressure = WindSpeedCalculator<KnmiPressureVariable>(trueNorth: trueNorth)
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+            let writerMultistep = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
 
             // process sequentialy, as precipitation need to be in order for deaveraging
             try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName"),
-                      var stepRange = message.get(attribute: "stepRange"),
-                      var stepType = message.get(attribute: "stepType"),
+                      let stepRange = message.get(attribute: "stepRange"),
+                      let stepType = message.get(attribute: "stepType"),
                       let levelStr = message.get(attribute: "level"),
                       let typeOfLevel = message.get(attribute: "typeOfLevel"),
                       let parameterName = message.get(attribute: "parameterName"),
@@ -133,7 +135,9 @@ struct KnmiDownload: AsyncCommand {
                       let validityTime = message.get(attribute: "validityTime"),
                       let validityDate = message.get(attribute: "validityDate"),
                       let unit = message.get(attribute: "units"),
-                      let paramId = message.getLong(attribute: "paramId")
+                      let paramId = message.getLong(attribute: "paramId"),
+                      /// GRIB1 paramId
+                      let indicatorOfParameter = message.getLong(attribute: "indicatorOfParameter")
                       // let parameterCategory = message.getLong(attribute: "parameterCategory"),
                       // let parameterNumber = message.getLong(attribute: "parameterNumber")
                 else {
@@ -143,20 +147,20 @@ struct KnmiDownload: AsyncCommand {
                 /// NOTE: KNMI does not seem to set this field. Only way to decode member number would be file name which is not accessible while streaming
                 let member = message.getLong(attribute: "perturbationNumber") ?? 0
                 let timestamp = try Timestamp.from(yyyymmdd: "\(validityDate)\(Int(validityTime)!.zeroPadded(len: 4))")
-                let writer = try await writer.getWriter(time: timestamp)
+                let writer = try await writerMultistep.getWriter(time: timestamp)
 
                 /// NL nest has 100,200,300 hPa levels.... not sure what the point is with those levels
                 if domain == .harmonie_arome_netherlands && typeOfLevel == "isobaricInhPa" {
                     return
                 }
 
-                if ["rain", "tsnowp"].contains(shortName) && stepType == "instant" {
+                if [181, 184].contains(indicatorOfParameter) && stepType == "instant" {
                     // Rain and snow snowfall are twice inside the GRIB file.
                     // One instant and accumulation. Make sure to only use accumulation
                     return
                 }
                 
-                switch shortName {
+                switch indicatorOfParameter {
                 /*case "10u":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_speed_10m, outDirection: .wind_direction_10m, writer: writer)
@@ -169,13 +173,13 @@ struct KnmiDownload: AsyncCommand {
                 case "100v":
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_speed_100m, outDirection: .wind_direction_100m, writer: writer)*/
-                case "ugst":
+                case 162:
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     return try await windSpeedCalculator.ingest(.u(array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
-                case "vgst":
+                case 163:
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     return try await windSpeedCalculator.ingest(.v(array), member: member, outSpeed: .wind_gusts_10m, outDirection: nil, writer: writer)
-                case "u":
+                case 33:
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     let level = Int(levelStr)!
                     if typeOfLevel == "heightAboveGround" {
@@ -194,9 +198,9 @@ struct KnmiDownload: AsyncCommand {
                             logger.info("Level not defined for wind speed: \(levelStr)")
                         }
                     } else {
-                        return try await windSpeedCalculatorPressure.ingest(.u(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                        return try await windSpeedCalculatorPressure.ingest(.u(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_direction, level: level), writer: writer)
                     }
-                case "v":
+                case 34:
                     let array = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false).array
                     let level = Int(levelStr)!
                     if typeOfLevel == "heightAboveGround" {
@@ -215,21 +219,21 @@ struct KnmiDownload: AsyncCommand {
                             logger.info("Level not defined for wind speed: \(levelStr)")
                         }
                     } else {
-                        return try await windSpeedCalculatorPressure.ingest(.v(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_speed, level: level), writer: writer)
+                        return try await windSpeedCalculatorPressure.ingest(.v(array), member: member, outSpeed: .init(variable: .wind_speed, level: level), outDirection: .init(variable: .wind_direction, level: level), writer: writer)
                     }
                 default:
                     break
                 }
 
-                if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) {
+                if let temporary = KnmiVariableTemporary.getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel, indicatorOfParameter: indicatorOfParameter) {
                     if !generateElevationFile && [KnmiVariableTemporary.elevation, .landmask].contains(temporary) {
                         return
                     }
                     logger.info("Keep in memory: \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                     var grib2d = GribArray2D(nx: nx, ny: ny)
                     try grib2d.load(message: message)
-                    switch unit {
-                    case "m**2 s**-2": // gph to metre
+                    switch indicatorOfParameter {
+                    case 6: // gph to metre
                         grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
                     default:
                         break
@@ -238,16 +242,13 @@ struct KnmiDownload: AsyncCommand {
                     return
                 }
 
-                guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
-                    logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
+                guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel, indicatorOfParameter: indicatorOfParameter) else {
+                    let table2Version = message.getLong(attribute: "table2Version") ?? 0
+                    let levelType = message.get(attribute: "levelType") ?? "-"
+                    let centre = message.get(attribute: "centre") ?? "-"
+                    let edition = message.get(attribute: "edition") ?? "-"
+                    logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member) indicatorOfParameter=\(indicatorOfParameter) table2Version=\(table2Version) levelType=\(levelType) centre=\(centre) edition=\(edition)")
                     return
-                }
-                
-                if domain == .harmonie_arome_europe, let variable = variable as? KnmiSurfaceVariable, variable == .shortwave_radiation {
-                    /// 2025-12-10: Shortwave radiation was accumulated, but wrong GRIB meta attributes
-                    let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
-                    stepType = "accum"
-                    stepRange = "0-\(hour)"
                 }
 
                 if stepType == "accum" && timestamp == run {
@@ -260,40 +261,55 @@ struct KnmiDownload: AsyncCommand {
 
                 // try message.debugGrid(grid: domain.grid, flipLatidude: false, shift180Longitude: false)
 
-                switch unit {
-                case "K":
+                switch indicatorOfParameter {
+                case 11: // temperature
                     grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
-                case "m**2 s**-2": // gph to metre
+                case 6: // gph to metre
                     grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                case "(0 - 1)", "(0-1)":
+                case 73, 74, 75: // low/mid/high clouds (but not total!)
                     if variable.unit == .percentage {
                         grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
                     }
-                case "Pa":
+                case 2: // pressure
                     grib2d.array.data.multiplyAdd(multiply: 1 / 100, add: 0) // to hPa
-                case "J m**-2":
+                case 117: // shortwave radiation
                     grib2d.array.data.multiplyAdd(multiply: 1 / 3600, add: 0) // to W/m2
                 default:
                     break
                 }
-
-                // Deaccumulate precipitation
-                guard await previous.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                
+                if stepType == "accum", let variable: KnmiSurfaceVariable = variable as? KnmiSurfaceVariable {
+                    // Collect all accumulated variables and process them as soon as they are in sequential order
+                    await inMemoryAccumulated.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    while true {
+                        let step = (await deaverager.lastStep(variable, member) ?? 0) + domain.dtHours
+                        let time = run.add(hours: step)
+                        guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
+                            break
+                        }
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &data) else {
+                            continue
+                        }
+                        let count = await inMemoryAccumulated.data.count
+                        logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                        try await writerMultistep.write(time: time, member: member, variable: variable, data: data.data)
+                    }
                     return
                 }
+
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
 
             if generateElevationFile {
                 try await inMemory.generateElevationFile(elevation: .elevation, landmask: .landmask, domain: domain)
             }
-            return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+            return try await writerMultistep.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
         }
         await curl.printStatistics()
         return handles
     }
 
-    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String) -> GenericVariable? {
+    func getVariable(shortName: String, levelStr: String, parameterName: String, typeOfLevel: String, indicatorOfParameter: Int) -> GenericVariable? {
         if typeOfLevel == "isobaricInhPa" {
             guard let level = Int(levelStr) else {
                 fatalError("Could not parse level str \(levelStr)")
@@ -301,74 +317,70 @@ struct KnmiDownload: AsyncCommand {
             if level < 10 {
                 return nil
             }
-            switch shortName {
-            case "t":
+            switch indicatorOfParameter {
+            case 11:
                 return KnmiPressureVariable(variable: .temperature, level: level)
             /*case "u": Wind is converted in a separate step to speed and direction with true north correction
                 return KnmiPressureVariable(variable: .wind_u_component, level: level)
             case "v":
                 return KnmiPressureVariable(variable: .wind_v_component, level: level)*/
-            case "r":
+            case 52:
                 return KnmiPressureVariable(variable: .relative_humidity, level: level)
-            case "z":
+            case 6:
                 return KnmiPressureVariable(variable: .geopotential_height, level: level)
             default:
                 break
             }
         }
 
-        switch (shortName, typeOfLevel, levelStr) {
-        case ("vis", "heightAboveGround", "0"):
+        switch (indicatorOfParameter, typeOfLevel, levelStr) {
+        case (20, "heightAboveGround", "0"):
             return KnmiSurfaceVariable.visibility
-        case ("t", "heightAboveGround", "0"):
+        case (11, "heightAboveGround", "0"):
             return KnmiSurfaceVariable.surface_temperature
-        case ("t", "heightAboveGround", "2"):
+        case (11, "heightAboveGround", "2"):
             return KnmiSurfaceVariable.temperature_2m
-        case ("r", "heightAboveGround", "2"):
+        case (52, "heightAboveGround", "2"):
             return KnmiSurfaceVariable.relative_humidity_2m
-        case ("pres", "heightAboveSea", "0"):
+        case (2, "heightAboveSea", "0"):
             return KnmiSurfaceVariable.pressure_msl
-        case ("t", "heightAboveGround", "50"):
+        case (11, "heightAboveGround", "50"):
             return KnmiSurfaceVariable.temperature_50m
-        case ("t", "heightAboveGround", "100"):
+        case (11, "heightAboveGround", "100"):
             return KnmiSurfaceVariable.temperature_100m
-        case ("t", "heightAboveGround", "200"):
+        case (11, "heightAboveGround", "200"):
             return KnmiSurfaceVariable.temperature_200m
-        case ("t", "heightAboveGround", "300"):
+        case (11, "heightAboveGround", "300"):
             return KnmiSurfaceVariable.temperature_300m
-        case ("sdwe", "heightAboveGround", "0"):
+        case (65, "heightAboveGround", "0"):
             return KnmiSurfaceVariable.snow_depth_water_equivalent
         default:
             break
         }
 
-        switch (shortName, levelStr) {
-        case ("rain", "0"):
+        switch (indicatorOfParameter, levelStr) {
+        case (181, "0"):
             return KnmiSurfaceVariable.rain
-        case ("tp", "0"):
+        case (61, "0"):
             return KnmiSurfaceVariable.precipitation
-        case ("snow", "0"):
+        case (184, "0"):
             return KnmiSurfaceVariable.snowfall_water_equivalent
-        case ("2t", "2"):
+        case (11, "2"):
             return KnmiSurfaceVariable.temperature_2m
-        case ("2r", "2"):
+        case (52, "2"):
             return KnmiSurfaceVariable.relative_humidity_2m
-        case ("prmsl", "0"):
+        case (1, "0"):
               return KnmiSurfaceVariable.pressure_msl
-        case ("clct", "0"):
-              return KnmiSurfaceVariable.cloud_cover
-        case ("grad", "0"):
+        case (117, "0"):
             return KnmiSurfaceVariable.shortwave_radiation
-        case ("tcc", "0"):
+        case (71, "0"):
             return KnmiSurfaceVariable.cloud_cover
-        case ("lcc", "0"):
+        case (73, "0"):
             return KnmiSurfaceVariable.cloud_cover_low
-        case ("mcc", "0"):
+        case (74, "0"):
             return KnmiSurfaceVariable.cloud_cover_mid
-        case ("hcc", "0"):
+        case (75, "0"):
             return KnmiSurfaceVariable.cloud_cover_high
-        case ("tsnowp", "0"):
-            return KnmiSurfaceVariable.snowfall_water_equivalent
         default: return nil
         }
     }
