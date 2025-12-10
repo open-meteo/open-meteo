@@ -115,8 +115,10 @@ struct KnmiDownload: AsyncCommand {
         }
 
         let handles = try await curl.withGribStream(url: metaData.temporaryDownloadUrl, bzip2Decode: false) { stream in
-            let previous = GribDeaverager()
+            let deaverager = GribDeaverager()
             let inMemory = VariablePerMemberStorage<KnmiVariableTemporary>()
+            /// Single GRIB files contains multiple time-steps in mixed order
+            let inMemoryAccumulated = VariablePerMemberStorage<KnmiSurfaceVariable>()
             let windSpeedCalculator = WindSpeedCalculator<KnmiSurfaceVariable>(trueNorth: trueNorth)
             let windSpeedCalculatorPressure = WindSpeedCalculator<KnmiPressureVariable>(trueNorth: trueNorth)
             let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
@@ -275,11 +277,26 @@ struct KnmiDownload: AsyncCommand {
                 default:
                     break
                 }
-
-                // Deaccumulate precipitation
-                guard await previous.deaccumulateIfRequired(variable: "\(variable)", member: 0, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
+                
+                if stepType == "accum", let variable: KnmiSurfaceVariable = variable as? KnmiSurfaceVariable {
+                    // Collect all accumulated variables and process them as soon as they are in sequential order
+                    await inMemoryAccumulated.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                    while true {
+                        let step = (await deaverager.lastStep(variable, member) ?? 0) + domain.dtHours
+                        let time = run.add(hours: step)
+                        guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
+                            break
+                        }
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(step)", array2d: &data) else {
+                            continue
+                        }
+                        let count = await inMemoryAccumulated.data.count
+                        logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                        try await writer.write(member: member, variable: variable, data: data.data)
+                    }
                     return
                 }
+
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
 
