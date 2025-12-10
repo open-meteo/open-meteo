@@ -124,8 +124,8 @@ struct KnmiDownload: AsyncCommand {
             // process sequentialy, as precipitation need to be in order for deaveraging
             try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
                 guard let shortName = message.get(attribute: "shortName"),
-                      let stepRange = message.get(attribute: "stepRange"),
-                      let stepType = message.get(attribute: "stepType"),
+                      var stepRange = message.get(attribute: "stepRange"),
+                      var stepType = message.get(attribute: "stepType"),
                       let levelStr = message.get(attribute: "level"),
                       let typeOfLevel = message.get(attribute: "typeOfLevel"),
                       let parameterName = message.get(attribute: "parameterName"),
@@ -241,6 +241,13 @@ struct KnmiDownload: AsyncCommand {
                 guard let variable = getVariable(shortName: shortName, levelStr: levelStr, parameterName: parameterName, typeOfLevel: typeOfLevel) else {
                     logger.warning("Unmapped GRIB message \(shortName) level=\(levelStr) [\(typeOfLevel)] \(stepRange) \(stepType) '\(parameterName)' \(parameterUnits)  id=\(paramId) unit=\(unit) member=\(member)")
                     return
+                }
+                
+                if domain == .harmonie_arome_europe, let variable = variable as? KnmiSurfaceVariable, variable == .shortwave_radiation {
+                    /// 2025-12-10: Shortwave radiation was accumulated, but wrong GRIB meta attributes
+                    let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+                    stepType = "accum"
+                    stepRange = "0-\(hour)"
                 }
 
                 if stepType == "accum" && timestamp == run {
