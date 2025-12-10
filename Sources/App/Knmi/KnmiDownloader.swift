@@ -287,7 +287,7 @@ struct KnmiDownload: AsyncCommand {
                         guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
                             break
                         }
-                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(step)", array2d: &data) else {
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &data) else {
                             continue
                         }
                         let count = await inMemoryAccumulated.data.count
