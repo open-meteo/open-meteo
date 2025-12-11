@@ -98,6 +98,7 @@ enum DomainRegistry: String, CaseIterable {
 
     case jma_msm
     case jma_gsm
+    case jma_msm_upper_level
 
     case metno_nordic_pp
 
@@ -304,6 +305,8 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfSeasDomain.ec46_weekly
         case .jma_msm:
             return JmaDomain.msm
+        case .jma_msm_upper_level:
+            return JmaDomain.msm_upper_level
         case .ncep_cfsv2:
             return nil
         case .metno_nordic_pp:

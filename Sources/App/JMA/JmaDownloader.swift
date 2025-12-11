@@ -97,6 +97,14 @@ struct JmaDownload: AsyncCommand {
             filesToDownload = range.map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_Lsurf_FH\(hour)_grib2.bin"
             }
+        case .msm_upper_level:
+            // 0 und 12z run have more data
+            let runc = run.toComponents()
+            let after2022july = (runc.year >= 2022 && runc.month >= 7) || runc.year >= 2023
+            let range = (run.hour % 12 == 0 && after2022july) ? ["00-15", "18-33", "36-39", "42-51", "54-78"] : ["00-15", "18-33", "36-39"]
+            filesToDownload = range.map { hour in
+                "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_L-pall_FH\(hour)_grib2.bin"
+            }
         }
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
@@ -120,6 +128,7 @@ struct JmaDownload: AsyncCommand {
                     }
                     let timestamp = run.add(hours: hour)
                     var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                    //try message.debugGrid(grid: domain.grid, flipLatidude: true, shift180Longitude: false)
                     try grib2d.load(message: message)
                     if domain.isGlobal {
                         grib2d.array.shift180LongitudeAndFlipLatitude()
@@ -464,6 +473,7 @@ typealias JmaVariable = SurfaceAndPressureVariable<JmaSurfaceVariable, JmaPressu
 enum JmaDomain: String, GenericDomain, CaseIterable {
     case gsm
     case msm
+    case msm_upper_level
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -471,6 +481,8 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             return .jma_gsm
         case .msm:
             return .jma_msm
+        case .msm_upper_level:
+            return .jma_msm_upper_level
         }
     }
 
@@ -491,10 +503,14 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
     }
 
     var dtSeconds: Int {
-        if self == .gsm {
+        switch self {
+        case .gsm:
             return 6 * 3600
+        case .msm:
+            return 3600
+        case .msm_upper_level:
+            return 3 * 3600
         }
-        return 3600
     }
     var isGlobal: Bool {
         return self == .gsm
@@ -504,7 +520,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .gsm:
             return 6 * 3600
-        case .msm:
+        case .msm, .msm_upper_level:
             return 3 * 3600
         }
     }
@@ -517,7 +533,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             // First hours 3.5 h delay, second part 6.5 h delay
             // every 6 hours
             return t.add(-6 * 3600).floor(toNearest: 6 * 3600)
-        case .msm:
+        case .msm, .msm_upper_level:
             // Delay of 2-3 hours to init
             // every 3 hours
             return t.add(-2 * 3600).floor(toNearest: 3 * 3600)
@@ -536,7 +552,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             }
             let through = hour == 00 || hour == 12 ? 264 : 136
             return Array(stride(from: 0, through: through, by: 6))
-        case .msm:
+        case .msm, .msm_upper_level:
             let through = hour == 00 || hour == 12 ? 78 : 39
             return Array(stride(from: 0, through: through, by: 1))
         }
@@ -549,6 +565,8 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             return [1000, 925, 850, 700, 500, 400, 300, 250, 200, 150, 100]
         case .msm:
             return []
+        case .msm_upper_level:
+            return [1000, 975, 950, 529, 900, 850, 800, 700, 600, 500, 400, 250, 200, 150, 100]
         }
     }
 
@@ -558,6 +576,8 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             return 110
         case .msm:
             return 78 + 36
+        case .msm_upper_level:
+            return 80
         }
     }
 
@@ -567,6 +587,8 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .msm:
             return RegularGrid(nx: 481, ny: 505, latMin: 22.4, lonMin: 120, dx: 0.0625, dy: 0.05)
+        case .msm_upper_level:
+            return RegularGrid(nx: 241, ny: 253, latMin: 22.4, lonMin: 120, dx: 0.125, dy: 0.1)
         }
     }
 }
