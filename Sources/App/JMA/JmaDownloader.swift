@@ -566,7 +566,7 @@ enum JmaDomain: String, GenericDomain, CaseIterable {
         case .msm:
             return []
         case .msm_upper_level:
-            return [1000, 975, 950, 529, 900, 850, 800, 700, 600, 500, 400, 250, 200, 150, 100]
+            return [1000, 975, 950, 529, 900, 850, 800, 700, 600, 500, 400, 300, 250, 200, 150, 100]
         }
     }
 
