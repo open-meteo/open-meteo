@@ -266,7 +266,7 @@ struct KnmiDownload: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                 case 6: // gph to metre
                     grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                case 73, 74, 75: // low/mid/high clouds (but not total!)
+                case 73, 74, 75, 52: // low/mid/high clouds (but not total!) and RH
                     if variable.unit == .percentage {
                         grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
                     }
