@@ -26,6 +26,33 @@ import VaporTesting
             #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
             #expect(aa.distances.isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
             
+            let centerbb = grid.findPointXY(lat: 50.781, lon: 1.596)
+            let bb = try await grid.getSurroundingGridpoints(centerY: centerbb.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile)
+            #expect(bb.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            for p in bb.gridpoints {
+                let c = grid.getCoordinates(gridpoint: p)
+                //print("\(c.latitude), \(c.longitude)")
+                print("""
+{
+      "type": "Feature",
+      "properties": {},
+      "geometry": {
+        "coordinates": [
+                        \(c.longitude),
+            \(c.latitude)
+        ],
+        "type": "Point"
+      }
+    },
+""")
+            }
+            #expect(bb.elevations == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
+            #expect(bb.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            
+            
+            let bbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile))
+            #expect(bbb.gridpoint == 630534)
+            
             let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
             #expect(a.gridpoint == 543884)
             
