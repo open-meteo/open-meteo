@@ -53,6 +53,7 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
     case cape
     case visibility
     case freezing_level_height
+    case snow_depth_water_equivalent
 
     var storePreviousForecast: Bool {
         switch self {
@@ -113,6 +114,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return 0.1 // zero height 10 metre resolution
         case .cloud_top, .cloud_base:
             return 0.05 // 20 metre
+        case .snow_depth_water_equivalent:
+            return 1 // 1mm res
         }
     }
 
@@ -150,6 +153,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .hermite(bounds: 0...10e9)
         case .cloud_top, .cloud_base:
             return .hermite(bounds: 0...10e9)
+        case .snow_depth_water_equivalent:
+            return .linear
         }
     }
 
@@ -187,6 +192,8 @@ enum DmiSurfaceVariable: String, CaseIterable, GenericVariable, GenericVariableM
             return .metrePerSecond
         case .cloud_top, .cloud_base:
             return .metre
+        case .snow_depth_water_equivalent:
+            return .millimetre
         }
     }
 

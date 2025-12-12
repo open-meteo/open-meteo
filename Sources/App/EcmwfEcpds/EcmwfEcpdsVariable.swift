@@ -48,6 +48,14 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     //case sea_surface_temperature
     case boundary_layer_height
     case snow_density
+    
+    case ocean_u_current
+    case ocean_v_current
+    
+    case sea_ice_thickness
+    case sea_level_height_msl
+    
+    case lightning_density
 
     var omFileName: (file: String, level: Int) {
         return (rawValue, 0)
@@ -90,6 +98,14 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .albedo: return 1
         case .k_index: return 100
         case .snow_density: return 10
+        case .ocean_u_current, .ocean_v_current:
+            return 20 // 0.05 ms (~0.1 knots)
+        case .sea_ice_thickness:
+            return 100 // 1cm res
+        case .sea_level_height_msl:
+            return 100 // 1cm res
+        case .lightning_density:
+            return 10 // range 0-500
         }
     }
 
@@ -165,6 +181,14 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .linear
         case .snow_density:
             return .hermite(bounds: nil)
+        case .ocean_u_current, .ocean_v_current:
+            return .hermite(bounds: nil)
+        case .sea_ice_thickness:
+            return .hermite(bounds: 0...10e9)
+        case .sea_level_height_msl:
+            return .hermite(bounds: nil)
+        case .lightning_density:
+            return .hermite(bounds: 0...10e9)
         }
     }
 
@@ -266,6 +290,15 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .albedo: return .percentage
         case .k_index: return .dimensionless
         case .snow_density: return .kilogramPerCubicMetre
+        case .ocean_u_current, .ocean_v_current:
+            return .metrePerSecond
+        case .sea_ice_thickness:
+            return .metre
+        case .sea_level_height_msl:
+            return .metre
+        case .lightning_density:
+            // Add unit "strikes per 100 km2 per hour"
+            return .dimensionless
         }
     }
 
@@ -378,6 +411,16 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "rsn"
         case .boundary_layer_height:
             return "blh"
+        case .ocean_u_current:
+            return "ocu" // east wards
+        case .ocean_v_current:
+            return "ocv" // north wards
+        case .sea_ice_thickness:
+            return "sithick"
+        case .sea_level_height_msl:
+            return "zos"
+        case .lightning_density:
+            return "litota1,litota3,litota6"
         }
     }
     

@@ -69,6 +69,8 @@ enum EcmwfEcdpsIfsVariableDerived: String, GenericVariableMixable {
     case soil_moisture_index_0_to_100cm
     
     case snow_depth_water_equivalent
+    case ocean_current_velocity
+    case ocean_current_direction
 }
 
 
@@ -346,6 +348,18 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
             let depth = try await get(raw: .snow_depth, time: time)
             let density = try await get(raw: .snow_density, time: time)
             return DataAndUnit(zip(depth.data, density.data).map({$0*$1}), .millimetre)
+        case .ocean_current_velocity:
+            let u = try await get(raw: .ocean_u_current, time: time).data
+            let v = try await get(raw: .ocean_v_current, time: time).data
+            let speed = zip(u, v).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .ocean_current_direction:
+            let u = try await get(raw: .ocean_u_current, time: time).data
+            let v = try await get(raw: .ocean_v_current, time: time).data
+            let direction = Meteorology.windirectionFast(u: u, v: v).map {
+                ($0 + 180).truncatingRemainder(dividingBy: 360)
+            }
+            return DataAndUnit(direction, .degreeDirection)
         }
     }
 
@@ -454,6 +468,9 @@ struct EcmwfEcpdsReader: GenericReaderDerived, GenericReaderProtocol {
         case .snow_depth_water_equivalent:
             try await prefetchData(raw: .snow_density, time: time)
             try await prefetchData(raw: .snow_depth, time: time)
+        case .ocean_current_direction, .ocean_current_velocity:
+            try await prefetchData(raw: .ocean_u_current, time: time)
+            try await prefetchData(raw: .ocean_v_current, time: time)
         }
     }
 }

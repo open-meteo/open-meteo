@@ -537,6 +537,18 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             }
             let soilMoisture = try await get(derived: .soil_moisture_0_to_100cm, time: time)
             return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+        case .ocean_current_velocity:
+            let u = try await get(raw: .ocean_u_current, time: time).data
+            let v = try await get(raw: .ocean_v_current, time: time).data
+            let speed = zip(u, v).map(Meteorology.windspeed)
+            return DataAndUnit(speed, .metrePerSecond)
+        case .ocean_current_direction:
+            let u = try await get(raw: .ocean_u_current, time: time).data
+            let v = try await get(raw: .ocean_v_current, time: time).data
+            let direction = Meteorology.windirectionFast(u: u, v: v).map {
+                ($0 + 180).truncatingRemainder(dividingBy: 360)
+            }
+            return DataAndUnit(direction, .degreeDirection)
         }
     }
 
@@ -814,6 +826,9 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(derived: .soil_moisture_0_to_100cm, time: time)
         case .sunshine_duration:
             try await prefetchData(derived: .direct_radiation, time: time)
+        case .ocean_current_direction, .ocean_current_velocity:
+            try await prefetchData(raw: .ocean_u_current, time: time)
+            try await prefetchData(raw: .ocean_v_current, time: time)
         }
     }
 }

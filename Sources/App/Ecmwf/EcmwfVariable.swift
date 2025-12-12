@@ -954,4 +954,7 @@ enum EcmwfVariableDerived: String, GenericVariableMixable {
     case soil_moisture_index_28_to_100cm
     case soil_moisture_index_100_to_255cm
     case soil_moisture_index_0_to_100cm
+    
+    case ocean_current_velocity
+    case ocean_current_direction
 }

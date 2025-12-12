@@ -247,7 +247,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                     continue
                 }*/
                 
-                let file = "\(package)_\(run.format_YYYYMMdd)T000000Z_\(monthYYYYMM)_m\((month+1).zeroPadded(len: 2)).bz2"
+                let file = "\(package)_\(run.format_YYYYMMdd)T000000Z_\(monthYYYYMM)_M\((month+1).zeroPadded(len: 2)).bz2"
                 //let file = "A\(package)L\(runMonth.zeroPadded(len: 2))010000\(monthToDownload.zeroPadded(len: 2))______1"
                 let url = "\(server)\(file)"
                 

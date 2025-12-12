@@ -267,6 +267,10 @@ struct DmiDownload: AsyncCommand {
             return DmiSurfaceVariable.cloud_base
         case "Cloud top":
             return DmiSurfaceVariable.cloud_top
+        case "Direct solar exposure":
+            return DmiSurfaceVariable.direct_radiation
+        case "Total snowfall rate water equivalent":
+            return DmiSurfaceVariable.snowfall_water_equivalent
         default:
             break
         }
@@ -349,6 +353,8 @@ struct DmiDownload: AsyncCommand {
         }
 
         switch (shortName, levelStr) {
+        case ("sd", "0"):
+            return DmiSurfaceVariable.snow_depth_water_equivalent
         case ("rain", "0"):
             return DmiSurfaceVariable.precipitation
         case ("tsrwe", "0"):

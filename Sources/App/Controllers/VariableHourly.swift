@@ -327,6 +327,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case ocean_current_direction
     case sea_level_height_msl
     case invert_barometer_height
+    case lightning_density
+    case sea_ice_thickness
 
 
     /// Some variables are kept for backwards compatibility

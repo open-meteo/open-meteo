@@ -177,7 +177,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 //let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                 
-                guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode == shortName}) else {
+                guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode.split(separator: ",").contains(where: { $0 == shortName})}) else {
                     logger.warning("Could not map variable \(shortName)")
                     return
                 }
@@ -309,7 +309,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     return
                 }
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
-                guard let variable = EcmwfEcdpsWamVariable.allCases.first(where: {$0.gribCode == shortName}) else {
+                guard let variable = EcmwfEcdpsWamVariable.allCases.first(where: {$0.gribCode.split(separator: ",").contains(where: { $0 == shortName})}) else {
                     logger.warning("Could not map variable \(shortName)")
                     return
                 }
