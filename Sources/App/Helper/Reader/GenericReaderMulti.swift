@@ -107,7 +107,7 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
         reader.last?.targetElevation ?? .nan
     }
     var modelDtSeconds: Int {
-        reader.first?.modelDtSeconds ?? 3600
+        reader.last?.modelDtSeconds ?? 3600
     }
     var modelElevation: ElevationOrSea {
         reader.last?.modelElevation ?? .noData
