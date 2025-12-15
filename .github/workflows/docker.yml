@@ -89,7 +89,7 @@ jobs:
           touch "/tmp/digests2/${digest#sha256:}" 
       -
         name: Upload digest
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: digests-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests/*
@@ -97,7 +97,7 @@ jobs:
           retention-days: 1
       -
         name: Upload digest2
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: digests2-${{ env.PLATFORM_PAIR }}
           path: /tmp/digests2/*
