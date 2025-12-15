@@ -8,7 +8,7 @@ struct DemController {
             let longitude = params.longitude
 
             guard latitude.count == longitude.count else {
-                throw ForecastApiError.latitudeAndLongitudeSameCount
+                throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
             }
             guard !latitude.isEmpty else {
                 throw ForecastApiError.latitudeAndLongitudeNotEmpty

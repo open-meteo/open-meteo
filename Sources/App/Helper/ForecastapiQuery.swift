@@ -359,7 +359,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
             }
         }
         guard timezone.count == coordinates.count else {
-            throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
+            throw ForecastApiError.coordinatesAndTimezoneCountMustBeTheSame
         }
         return try zip(coordinates, timezone).map {
             ($0, try $1.resolve(coordinate: $0))
@@ -544,10 +544,10 @@ enum ForecastApiError: Error {
     case timezoneNotSupported
     case noDataAvailableForThisLocation
     case parameterNotAllowedWithStartEndRange(parameter: String)
-    case latitudeAndLongitudeSameCount
     case latitudeAndLongitudeNotEmpty
     case latitudeAndLongitudeMaximum(max: Int)
     case latitudeAndLongitudeCountMustBeTheSame
+    case coordinatesAndTimezoneCountMustBeTheSame
     case locationIdCountMustBeTheSame
     case startAndEndDateCountMustBeTheSame
     case coordinatesAndStartEndDatesCountMustBeTheSame
@@ -585,14 +585,14 @@ extension ForecastApiError: AbortError {
             return "Parameter '\(parameter)' is mutually exclusive with 'start_date' and 'end_date'"
         case .timezoneNotSupported:
             return "This API does not yet support timezones"
-        case .latitudeAndLongitudeSameCount:
-            return "Parameter 'latitude' and 'longitude' must have the same amount of elements"
         case .latitudeAndLongitudeNotEmpty:
             return "Parameter 'latitude' and 'longitude' must not be empty"
         case .latitudeAndLongitudeMaximum(max: let max):
             return "Parameter 'latitude' and 'longitude' must not exceed \(max) coordinates."
         case .latitudeAndLongitudeCountMustBeTheSame:
             return "Parameter 'latitude' and 'longitude' must have the same number of elements"
+        case .coordinatesAndTimezoneCountMustBeTheSame:
+            return "Parameter 'timezone' and coordinates must have the same number of elements"
         case .locationIdCountMustBeTheSame:
             return "Parameter 'location_id' and coordinates must have the same number of elements"
         case .noDataAvailableForThisLocation:
