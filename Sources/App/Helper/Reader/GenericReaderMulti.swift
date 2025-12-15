@@ -15,7 +15,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
         reader.last?.targetElevation ?? .nan
     }
     var modelDtSeconds: Int {
-        reader.first?.modelDtSeconds ?? 3600
+        reader.last?.modelDtSeconds ?? 3600
     }
     var modelElevation: ElevationOrSea {
         reader.last?.modelElevation ?? .noData
@@ -24,7 +24,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
     public init(reader: [any GenericReaderProtocol]) {
         self.reader = reader
     }
-    
+
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
         return try await reader.first?.getStatic(type: type)
     }
@@ -34,7 +34,7 @@ struct GenericReaderMulti<Variable: GenericVariableMixable>: GenericReaderOption
             let _ = try await prefetchData(variable: variable, time: time)
         }
     }
-    
+
     func prefetchData(variable: Variable, time: TimerangeDtAndSettings) async throws -> Bool {
         for reader in reader {
             if try await reader.prefetchData(mixed: variable.rawValue, time: time) {
@@ -107,12 +107,12 @@ struct GenericReaderMultiSameType<Variable: GenericVariableMixable>: GenericRead
         reader.last?.targetElevation ?? .nan
     }
     var modelDtSeconds: Int {
-        reader.first?.modelDtSeconds ?? 3600
+        reader.last?.modelDtSeconds ?? 3600
     }
     var modelElevation: ElevationOrSea {
         reader.last?.modelElevation ?? .noData
     }
-    
+
     func getStatic(type: ReaderStaticVariable) async throws -> Float? {
         return try await reader.last?.getStatic(type: type)
     }
