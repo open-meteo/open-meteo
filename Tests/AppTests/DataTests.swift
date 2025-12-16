@@ -15,7 +15,7 @@ import VaporTesting
     
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridSeaMatch() async throws {
         try await withApp { app in
-            let elevationFile = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
             let grid = GaussianGrid(type: .o1280)
             // Longitude 0° wraps on x axis
             let center = grid.findPointXY(lat: 53.647546, lon: 0)
@@ -52,6 +52,21 @@ import VaporTesting
             
             let bbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile))
             #expect(bbb.gridpoint == 630534)
+            
+            // WAM only returns NaN for this grid cell, use corrected land-mask
+            let elevationFile2 = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let center2 = grid.findPointXY(lat: 50.781, lon: 1.596)
+            #expect(center.x == 0)
+            #expect(center.y == 516)
+            let aaa = try await grid.getSurroundingGridpoints(centerY: center2.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile2)
+            #expect(aaa.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(aaa.elevations.isSimilar([-999.0, -999.0, .nan, -999.0, .nan, .nan, -999.0, .nan, .nan]))
+            #expect(aaa.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            let bbbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile2))
+            #expect(bbbb.gridpoint == 628290)
+            let bResolved = grid.getCoordinates(gridpoint: 628290)
+            #expect(bResolved.latitude == 50.861156)
+            #expect(bResolved.longitude == 1.6042781)
             
             let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
             #expect(a.gridpoint == 543884)
