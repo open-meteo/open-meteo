@@ -63,13 +63,19 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         }
         logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
-        //try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
+        try await downloadEcmwfElevation(application: context.application, domain: domain, run: run)
         let handles = try await downloadEcmwf(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateTimeSeries: !signature.skipTimeseries)
     }
 
     /// Download elevation file
-    func downloadEcmwfElevation(application: Application, domain: EcmwfEcpdsDomain, server: String, run: Timestamp) async throws {
+    func downloadEcmwfElevation(application: Application, domain: EcmwfEcpdsDomain, run: Timestamp) async throws {
+        /*Manually generate land mask
+         let path = "/Users/patrick/Downloads/_mars-bol-webmars-private-svc-blue-000-7a527896970b09a4fc90fa37bf98d3ff-_kuWGj.grib"
+        try domain.surfaceElevationFileOm.createDirectory()
+        try DownloadEra5Command.processElevationLsmGrib(domain: domain, files: [path], createNetCdf: false)
+        fatalError("OK")*/
+        
         /*let logger = application.logger
         let surfaceElevationFileOm = domain.surfaceElevationFileOm
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm.getFilePath()) {

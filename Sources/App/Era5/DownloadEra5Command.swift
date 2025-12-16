@@ -302,7 +302,7 @@ struct DownloadEra5Command: AsyncCommand {
                     landmask = data
                 case "slt":
                     soilType = data
-                case "swh":
+                case "swh", "wind": // "wind" is used for WAM HRES
                     elevation = .init(repeating: .nan, count: data.count)
                     landmask = data.map { $0.isNaN ? 1 : 0 }
                 case "2t":
