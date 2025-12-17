@@ -38,6 +38,18 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 - Larger changes are announced in the [Open-Meteo Blog](https://openmeteo.substack.com)
 - The [Open-Meteo weather database](https://github.com/open-meteo/open-data) is redistributed as part of an AWS Open-Data Sponsorship
 
+## Repository Structure
+
+Open-Meteo consists of multiple repositories serving different purposes:
+
+- **This repository** ([open-meteo/open-meteo](https://github.com/open-meteo/open-meteo)) - Documentation, setup guides, and usage instructions
+- **API Server** ([open-meteo/open-meteo-api](https://github.com/open-meteo/open-meteo-api)) - Swift source code for the weather API server and download commands referenced in the [cronjobs documentation](/docs/cronjobs.md)
+- **Website** ([open-meteo/open-meteo-website](https://github.com/open-meteo/open-meteo-website)) - Source code for https://open-meteo.com
+- **Geocoding API** ([open-meteo/geocoding-api](https://github.com/open-meteo/geocoding-api)) - Geocoding service implementation
+- **Open Data** ([open-meteo/open-data](https://github.com/open-meteo/open-data)) - Weather database files and AWS distribution
+
+To run your own weather API server, refer to the [getting started guide](/docs/getting-started.md) in this repository and the [API server source code](https://github.com/open-meteo/open-meteo-api) for implementation details.
+
 ## Who is using Open-Meteo?
 
 Apps:
