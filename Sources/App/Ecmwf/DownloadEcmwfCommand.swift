@@ -443,7 +443,6 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 if shortName == "lsm" {
                     return
                 }
-                let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                 let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
 
                 guard let variable = variables.first(where: { variable in
