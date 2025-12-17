@@ -42,6 +42,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
         @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
         var uploadS3OnlyProbabilities: Bool
+        
+        @Flag(name: "download-full-grib-file", help: "Skip GRIB inventory and process entire file")
+        var downloadFullGribFile: Bool
     }
 
     var help: String {
@@ -73,7 +76,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
                 logger.info("Downloading domain ECMWF run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-                let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil)
+                let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: nil, downloadFullGribFile: signature.downloadFullGribFile)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
@@ -83,7 +86,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
         if !isWave {
             try await downloadEcmwfElevation(application: context.application, domain: domain, base: base, run: run)
         }
-        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = isWave ? try await downloadEcmwfWave(application: context.application, domain: domain, base: base, run: run, variables: waveVariables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile) : try await downloadEcmwf(application: context.application, domain: domain, base: base, run: run, variables: variables, concurrent: nConcurrent, maxForecastHour: signature.maxForecastHour, uploadS3Bucket: signature.uploadS3Bucket, downloadFullGribFile: signature.downloadFullGribFile)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
     }
 
@@ -101,7 +104,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
 
         logger.info("Downloading height and elevation data")
         let url = domain.getUrl(base: base, run: run, hour: 0)[0]
-        for try await message in try await curl.downloadEcmwfIndexed(url: url, concurrent: 1, isIncluded: { entry in
+        for try await message in try await curl.downloadEcmwfIndexed(url: url, concurrent: 1, downloadFullGribFile: false, isIncluded: { entry in
             guard entry.number == nil else {
                 // ignore ensemble members, only use control
                 return false
@@ -156,7 +159,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwf(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         // Retry unauthorized errors, because ECMWF servers randomly return this error code
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryUnauthorized: true)
@@ -195,7 +198,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             /// AIFS025 ensemble stores control and perturbed forecast in different files
             let urls = domain.getUrl(base: base, run: run, hour: hour)
             for url in urls {
-                try await curl.downloadEcmwfIndexed(url: url, concurrent: max(2, concurrent), isIncluded: { entry in
+                try await curl.downloadEcmwfIndexed(url: url, concurrent: max(2, concurrent), downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
                     return variables.contains(where: { variable in
                         if entry.param == "max_i10fg" && variable == .wind_gusts_10m {
                             return true
@@ -228,19 +231,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                     let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                     
                     guard let variable = EcmwfVariable.from(shortName: shortName, levelhPa: levelhPa) else {
-                        print(
-                            message.get(attribute: "name")!,
-                            message.get(attribute: "shortName")!,
-                            message.get(attribute: "level")!,
-                            message.get(attribute: "paramId")!
-                        )
-                        if message.get(attribute: "name") == "unknown" {
-                            message.iterate(namespace: .ls).forEach({ print($0) })
-                            message.iterate(namespace: .parameter).forEach({ print($0) })
-                            message.iterate(namespace: .mars).forEach({ print($0) })
-                            message.iterate(namespace: .all).forEach({ print($0) })
-                        }
-                        fatalError("Got unknown variable \(shortName) \(levelhPa)")
+                        let name = message.get(attribute: "name") ?? "-"
+                        let shortName = message.get(attribute: "shortName") ?? "-"
+                        let level = message.get(attribute: "level") ?? "-"
+                        let paramId = message.getLong(attribute: "paramId") ?? -1
+                        logger.debug("Got unknown variable \(shortName) id=\(paramId) level=\(level) '\(name)'")
+                        return
                     }
                     //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
                     /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
@@ -413,7 +409,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
     }
 
     /// Download ECMWF ifs open data
-    func downloadEcmwfWave(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEcmwfWave(application: Application, domain: EcmwfDomain, base: String, run: Timestamp, variables: [EcmwfWaveVariable], concurrent: Int, maxForecastHour: Int?, uploadS3Bucket: String?, downloadFullGribFile: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
         Process.alarm(seconds: 6 * 3600)
@@ -436,7 +432,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil)
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
-            try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, isIncluded: { entry in
+            try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in
                 return variables.contains(where: { variable in
                     return entry.param == variable.gribName
                 })
@@ -453,19 +449,12 @@ struct DownloadEcmwfCommand: AsyncCommand {
                 guard let variable = variables.first(where: { variable in
                     return shortName == variable.gribName
                 }) else {
-                    print(
-                        message.get(attribute: "name")!,
-                        message.get(attribute: "shortName")!,
-                        message.get(attribute: "level")!,
-                        message.get(attribute: "paramId")!
-                    )
-                    if message.get(attribute: "name") == "unknown" {
-                        message.iterate(namespace: .ls).forEach({ print($0) })
-                        message.iterate(namespace: .parameter).forEach({ print($0) })
-                        message.iterate(namespace: .mars).forEach({ print($0) })
-                        message.iterate(namespace: .all).forEach({ print($0) })
-                    }
-                    fatalError("Got unknown variable \(shortName) \(levelhPa)")
+                    let name = message.get(attribute: "name") ?? "-"
+                    let shortName = message.get(attribute: "shortName") ?? "-"
+                    let level = message.get(attribute: "level") ?? "-"
+                    let paramId = message.getLong(attribute: "paramId") ?? -1
+                    logger.debug("Got unknown variable \(shortName) id=\(paramId) level=\(level) '\(name)'")
+                    return
                 }
                 // logger.info("Processing \(variable)")
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
