@@ -139,7 +139,7 @@ extension VariablePerMemberStorage {
         try elevationFile.createDirectory()
         for i in elevation.indices {
             if elevation[i] >= 9000 {
-                fatalError("Elevation greater 90000")
+                fatalError("Elevation greater 9000")
             }
             if landMask[i] < 0.5 {
                 // mask sea

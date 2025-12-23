@@ -24,7 +24,7 @@ jobs:
       run: cp /usr/libexec/swift/linux/swift-backtrace-static ./swift-backtrace
     - name: Cache resolved dependencies
       id: cache-resolved-dependencies
-      uses: actions/cache@v4
+      uses: actions/cache@v5
       with:
         path: |
           .build

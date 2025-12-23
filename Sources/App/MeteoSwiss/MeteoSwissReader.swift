@@ -205,7 +205,7 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                 let snowfall_height = try await get(raw: .snowfall_height, time: time)
                 let elevation = reader.targetElevation
                 let snowfall = zip(snowfall_height.data, precipitation.data).map {
-                    $0 < elevation ? $1*0.7 : 0
+                    $0 < elevation ? $1*0.7 : ($1*0)
                 }
                 return DataAndUnit(snowfall, SiUnit.centimetre)
             case .rain:
@@ -213,7 +213,7 @@ struct MeteoSwissReader: GenericReaderDerived, GenericReaderProtocol {
                 let snowfall_height = try await get(raw: .snowfall_height, time: time)
                 let elevation = reader.targetElevation
                 let rain = zip(snowfall_height.data, precipitation.data).map {
-                    $0 < elevation ? 0 : $1
+                    $0 < elevation ? $0*0 : $1
                 }
                 return DataAndUnit(rain, SiUnit.millimetre)
             case .surface_pressure:

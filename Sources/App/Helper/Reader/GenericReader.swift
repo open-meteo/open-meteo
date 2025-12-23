@@ -174,46 +174,47 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
         try await omFileSplitter.willNeed(variable: variable.omFileName.file, location: position..<position + 1, level: time.ensembleMemberLevel, time: time.with(time: timeRead), logger: logger, httpClient: httpClient)
     }
 
-    /// Read and scale if required
-    private func readAndScale(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
-        var data = try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
-        
-        // TODO interpolate missing timesteps after 
-
-        /// Scale pascal to hecto pasal. Case in era5
-        if variable.unit == .pascal {
+    /// Read
+    private func readRaw(variable: Variable, time: TimerangeDtAndSettings) async throws -> [Float] {
+        return try await omFileSplitter.read(variable: variable, location: position..<position + 1, level: time.ensembleMemberLevel, time: time, logger: logger, httpClient: httpClient)
+    }
+    
+    /// Scale and apply elevation correction. Must be done after temporal interpolation to preserve scaling
+    private func scale(data: consuming [Float], isElevationCorrectable: Bool, unit: SiUnit) -> DataAndUnit {
+        if unit == .pascal {
             return DataAndUnit(data.map({ $0 / 100 }), .hectopascal)
         }
 
-        if variable.isElevationCorrectable && variable.unit == .celsius && !modelElevation.numeric.isNaN && !targetElevation.isNaN && targetElevation != modelElevation.numeric {
+        if isElevationCorrectable && unit == .celsius && !modelElevation.numeric.isNaN && !targetElevation.isNaN && targetElevation != modelElevation.numeric {
             for i in data.indices {
                 // correct temperature by 0.65° per 100 m elevation
                 data[i] += (modelElevation.numeric - targetElevation) * 0.0065
             }
         }
-        return DataAndUnit(data, variable.unit)
+        return DataAndUnit(data, unit)
     }
 
     /// Read data and interpolate if required
     func readAndInterpolate(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {
         if time.dtSeconds == domain.dtSeconds {
-            return try await readAndScale(variable: variable, time: time)
+            let data = try await readRaw(variable: variable, time: time)
+            return scale(data: data, isElevationCorrectable: variable.isElevationCorrectable, unit: variable.unit)
         }
         let interpolationType = variable.interpolation
 
         if time.dtSeconds > domain.dtSeconds {
             // Aggregate data
             let timeRead = time.time.forAggregationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
-            let read = try await readAndScale(variable: variable, time: time.with(time: timeRead))
-            let aggregated = read.data.aggregate(type: interpolationType, timeOld: timeRead, timeNew: time.time)
-            return DataAndUnit(aggregated, read.unit)
+            let data = try await readRaw(variable: variable, time: time.with(time: timeRead))
+            let aggregated = data.aggregate(type: interpolationType, timeOld: timeRead, timeNew: time.time)
+            return scale(data: aggregated, isElevationCorrectable: variable.isElevationCorrectable, unit: variable.unit)
         }
 
         // Interpolate data
         let timeLow = time.time.forInterpolationTo(modelDt: domain.dtSeconds, interpolation: interpolationType)
-        let read = try await readAndScale(variable: variable, time: time.with(time: timeLow))
-        let interpolated = read.data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
-        return DataAndUnit(interpolated, read.unit)
+        let data = try await readRaw(variable: variable, time: time.with(time: timeLow))
+        let interpolated = data.interpolate(type: interpolationType, timeOld: timeLow, timeNew: time.time, latitude: modelLat, longitude: modelLon, scalefactor: variable.scalefactor)
+        return scale(data: interpolated, isElevationCorrectable: variable.isElevationCorrectable, unit: variable.unit)
     }
 
     func get(variable: Variable, time: TimerangeDtAndSettings) async throws -> DataAndUnit {

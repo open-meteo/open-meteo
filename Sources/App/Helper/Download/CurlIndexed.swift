@@ -37,7 +37,12 @@ extension Curl {
     }
 
     /// Download a ECMWF grib file from the opendata server, but selectively get messages and download only partial file
-    func downloadEcmwfIndexed(url: String, concurrent: Int, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
+    /// If `downloadFullGribFile` is set, skip inventory and perform full download. This can be faster if all variables are processed anyway
+    func downloadEcmwfIndexed(url: String, concurrent: Int, downloadFullGribFile: Bool, isIncluded: (EcmwfIndexEntry) -> Bool) async throws -> AnyAsyncSequence<GribMessage> {
+        if downloadFullGribFile {
+            return try await getGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent)
+        }
+        
         let urlIndex = url.replacingOccurrences(of: ".grib2", with: ".index")
         let index = try await downloadInMemoryAsync(url: urlIndex, minSize: nil).readEcmwfIndexEntries().filter(isIncluded)
         guard !index.isEmpty else {

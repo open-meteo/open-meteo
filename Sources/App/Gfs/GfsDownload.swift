@@ -104,7 +104,7 @@ struct GfsDownload: AsyncCommand {
 
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
 
-            let nConcurrent = signature.concurrent ?? 1
+            let nConcurrent = signature.concurrent ?? 4
             try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: !signature.secondFlush)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
@@ -205,8 +205,9 @@ struct GfsDownload: AsyncCommand {
 
         //let storeOnDisk = domain == .gfs013 || domain == .gfs025 || domain == .hrrr_conus
         let isEnsemble = domain.countEnsembleMember > 1
-
-        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+        
+        let nx = domain.grid.nx
+        let ny = domain.grid.ny
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
@@ -234,7 +235,7 @@ struct GfsDownload: AsyncCommand {
 
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: 0, useAws: downloadFromAws)
                 for (variable, message) in try await curl.downloadIndexedGrib(url: url, variables: variables, errorOnMissing: !skipMissing) {
-                    try grib2d.load(message: message)
+                    var grib2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                     guard let timestep = variable.timestep else {
                         continue
                     }
@@ -306,7 +307,8 @@ struct GfsDownload: AsyncCommand {
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
 
-            for member in 0..<domain.countEnsembleMember {
+           //for member in 0..<domain.countEnsembleMember {
+            try await (0..<domain.countEnsembleMember).foreachConcurrent(nConcurrent: 8) { member in
                 let variables = (forecastHour == 0 ? variablesHour0 : variables)
                 let url = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member, useAws: downloadFromAws)
                 
@@ -330,7 +332,7 @@ struct GfsDownload: AsyncCommand {
                             continue
                         }
                     }
-                    try grib2d.load(message: message)
+                    var grib2d = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: false)
                     if domain.isGlobal {
                         grib2d.array.shift180LongitudeAndFlipLatitude()
                     }
@@ -387,18 +389,6 @@ struct GfsDownload: AsyncCommand {
                                     continue
                                 }
                                 grib2d.array.data[i] /= factor.data[i]
-                            }
-                        }
-                    }
-                    
-                    // Cloud cover in GFS ensemble may be -1 or 101 or 102
-                    if [GfsDomain.gfs025_ens, .gfs05_ens].contains(domain), let variable = variable.variable as? GfsSurfaceVariable, variable == .cloud_cover {
-                        for i in grib2d.array.data.indices {
-                            if grib2d.array.data[i] > 100 {
-                                grib2d.array.data[i] = 100
-                            }
-                            if grib2d.array.data[i] < 0 {
-                                grib2d.array.data[i] = 0
                             }
                         }
                     }

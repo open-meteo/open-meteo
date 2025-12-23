@@ -304,9 +304,10 @@ struct DmiReader: GenericReaderDerived, GenericReaderProtocol {
                 let dni = Zensun.calculateBackwardsDNI(directRadiation: direct.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time, convertToInstant: true)
                 return DataAndUnit(dni, direct.unit)
             case .diffuse_radiation:
-                let swrad = try await get(raw: .shortwave_radiation, time: time)
-                let diffuse = Zensun.calculateDiffuseRadiationBackwards(shortwaveRadiation: swrad.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(diffuse, swrad.unit)
+                let swrad = try await get(raw: .shortwave_radiation, time: time).data
+                let direct = try await get(raw: .direct_radiation, time: time).data
+                let diff = zip(swrad, direct).map(-)
+                return DataAndUnit(diff, .wattPerSquareMetre)
             case .direct_radiation_instant:
                 let direct = try await get(raw: .direct_radiation, time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
