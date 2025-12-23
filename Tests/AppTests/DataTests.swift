@@ -29,23 +29,6 @@ import VaporTesting
             let centerbb = grid.findPointXY(lat: 50.781, lon: 1.596)
             let bb = try await grid.getSurroundingGridpoints(centerY: centerbb.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile)
             #expect(bb.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
-            for p in bb.gridpoints {
-                let c = grid.getCoordinates(gridpoint: p)
-                //print("\(c.latitude), \(c.longitude)")
-                print("""
-{
-      "type": "Feature",
-      "properties": {},
-      "geometry": {
-        "coordinates": [
-                        \(c.longitude),
-            \(c.latitude)
-        ],
-        "type": "Point"
-      }
-    },
-""")
-            }
             #expect(bb.elevations == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
             #expect(bb.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
             
