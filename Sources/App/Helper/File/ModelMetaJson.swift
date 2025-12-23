@@ -75,8 +75,8 @@ struct ModelUpdateMetaJson: Codable, Sendable {
 
     /// Chunk files dimensions
     let chunk_file_dimensions: [DimensionName: Int]?
-    let grid_mapping_name: GridMappingName?
-    let grid_mapping_parameters: OrderedDictionary<CfAttributeName, Float>?
+    let grid_mapping_name: CfGridMappingName?
+    let grid_mapping_parameters: OrderedDictionary<CfGridMappingAttributeName, Float>?
     let grid_bounds: GridBounds?
     let proj_string: String?
 

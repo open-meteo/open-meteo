@@ -1,7 +1,37 @@
 import OrderedCollections
 
+public enum CfGridMappingName: String, Codable, Sendable {
+    case lambertConformalConic = "lambert_conformal_conic"
+    case lambertAzimuthalEqualArea = "lambert_azimuthal_equal_area"
+    case stereographic = "stereographic"
+    case rotatedLatLon = "rotated_latitude_longitude"
+    case latitudeLongitude = "latitude_longitude"
+
+    var proj4Name: String {
+        switch self {
+        case .lambertConformalConic:
+            return "lcc"
+        case .lambertAzimuthalEqualArea:
+            return "laea"
+        case .stereographic:
+            return "stere"
+        case .rotatedLatLon:
+            // This is a tiny hack to correctly support rotated lat/lon grids
+            // They are generally defined as a oblique spherical projection,
+            // where the projection to be used needs to be specified via the
+            // +o_proj parameter. There is no real equivalent to the o_proj
+            // parameter in the CF conventions.
+            // https://proj.org/en/stable/operations/projections/ob_tran.html
+            // https://cfconventions.org/cf-conventions/cf-conventions.html#_rotated_pole
+            return "ob_tran +o_proj=longlat"
+        case .latitudeLongitude:
+            return "longlat"
+        }
+    }
+}
+
 // CF Convention attribute names enumeration
-public enum CfAttributeName: String, CaseIterable, Codable, Sendable {
+public enum CfGridMappingAttributeName: String, CaseIterable, Codable, Sendable {
     case latitudeOfProjectionOrigin = "latitude_of_projection_origin"
     case longitudeOfProjectionOrigin = "longitude_of_projection_origin"
     case longitudeOfCentralMeridian = "longitude_of_central_meridian"
@@ -55,8 +85,8 @@ enum Proj4Parameter: String, CaseIterable {
 /// Grid mapping name according to CF conventions
 /// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
 public protocol CfProjectionConvertible: Sendable {
-    var gridMappingName: GridMappingName { get }
-    func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float>
+    var gridMappingName: CfGridMappingName { get }
+    func toCfAttributes() -> OrderedDictionary<CfGridMappingAttributeName, Float>
 
     // Default implementation provided in extension
     func toProj4String() -> String
@@ -88,10 +118,10 @@ struct LambertConformalConicParameters: CfProjectionConvertible {
     let falseNorthing: Float?
     let earthRadius: Float?
 
-    var gridMappingName: GridMappingName { .lambertConformalConic }
+    var gridMappingName: CfGridMappingName { .lambertConformalConic }
 
-    func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
-        var attributes: OrderedDictionary<CfAttributeName, Float> = [:]
+    func toCfAttributes() -> OrderedDictionary<CfGridMappingAttributeName, Float> {
+        var attributes: OrderedDictionary<CfGridMappingAttributeName, Float> = [:]
 
         // if standardParallel.count >= 1 {
         //     attributes[.standardParallel] = standardParallel[0]
@@ -126,10 +156,10 @@ struct LambertAzimuthalEqualAreaParameters: CfProjectionConvertible {
     let falseNorthing: Float?
     let earthRadius: Float?
 
-    var gridMappingName: GridMappingName { .lambertAzimuthalEqualArea }
+    var gridMappingName: CfGridMappingName { .lambertAzimuthalEqualArea }
 
-    func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
-        var attributes: OrderedDictionary<CfAttributeName, Float> = [:]
+    func toCfAttributes() -> OrderedDictionary<CfGridMappingAttributeName, Float> {
+        var attributes: OrderedDictionary<CfGridMappingAttributeName, Float> = [:]
 
         attributes[.longitudeOfProjectionOrigin] = longitudeOfProjectionOrigin
         attributes[.latitudeOfProjectionOrigin] = latitudeOfProjectionOrigin
@@ -154,10 +184,10 @@ struct StereographicParameters: CfProjectionConvertible {
     let latitudeOfProjectionOrigin: Float
     let earthRadius: Float?
 
-    var gridMappingName: GridMappingName { .stereographic }
+    var gridMappingName: CfGridMappingName { .stereographic }
 
-    func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
-        var attributes: OrderedDictionary<CfAttributeName, Float> = [:]
+    func toCfAttributes() -> OrderedDictionary<CfGridMappingAttributeName, Float> {
+        var attributes: OrderedDictionary<CfGridMappingAttributeName, Float> = [:]
 
         attributes[.latitudeOfProjectionOrigin] = latitudeOfProjectionOrigin
         attributes[.straightVerticalLongitudeFromPole] = straightVerticalLongitudeFromPole
@@ -176,10 +206,10 @@ struct RotatedLatitudeLongitudeParameters: CfProjectionConvertible {
     let gridNorthPoleLongitude: Float
     let northPoleGridLongitude: Float?
 
-    var gridMappingName: GridMappingName { .rotatedLatLon }
+    var gridMappingName: CfGridMappingName { .rotatedLatLon }
 
-    func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
-        var attributes: OrderedDictionary<CfAttributeName, Float> = [:]
+    func toCfAttributes() -> OrderedDictionary<CfGridMappingAttributeName, Float> {
+        var attributes: OrderedDictionary<CfGridMappingAttributeName, Float> = [:]
 
         attributes[.gridNorthPoleLatitude] = gridNorthPoleLatitude
         attributes[.gridNorthPoleLongitude] = gridNorthPoleLongitude
@@ -194,9 +224,9 @@ struct RotatedLatitudeLongitudeParameters: CfProjectionConvertible {
 
 // Regular Latitude-Longitude (no projection)
 struct LatitudeLongitudeParameters: CfProjectionConvertible {
-    var gridMappingName: GridMappingName { .latitudeLongitude }
+    var gridMappingName: CfGridMappingName { .latitudeLongitude }
 
-    func toCfAttributes() -> OrderedDictionary<CfAttributeName, Float> {
+    func toCfAttributes() -> OrderedDictionary<CfGridMappingAttributeName, Float> {
         // No additional parameters needed for regular lat/lon
         return [:]
     }
