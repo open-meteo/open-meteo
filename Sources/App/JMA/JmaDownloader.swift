@@ -121,6 +121,8 @@ struct JmaDownload: AsyncCommand {
                           let stepRange = message.get(attribute: "stepRange"),
                           let stepType = message.get(attribute: "stepType"),
                           let hour = message.get(attribute: "endStep").flatMap(Int.init) else {
+                        let shortName = message.get(attribute: "shortName") ?? "-"
+                        logger.info("Could not map variable \(shortName)")
                         return
                     }
                     if hour == 0 && variable.skipHour0 {
@@ -198,7 +200,7 @@ extension GribMessage {
         case "lcc": return JmaSurfaceVariable.cloud_cover_low
         case "mcc": return JmaSurfaceVariable.cloud_cover_mid
         case "hcc": return JmaSurfaceVariable.cloud_cover_high
-        case "dswrf", "msdwswrf": return JmaSurfaceVariable.shortwave_radiation
+        case "dswrf", "msdwswrf", "avg_sdswrf": return JmaSurfaceVariable.shortwave_radiation
         case "unknown":
             if parameterCategory == 6 && parameterNumber == 1 {
                 return JmaSurfaceVariable.cloud_cover

@@ -266,7 +266,7 @@ struct KnmiDownload: AsyncCommand {
                     grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                 case 6: // gph to metre
                     grib2d.array.data.multiplyAdd(multiply: 1 / 9.80665, add: 0)
-                case 73, 74, 75, 52: // low/mid/high clouds (but not total!) and RH
+                case 71, 73, 74, 75, 52: // total/low/mid/high clouds and RH
                     if variable.unit == .percentage {
                         grib2d.array.data.multiplyAdd(multiply: 100, add: 0)
                     }
@@ -287,7 +287,7 @@ struct KnmiDownload: AsyncCommand {
                         guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
                             break
                         }
-                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, array2d: &data) else {
+                        guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: "0-\(step)", array2d: &data) else {
                             continue
                         }
                         let count = await inMemoryAccumulated.data.count

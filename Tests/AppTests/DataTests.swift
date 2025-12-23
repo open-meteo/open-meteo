@@ -15,7 +15,7 @@ import VaporTesting
     
     @Test(.disabled(if: OpenMeteo.remoteDataDirectory == nil)) func gaussianGridSeaMatch() async throws {
         try await withApp { app in
-            let elevationFile = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let elevationFile = try #require(await EcmwfEcpdsDomain.ifs.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
             let grid = GaussianGrid(type: .o1280)
             // Longitude 0° wraps on x axis
             let center = grid.findPointXY(lat: 53.647546, lon: 0)
@@ -25,6 +25,31 @@ import VaporTesting
             #expect(aa.gridpoints == [539720, 539721, 541799, 541800, 541801, 543883, 543884, 543885, 545971])
             #expect(aa.elevations == [5.0, -999.0, 6.0, -4.0, -999.0, 3.0, -999.0, -999.0, 14.0])
             #expect(aa.distances.isSimilar([0.009189781, 0.039145403, 0.039145403, 0.00065343047, 0.03049417, 0.03049417, 0.0020012162, 0.03172773, 0.03172773], accuracy: 0.0001))
+            
+            let centerbb = grid.findPointXY(lat: 50.781, lon: 1.596)
+            let bb = try await grid.getSurroundingGridpoints(centerY: centerbb.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile)
+            #expect(bb.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(bb.elevations == [-999.0, -999.0, 50.0, -999.0, -999.0, 76.0, -999.0, 28.0, 94.0])
+            #expect(bb.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            
+            
+            let bbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile))
+            #expect(bbb.gridpoint == 630534)
+            
+            // WAM only returns NaN for this grid cell, use corrected land-mask
+            let elevationFile2 = try #require(await EcmwfEcpdsDomain.wam.getStaticFile(type: .elevation, httpClient: app.http.client.shared, logger: app.logger))
+            let center2 = grid.findPointXY(lat: 50.781, lon: 1.596)
+            #expect(center.x == 0)
+            #expect(center.y == 516)
+            let aaa = try await grid.getSurroundingGridpoints(centerY: center2.y, lat: 50.781, lon: 1.596, elevationFile: elevationFile2)
+            #expect(aaa.gridpoints == [628289, 628290, 628291, 630533, 630534, 630535, 632781, 632782, 632783])
+            #expect(aaa.elevations.isSimilar([-999.0, -999.0, .nan, -999.0, .nan, .nan, -999.0, .nan, .nan]))
+            #expect(aaa.distances.isSimilar([0.029574867, 0.00649387, 0.03488704, 0.02403517, 0.00012665402, 0.027509289, 0.028389191, 0.0036591913, 0.030038308], accuracy: 0.0001))
+            let bbbb = try #require(await grid.findPointInSea(lat: 50.781, lon: 1.596, elevationFile: elevationFile2))
+            #expect(bbbb.gridpoint == 628290)
+            let bResolved = grid.getCoordinates(gridpoint: 628290)
+            #expect(bResolved.latitude == 50.861156)
+            #expect(bResolved.longitude == 1.6042781)
             
             let a = try #require(await grid.findPointInSea(lat: 53.647546, lon: 0, elevationFile: elevationFile))
             #expect(a.gridpoint == 543884)
