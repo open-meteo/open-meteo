@@ -1,6 +1,6 @@
 import Foundation
 import OmFileFormat
-import OrderedCollections
+
 
 public protocol Gridable: Sendable {
     var nx: Int { get }
@@ -14,6 +14,7 @@ public protocol Gridable: Sendable {
     associatedtype SliceType: Sequence<Int>
     func findBox(boundingBox bb: BoundingBoxWGS84) -> SliceType?
     func getCoordinates(gridpoint: Int) -> (latitude: Float, longitude: Float)
+    
     func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
     func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
     

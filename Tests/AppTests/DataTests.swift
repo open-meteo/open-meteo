@@ -426,7 +426,7 @@ import VaporTesting
         #expect(lon.isApproximatelyEqual(to: -40.708557, absoluteTolerance: 0.001))
     }
 
-    func testCerraGrid() {
+    @Test func cerraGrid() {
         //
         let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
 
