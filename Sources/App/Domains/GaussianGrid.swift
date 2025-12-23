@@ -2,10 +2,10 @@ import Foundation
 import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
-struct GaussianGrid: Gridable {    
+struct GaussianGrid: Gridable {
     var proj4: String {
-        // TODO: GaussianGrid is a special case we will have to treat differently...
-        return ""
+        // Gaussian grids do not have a Proj4 string. Encode the Gaussian grid type in the title attribute. E.g. `+title=O1280`
+        return "+proj=longlat +title=\(type.proj4Title) +units=m +datum=WGS84 +no_defs +type=crs"
     }
 
     enum GridType {
@@ -13,6 +13,19 @@ struct GaussianGrid: Gridable {
         case o320
         case n320
         case n160
+        
+        var proj4Title: String {
+            switch self {
+            case .o1280:
+                return "O1280"
+            case .o320:
+                return "O320"
+            case .n320:
+                return "N320"
+            case .n160:
+                return "N160"
+            }
+        }
 
         /// Note quite sure if there is an analytical solution for N type grid. https://confluence.ecmwf.int/display/FCST/Gaussian+grid+with+320+latitude+lines+between+pole+and+equator
         /// Therefore here is a lookup table

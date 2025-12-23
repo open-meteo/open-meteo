@@ -74,6 +74,9 @@ import Testing
 
         let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.proj4
         #expect(ukmoRegionalDeterministicProj4 == "+proj=laea +lon_0=-2.5 +lat_0=54.9 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+        
+        let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.proj4
+        #expect(o1280Proj4 == "+proj=longlat +title=O1280 +units=m +datum=WGS84 +no_defs +type=crs")
     }
 
     @Test func gridBoundsForKnownDomains() {
