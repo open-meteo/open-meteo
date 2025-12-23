@@ -2,12 +2,7 @@ import Foundation
 import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
-struct GaussianGrid: Gridable {
-    // TODO: GaussianGrid is a special case we will have to treat differently...
-    var cfProjectionParameters: any CfProjectionConvertible {
-        LatitudeLongitudeParameters()
-    }
-    
+struct GaussianGrid: Gridable {    
     var proj4: String {
         // TODO: GaussianGrid is a special case we will have to treat differently...
         return ""

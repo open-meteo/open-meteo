@@ -8,10 +8,6 @@ struct RegularGrid: Gridable {
     let dx: Float
     let dy: Float
     let searchRadius: Int
-
-    var cfProjectionParameters: any CfProjectionConvertible {
-        LatitudeLongitudeParameters()
-    }
     
     var proj4: String {
         return "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs"

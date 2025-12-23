@@ -6,8 +6,6 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
     let λ0_dec: Float
     let ϕ1: Float
     let R: Float
-
-    let cfProjectionParameters: any CfProjectionConvertible
     
     var proj4: String {
         return "+proj=laea +lon_0=\(λ0_dec) +lat_0=\(ϕ1.radiansToDegrees) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
@@ -19,13 +17,6 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
      radius of earth
      */
     init(λ0 λ0_dec: Float, ϕ1 ϕ1_dec: Float, radius: Float = 6371229) {
-        self.cfProjectionParameters = LambertAzimuthalEqualAreaParameters(
-            longitudeOfProjectionOrigin: λ0_dec,
-            latitudeOfProjectionOrigin: ϕ1_dec,
-            falseEasting: 0,
-            falseNorthing: 0,
-            earthRadius: radius
-        )
         λ0 = λ0_dec.degreesToRadians
         ϕ1 = ϕ1_dec.degreesToRadians
         R = radius

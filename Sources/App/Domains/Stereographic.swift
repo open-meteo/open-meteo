@@ -14,14 +14,6 @@ struct StereographicProjection: Projectable {
 
     /// Radius of Earth in meters
     var R: Float
-
-    var cfProjectionParameters: any CfProjectionConvertible {
-        StereographicParameters(
-            straightVerticalLongitudeFromPole: λ0.radiansToDegrees,
-            latitudeOfProjectionOrigin: sinϕ1.radiansToDegrees,
-            earthRadius: R
-        )
-    }
     
     var proj4: String {
         return "+proj=stere +lat_0=\(sinϕ1.radiansToDegrees) +lon_0=\(λ0.radiansToDegrees) +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"

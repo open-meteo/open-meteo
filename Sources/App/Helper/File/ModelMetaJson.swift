@@ -75,8 +75,6 @@ struct ModelUpdateMetaJson: Codable, Sendable {
 
     /// Chunk files dimensions
     let chunk_file_dimensions: [DimensionName: Int]?
-    let grid_mapping_name: CfGridMappingName?
-    let grid_mapping_parameters: OrderedDictionary<CfGridMappingAttributeName, Float>?
     let grid_bounds: GridBounds?
     let proj_string: String?
 
@@ -102,10 +100,8 @@ struct ModelUpdateMetaJson: Codable, Sendable {
                 .ny: domain.grid.ny,
                 .nt: domain.omFileLength
             ],
-            grid_mapping_name: domain.grid.cfProjectionParameters.gridMappingName,
-            grid_mapping_parameters: domain.grid.cfProjectionParameters.toCfAttributes(),
             grid_bounds: domain.grid.gridBounds,
-            proj_string: domain.grid.cfProjectionParameters.toProj4String()
+            proj_string: domain.grid.proj4
         )
         let path = ModelUpdateMetaFile(domain: domain.domainRegistry)
         try path.createDirectory()
@@ -124,8 +120,6 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             update_interval_seconds: update_interval_seconds,
             chunk_time_length: chunk_time_length,
             chunk_file_dimensions: chunk_file_dimensions,
-            grid_mapping_name: grid_mapping_name,
-            grid_mapping_parameters: grid_mapping_parameters,
             grid_bounds: grid_bounds,
             proj_string: proj_string
         )
