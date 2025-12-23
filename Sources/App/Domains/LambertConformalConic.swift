@@ -6,11 +6,20 @@ struct LambertConformalConicProjection: Projectable {
     let F: Float
     let n: Float
     let λ0: Float
+    
+    let λ0_dec: Float
+    let ϕ0_dec: Float
+    let ϕ1_dec: Float
+    let ϕ2_dec: Float
 
     /// Radius of Earth. Different radiuses may be used for different GRIBS: https://github.com/SciTools/iris-grib/issues/241#issuecomment-1239069695
     let R: Float
 
     let cfProjectionParameters: any CfProjectionConvertible
+    
+    var proj4: String {
+        return "+proj=lcc +lon_0=\(λ0_dec) +lat_0=\(ϕ0_dec) +lat_1=\(ϕ1_dec) +lat_2=\(ϕ2_dec) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
+    }
 
     /// λ0 reference longitude in degrees `LoVInDegrees` in grib
     /// ϕ0  reference latitude in degrees. `LaDInDegrees` in grib
@@ -41,6 +50,10 @@ struct LambertConformalConicProjection: Projectable {
         F = (cos(ϕ1) * powf(tan(.pi / 4 + ϕ1 / 2), n)) / n
         ρ0 = F / powf(tan(.pi / 4 + ϕ0 / 2), n)
         R = radius
+        self.λ0_dec = λ0_dec
+        self.ϕ0_dec = ϕ0_dec
+        self.ϕ1_dec = ϕ1_dec
+        self.ϕ2_dec = ϕ2_dec
     }
 
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float) {

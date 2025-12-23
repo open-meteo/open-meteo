@@ -16,6 +16,11 @@ struct RotatedLatLonProjection: Projectable {
             northPoleGridLongitude: ϕ.radiansToDegrees
         )
     }
+    
+    var proj4: String {
+        let o_lat_p = -(θ.radiansToDegrees - 90)
+        return "+proj=ob_tran +o_proj=longlat +o_lat_p=\(o_lat_p) +o_lon_p=0.0 +lon_1=\(ϕ.radiansToDegrees) +units=m +datum=WGS84 +no_defs +type=crs"
+    }
 
     public init(latitude: Float, longitude: Float) {
         θ = (90 + latitude).degreesToRadians

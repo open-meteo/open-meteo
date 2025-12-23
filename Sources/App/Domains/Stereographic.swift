@@ -22,6 +22,10 @@ struct StereographicProjection: Projectable {
             earthRadius: R
         )
     }
+    
+    var proj4: String {
+        return "+proj=stere +lat_0=\(sinϕ1.radiansToDegrees) +lon_0=\(λ0.radiansToDegrees) +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
+    }
 
     public init(latitude: Float, longitude: Float, radius: Float) {
         λ0 = longitude.degreesToRadians

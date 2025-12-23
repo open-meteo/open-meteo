@@ -5,6 +5,7 @@ protocol Projectable: Sendable {
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float)
 
     var cfProjectionParameters: any CfProjectionConvertible { get }
+    var proj4: String { get }
 }
 
 struct ProjectionGrid<Projection: Projectable>: Gridable {
@@ -19,6 +20,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
 
     var cfProjectionParameters: any CfProjectionConvertible {
         self.projection.cfProjectionParameters
+    }
+    
+    var proj4: String {
+        return projection.proj4
     }
 
     var searchRadius: Int {

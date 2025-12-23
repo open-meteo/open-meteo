@@ -3,14 +3,19 @@ import Foundation
 /// See https://mathworld.wolfram.com/LambertAzimuthalEqual-AreaProjection.html
 struct LambertAzimuthalEqualAreaProjection: Projectable {
     let λ0: Float
+    let λ0_dec: Float
     let ϕ1: Float
     let R: Float
 
     let cfProjectionParameters: any CfProjectionConvertible
+    
+    var proj4: String {
+        return "+proj=laea +lon_0=\(λ0_dec) +lat_0=\(ϕ1.radiansToDegrees) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
+    }
 
     /*
      λ0 central longitude
-     ϕ1 standard parallal
+     ϕ1 standard parallel
      radius of earth
      */
     init(λ0 λ0_dec: Float, ϕ1 ϕ1_dec: Float, radius: Float = 6371229) {
@@ -24,6 +29,7 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
         λ0 = λ0_dec.degreesToRadians
         ϕ1 = ϕ1_dec.degreesToRadians
         R = radius
+        self.λ0_dec = λ0_dec
     }
 
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float) {

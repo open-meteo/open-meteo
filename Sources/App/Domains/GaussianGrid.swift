@@ -7,6 +7,11 @@ struct GaussianGrid: Gridable {
     var cfProjectionParameters: any CfProjectionConvertible {
         LatitudeLongitudeParameters()
     }
+    
+    var proj4: String {
+        // TODO: GaussianGrid is a special case we will have to treat differently...
+        return ""
+    }
 
     enum GridType {
         case o1280

@@ -12,6 +12,10 @@ struct RegularGrid: Gridable {
     var cfProjectionParameters: any CfProjectionConvertible {
         LatitudeLongitudeParameters()
     }
+    
+    var proj4: String {
+        return "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs"
+    }
 
     public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
         self.nx = nx

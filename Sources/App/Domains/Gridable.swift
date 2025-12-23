@@ -20,6 +20,9 @@ public protocol Gridable: Sendable {
     /// Grid mapping name according to CF conventions
     /// https://cfconventions.org/cf-conventions/cf-conventions.html#appendix-grid-mappings
     var cfProjectionParameters: any CfProjectionConvertible { get }
+    
+    /// Proj4 string
+    var proj4: String { get }
 }
 
 extension Gridable {
