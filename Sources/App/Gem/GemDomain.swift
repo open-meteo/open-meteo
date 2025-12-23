@@ -191,7 +191,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_global:
             return RegularGrid(nx: 2400, ny: 1201, latMin: -90, lonMin: -180, dx: 0.15, dy: 0.15)
         case .gem_regional:
-            return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
+            return ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
         case .gem_hrdps_continental:
             return ProjectionGrid(nx: 2540, ny: 1290, latitude: 39.626034...47.876457, longitude: -133.62952...(-40.708557), projection: RotatedLatLonProjection(latitude: -36.0885, longitude: 245.305))
         case .gem_hrdps_west:
@@ -202,8 +202,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return ProjectionGrid(
                 nx: 1330,
                 ny: 1180,
-                latitudeProjectionOrigion: 5.308595 + (1180 * -0.00899),  // Bottom-left
-                longitudeProjectionOrigion: -22.18489,
+                latitudeProjectionOrigin: 5.308595 + (1180 * -0.00899),  // Bottom-left
+                longitudeProjectionOrigin: -22.18489,
                 dx: 0.00899,
                 dy: 0.00899,
                 projection: RotatedLatLonProjection(latitude: 33.443381, longitude: 86.463574)

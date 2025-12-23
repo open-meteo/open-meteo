@@ -2,7 +2,7 @@ import Foundation
 
 /// Stereographic projection
 /// https://mathworld.wolfram.com/StereographicProjection.html
-struct StereograpicProjection: Projectable {
+struct StereographicProjection: Projectable {
     /// Central longitude
     let λ0: Float
 
@@ -12,8 +12,16 @@ struct StereograpicProjection: Projectable {
     /// Cosine of central latitude
     let cosϕ1: Float
 
-    /// Radius of Earth
+    /// Radius of Earth in meters
     var R: Float
+
+    var cfProjectionParameters: any CfProjectionConvertible {
+        StereographicParameters(
+            straightVerticalLongitudeFromPole: λ0.radiansToDegrees,
+            latitudeOfProjectionOrigin: sinϕ1.radiansToDegrees,
+            earthRadius: R
+        )
+    }
 
     public init(latitude: Float, longitude: Float, radius: Float) {
         λ0 = longitude.degreesToRadians
