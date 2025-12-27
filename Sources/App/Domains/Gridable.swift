@@ -19,7 +19,7 @@ public protocol Gridable: Sendable {
     func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
     
     /// Proj4 string
-    var proj4: String { get }
+    var proj4String: String { get }
 }
 
 extension Gridable {

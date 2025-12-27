@@ -76,7 +76,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
     /// Chunk files dimensions
     let chunk_file_dimensions: [DimensionName: Int]?
     let grid_bounds: GridBounds?
-    let proj_string: String?
+    let proj4_string: String?
 
 
     /// Time at which that model run has been available on the current server
@@ -101,7 +101,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
                 .nt: domain.omFileLength
             ],
             grid_bounds: domain.grid.gridBounds,
-            proj_string: domain.grid.proj4
+            proj4_string: domain.grid.proj4String
         )
         let path = ModelUpdateMetaFile(domain: domain.domainRegistry)
         try path.createDirectory()
@@ -121,7 +121,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             chunk_time_length: chunk_time_length,
             chunk_file_dimensions: chunk_file_dimensions,
             grid_bounds: grid_bounds,
-            proj_string: proj_string
+            proj4_string: proj4_string
         )
     }
 }

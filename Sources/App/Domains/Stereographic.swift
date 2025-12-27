@@ -15,7 +15,7 @@ struct StereographicProjection: Projectable {
     /// Radius of Earth in meters
     var R: Float
     
-    var proj4: String {
+    var proj4String: String {
         return "+proj=stere +lat_0=\(sinϕ1.radiansToDegrees) +lon_0=\(λ0.radiansToDegrees) +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
     }
 

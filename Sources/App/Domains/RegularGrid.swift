@@ -9,7 +9,7 @@ struct RegularGrid: Gridable {
     let dy: Float
     let searchRadius: Int
     
-    var proj4: String {
+    var proj4String: String {
         return "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs"
     }
 

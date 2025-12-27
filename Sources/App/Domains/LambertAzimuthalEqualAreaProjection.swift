@@ -7,7 +7,7 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
     let ϕ1: Float
     let R: Float
     
-    var proj4: String {
+    var proj4String: String {
         return "+proj=laea +lon_0=\(λ0_dec) +lat_0=\(ϕ1.radiansToDegrees) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
     }
 

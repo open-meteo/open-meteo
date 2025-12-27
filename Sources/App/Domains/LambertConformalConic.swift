@@ -15,7 +15,7 @@ struct LambertConformalConicProjection: Projectable {
     /// Radius of Earth. Different radiuses may be used for different GRIBS: https://github.com/SciTools/iris-grib/issues/241#issuecomment-1239069695
     let R: Float
     
-    var proj4: String {
+    var proj4String: String {
         return "+proj=lcc +lon_0=\(λ0_dec) +lat_0=\(ϕ0_dec) +lat_1=\(ϕ1_dec) +lat_2=\(ϕ2_dec) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
     }
 

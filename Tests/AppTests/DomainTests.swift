@@ -57,25 +57,25 @@ import Testing
     }
 
     @Test func proj4StringForKnownDomains() {
-        let iconProj4 = IconDomains.icon.grid.proj4
+        let iconProj4 = IconDomains.icon.grid.proj4String
         #expect(iconProj4 == "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs")
 
-        let aromeProj4 = MeteoFranceDomain.arome_france.grid.proj4
+        let aromeProj4 = MeteoFranceDomain.arome_france.grid.proj4String
         #expect(aromeProj4 == "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs")
 
-        let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.proj4
+        let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.proj4String
         #expect(cmcGemContinentalProj4 == "+proj=ob_tran +o_proj=longlat +o_lat_p=36.0885 +o_lon_p=0.0 +lon_1=245.305 +units=m +datum=WGS84 +no_defs +type=crs")
 
-        let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.proj4
+        let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.proj4String
         #expect(cmcGemRegionalProj4 == "+proj=stere +lat_0=57.295784 +lon_0=249.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
 
-        let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.proj4
+        let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.proj4String
         #expect(dmiHarmonieProj4 == "+proj=lcc +lon_0=352.0 +lat_0=55.5 +lat_1=55.5 +lat_2=55.5 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
 
-        let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.proj4
+        let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.proj4String
         #expect(ukmoRegionalDeterministicProj4 == "+proj=laea +lon_0=-2.5 +lat_0=54.9 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
         
-        let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.proj4
+        let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.proj4String
         #expect(o1280Proj4 == "+proj=longlat +title=O1280 +units=m +datum=WGS84 +no_defs +type=crs")
     }
 

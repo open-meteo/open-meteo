@@ -9,7 +9,7 @@ struct RotatedLatLonProjection: Projectable {
     /// Rotation around z-axis
     let ϕ: Float
 
-    var proj4: String {
+    var proj4String: String {
         let o_lat_p = -(θ.radiansToDegrees - 90)
         return "+proj=ob_tran +o_proj=longlat +o_lat_p=\(o_lat_p) +o_lon_p=0.0 +lon_1=\(ϕ.radiansToDegrees) +units=m +datum=WGS84 +no_defs +type=crs"
     }

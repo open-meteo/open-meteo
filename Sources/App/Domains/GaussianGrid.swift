@@ -3,7 +3,7 @@ import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
 struct GaussianGrid: Gridable {
-    var proj4: String {
+    var proj4String: String {
         // Gaussian grids do not have a Proj4 string. Encode the Gaussian grid type in the title attribute. E.g. `+title=O1280`
         return "+proj=longlat +title=\(type.proj4Title) +units=m +datum=WGS84 +no_defs +type=crs"
     }
