@@ -9,9 +9,27 @@ struct RotatedLatLonProjection: Projectable {
     /// Rotation around z-axis
     let ϕ: Float
 
-    var proj4String: String {
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
         let o_lat_p = -(θ.radiansToDegrees - 90)
-        return "+proj=ob_tran +o_proj=longlat +o_lat_p=\(o_lat_p) +o_lon_p=0.0 +lon_1=\(ϕ.radiansToDegrees) +units=m +datum=WGS84 +no_defs +type=crs"
+        return """
+            PROJCRS["Rotated Lat/Lon",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                CONVERSION["Oblique Transformation",
+                    METHOD["Oblique Transformation"],
+                    PARAMETER["Latitude of rotated pole", \(o_lat_p)],
+                    PARAMETER["Longitude of rotated pole", \(ϕ.radiansToDegrees)],
+                    PARAMETER["Azimuth", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["x",east],
+                    AXIS["y",north],
+                UNIT["degree",0.0174532925199433],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
+            ]
+            """
     }
 
     public init(latitude: Float, longitude: Float) {

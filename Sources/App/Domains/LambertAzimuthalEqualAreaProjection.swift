@@ -7,8 +7,27 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
     let ϕ1: Float
     let R: Float
     
-    var proj4String: String {
-        return "+proj=laea +lon_0=\(λ0_dec) +lat_0=\(ϕ1.radiansToDegrees) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
+        return """
+            PROJCRS["Lambert Azimuthal Equal-Area",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",\(R),298.257223563]]],
+                CONVERSION["Lambert Azimuthal Equal-Area",
+                    METHOD["Lambert Azimuthal Equal-Area"],
+                    PARAMETER["Latitude of natural origin", \(ϕ1.radiansToDegrees)],
+                    PARAMETER["Longitude of natural origin", \(λ0_dec)],
+                    PARAMETER["False easting", 0.0],
+                    PARAMETER["False northing", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                UNIT["metre",1.0],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
+            ]
+            """
     }
 
     /*

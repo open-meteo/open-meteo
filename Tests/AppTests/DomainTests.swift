@@ -56,27 +56,141 @@ import Testing
         #expect(sliceELonBorder.xRange == 0..<1)
     }
 
-    @Test func proj4StringForKnownDomains() {
-        let iconProj4 = IconDomains.icon.grid.proj4String
-        #expect(iconProj4 == "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs")
+    @Test func ogcWkt2StringForKnownDomains() {
+        let iconProj4 = IconDomains.icon.grid.crsWkt2
+        #expect(iconProj4 == """
+            GEOGCRS["WGS 84",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                UNIT["degree",0.0174532925199433]
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[-90.0,-180.0,90.0,179.75]]
+            ]
+            """)
 
-        let aromeProj4 = MeteoFranceDomain.arome_france.grid.proj4String
-        #expect(aromeProj4 == "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs")
+        let aromeProj4 = MeteoFranceDomain.arome_france.grid.crsWkt2
+        #expect(aromeProj4 == """
+            GEOGCRS["WGS 84",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                UNIT["degree",0.0174532925199433]
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[37.5,-12.0,55.4,16.0]]
+            ]
+            """)
 
-        let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.proj4String
-        #expect(cmcGemContinentalProj4 == "+proj=ob_tran +o_proj=longlat +o_lat_p=36.0885 +o_lon_p=0.0 +lon_1=245.305 +units=m +datum=WGS84 +no_defs +type=crs")
+        let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.crsWkt2
+        #expect(cmcGemContinentalProj4 == """
+            PROJCRS["Rotated Lat/Lon",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                CONVERSION["Oblique Transformation",
+                    METHOD["Oblique Transformation"],
+                    PARAMETER["Latitude of rotated pole", 36.0885],
+                    PARAMETER["Longitude of rotated pole", 245.305],
+                    PARAMETER["Azimuth", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["x",east],
+                    AXIS["y",north],
+                UNIT["degree",0.0174532925199433],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[39.626034,-133.62952,47.87646,-40.708527]]
+            ]
+            """)
 
-        let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.proj4String
-        #expect(cmcGemRegionalProj4 == "+proj=stere +lat_0=57.295784 +lon_0=249.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+        let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.crsWkt2
+        #expect(cmcGemRegionalProj4 == """
+            PROJCRS["Stereographic",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
+                CONVERSION["Stereographic",
+                    METHOD["Stereographic"],
+                    PARAMETER["Latitude of natural origin", 57.295784],
+                    PARAMETER["Longitude of natural origin", 249.0],
+                    PARAMETER["Scale factor at natural origin", 1.0],
+                    PARAMETER["False easting", 0.0],
+                    PARAMETER["False northing", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                UNIT["metre",1.0],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[18.145027,-142.89252,45.40545,-10.174438]]
+            ]
+            """)
 
-        let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.proj4String
-        #expect(dmiHarmonieProj4 == "+proj=lcc +lon_0=352.0 +lat_0=55.5 +lat_1=55.5 +lat_2=55.5 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+        let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.crsWkt2
+        #expect(dmiHarmonieProj4 == """
+            PROJCRS["Lambert Conformal Conic",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                CONVERSION["Lambert Conformal Conic",
+                    METHOD["Lambert Conformal Conic (2SP)"],
+                    PARAMETER["Latitude of 1st standard parallel",55.5],
+                    PARAMETER["Latitude of 2nd standard parallel",55.5],
+                    PARAMETER["Latitude of false origin",55.5],
+                    PARAMETER["Longitude of false origin",352.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                UNIT["metre",1],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[39.670998,-25.421997,62.667618,40.069855]]
+            ]
+            """)
 
-        let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.proj4String
-        #expect(ukmoRegionalDeterministicProj4 == "+proj=laea +lon_0=-2.5 +lat_0=54.9 +x_0=0.0 +y_0=0.0 +R=6371229.0 +units=m +datum=WGS84 +no_defs +type=crs")
+        let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.crsWkt2
+        #expect(ukmoRegionalDeterministicProj4 == """
+            PROJCRS["Lambert Azimuthal Equal-Area",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
+                CONVERSION["Lambert Azimuthal Equal-Area",
+                    METHOD["Lambert Azimuthal Equal-Area"],
+                    PARAMETER["Latitude of natural origin", 54.9],
+                    PARAMETER["Longitude of natural origin", -2.5],
+                    PARAMETER["False easting", 0.0],
+                    PARAMETER["False northing", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                UNIT["metre",1.0],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[44.508755,-17.152863,61.92511,15.352753]]
+            ]
+            """)
         
-        let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.proj4String
-        #expect(o1280Proj4 == "+proj=longlat +title=O1280 +units=m +datum=WGS84 +no_defs +type=crs")
+        let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.crsWkt2
+        #expect(o1280Proj4 == """
+            GEOGCRS["WGS 84 / O1280 Gaussian Grid",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                UNIT["degree",0.0174532925199433],
+                REMARK["Gaussian reduced grid O1280 (ECMWF)"],
+                ID["gaussian_grid","O1280"],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[-90,-180.0,90,180]]
+            ]
+            """)
     }
 
     @Test func gridBoundsForKnownDomains() {

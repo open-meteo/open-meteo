@@ -4,7 +4,7 @@ protocol Projectable: Sendable {
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float)
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float)
 
-    var proj4String: String { get }
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String
 }
 
 struct ProjectionGrid<Projection: Projectable>: Gridable {
@@ -17,8 +17,10 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     /// In metres
     let dy: Float
     
-    var proj4String: String {
-        return projection.proj4String
+    var crsWkt2: String {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return projection.crsWkt2(latMin: sw.latitude, lonMin: sw.longitude, latMax: ne.latitude, lonMax: ne.longitude)
     }
 
     var searchRadius: Int {

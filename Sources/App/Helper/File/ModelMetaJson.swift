@@ -33,7 +33,6 @@ import OmFileFormat
 
 /**
  TODO:
- - CAMS, IconWave, GloFas, seasonal forecast, CMIP, satellite
  - run end lenght might be too short for side-runs
  - license
  - name of provider
@@ -75,8 +74,12 @@ struct ModelUpdateMetaJson: Codable, Sendable {
 
     /// Chunk files dimensions
     let chunk_file_dimensions: [DimensionName: Int]?
+    
+    /// WGS84 coordinates of the first and last grid point
     let grid_bounds: GridBounds?
-    let proj4_string: String?
+    
+    /// Coordinate reference system WKT string with projection information like `PROJCRS["Stereographic",BASEGEOGCRS["WGS 84",...`
+    let crs_wkt: String?
 
 
     /// Time at which that model run has been available on the current server
@@ -101,7 +104,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
                 .nt: domain.omFileLength
             ],
             grid_bounds: domain.grid.gridBounds,
-            proj4_string: domain.grid.proj4String
+            crs_wkt: domain.grid.crsWkt2
         )
         let path = ModelUpdateMetaFile(domain: domain.domainRegistry)
         try path.createDirectory()
@@ -121,7 +124,7 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             chunk_time_length: chunk_time_length,
             chunk_file_dimensions: chunk_file_dimensions,
             grid_bounds: grid_bounds,
-            proj4_string: proj4_string
+            crs_wkt: crs_wkt
         )
     }
 }

@@ -3,9 +3,23 @@ import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
 struct GaussianGrid: Gridable {
-    var proj4String: String {
-        // Gaussian grids do not have a Proj4 string. Encode the Gaussian grid type in the title attribute. E.g. `+title=O1280`
-        return "+proj=longlat +title=\(type.proj4Title) +units=m +datum=WGS84 +no_defs +type=crs"
+    var crsWkt2: String {
+        // Gaussian grids do not have a OGC WTK2 string. Encode the Gaussian grid type as id "gaussian_grid"
+        return """
+            GEOGCRS["WGS 84 / \(type.proj4Title) Gaussian Grid",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                UNIT["degree",0.0174532925199433],
+                REMARK["Gaussian reduced grid \(type.proj4Title) (ECMWF)"],
+                ID["gaussian_grid","\(type.proj4Title)"],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[-90,-180.0,90,180]]
+            ]
+            """
     }
 
     enum GridType {

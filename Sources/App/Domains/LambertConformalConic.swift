@@ -15,8 +15,27 @@ struct LambertConformalConicProjection: Projectable {
     /// Radius of Earth. Different radiuses may be used for different GRIBS: https://github.com/SciTools/iris-grib/issues/241#issuecomment-1239069695
     let R: Float
     
-    var proj4String: String {
-        return "+proj=lcc +lon_0=\(λ0_dec) +lat_0=\(ϕ0_dec) +lat_1=\(ϕ1_dec) +lat_2=\(ϕ2_dec) +x_0=0.0 +y_0=0.0 +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
+        return """
+            PROJCRS["Lambert Conformal Conic",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                CONVERSION["Lambert Conformal Conic",
+                    METHOD["Lambert Conformal Conic (2SP)"],
+                    PARAMETER["Latitude of 1st standard parallel",\(ϕ1_dec)],
+                    PARAMETER["Latitude of 2nd standard parallel",\(ϕ2_dec)],
+                    PARAMETER["Latitude of false origin",\(ϕ0_dec)],
+                    PARAMETER["Longitude of false origin",\(λ0_dec)]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                UNIT["metre",1],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
+            ]
+            """
     }
 
     /// λ0 reference longitude in degrees `LoVInDegrees` in grib

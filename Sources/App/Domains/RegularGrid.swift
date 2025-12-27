@@ -9,8 +9,22 @@ struct RegularGrid: Gridable {
     let dy: Float
     let searchRadius: Int
     
-    var proj4String: String {
-        return "+proj=longlat +units=m +datum=WGS84 +no_defs +type=crs"
+    var crsWkt2: String {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return """
+            GEOGCRS["WGS 84",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                UNIT["degree",0.0174532925199433]
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(sw.latitude),\(sw.longitude),\(ne.latitude),\(ne.longitude)]]
+            ]
+            """
     }
 
     public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {

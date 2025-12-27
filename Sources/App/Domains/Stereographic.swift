@@ -15,8 +15,28 @@ struct StereographicProjection: Projectable {
     /// Radius of Earth in meters
     var R: Float
     
-    var proj4String: String {
-        return "+proj=stere +lat_0=\(sinϕ1.radiansToDegrees) +lon_0=\(λ0.radiansToDegrees) +R=\(R) +units=m +datum=WGS84 +no_defs +type=crs"
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
+        return """
+            PROJCRS["Stereographic",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",\(R),298.257223563]]],
+                CONVERSION["Stereographic",
+                    METHOD["Stereographic"],
+                    PARAMETER["Latitude of natural origin", \(sinϕ1.radiansToDegrees)],
+                    PARAMETER["Longitude of natural origin", \(λ0.radiansToDegrees)],
+                    PARAMETER["Scale factor at natural origin", 1.0],
+                    PARAMETER["False easting", 0.0],
+                    PARAMETER["False northing", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                UNIT["metre",1.0],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
+            ]
+            """
     }
 
     public init(latitude: Float, longitude: Float, radius: Float) {
