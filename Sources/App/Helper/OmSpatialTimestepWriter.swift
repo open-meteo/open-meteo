@@ -138,7 +138,8 @@ actor OmSpatialTimestepWriter {
             last_modified_time: Date(),
             completed: completed,
             valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
-            variables: self.variables.map(\.omFileNameWithMember).sorted()
+            variables: self.variables.map(\.omFileNameWithMember).sorted(),
+            crs_wkt: domain.grid.crsWkt2
         )
         let realm = realm.map { "_\($0)" } ?? ""
         let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
@@ -203,17 +204,20 @@ actor OmSpatialTimestepWriter {
         
         let runTime = try writer.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
         let validTime =  try writer.write(value: time.timeIntervalSince1970, name: "valid_time", children: [])
-        //let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
+        let coordinates = try writer.write(value: "lat lon", name: "coordinates", children: [])
         let createdAt = try writer.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
+        let crs = try writer.write(value: domain.grid.crsWkt2, name: "crs_wkt", children: [])
+        
         // Write LUTs of all variables
         let writerFinalised = try self.variables.map {
             try $0.writer.finalise()
         }
         // Write variable meta data
         let variablesOffset = try zip(variables, writerFinalised).map {
-            return try writer.write(array: $0.1, name: $0.0.omFileNameWithMember, children: [])
+            let unit = try writer.write(value: $0.0.variable.unit.abbreviation, name: "unit", children: [])
+            return try writer.write(array: $0.1, name: $0.0.omFileNameWithMember, children: [unit])
         }
-        let root = try writer.writeNone(name: "", children: variablesOffset + [runTime, validTime, /*coordinates,*/ createdAt])
+        let root = try writer.writeNone(name: "", children: variablesOffset + [crs, runTime, validTime, coordinates, createdAt])
         try writer.writeTrailer(rootVariable: root)
         
         if let filename {

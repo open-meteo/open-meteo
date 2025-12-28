@@ -9,6 +9,28 @@ struct RotatedLatLonProjection: Projectable {
     /// Rotation around z-axis
     let ϕ: Float
 
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
+        let o_lat_p = -(θ.radiansToDegrees - 90)
+        return """
+            GEOGCRS["Rotated Lat/Lon",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                DERIVINGCONVERSION["Rotated Lat/Lon",
+                    METHOD["PROJ ob_tran o_proj=longlat"],
+                    PARAMETER["o_lon_p",0],
+                    PARAMETER["o_lat_p",\(o_lat_p)],
+                    PARAMETER["lon_0",\(ϕ.radiansToDegrees)]]
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                    ANGLEUNIT["degree",0.0174532925199433],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
+            """
+    }
+
     public init(latitude: Float, longitude: Float) {
         θ = (90 + latitude).degreesToRadians
         ϕ = longitude.degreesToRadians

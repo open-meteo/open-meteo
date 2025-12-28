@@ -9,6 +9,9 @@ struct FullRunMetaJson: Codable {
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
     let temporal_resolution_seconds: Int
     
+    /// Coordinate reference system WKT string with projection information like `PROJCRS["Stereographic",BASEGEOGCRS["WGS 84",...`
+    let crs_wkt: String?
+    
     // valid_times? Params like precipitation do not have the first step. Some MeteoFrance variables are also missing steps...
     
     /// Use directory listing to get all variables. Model or pressure levels might be downloaded at a different time
@@ -23,6 +26,7 @@ struct FullRunMetaJson: Codable {
         self.reference_time = run.toDate()
         self.created_at = Date()
         self.temporal_resolution_seconds = domain.dtSeconds
+        self.crs_wkt = domain.grid.crsWkt2
         self.valid_times = validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ)
     }
     

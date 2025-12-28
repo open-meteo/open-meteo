@@ -6,6 +6,9 @@ struct DataSpatialJson: Codable {
     let completed: Bool
     let valid_times: [String]
     let variables: [String]
+    
+    /// Coordinate reference system WKT string with projection information like `PROJCRS["Stereographic",BASEGEOGCRS["WGS 84",...`
+    let crs_wkt: String?
 
     /// Data temporal resolution in seconds. E.g. 3600 for 1-hourly data
     //let temporal_resolution_seconds: Int
