@@ -66,17 +66,17 @@ struct ModelUpdateMetaJson: Codable, Sendable {
     let chunk_time_length: Int?
 
 
-    enum DimensionName: String, Codable, Hashable {
+    /*enum DimensionName: String, Codable, Hashable {
         case nx
         case ny
         case nt
-    }
+    }*/
 
     /// Chunk files dimensions
-    let chunk_file_dimensions: [DimensionName: Int]?
+    //let chunk_file_dimensions: [DimensionName: Int]?
     
     /// WGS84 coordinates of the first and last grid point
-    let grid_bounds: GridBounds?
+    ///let grid_bounds: GridBounds?
     
     /// Coordinate reference system WKT string with projection information like `PROJCRS["Stereographic",BASEGEOGCRS["WGS 84",...`
     let crs_wkt: String?
@@ -98,12 +98,12 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             data_end_time: end.timeIntervalSince1970,
             update_interval_seconds: domain.updateIntervalSeconds,
             chunk_time_length: domain.omFileLength,
-            chunk_file_dimensions: [
+            /*chunk_file_dimensions: [
                 .nx: domain.grid.nx,
                 .ny: domain.grid.ny,
                 .nt: domain.omFileLength
             ],
-            grid_bounds: domain.grid.gridBounds,
+            grid_bounds: domain.grid.gridBounds,*/
             crs_wkt: domain.grid.crsWkt2
         )
         let path = ModelUpdateMetaFile(domain: domain.domainRegistry)
@@ -122,8 +122,8 @@ struct ModelUpdateMetaJson: Codable, Sendable {
             data_end_time: data_end_time,
             update_interval_seconds: update_interval_seconds,
             chunk_time_length: chunk_time_length,
-            chunk_file_dimensions: chunk_file_dimensions,
-            grid_bounds: grid_bounds,
+            //chunk_file_dimensions: chunk_file_dimensions,
+            //grid_bounds: grid_bounds,
             crs_wkt: crs_wkt
         )
     }
