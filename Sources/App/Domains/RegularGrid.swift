@@ -19,11 +19,10 @@ struct RegularGrid: Gridable {
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
-                UNIT["degree",0.0174532925199433]
+                    ANGLEUNIT["degree",0.0174532925199433]
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[\(sw.latitude),\(sw.longitude),\(ne.latitude),\(ne.longitude)]]
-            ]
+                    BBOX[\(sw.latitude),\(sw.longitude),\(ne.latitude),\(ne.longitude)]]]
             """
     }
 

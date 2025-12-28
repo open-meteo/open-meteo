@@ -22,11 +22,10 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
                 CS[Cartesian,2],
                     AXIS["easting",east],
                     AXIS["northing",north],
-                UNIT["metre",1.0],
+                    LENGTHUNIT["metre",1.0],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
-            ]
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
             """
     }
 

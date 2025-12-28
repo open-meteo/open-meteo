@@ -12,13 +12,12 @@ struct GaussianGrid: Gridable {
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
-                UNIT["degree",0.0174532925199433],
+                    ANGLEUNIT["degree",0.0174532925199433],
                 REMARK["Gaussian reduced grid \(type.proj4Title) (ECMWF)"],
                 ID["gaussian_grid","\(type.proj4Title)"],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[-90,-180.0,90,180]]
-            ]
+                    BBOX[-90,-180.0,90,180]]]
             """
     }
 

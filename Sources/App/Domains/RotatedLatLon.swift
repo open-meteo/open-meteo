@@ -12,23 +12,22 @@ struct RotatedLatLonProjection: Projectable {
     func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
         let o_lat_p = -(θ.radiansToDegrees - 90)
         return """
-            PROJCRS["Rotated Lat/Lon",
+            GEOGCRS["Rotated Lat/Lon",
                 BASEGEOGCRS["WGS 84",
                     DATUM["World Geodetic System 1984",
                         ELLIPSOID["WGS 84",6378137,298.257223563]]],
-                CONVERSION["Oblique Transformation",
-                    METHOD["Oblique Transformation"],
-                    PARAMETER["Latitude of rotated pole", \(o_lat_p)],
-                    PARAMETER["Longitude of rotated pole", \(ϕ.radiansToDegrees)],
-                    PARAMETER["Azimuth", 0.0]],
-                CS[Cartesian,2],
-                    AXIS["x",east],
-                    AXIS["y",north],
-                UNIT["degree",0.0174532925199433],
+                DERIVINGCONVERSION["Rotated Lat/Lon",
+                    METHOD["PROJ ob_tran o_proj=longlat"],
+                    PARAMETER["o_lon_p",0],
+                    PARAMETER["o_lat_p",\(o_lat_p)],
+                    PARAMETER["lon_0",\(ϕ.radiansToDegrees)]]
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                    ANGLEUNIT["degree",0.0174532925199433],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
-            ]
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
             """
     }
 

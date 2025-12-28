@@ -65,11 +65,10 @@ import Testing
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
-                UNIT["degree",0.0174532925199433]
+                    ANGLEUNIT["degree",0.0174532925199433]
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[-90.0,-180.0,90.0,179.75]]
-            ]
+                    BBOX[-90.0,-180.0,90.0,179.75]]]
             """)
 
         let aromeProj4 = MeteoFranceDomain.arome_france.grid.crsWkt2
@@ -80,32 +79,30 @@ import Testing
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
-                UNIT["degree",0.0174532925199433]
+                    ANGLEUNIT["degree",0.0174532925199433]
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[37.5,-12.0,55.4,16.0]]
-            ]
+                    BBOX[37.5,-12.0,55.4,16.0]]]
             """)
 
         let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.crsWkt2
         #expect(cmcGemContinentalProj4 == """
-            PROJCRS["Rotated Lat/Lon",
+            GEOGCRS["Rotated Lat/Lon",
                 BASEGEOGCRS["WGS 84",
                     DATUM["World Geodetic System 1984",
                         ELLIPSOID["WGS 84",6378137,298.257223563]]],
-                CONVERSION["Oblique Transformation",
-                    METHOD["Oblique Transformation"],
-                    PARAMETER["Latitude of rotated pole", 36.0885],
-                    PARAMETER["Longitude of rotated pole", 245.305],
-                    PARAMETER["Azimuth", 0.0]],
-                CS[Cartesian,2],
-                    AXIS["x",east],
-                    AXIS["y",north],
-                UNIT["degree",0.0174532925199433],
+                DERIVINGCONVERSION["Rotated Lat/Lon",
+                    METHOD["PROJ ob_tran o_proj=longlat"],
+                    PARAMETER["o_lon_p",0],
+                    PARAMETER["o_lat_p",36.0885],
+                    PARAMETER["lon_0",245.305]]
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                    ANGLEUNIT["degree",0.0174532925199433],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[39.626034,-133.62952,47.87646,-40.708527]]
-            ]
+                    BBOX[39.626034,-133.62952,47.87646,-40.708527]]]
             """)
 
         let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.crsWkt2
@@ -116,7 +113,7 @@ import Testing
                         ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
                 CONVERSION["Stereographic",
                     METHOD["Stereographic"],
-                    PARAMETER["Latitude of natural origin", 57.295784],
+                    PARAMETER["Latitude of natural origin", 90.0],
                     PARAMETER["Longitude of natural origin", 249.0],
                     PARAMETER["Scale factor at natural origin", 1.0],
                     PARAMETER["False easting", 0.0],
@@ -124,21 +121,20 @@ import Testing
                 CS[Cartesian,2],
                     AXIS["easting",east],
                     AXIS["northing",north],
-                UNIT["metre",1.0],
+                    LENGTHUNIT["metre",1.0],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[18.145027,-142.89252,45.40545,-10.174438]]
-            ]
+                    BBOX[18.145027,-142.89252,45.40545,-10.174438]]]
             """)
 
         let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.crsWkt2
         #expect(dmiHarmonieProj4 == """
-            PROJCRS["Lambert Conformal Conic",
+            PROJCRS["Lambert Conic Conformal",
                 BASEGEOGCRS["WGS 84",
                     DATUM["World Geodetic System 1984",
                         ELLIPSOID["WGS 84",6378137,298.257223563]]],
-                CONVERSION["Lambert Conformal Conic",
-                    METHOD["Lambert Conformal Conic (2SP)"],
+                CONVERSION["Lambert Conic Conformal",
+                    METHOD["Lambert Conic Conformal (2SP)"],
                     PARAMETER["Latitude of 1st standard parallel",55.5],
                     PARAMETER["Latitude of 2nd standard parallel",55.5],
                     PARAMETER["Latitude of false origin",55.5],
@@ -146,11 +142,10 @@ import Testing
                 CS[Cartesian,2],
                     AXIS["easting",east],
                     AXIS["northing",north],
-                UNIT["metre",1],
+                    LENGTHUNIT["metre",1],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[39.670998,-25.421997,62.667618,40.069855]]
-            ]
+                    BBOX[39.670998,-25.421997,62.667618,40.069855]]]
             """)
 
         let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.crsWkt2
@@ -168,11 +163,10 @@ import Testing
                 CS[Cartesian,2],
                     AXIS["easting",east],
                     AXIS["northing",north],
-                UNIT["metre",1.0],
+                    LENGTHUNIT["metre",1.0],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[44.508755,-17.152863,61.92511,15.352753]]
-            ]
+                    BBOX[44.508755,-17.152863,61.92511,15.352753]]]
             """)
         
         let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.crsWkt2
@@ -183,13 +177,12 @@ import Testing
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
-                UNIT["degree",0.0174532925199433],
+                    ANGLEUNIT["degree",0.0174532925199433],
                 REMARK["Gaussian reduced grid O1280 (ECMWF)"],
                 ID["gaussian_grid","O1280"],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[-90,-180.0,90,180]]
-            ]
+                    BBOX[-90,-180.0,90,180]]]
             """)
     }
 

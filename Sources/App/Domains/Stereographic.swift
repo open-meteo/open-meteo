@@ -23,7 +23,7 @@ struct StereographicProjection: Projectable {
                         ELLIPSOID["WGS 84",\(R),298.257223563]]],
                 CONVERSION["Stereographic",
                     METHOD["Stereographic"],
-                    PARAMETER["Latitude of natural origin", \(sinϕ1.radiansToDegrees)],
+                    PARAMETER["Latitude of natural origin", \(asin(sinϕ1).radiansToDegrees)],
                     PARAMETER["Longitude of natural origin", \(λ0.radiansToDegrees)],
                     PARAMETER["Scale factor at natural origin", 1.0],
                     PARAMETER["False easting", 0.0],
@@ -31,11 +31,10 @@ struct StereographicProjection: Projectable {
                 CS[Cartesian,2],
                     AXIS["easting",east],
                     AXIS["northing",north],
-                UNIT["metre",1.0],
+                    LENGTHUNIT["metre",1.0],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
-            ]
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
             """
     }
 

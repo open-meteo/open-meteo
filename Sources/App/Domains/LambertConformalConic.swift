@@ -17,12 +17,12 @@ struct LambertConformalConicProjection: Projectable {
     
     func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
         return """
-            PROJCRS["Lambert Conformal Conic",
+            PROJCRS["Lambert Conic Conformal",
                 BASEGEOGCRS["WGS 84",
                     DATUM["World Geodetic System 1984",
                         ELLIPSOID["WGS 84",6378137,298.257223563]]],
-                CONVERSION["Lambert Conformal Conic",
-                    METHOD["Lambert Conformal Conic (2SP)"],
+                CONVERSION["Lambert Conic Conformal",
+                    METHOD["Lambert Conic Conformal (2SP)"],
                     PARAMETER["Latitude of 1st standard parallel",\(ϕ1_dec)],
                     PARAMETER["Latitude of 2nd standard parallel",\(ϕ2_dec)],
                     PARAMETER["Latitude of false origin",\(ϕ0_dec)],
@@ -30,11 +30,10 @@ struct LambertConformalConicProjection: Projectable {
                 CS[Cartesian,2],
                     AXIS["easting",east],
                     AXIS["northing",north],
-                UNIT["metre",1],
+                    LENGTHUNIT["metre",1],
                 USAGE[
                     SCOPE["grid"],
-                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]
-            ]
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
             """
     }
 
