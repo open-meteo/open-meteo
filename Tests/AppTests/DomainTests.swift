@@ -171,15 +171,14 @@ import Testing
         
         let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.crsWkt2
         #expect(o1280Proj4 == """
-            GEOGCRS["WGS 84 / O1280 Gaussian Grid",
+            GEOGCRS["Reduced Gaussian Grid",
                 DATUM["World Geodetic System 1984",
                     ELLIPSOID["WGS 84",6378137,298.257223563]],
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
                     ANGLEUNIT["degree",0.0174532925199433],
-                REMARK["Gaussian reduced grid O1280 (ECMWF)"],
-                ID["gaussian_grid","O1280"],
+                REMARK["Reduced Gaussian Grid O1280 (ECMWF)"],
                 USAGE[
                     SCOPE["grid"],
                     BBOX[-90,-180.0,90,180]]]

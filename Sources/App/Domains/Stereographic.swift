@@ -5,13 +5,16 @@ import Foundation
 struct StereographicProjection: Projectable {
     /// Central longitude
     let λ0: Float
+    
+    /// Central latitude
+    let ϕ1_dec: Float
 
     /// Sinus of central latitude
     let sinϕ1: Float
 
     /// Cosine of central latitude
     let cosϕ1: Float
-
+    
     /// Radius of Earth in meters
     var R: Float
     
@@ -23,7 +26,7 @@ struct StereographicProjection: Projectable {
                         ELLIPSOID["WGS 84",\(R),298.257223563]]],
                 CONVERSION["Stereographic",
                     METHOD["Stereographic"],
-                    PARAMETER["Latitude of natural origin", \(asin(sinϕ1).radiansToDegrees)],
+                    PARAMETER["Latitude of natural origin", \(ϕ1_dec)],
                     PARAMETER["Longitude of natural origin", \(λ0.radiansToDegrees)],
                     PARAMETER["Scale factor at natural origin", 1.0],
                     PARAMETER["False easting", 0.0],
@@ -40,6 +43,7 @@ struct StereographicProjection: Projectable {
 
     public init(latitude: Float, longitude: Float, radius: Float) {
         λ0 = longitude.degreesToRadians
+        ϕ1_dec = latitude
         sinϕ1 = sin(latitude.degreesToRadians)
         cosϕ1 = cos(latitude.degreesToRadians)
         R = radius

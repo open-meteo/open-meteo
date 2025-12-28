@@ -6,15 +6,14 @@ struct GaussianGrid: Gridable {
     var crsWkt2: String {
         // Gaussian grids do not have a OGC WTK2 string. Encode the Gaussian grid type as id "gaussian_grid"
         return """
-            GEOGCRS["WGS 84 / \(type.proj4Title) Gaussian Grid",
+            GEOGCRS["Reduced Gaussian Grid",
                 DATUM["World Geodetic System 1984",
                     ELLIPSOID["WGS 84",6378137,298.257223563]],
                 CS[ellipsoidal,2],
                     AXIS["latitude",north],
                     AXIS["longitude",east],
                     ANGLEUNIT["degree",0.0174532925199433],
-                REMARK["Gaussian reduced grid \(type.proj4Title) (ECMWF)"],
-                ID["gaussian_grid","\(type.proj4Title)"],
+                REMARK["Reduced Gaussian Grid \(type.proj4Title) (ECMWF)"],
                 USAGE[
                     SCOPE["grid"],
                     BBOX[-90,-180.0,90,180]]]
