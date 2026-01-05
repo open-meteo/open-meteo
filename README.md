@@ -60,6 +60,7 @@ Apps:
 - [QuickWeather](https://github.com/TylerWilliamson/QuickWeather) Fast, free, and open source Android app
 - [Rain](https://github.com/DarkMooNight/Rain) Free, open source, beautiful, minimal and fast weather app
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
+- [Road Vagabond](https://roadvagabond.com) A camping destination discovery app showing zones within your drive time with weather-based filtering.
 - [SkyMuse](https://github.com/cakephone/skymuse) Minimal, privacy-respecting weather app. Built with web technologies.
 - [Slideshow](https://slideshow.digital/) Digital Signage app for Android
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
