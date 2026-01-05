@@ -20,7 +20,7 @@ struct LambertConformalConicProjection: Projectable {
             PROJCRS["Lambert Conic Conformal",
                 BASEGEOGCRS["WGS 84",
                     DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                        ELLIPSOID["WGS 84",\(R),298.257223563]]],
                 CONVERSION["Lambert Conic Conformal",
                     METHOD["Lambert Conic Conformal (2SP)"],
                     PARAMETER["Latitude of 1st standard parallel",\(ϕ1_dec)],
@@ -40,7 +40,7 @@ struct LambertConformalConicProjection: Projectable {
     /// λ0 reference longitude in degrees `LoVInDegrees` in grib
     /// ϕ0  reference latitude in degrees. `LaDInDegrees` in grib
     /// ϕ1 and ϕ2 standard parallels in degrees `Latin1InDegrees` and `Latin2InDegrees` in grib
-    public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float, radius: Float = 6370.997) {
+    public init(λ0 λ0_dec: Float, ϕ0 ϕ0_dec: Float, ϕ1 ϕ1_dec: Float, ϕ2 ϕ2_dec: Float , radius: Float) {
         // https://mathworld.wolfram.com/LambertConformalConicProjection.html
         // https://pubs.usgs.gov/pp/1395/report.pdf page 104
         λ0 = ((λ0_dec + 180).truncatingRemainder(dividingBy: 360) - 180).degreesToRadians

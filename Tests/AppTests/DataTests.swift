@@ -268,7 +268,7 @@ import VaporTesting
     }
 
     @Test func lambertConformal() {
-        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
+        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5, radius: 6370.997)
         let pos = proj.forward(latitude: 47, longitude: -8)
         #expect(pos.x == 5833.8677)
         #expect(pos.y == 8632.733)
@@ -428,7 +428,7 @@ import VaporTesting
 
     @Test func cerraGrid() {
         //
-        let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
+        let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50, radius: 6371229))
 
         var pos = grid.findPoint(lat: 20.29228, lon: -17.485962)!
         var (lat, lon) = grid.getCoordinates(gridpoint: pos)

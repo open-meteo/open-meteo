@@ -57,6 +57,10 @@ import Testing
     }
 
     @Test func ogcWkt2StringForKnownDomains() {
+        // Following OGC WKT2 v2 https://www.ogc.org/standards/wkt-crs/
+        // Different projections are used for different weather models
+        // BBOX always contains the WGS84 coordinate of the south-wast and north-east coordinate
+        // Note: dump proj4 string from GRIB files: `grib_ls -p short_name,projString <grib_file>`
         let iconProj4 = IconDomains.icon.grid.crsWkt2
         #expect(iconProj4 == """
             GEOGCRS["WGS 84",
@@ -132,7 +136,7 @@ import Testing
             PROJCRS["Lambert Conic Conformal",
                 BASEGEOGCRS["WGS 84",
                     DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                        ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
                 CONVERSION["Lambert Conic Conformal",
                     METHOD["Lambert Conic Conformal (2SP)"],
                     PARAMETER["Latitude of 1st standard parallel",55.5],

@@ -143,7 +143,7 @@ enum CdsDomain: String, GenericDomain, CaseIterable {
         case .era5_land, .era5_land_daily:
             return RegularGrid(nx: 3600, ny: 1801, latMin: -90, lonMin: -180, dx: 0.1, dy: 0.1)
         case .cerra:
-            return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
+            return ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50, radius: 6371229))
         case .ecmwf_ifs, .ecmwf_ifs_analysis_long_window, .ecmwf_ifs_long_window, .ecmwf_ifs_analysis:
             return GaussianGrid(type: .o1280)
         }
