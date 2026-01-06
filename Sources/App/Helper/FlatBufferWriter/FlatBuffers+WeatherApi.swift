@@ -1082,7 +1082,7 @@ extension MultiDomains {
             return .gfs025 // TODO register
         case .ncep_aigefs025:
             return .gfs025 // TODO register
-        case .ncep_hgefs025_stats:fi
+        case .ncep_hgefs025_stats:
             return .gfs025 // TODO register
         }
     }
