@@ -226,19 +226,22 @@ struct GfsGraphCastDownload: AsyncCommand {
                     let level = v.variable.level
                     let clouds = data.data.map { Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level)) }
                     switch level {
-                    case ...250:
+                    case ...300:
+                        /// high clouds (>8 km): 300/250/200/150/100/50
                         for i in cloudcover_high.indices {
                             if cloudcover_high[i].isNaN || cloudcover_high[i] < clouds[i] {
                                 cloudcover_high[i] = clouds[i]
                             }
                         }
                     case ...700:
+                        /// mid clouds (3 km - 8km): 700/600/500/400
                         for i in cloudcover_mid.indices {
                             if cloudcover_mid[i].isNaN || cloudcover_mid[i] < clouds[i] {
                                 cloudcover_mid[i] = clouds[i]
                             }
                         }
                     default:
+                        /// low clouds (surface - 3km): 1000/925/850
                         for i in cloudcover_low.indices {
                             if cloudcover_low[i].isNaN || cloudcover_low[i] < clouds[i] {
                                 cloudcover_low[i] = clouds[i]

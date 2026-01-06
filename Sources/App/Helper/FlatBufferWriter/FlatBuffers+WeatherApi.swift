@@ -1078,6 +1078,10 @@ extension MultiDomains {
         case .ecmwf_wam:
             // TODO register HRES WAM
             return .ecmwfWam025
+        case .ncep_aigfs025:
+            return .gfs025 // TODO register
+        case .ncep_aigefs025:
+            return .gfs025 // TODO register
         }
     }
 }

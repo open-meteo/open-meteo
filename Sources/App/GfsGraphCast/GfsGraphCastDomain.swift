@@ -84,9 +84,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     
     /// Returns two grib files, in case grib messages are split in two different files
     func getGribUrl(run: Timestamp, forecastHour: Int, member: Int) -> [String] {
-        let fHH = forecastHour.zeroPadded(len: 2)
         let fHHH = forecastHour.zeroPadded(len: 3)
-        
         let yyyymmdd = run.format_YYYYMMdd
         let hh = run.hh
 
