@@ -654,6 +654,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ncep_nam_conus
     case ncep_aigfs025
     case ncep_aigefs025
+    case ncep_hgefs025_stats
     
     case meteofrance_seamless
     case meteofrance_mix
@@ -1092,6 +1093,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ].compactMap({ $0 })
         case .ncep_aigefs025:
             return try await GfsGraphCastReader(domain: .aigefs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_hgefs025_stats:
+            return try await GfsGraphCastReader(domain: .hgefs025_stats, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return ([arpegeProbabilities] + (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
@@ -1417,6 +1420,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GfsGraphCastDomain.aigfs025
         case .ncep_aigefs025:
             return GfsGraphCastDomain.aigefs025
+        case .ncep_hgefs025_stats:
+            return GfsGraphCastDomain.hgefs025_stats
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return MeteoFranceDomain.arpege_world
         case .meteofrance_arpege_europe, .arpege_europe:
@@ -1656,6 +1661,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GfsGraphCastReader(domain: .aigfs025, gridpoint: gridpoint, options: options)
         case .ncep_aigefs025:
             return try await GfsGraphCastReader(domain: .aigefs025, gridpoint: gridpoint, options: options)
+        case .ncep_hgefs025_stats:
+            return try await GfsGraphCastReader(domain: .hgefs025_stats, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return try await MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_europe, .arpege_europe, .meteofrance_arome_france0025:

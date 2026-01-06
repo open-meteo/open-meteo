@@ -4,6 +4,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     case graphcast025
     case aigfs025
     case aigefs025
+    case hgefs025_stats
     
     var domainRegistry: DomainRegistry {
         switch self {
@@ -13,6 +14,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return .ncep_aigfs025
         case .aigefs025:
             return .ncep_aigefs025
+        case .hgefs025_stats:
+            return .ncep_hgefs025_stats
         }
     }
 
@@ -44,6 +47,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return 1
         case .aigefs025:
             return 30+1
+        case .hgefs025_stats:
+            return 1
         }
     }
 
@@ -61,6 +66,9 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         case .aigfs025, .aigefs025:
             // 3:40 delay for AIGFS
             return t.add(hours: -3).floor(toNearestHour: 6)
+        case .hgefs025_stats:
+            // 6:40 delay
+            return t.add(hours: -6).floor(toNearestHour: 6)
         }
     }
 
@@ -101,6 +109,12 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
             let base = "\(server)aigfs/prod/aigfs.\(yyyymmdd)/\(hh)/model/atmos/grib2/"
             return ["\(base)aigfs.t\(hh)z.sfc.f\(fHHH).grib2", "\(base)aigfs.t\(hh)z.pres.f\(fHHH).grib2"]
+        case .hgefs025_stats:
+            let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
+            let base = "\(server)hgefs/prod/hgefs.\(yyyymmdd)/\(hh)/ensstat/products/atmos/grib2/"
+            // TODO implement spread variables
+            // "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2"
+            return ["\(base)hgefs.t\(hh)z.sfc.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.avg.f\(fHHH).grib2"]
         }
     }
 }
