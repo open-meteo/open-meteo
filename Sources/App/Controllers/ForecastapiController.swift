@@ -1085,7 +1085,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ncep_aigfs025:
-            return try await GfsGraphCastReader(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            /// Use precipitation_probability from AIGEFS
+            return [
+                try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
+                try await GfsGraphCastReader(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            ].compactMap({ $0 })
         case .ncep_aigefs025:
             return try await GfsGraphCastReader(domain: .aigefs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:

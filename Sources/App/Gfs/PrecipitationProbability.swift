@@ -79,6 +79,11 @@ enum ProbabilityReader {
     static func makeIconD2Reader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<IconDomains, ProbabilityVariable>? {
         return try await GenericReader<IconDomains, ProbabilityVariable>(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
+    
+    /// Reader for probabilities based on AIGEFS
+    static func makeAigefsReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<GfsGraphCastDomain, ProbabilityVariable>? {
+        return try await GenericReader<GfsGraphCastDomain, ProbabilityVariable>(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+    }
 
     /// Reader for probabilities based on BOM ACCESS GLOBAL ENSEMBLE
     static func makeBomReader(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> GenericReader<BomDomain, ProbabilityVariable> {
