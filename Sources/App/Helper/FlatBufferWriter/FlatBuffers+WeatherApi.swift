@@ -1082,6 +1082,8 @@ extension MultiDomains {
             return .gfs025 // TODO register
         case .ncep_aigefs025:
             return .gfs025 // TODO register
+        case .ncep_hrrr_conus:
+            return .gfs025 // TODO register
         }
     }
 }
