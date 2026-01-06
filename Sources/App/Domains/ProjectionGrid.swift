@@ -3,6 +3,8 @@ import Foundation
 protocol Projectable: Sendable {
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float)
     func inverse(x: Float, y: Float) -> (latitude: Float, longitude: Float)
+
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String
 }
 
 struct ProjectionGrid<Projection: Projectable>: Gridable {
@@ -14,6 +16,12 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
     let dx: Float
     /// In metres
     let dy: Float
+    
+    var crsWkt2: String {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return projection.crsWkt2(latMin: sw.latitude, lonMin: sw.longitude, latMax: ne.latitude, lonMax: ne.longitude)
+    }
 
     var searchRadius: Int {
         return 1
@@ -39,11 +47,11 @@ struct ProjectionGrid<Projection: Projectable>: Gridable {
         self.dy = dy
     }
 
-    public init(nx: Int, ny: Int, latitudeProjectionOrigion: Float, longitudeProjectionOrigion: Float, dx: Float, dy: Float, projection: Projection) {
+    public init(nx: Int, ny: Int, latitudeProjectionOrigin: Float, longitudeProjectionOrigin: Float, dx: Float, dy: Float, projection: Projection) {
         self.nx = nx
         self.ny = ny
         self.projection = projection
-        origin = (longitudeProjectionOrigion, latitudeProjectionOrigion)
+        origin = (longitudeProjectionOrigin, latitudeProjectionOrigin)
         self.dx = dx
         self.dy = dy
     }

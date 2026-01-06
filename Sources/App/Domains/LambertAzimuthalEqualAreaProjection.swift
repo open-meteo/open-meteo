@@ -3,18 +3,42 @@ import Foundation
 /// See https://mathworld.wolfram.com/LambertAzimuthalEqual-AreaProjection.html
 struct LambertAzimuthalEqualAreaProjection: Projectable {
     let λ0: Float
+    let λ0_dec: Float
     let ϕ1: Float
     let R: Float
+    
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
+        return """
+            PROJCRS["Lambert Azimuthal Equal-Area",
+                BASEGEOGCRS["WGS 84",
+                    DATUM["World Geodetic System 1984",
+                        ELLIPSOID["WGS 84",\(R),298.257223563]]],
+                CONVERSION["Lambert Azimuthal Equal-Area",
+                    METHOD["Lambert Azimuthal Equal-Area"],
+                    PARAMETER["Latitude of natural origin", \(ϕ1.radiansToDegrees)],
+                    PARAMETER["Longitude of natural origin", \(λ0_dec)],
+                    PARAMETER["False easting", 0.0],
+                    PARAMETER["False northing", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                    LENGTHUNIT["metre",1.0],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
+            """
+    }
 
     /*
      λ0 central longitude
-     ϕ1 standard parallal
+     ϕ1 standard parallel
      radius of earth
      */
     init(λ0 λ0_dec: Float, ϕ1 ϕ1_dec: Float, radius: Float = 6371229) {
         λ0 = λ0_dec.degreesToRadians
         ϕ1 = ϕ1_dec.degreesToRadians
         R = radius
+        self.λ0_dec = λ0_dec
     }
 
     func forward(latitude: Float, longitude: Float) -> (x: Float, y: Float) {

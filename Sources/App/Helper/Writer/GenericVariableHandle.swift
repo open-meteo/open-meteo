@@ -189,6 +189,9 @@ struct GenericVariableHandle: Sendable {
             let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
             let coordinates = try writeFile.write(value: coordinatesString, name: "coordinates", children: [])
             let runTime: OmOffsetSize? = try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
+            let crs = try writeFile.write(value: domain.grid.crsWkt2, name: "crs_wkt", children: [])
+            let unit = try writeFile.write(value: variable.unit.abbreviation, name: "unit", children: [])
+            
             let validTimeArray = try writeFile.writeArray(
                 data: time.map(\.timeIntervalSince1970),
                 dimensions: [UInt64(nTime)],
@@ -198,7 +201,7 @@ struct GenericVariableHandle: Sendable {
                 add_offset: 0
             )
             let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
-            let root = try writeFile.write(array: arrayFinalised, name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
+            let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
             
             try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)

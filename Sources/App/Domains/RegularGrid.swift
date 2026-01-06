@@ -8,6 +8,23 @@ struct RegularGrid: Gridable {
     let dx: Float
     let dy: Float
     let searchRadius: Int
+    
+    var crsWkt2: String {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return """
+            GEOGCRS["WGS 84",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                    ANGLEUNIT["degree",0.0174532925199433]
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(sw.latitude),\(sw.longitude),\(ne.latitude),\(ne.longitude)]]]
+            """
+    }
 
     public init(nx: Int, ny: Int, latMin: Float, lonMin: Float, dx: Float, dy: Float, searchRadius: Int = 1) {
         self.nx = nx

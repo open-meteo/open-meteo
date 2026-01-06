@@ -268,7 +268,7 @@ import VaporTesting
     }
 
     @Test func lambertConformal() {
-        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5)
+        let proj = LambertConformalConicProjection(λ0: -97.5, ϕ0: 0, ϕ1: 38.5, ϕ2: 38.5, radius: 6370.997)
         let pos = proj.forward(latitude: 47, longitude: -8)
         #expect(pos.x == 5833.8677)
         #expect(pos.y == 8632.733)
@@ -330,7 +330,7 @@ import VaporTesting
 
     @Test func lambertAzimuthalEqualAreaProjection() {
         let proj = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
-        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigion: -1036000, longitudeProjectionOrigion: -1158000, dx: 2000, dy: 2000, projection: proj)
+        let grid = ProjectionGrid(nx: 1042, ny: 970, latitudeProjectionOrigin: -1036000, longitudeProjectionOrigin: -1158000, dx: 2000, dy: 2000, projection: proj)
         // peak north denmark 57.745566, 10.620785
         let coords = proj.forward(latitude: 57.745566, longitude: 10.620785)
         #expect(coords.x.isApproximatelyEqual(to: 773650.5, absoluteTolerance: 0.0001)) // around 774000.0
@@ -389,7 +389,7 @@ import VaporTesting
 
     @Test func stereographic() {
         let nx = 935
-        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereograpicProjection(latitude: 90, longitude: 249, radius: 6371229))
+        let grid = ProjectionGrid(nx: 935, ny: 824, latitude: 18.14503...45.405453, longitude: 217.10745...349.8256, projection: StereographicProjection(latitude: 90, longitude: 249, radius: 6371229))
 
         let pos = grid.findPoint(lat: 64.79836, lon: 241.40111)!
         #expect(pos % nx == 420)
@@ -428,7 +428,7 @@ import VaporTesting
 
     @Test func cerraGrid() {
         //
-        let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50))
+        let grid = ProjectionGrid(nx: 1069, ny: 1069, latitude: 20.29228...63.769516, longitude: -17.485962...74.10509, projection: LambertConformalConicProjection(λ0: 8, ϕ0: 50, ϕ1: 50, ϕ2: 50, radius: 6371229))
 
         var pos = grid.findPoint(lat: 20.29228, lon: -17.485962)!
         var (lat, lon) = grid.getCoordinates(gridpoint: pos)
@@ -721,7 +721,7 @@ import VaporTesting
 
     @Test func stereographicIconMCH1() {
         let projection = RotatedLatLonProjection(latitude: 43.0, longitude: 190.0)
-        let grid = ProjectionGrid(nx: Int((6.86+4.83)/0.01+1), ny: Int((4.46+3.39)/0.01+1), latitudeProjectionOrigion: -4.46, longitudeProjectionOrigion: -6.86, dx: 0.01, dy: 0.01, projection: projection)
+        let grid = ProjectionGrid(nx: Int((6.86+4.83)/0.01+1), ny: Int((4.46+3.39)/0.01+1), latitudeProjectionOrigin: -4.46, longitudeProjectionOrigin: -6.86, dx: 0.01, dy: 0.01, projection: projection)
 
         #expect(grid.nx == 1170)
         #expect(grid.ny == 786)
