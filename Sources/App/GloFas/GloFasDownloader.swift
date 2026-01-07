@@ -194,7 +194,7 @@ struct GloFasDownloader: AsyncCommand {
         }
 
         logger.info("Reading to timeseries")
-        let om = OmFileSplitter(domain)
+        let om = OmFileSplitter(domain, nMembers: 1)
         var data2d = Array2DFastTime(nLocations: nx * ny, nTime: timeinterval.count)
         for (i, date) in timeinterval.enumerated() {
             logger.info("Reading \(date.format_YYYYMMdd)")
