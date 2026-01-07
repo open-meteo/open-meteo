@@ -2,9 +2,21 @@ import Foundation
 
 enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     case graphcast025
-
+    case aigfs025
+    case aigefs025
+    case hgefs025_stats
+    
     var domainRegistry: DomainRegistry {
-        return .ncep_gfs_graphcast025
+        switch self {
+        case .graphcast025:
+            return .ncep_gfs_graphcast025
+        case .aigfs025:
+            return .ncep_aigfs025
+        case .aigefs025:
+            return .ncep_aigefs025
+        case .hgefs025_stats:
+            return .ncep_hgefs025_stats
+        }
     }
 
     var domainRegistryStatic: DomainRegistry? {
@@ -28,7 +40,16 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     }
     
     var countEnsembleMember: Int {
-        return 1
+        switch self {
+        case .graphcast025:
+            return 1
+        case .aigfs025:
+            return 1
+        case .aigefs025:
+            return 30+1
+        case .hgefs025_stats:
+            return 1
+        }
     }
 
     var updateIntervalSeconds: Int {
@@ -38,12 +59,27 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     /// Based on the current time , guess the current run that should be available soon on the open-data server
     var lastRun: Timestamp {
         let t = Timestamp.now()
-        // GraphCast has a delay of 9-10 hours hours after initialisation. Cronjobs starts at 9:05
-        return t.add(hours: -9).floor(toNearestHour: 6)
+        switch self {
+        case .graphcast025:
+            // GraphCast has a delay of 9-10 hours hours after initialisation. Cronjobs starts at 9:05
+            return t.add(hours: -9).floor(toNearestHour: 6)
+        case .aigfs025, .aigefs025:
+            // 3:40 delay for AIGFS
+            return t.add(hours: -3).floor(toNearestHour: 6)
+        case .hgefs025_stats:
+            // 6:40 delay
+            return t.add(hours: -6).floor(toNearestHour: 6)
+        }
     }
 
     func forecastHours(run: Int) -> [Int] {
-        return Array(stride(from: 6, through: 384, by: 6))
+        switch self {
+        case .graphcast025, .aigfs025, .aigefs025:
+            return Array(stride(from: 6, through: 384, by: 6))
+        case .hgefs025_stats:
+            return Array(stride(from: 6, through: 240, by: 6))
+        }
+        
     }
 
     var levels: [Int] {
@@ -58,5 +94,33 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
 
     var grid: any Gridable {
         return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+    }
+    
+    /// Returns two grib files, in case grib messages are split in two different files
+    func getGribUrl(run: Timestamp, forecastHour: Int, member: Int) -> [String] {
+        let fHHH = forecastHour.zeroPadded(len: 3)
+        let yyyymmdd = run.format_YYYYMMdd
+        let hh = run.hh
+
+        switch self {
+        case .graphcast025:
+            let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
+            return ["\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_13_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(fHHH)"]
+        case .aigefs025:
+            let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
+            let mmm = member.zeroPadded(len: 3)
+            let base = "\(server)aigefs/prod/aigefs.\(yyyymmdd)/\(hh)/mem\(mmm)/model/atmos/grib2/"
+            return ["\(base)aigefs.t\(hh)z.sfc.f\(fHHH).grib2", "\(base)aigefs.t\(hh)z.pres.f\(fHHH).grib2"]
+        case .aigfs025:
+            let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
+            let base = "\(server)aigfs/prod/aigfs.\(yyyymmdd)/\(hh)/model/atmos/grib2/"
+            return ["\(base)aigfs.t\(hh)z.sfc.f\(fHHH).grib2", "\(base)aigfs.t\(hh)z.pres.f\(fHHH).grib2"]
+        case .hgefs025_stats:
+            let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
+            let base = "\(server)hgefs/prod/hgefs.\(yyyymmdd)/\(hh)/ensstat/products/atmos/grib2/"
+            // TODO implement spread variables
+            // "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2"
+            return ["\(base)hgefs.t\(hh)z.sfc.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.avg.f\(fHHH).grib2"]
+        }
     }
 }

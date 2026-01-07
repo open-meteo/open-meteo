@@ -4,7 +4,7 @@ import Vapor
 @preconcurrency import SwiftEccodes
 
 /**
- Downloader for GFS GraphCast
+ Downloader for GFS GraphCast, AIGFS and AIGEFS
  */
 struct GfsGraphCastDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -89,7 +89,7 @@ struct GfsGraphCastDownload: AsyncCommand {
             case "Vertical velocity (pressure)":
                 return GfsGraphCastPressureVariable(variable: .vertical_velocity, level: level)
             case "Specific humidity":
-                return GfsGraphCastPressureVariable(variable: .specific_humdity, level: level)
+                return GfsGraphCastPressureVariable(variable: .specific_humidity, level: level)
             default:
                 return nil
             }
@@ -122,69 +122,82 @@ struct GfsGraphCastDownload: AsyncCommand {
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let timestamps = domain.forecastHours(run: run.hour).map { run.add(hours: $0) }
-
-        // https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/graphcastgfs.20240401/00/forecasts_13_levels/graphcastgfs.t00z.pgrb2.0p25.f006
-        let server = "https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/"
+        let isEnsemble = domain.countEnsembleMember > 1
+        let members = 0..<domain.countEnsembleMember
+        
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
+        
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
-            let thhh = forecastHour.zeroPadded(len: 3)
-            let url = "\(server)graphcastgfs.\(run.format_YYYYMMdd)/\(run.hh)/forecasts_13_levels/graphcastgfs.t\(run.hh)z.pgrb2.0p25.f\(thhh)"
-            let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
-            return try await curl.withGribStream(url: url, bzip2Decode: false, nConcurrent: concurrent) { stream in
-                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil)
-                try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
-                    guard let variable = getCmaVariable(logger: logger, message: message) else {
-                        return
-                    }
-                    guard let stepRange = message.get(attribute: "stepRange") else {
-                        fatalError("could not get step range or type")
-                    }
-
-                    var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
-                    // message.dumpAttributes()
-                    try grib2d.load(message: message)
-                    grib2d.array.shift180LongitudeAndFlipLatitude()
-
-                    // Scaling before compression with scalefactor
-                    if let fma = variable.multiplyAdd {
-                        grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                    }
-
-                    if let variable = variable as? GfsGraphCastSurfaceVariable, variable == .precipitation {
-                        // There are 2 precipitation messages inside. Actiually the second is no precip
-                        if stepRange.starts(with: "0-") {
-                            return
+            logger.info("Downloading forecastHour \(forecastHour)")
+            
+            let storePrecipMembers = VariablePerMemberStorage<GfsGraphCastSurfaceVariable>()
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
+            let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            
+            for member in members {
+                let urls = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
+                let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
+                
+                for url in urls {
+                    for try await message in try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: min(2, concurrent)) {
+                        guard let variable = getCmaVariable(logger: logger, message: message) else {
+                            continue
                         }
-                    }
-
-                    if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .specific_humdity, .vertical_velocity].contains(variable.variable) {
-                        await storage.set(variable: variable, timestamp: timestamp, member: 0, data: grib2d.array)
-                        if variable.variable == .specific_humdity || variable.variable == .vertical_velocity {
-                            // do not store specific humidity on disk
-                            return
+                        guard let stepRange = message.get(attribute: "stepRange") else {
+                            fatalError("could not get step range or type")
                         }
-                    }
 
-                    logger.info("Compressing and writing data to \(variable.omFileName.file)_\(forecastHour).om")
-                    try await writer.write(member: 0, variable: variable, data: grib2d.array.data)
+                        var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
+                        // message.dumpAttributes()
+                        try grib2d.load(message: message)
+                        grib2d.array.shift180LongitudeAndFlipLatitude()
+
+                        // Scaling before compression with scale-factor
+                        if let fma = variable.multiplyAdd {
+                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                        }
+                        
+                        if let variable = variable as? GfsGraphCastSurfaceVariable , variable == .precipitation {
+                            // There are 2 precipitation messages inside. Actually the second is no precipitation
+                            if stepRange.starts(with: "0-") {
+                                continue
+                            }
+                            // Store precipitation for probabilities
+                            await storePrecipMembers.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                        }
+
+                        if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .specific_humidity, .vertical_velocity].contains(variable.variable) {
+                            await storage.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            if variable.variable == .specific_humidity || variable.variable == .vertical_velocity {
+                                // do not store specific humidity on disk
+                                continue
+                            }
+                        }
+                        
+                        logger.info("Compressing and writing data \(variable.omFileName.file) hour \(forecastHour) member \(member)")
+                        try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+                    }
                 }
+                
                 /// Convert specific humidity to relative humidity
                 try await storage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
-                    guard v.variable.variable == .specific_humdity else {
+                    guard v.variable.variable == .specific_humidity else {
                         return
                     }
                     let level = v.variable.level
                     logger.info("Calculating relative humidity on level \(level)")
                     guard let t = await storage.get(v.with(variable: .init(variable: .temperature, level: level))) else {
-                        fatalError("Requires temperature_2m")
+                        fatalError("Requires temperature in level \(level)")
                     }
 
                     let data = Meteorology.specificToRelativeHumidity(specificHumidity: data.data, temperature: t.data, pressure: .init(repeating: Float(level), count: t.count))
 
                     let rhVariable = GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
                     // Store to calculate cloud cover
-                    await storage.set(variable: rhVariable, timestamp: timestamp, member: 0, data: Array2D(data: data, nx: t.nx, ny: t.ny))
-                    try await writer.write(member: 0, variable: rhVariable, data: data)
+                    await storage.set(variable: rhVariable, timestamp: timestamp, member: member, data: Array2D(data: data, nx: t.nx, ny: t.ny))
+                    try await writer.write(member: member, variable: rhVariable, data: data)
                 }
 
                 // convert pressure vertical velocity to geometric velocity
@@ -198,7 +211,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                         fatalError("Requires temperature_2m")
                     }
                     let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
-                    try await writer.write(member: 0, variable: v.variable, data: data)
+                    try await writer.write(member: member, variable: v.variable, data: data)
                 }
 
                 // Calculate cloud cover mid/low/high/total
@@ -213,19 +226,22 @@ struct GfsGraphCastDownload: AsyncCommand {
                     let level = v.variable.level
                     let clouds = data.data.map { Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(level)) }
                     switch level {
-                    case ...250:
+                    case ...300:
+                        /// high clouds (>8 km): 300/250/200/150/100/50
                         for i in cloudcover_high.indices {
                             if cloudcover_high[i].isNaN || cloudcover_high[i] < clouds[i] {
                                 cloudcover_high[i] = clouds[i]
                             }
                         }
                     case ...700:
+                        /// mid clouds (3 km - 8km): 700/600/500/400
                         for i in cloudcover_mid.indices {
                             if cloudcover_mid[i].isNaN || cloudcover_mid[i] < clouds[i] {
                                 cloudcover_mid[i] = clouds[i]
                             }
                         }
                     default:
+                        /// low clouds (surface - 3km): 1000/925/850
                         for i in cloudcover_low.indices {
                             if cloudcover_low[i].isNaN || cloudcover_low[i] < clouds[i] {
                                 cloudcover_low[i] = clouds[i]
@@ -238,14 +254,28 @@ struct GfsGraphCastDownload: AsyncCommand {
                     mid: cloudcover_mid,
                     high: cloudcover_high
                 )
-                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_low, data: cloudcover_low)
-                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid)
-                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high)
-                try await writer.write(member: 0, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
-                
-                let completed = i == timestamps.count - 1
-                return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover_low, data: cloudcover_low)
+                try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid)
+                try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high)
+                try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
             }
+            
+            if let writerProbabilities {
+                let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
+                try await storePrecipMembers.calculatePrecipitationProbability(
+                    precipitationVariable: .precipitation,
+                    dtHoursOfCurrentStep: forecastHour - previousHour,
+                    writer: writerProbabilities
+                )
+            }
+            let completed = i == timestamps.count - 1
+            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
+            try await uploadTask?.value
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await writerProbabilities?.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            }
+            return handles
         }
         await curl.printStatistics()
         Process.alarm(seconds: 0)

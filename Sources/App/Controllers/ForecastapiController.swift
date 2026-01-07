@@ -652,6 +652,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ncep_hrrr_conus_15min
     case ncep_gfs_graphcast025
     case ncep_nam_conus
+    case ncep_aigfs025
+    case ncep_aigefs025
+    case ncep_hgefs025_stats
     
     case meteofrance_seamless
     case meteofrance_mix
@@ -1082,6 +1085,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GfsReader(domains: [.nam_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_aigfs025:
+            /// Use precipitation_probability from AIGEFS
+            return [
+                try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
+                try await GfsGraphCastReader(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            ].compactMap({ $0 })
+        case .ncep_aigefs025:
+            return try await GfsGraphCastReader(domain: .aigefs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+        case .ncep_hgefs025_stats:
+            return try await GfsGraphCastReader(domain: .hgefs025_stats, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return ([arpegeProbabilities] + (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
@@ -1403,6 +1416,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GfsDomain.nam_conus
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return GfsGraphCastDomain.graphcast025
+        case .ncep_aigfs025:
+            return GfsGraphCastDomain.aigfs025
+        case .ncep_aigefs025:
+            return GfsGraphCastDomain.aigefs025
+        case .ncep_hgefs025_stats:
+            return GfsGraphCastDomain.hgefs025_stats
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return MeteoFranceDomain.arpege_world
         case .meteofrance_arpege_europe, .arpege_europe:
@@ -1638,6 +1657,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GfsReader(domain: .nam_conus, gridpoint: gridpoint, options: options)
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
             return try await GfsGraphCastReader(domain: .graphcast025, gridpoint: gridpoint, options: options)
+        case .ncep_aigfs025:
+            return try await GfsGraphCastReader(domain: .aigfs025, gridpoint: gridpoint, options: options)
+        case .ncep_aigefs025:
+            return try await GfsGraphCastReader(domain: .aigefs025, gridpoint: gridpoint, options: options)
+        case .ncep_hgefs025_stats:
+            return try await GfsGraphCastReader(domain: .hgefs025_stats, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return try await MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_europe, .arpege_europe, .meteofrance_arome_france0025:
@@ -1898,6 +1923,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return EcmwfDomain.wam025_ensemble.countEnsembleMember
         case .ncep_gefswave025:
             return GfsDomain.gfswave025_ens.countEnsembleMember
+        case .ncep_aigefs025:
+            return GfsGraphCastDomain.aigefs025.countEnsembleMember
         default:
             return 1
         }
