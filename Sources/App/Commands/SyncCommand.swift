@@ -350,7 +350,7 @@ fileprivate extension Array where Element == S3DataController.S3ListV2File {
             }
             let last = file.name.lastIndex(of: "/") ?? file.name.startIndex
             let name = file.name[file.name.index(after: last)..<file.name.endIndex]
-            if name.starts(with: "master_") || name.starts(with: "linear_bias_seasonal") {
+            if name.starts(with: "master_") || name.starts(with: "linear_bias_seasonal") || name.starts(with: "rolling") {
                 return true
             }
             if name.starts(with: "year_"), let year = Int(name[name.index(name.startIndex, offsetBy: 5)..<(name.lastIndex(of: ".") ?? name.endIndex)]) {
