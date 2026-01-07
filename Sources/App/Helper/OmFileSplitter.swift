@@ -485,12 +485,19 @@ struct OmFileSplitter {
         let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: 0, previousDay: 0)
         try readFile.createDirectory()
         
-        /// Total timerange expanded by `retainDays`
-        let fileTime = TimerangeDt(start: time.range.lowerBound.with(hour: 0).subtract(days: retainDays), to: time.range.upperBound, dtSeconds: time.dtSeconds)
-        
         // May not exist on first download
         let omRead = try? await OmFileReader(mmapFile: readFile.getFilePath())
         let readTime = try await omRead?.getTimeRangeDt()
+        
+        /// Total timerange expanded by `retainDays`
+        /// `start`is taking the minimum to now, because GFS late runs start 16 days into the future
+        /// `to` considers the existing readTime upper limit, because side-runs might be shorter than previous runs
+        let fileTime = TimerangeDt(
+            start: min(Timestamp.now(), time.range.lowerBound).with(hour: 0).subtract(days: retainDays),
+            to: max(time.range.upperBound, readTime?.range.upperBound ?? time.range.upperBound),
+            dtSeconds: time.dtSeconds
+        )
+        
         let readOffsets = readTime.map { readTime in
             guard readTime.dtSeconds == fileTime.dtSeconds else {
                 fatalError("invalid readDtSeconds: \(readTime.dtSeconds), expected: \(fileTime.dtSeconds)")
