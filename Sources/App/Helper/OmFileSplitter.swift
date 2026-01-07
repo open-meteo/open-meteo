@@ -542,17 +542,17 @@ struct OmFileSplitter {
                     case 3:
                         try await omRead.read(
                             into: &fileData,
-                            range: [yRange, xRange, UInt64(readOffsets.array.lowerBound) ..< UInt64(readOffsets.array.upperBound)],
-                            intoCubeOffset: [0, 0, UInt64(readOffsets.file.lowerBound)],
-                            intoCubeDimension: [UInt64(processChunkY), UInt64(processChunkX), UInt64(fileTime.count)]
+                            range: [yRange, xRange, UInt64(readOffsets.file.lowerBound) ..< UInt64(readOffsets.file.upperBound)],
+                            intoCubeOffset: [0, 0, UInt64(readOffsets.array.lowerBound)],
+                            intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(fileTime.count)]
                             
                         )
                     case 4: // ensemble files
                         try await omRead.read(
                             into: &fileData,
-                            range: [yRange, xRange, memberRange, UInt64(readOffsets.array.lowerBound) ..< UInt64(readOffsets.array.upperBound)],
-                            intoCubeOffset: [0, 0, 0, UInt64(readOffsets.file.lowerBound)],
-                            intoCubeDimension: [UInt64(processChunkY), UInt64(processChunkX), UInt64(nMembers), UInt64(fileTime.count)]
+                            range: [yRange, xRange, memberRange, UInt64(readOffsets.file.lowerBound) ..< UInt64(readOffsets.file.upperBound)],
+                            intoCubeOffset: [0, 0, 0, UInt64(readOffsets.array.lowerBound)],
+                            intoCubeDimension: [UInt64(yRange.count), UInt64(xRange.count), UInt64(nMembers), UInt64(fileTime.count)]
                         )
                     default:
                         fatalError("Unexpected number of dimensions (\(dimensions.count))")
