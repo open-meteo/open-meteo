@@ -192,6 +192,8 @@ enum DomainRegistry: String, CaseIterable {
             return 3
         case .ecmwf_ec46:
             return 31
+        case .ecmwf_seas5, .ecmwf_seas5_daily, .ecmwf_seas5_12hourly:
+            return 0
         default:
             return nil
         }
