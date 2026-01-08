@@ -303,12 +303,12 @@ struct OmFileSplitter {
      
      TODO: should use Array3DFastTime
      */
-    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16) async throws {
+    func updateFromTimeOriented(variable: String, array2d: Array2DFastTime, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16) async throws {
         precondition(array2d.nTime == time.count)
         precondition(array2d.nLocations == nx * ny)
 
         // Process at most 8 MB at once
-        try await updateFromTimeOrientedStreaming3D(variable: variable, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { yRange, xRange, _ in
+        try await updateFromTimeOrientedStreaming3D(variable: variable, run: run, time: time, scalefactor: scalefactor, compression: compression, onlyGeneratePreviousDays: false) { yRange, xRange, _ in
             guard yRange.count == 1 || xRange.count == nx else {
                 fatalError("chunk dimensions need to be either parts of X or a mutliple or X")
             }
@@ -324,11 +324,11 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateFromTimeOrientedStreaming3D(variable: String, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateFromTimeOrientedStreaming3D(variable: String, run: Timestamp, time: TimerangeDt, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, onlyGeneratePreviousDays: Bool, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         if nMembers > 1, let retainDays = domain.useRollingDays {
             // Alsoc check nMembers, because ensemble domains also write precipitation probability as time chunks
-            return try await updateRollingTimeSeries(variable: variable, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, supplyChunk: supplyChunk)
+            return try await updateRollingTimeSeries(variable: variable, run: run, time: time, retainDays: retainDays, scalefactor: scalefactor, compression: compression, supplyChunk: supplyChunk)
         }
         
         let indexTime = time.toIndexTime()
@@ -480,7 +480,7 @@ struct OmFileSplitter {
      Write new data to archived storage and combine it with existing data.
      `supplyChunk` should provide data for a couple of thousands locations at once. Updates are done as a stream to lower memory usage
      */
-    func updateRollingTimeSeries(variable: String, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
+    func updateRollingTimeSeries(variable: String, run: Timestamp, time: TimerangeDt, retainDays: Int, scalefactor: Float, compression: OmCompressionType = .pfor_delta2d_int16, supplyChunk: (_ y: Range<UInt64>, _ x: Range<UInt64>, _ member: Range<UInt64>) async throws -> ArraySlice<Float>) async throws {
         
         let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .rolling, chunk: nil, ensembleMember: 0, previousDay: 0)
         try readFile.createDirectory()
@@ -490,10 +490,10 @@ struct OmFileSplitter {
         let readTime = try await omRead?.getTimeRangeDt()
         
         /// Total timerange expanded by `retainDays`
-        /// `start`is taking the minimum to now, because GFS late runs start 16 days into the future
+        /// `start`takes the run with hour 0 and subtracts retainDays. This is important to retain the correct time for GFS late runs.
         /// `to` considers the existing readTime upper limit, because side-runs might be shorter than previous runs
         let fileTime = TimerangeDt(
-            start: min(Timestamp.now(), time.range.lowerBound).with(hour: 0).subtract(days: retainDays),
+            start: run.with(hour: 0).subtract(days: retainDays),
             to: max(time.range.upperBound, readTime?.range.upperBound ?? time.range.upperBound),
             dtSeconds: time.dtSeconds
         )
