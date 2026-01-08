@@ -118,7 +118,7 @@ struct GfsGraphCastDownload: AsyncCommand {
 
     func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let deadLineHours: Double = 4
+        let deadLineHours: Double = domain == .aigefs025 ? 6 : 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         Process.alarm(seconds: Int(deadLineHours + 1) * 3600)
         let timestamps = domain.forecastHours(run: run.hour).map { run.add(hours: $0) }
@@ -136,7 +136,7 @@ struct GfsGraphCastDownload: AsyncCommand {
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             
-            for member in members {
+            try await members.foreachConcurrent(nConcurrent: 2) { member in
                 let urls = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
                 let storage = VariablePerMemberStorage<GfsGraphCastPressureVariable>()
                 
