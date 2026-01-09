@@ -396,10 +396,8 @@ struct OmFileSplitter {
             for xRange in (0..<UInt64(nx)).chunks(ofCount: processChunkX) {
                 let memberRange = 0 ..< UInt64(nMembers)
 
-                // Contains the entire time-series to be updated for a chunks of locations
+                // Contains the entire time-series to be updated for a chunk of locations
                 let data = try await supplyChunk(yRange, xRange, memberRange)
-
-                // TODO check if chunks need to be reorganised for ensemble files!!!
 
                 for writer in writers {
                     if let omRead = writer.read?.asArray(of: Float.self) {
@@ -525,8 +523,6 @@ struct OmFileSplitter {
         guard let writeOffsets = time.toIndexTime().intersect(fileTime: fileTime.toIndexTime()) else {
             fatalError("invalid file time")
         }
-        
-        //let nIndexTime = indexTime.count
 
         /// Spatial files use chunks multiple time larger than the final chunk. E.g. [15,526] will be [1,15] in the final time-series file
         let processChunkX = max(1, min(nx, 2 * 1024 * 1024 / nTimePerFile / nMembers / chunknLocations * chunknLocations))
@@ -610,6 +606,7 @@ struct OmFileSplitter {
 }
 
 extension OmFileReader {
+    /// Read time axis user in rolling OM files for ensemble data
     func getTimeRangeDt() async throws -> TimerangeDt? {
         let readStart: Int? = try await getChild(name: "time_start")?.readScalar()
         let readEnd: Int? = try await getChild(name: "time_end")?.readScalar()
