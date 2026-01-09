@@ -172,6 +172,32 @@ enum DomainRegistry: String, CaseIterable {
         }
         return "\(remote)\(rawValue)/".replacingOccurrences(of: "data/", with: "data_run/")
     }
+    
+    /// Instead of generating time chunks, use a single rolling files and retain a certain number of days inside
+    var useRollingDays: Int? {
+        switch self {
+        case .ecmwf_ifs025_ensemble, .ecmwf_aifs025_ensemble, .ecmwf_wam025_ensemble:
+            return 3
+        case .dwd_icon_eps, .dwd_icon_d2_eps, .dwd_icon_eu_eps:
+            return 3
+        case .ncep_gefs05, .ncep_gefs025, .ncep_aigefs025, .ncep_gefswave025:
+            return 3
+        case .cmc_gem_geps:
+            return 3
+        case .ukmo_global_ensemble_20km, .ukmo_uk_ensemble_2km:
+            return 3
+        case .bom_access_global_ensemble:
+            return 3
+        case .meteoswiss_icon_ch1_ensemble, .meteoswiss_icon_ch2_ensemble:
+            return 3
+        case .ecmwf_ec46:
+            return 31
+        case .ecmwf_seas5, .ecmwf_seas5_daily, .ecmwf_seas5_12hourly:
+            return 0
+        default:
+            return nil
+        }
+    }
 
     func getDomain() -> GenericDomain? {
         switch self {

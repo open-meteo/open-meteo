@@ -194,7 +194,7 @@ struct GloFasDownloader: AsyncCommand {
         }
 
         logger.info("Reading to timeseries")
-        let om = OmFileSplitter(domain)
+        let om = OmFileSplitter(domain, nMembers: 1)
         var data2d = Array2DFastTime(nLocations: nx * ny, nTime: timeinterval.count)
         for (i, date) in timeinterval.enumerated() {
             logger.info("Reading \(date.format_YYYYMMdd)")
@@ -207,7 +207,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx * ny, i] = try await dailyFile.read()
         }
         logger.info("Update om database")
-        try await om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
+        try await om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, run: timeinterval.range.lowerBound, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
     }
 
     /// Convert a single file

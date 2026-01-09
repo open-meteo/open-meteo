@@ -9,10 +9,12 @@ enum OmFileSeriesType: String {
     case year
     case master
     case linear_bias_seasonal
+    case rolling
 }
 
 enum OmFileType: Hashable, RemoteFileManageable {
-    typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?)
+    /// Timestamps are set for "data_run" files, timerangeDt is set for ensemble "rolling" files
+    typealias Value = (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?)
     
     case domainChunk(domain: DomainRegistry, variable: String, type: OmFileSeriesType, chunk: Int?, ensembleMember: Int, previousDay: Int)
     case staticFile(domain: DomainRegistry, variable: String, chunk: Int? = nil)
@@ -23,19 +25,17 @@ enum OmFileType: Hashable, RemoteFileManageable {
     func makeRemoteReader(file: OmReaderBlockCache<OmHttpReaderBackend, MmapFile>) async throws -> OmFileRemoteOmReader {
         let reader = try await OmFileReader(fn: file)
         let arrayReader = try reader.expectArray(of: Float.self)
-        if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
-            return OmFileRemoteOmReader(reader: arrayReader, timestamps: times)
-        }
-        return OmFileRemoteOmReader(reader: arrayReader, timestamps: nil)
+        let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
+        let timerangeDt = try await reader.getTimeRangeDt()
+        return OmFileRemoteOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
     }
     
     func makeLocalReader(file: MmapFile) async throws -> OmFileLocalOmReader {
         let reader = try await OmFileReader(fn: file)
         let arrayReader = try reader.expectArray(of: Float.self)
-        if let times = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init) {
-            return OmFileLocalOmReader(reader: arrayReader, timestamps: times)
-        }
-        return OmFileLocalOmReader(reader: arrayReader, timestamps: nil)
+        let timestamps = try await reader.getChild(name: "time")?.asArray(of: Int.self)?.read().map(Timestamp.init)
+        let timerangeDt = try await reader.getTimeRangeDt()
+        return OmFileLocalOmReader(reader: arrayReader, timestamps: timestamps, timeRangeDt: timerangeDt)
     }
 
     /// Assemble the full file system path
@@ -76,6 +76,19 @@ enum OmFileType: Hashable, RemoteFileManageable {
                 return 24*3600
             case .linear_bias_seasonal:
                 return 24*3600
+            case .rolling:
+                guard let domain = domain.getDomain() else {
+                    return 24*3600
+                }
+                if let modificationTime {
+                    if modificationTime < now.subtract(seconds: domain.updateIntervalSeconds / 2) {
+                        return 15*60
+                    }
+                    if modificationTime < now.subtract(seconds: Int(Double(domain.updateIntervalSeconds) * 0.9)) {
+                        return 3*60
+                    }
+                }
+                return 10*60
             }
         case .staticFile(_, _, _):
             return 24*3600
@@ -154,26 +167,28 @@ extension RemoteFileManageable {
 struct OmFileRemoteOmReader: RemoteFileRepresentable {
     let reader: OmFileReaderArray<OmReaderBlockCache<OmHttpReaderBackend, MmapFile>, Float>
     let timestamps: [Timestamp]?
+    let timeRangeDt: TimerangeDt?
     
     var fn: OmReaderBlockCache<OmHttpReaderBackend, MmapFile> {
         reader.fn
     }
     
-    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
-        return (reader, timestamps)
+    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
+        return (reader, timestamps, timeRangeDt)
     }
 }
 
 struct OmFileLocalOmReader: LocalFileRepresentable {
     let reader: OmFileReaderArray<MmapFile, Float>
     let timestamps: [Timestamp]?
+    let timeRangeDt: TimerangeDt?
     
     var fn: MmapFile {
         reader.fn
     }
     
-    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?) {
-        return (reader, timestamps)
+    func cast() -> (reader: any OmFileReaderArrayProtocol<Float>, timestamps: [Timestamp]?, timeRangeDt: TimerangeDt?) {
+        return (reader, timestamps, timeRangeDt)
     }
 }
 
