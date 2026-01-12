@@ -16,10 +16,10 @@ extension Curl {
      Get GRIB data from the ECMWF API
      Important: http client must be configured to disallow redirects!
      */
-    func withEcmwfApi<T>(query: any Encodable, email: String, apikey: String, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+    func withEcmwfApi<T>(query: any Encodable, email: String, apikey: String, nConcurrent: Int? = nil, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let job = try await startEcmwfApiJob(query: query, email: email, apikey: apikey)
         let gribUrl = try await waitForEcmwfJob(job: job, email: email, apikey: apikey)
-        let result = try await withGribStream(url: gribUrl, bzip2Decode: false, body: body)
+        let result = try await withGribStream(url: gribUrl, bzip2Decode: false, nConcurrent: nConcurrent ?? 1, body: body)
         try await cleanupEcmwfApiJob(job: job, email: email, apikey: apikey)
         return result
     }
