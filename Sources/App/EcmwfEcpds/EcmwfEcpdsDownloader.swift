@@ -184,8 +184,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         let query = EcmwfQuery(
             date: run.iso8601_YYYY_MM_dd,
             param: "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/228051/228057",
-            step: //run.hour % 12 == 0 ? fullRunSteps :  sideRunSteps
-                "0/1/348",///2/3/4/5/6/7/8/9/10/11/12/13/14/15/16/17/18/19/20/21/22/23/24/25/26/27/28/29/30/31/32/33/34/35/36/37/38/39/40/41/42/43/44/45/46/47/48/49/50/51/52/53/54/55/56/57/58/59/60/61/62/63/64/65/66/67/68/69/70/71/72/73/74/75/76/77/78/79/80/81/82/83/84/85/86/87/88/89/90/93/96/99/102/105/108/111/114/117/120/123/126/129/132/135/138/141/144/150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360",
+            step: run.hour % 12 == 0 ? fullRunSteps : sideRunSteps,
             stream: run.hour % 12 == 0 ? "oper" : "scda",
             time: "\(run.hh)00",
             type: "fc")
