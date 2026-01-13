@@ -97,6 +97,10 @@ paths:
             - wind_direction_10m_dominant
             - shortwave_radiation_sum
             - et0_fao_evapotranspiration
+            - daylight_duration
+            - sunshine_duration
+            - rain_sum
+            - snowfall_sum
       - name: latitude
         in: query
         required: true
