@@ -174,8 +174,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             
             let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
             let deaverager = GribDeaverager()
-            
-            for steps in run.hour % 12 == 0 ? fullRunSteps : sideRunSteps {
+            let stepsArray = run.hour % 12 == 0 ? fullRunSteps : sideRunSteps
+            for steps in stepsArray {
                 // 20.3 = visibility
                 // 145.151 = Sea surface height
                 // 98.174 = Sea ice thickness
@@ -273,19 +273,22 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     }
                     /// Delete job from ECMWF MARS queue to free up resources
                     try await curl.cleanupEcmwfApiJob(job: job, email: email, apikey: key)
-                }
-            }
-            
-            let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: true)
+                    
+                    if stepsArray.last == steps {
+                        /// Convert to time-series and upload to AWS
+                        let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
+                        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: true)
 
-            if let directory = OpenMeteo.dataRunDirectory, uploadS3Bucket != nil {
-                // Delete run directory after S3 upload
-                let model = domain.domainRegistry.rawValue
-                let timeFormatted = run.format_directoriesYYYYMMddhhmm
-                let runDir = "\(directory)\(model)/\(timeFormatted)/"
-                logger.info("Deleting local run directory: \(runDir)")
-                try FileManager.default.removeItem(atPath: runDir)
+                        if let directory = OpenMeteo.dataRunDirectory, uploadS3Bucket != nil {
+                            // Delete run directory after S3 upload
+                            let model = domain.domainRegistry.rawValue
+                            let timeFormatted = run.format_directoriesYYYYMMddhhmm
+                            let runDir = "\(directory)\(model)/\(timeFormatted)/"
+                            logger.info("Deleting local run directory: \(runDir)")
+                            try FileManager.default.removeItem(atPath: runDir)
+                        }
+                    }
+                }
             }
         }
         try await processTask?.value
