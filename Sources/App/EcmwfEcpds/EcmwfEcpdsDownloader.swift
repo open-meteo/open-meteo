@@ -237,16 +237,17 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                             // Collect all accumulated variables and process them as soon as they are in sequential order
                             await inMemoryAccumulated.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                             while true {
-                                let step = (await deaverager.lastStep(variable, member) ?? 0) + domain.dtHours
+                                let lastStep = await deaverager.lastStep(variable, member) ?? 0
+                                let step = lastStep + (lastStep >= 144 ? 6 : lastStep >= 90 ? 3 : 1)
                                 let time = run.add(hours: step)
                                 guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
                                     break
                                 }
-                                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: "0-\(step)", array2d: &data) else {
+                                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(step)", array2d: &data) else {
                                     continue
                                 }
                                 let count = await inMemoryAccumulated.data.count
-                                logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                                logger.info("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
                                 try await writer.write(time: time, member: member, variable: variable, data: data.data)
                             }
                             return
