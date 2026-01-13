@@ -277,7 +277,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                     if stepsArray.last == steps {
                         /// Convert to time-series and upload to AWS
                         let handles = try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: nil)
-                        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: true)
+                        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: false, run: run, handles: handles, concurrent: concurrent, writeUpdateJson: false, uploadS3Bucket: uploadS3Bucket, uploadS3OnlyProbabilities: false, generateTimeSeries: false)
 
                         if let directory = OpenMeteo.dataRunDirectory, uploadS3Bucket != nil {
                             // Delete run directory after S3 upload
