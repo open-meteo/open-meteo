@@ -67,6 +67,7 @@ paths:
             - rain
             - weather_code
             - snowfall
+            - snow_depth
             - soil_temperature_0_to_7cm
             - soil_temperature_7_to_28cm
             - soil_temperature_28_to_100cm
