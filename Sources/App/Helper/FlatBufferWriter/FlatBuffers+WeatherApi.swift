@@ -533,11 +533,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .us_aqi_carbon_monoxide, .us_aqi_co:
             return .init(variable: .usAqiCarbonMonoxide)
         case .lightning_density:
-            // TODO add lightning_density in SDK
-            return .init(variable: .lightningPotential)
+            return .init(variable: .lightningDensity)
         case .sea_ice_thickness:
-            // TODO register sea_ice_thickness in SDK
-            return .init(variable: .seaIceCover)
+            return .init(variable: .seaIceThickness)
 
         }
     }
@@ -1076,14 +1074,13 @@ extension MultiDomains {
         case .consolidated_v4:
             return .glofasConsolidatedV4
         case .ecmwf_wam:
-            // TODO register HRES WAM
-            return .ecmwfWam025
+            return .ecmwfWam
         case .ncep_aigfs025:
-            return .gfs025 // TODO register
+            return .ncepAigfs025
         case .ncep_aigefs025:
-            return .gfs025 // TODO register
+            return .ncepAigefs025
         case .ncep_hgefs025_stats:
-            return .gfs025 // TODO register
+            return .ncepHgefs025Stats
         }
     }
 }
