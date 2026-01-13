@@ -194,11 +194,13 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 let gribUrl = try await curl.waitForEcmwfJob(job: job, email: email, apikey: key)
                 
                 let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
+                /// Single GRIB files contains multiple time-steps in mixed order
+                let inMemoryAccumulated = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
                 
                 // Wait for the previous process task to finish
                 try await processTask?.value
                 processTask = Task {
-                    for try await message in try await curl.getGribStream(url: gribUrl, bzip2Decode: false, nConcurrent: max(2, concurrent)) {
+                    try await curl.getGribStream(url: gribUrl, bzip2Decode: false, nConcurrent: max(2, concurrent)).foreachConcurrent(nConcurrent: concurrent) { message in
                         guard let shortName = message.get(attribute: "shortName"),
                               let unit = message.get(attribute: "units"),
                               let stepRange = message.get(attribute: "stepRange"),
@@ -208,14 +210,14 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         let timestamp = try message.getValidTimestamp()
                         let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
                         if shortName == "lsm" {
-                            continue
+                            return
                         }
                         //let levelhPa = message.get(attribute: "level").flatMap(Int.init)!
                         let member = message.get(attribute: "perturbationNumber").flatMap(Int.init) ?? 0
                         
                         guard let variable = EcmwfEcdpsIfsVariable.allCases.first(where: {$0.gribCode.split(separator: ",").contains(where: { $0 == shortName})}) else {
                             logger.warning("Could not map variable \(shortName)")
-                            continue
+                            return
                         }
                         
                         //print(message.get(attribute: "packingType"), message.get(attribute: "bitsPerValue"), message.get(attribute: "binaryScaleFactor"))
@@ -223,7 +225,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         let isAccumulated = [EcmwfEcdpsIfsVariable.shortwave_radiation, .direct_radiation, .precipitation, .runoff, .snowfall_water_equivalent, .showers].contains(variable)
                         /// Gusts in hour 0 only contain `0` values. The attributes for stepType and stepRange are not correctly set.
                         if (isAccumulated || isMax) && hour == 0 {
-                            continue
+                            return
                         }
                         
                         // logger.info("Processing \(variable)")
@@ -232,10 +234,22 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         
                         // Deaccumulate precipitation
                         if isAccumulated {
-                            // grib attributes for `stepType` are set wrongly to `instant`
-                            guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(hour)", grib2d: &grib2d) else {
-                                continue
+                            // Collect all accumulated variables and process them as soon as they are in sequential order
+                            await inMemoryAccumulated.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            while true {
+                                let step = (await deaverager.lastStep(variable, member) ?? 0) + domain.dtHours
+                                let time = run.add(hours: step)
+                                guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
+                                    break
+                                }
+                                guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: "0-\(step)", array2d: &data) else {
+                                    continue
+                                }
+                                let count = await inMemoryAccumulated.data.count
+                                logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                                try await writer.write(time: time, member: member, variable: variable, data: data.data)
                             }
+                            return
                         }
                         
                         // Scaling before compression with scalefactor
@@ -250,7 +264,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                             await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                             try await inMemory.calculateSnowDepth(density: .snow_density, waterEquivalent: .snow_depth, outVariable: EcmwfEcdpsIfsVariable.snow_depth, writer: writer)
                             if variable == .snow_depth {
-                                continue
+                                return
                             }
                         }
                         
