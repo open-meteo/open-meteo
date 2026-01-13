@@ -185,10 +185,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             // 145.151 = Sea surface height
             // 98.174 = Sea ice thickness
             // 228051 = litota1
-            // 228057 = litota3 + litota6
+            // 228057 = litota3 + litota6 -> disabled because MARS query fails with wrong number of fields. Need to use a different timerange
             let query = EcmwfQuery(
                 date: run.iso8601_YYYY_MM_dd,
-                param: "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/228051/228057",
+                param: "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151",
                 step: steps,
                 stream: run.hour % 12 == 0 ? "oper" : "scda",
                 time: "\(run.hh)00",
