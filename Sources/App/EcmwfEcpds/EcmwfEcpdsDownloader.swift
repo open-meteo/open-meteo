@@ -274,7 +274,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 try FileManager.default.removeItem(atPath: runDir)
             }
         }
-        
+        try await processTask?.value
         try await client.shutdown()
     }
 
