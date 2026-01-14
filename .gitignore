@@ -9,8 +9,8 @@ db.sqlite
 .env
 data/
 data
-data_run/
-data_spatial/
+data_run
+data_spatial
 .cache
 .venv
 .vscode/
