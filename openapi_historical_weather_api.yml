@@ -85,6 +85,7 @@ paths:
             enum:
             - temperature_2m_max
             - temperature_2m_min
+            - temperature_2m_mean
             - apparent_temperature_max
             - apparent_temperature_min
             - precipitation_sum
