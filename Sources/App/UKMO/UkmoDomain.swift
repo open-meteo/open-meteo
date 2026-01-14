@@ -115,11 +115,11 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         let t = Timestamp.now()
         switch self {
         case .global_deterministic_10km, .global_ensemble_20km:
-            // Delay of 9:00 hours after initialisation, updates every 6 hours
-            return t.add(hours: -9).floor(toNearestHour: 6)
+            // Delay of 6:30 hours after initialisation, updates every 6 hours
+            return t.add(hours: -6).floor(toNearestHour: 6)
         case .uk_deterministic_2km, .uk_ensemble_2km:
-            // Delay of 6:00 hours after initialisation, updates every hour
-            return t.add(hours: -6).floor(toNearestHour: 1)
+            // Delay of 4:15-4:45 hours after initialisation, updates every hour. Cronjobs start at minute 0 of every hour
+            return t.add(hours: -4).floor(toNearestHour: 1)
         }
     }
 
