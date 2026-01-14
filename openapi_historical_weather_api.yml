@@ -67,6 +67,7 @@ paths:
             - rain
             - weather_code
             - snowfall
+            - snow_depth
             - soil_temperature_0_to_7cm
             - soil_temperature_7_to_28cm
             - soil_temperature_28_to_100cm
@@ -84,6 +85,7 @@ paths:
             enum:
             - temperature_2m_max
             - temperature_2m_min
+            - temperature_2m_mean
             - apparent_temperature_max
             - apparent_temperature_min
             - precipitation_sum
@@ -96,6 +98,10 @@ paths:
             - wind_direction_10m_dominant
             - shortwave_radiation_sum
             - et0_fao_evapotranspiration
+            - daylight_duration
+            - sunshine_duration
+            - rain_sum
+            - snowfall_sum
       - name: latitude
         in: query
         required: true
