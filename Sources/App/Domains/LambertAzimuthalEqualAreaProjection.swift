@@ -6,13 +6,13 @@ struct LambertAzimuthalEqualAreaProjection: Projectable {
     let λ0_dec: Float
     let ϕ1: Float
     let R: Float
-    
+
     func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
         return """
             PROJCRS["Lambert Azimuthal Equal-Area",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",\(R),298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",\(R),0.0]]],
                 CONVERSION["Lambert Azimuthal Equal-Area",
                     METHOD["Lambert Azimuthal Equal-Area"],
                     PARAMETER["Latitude of natural origin", \(ϕ1.radiansToDegrees)],

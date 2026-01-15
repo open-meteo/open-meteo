@@ -6,7 +6,7 @@ struct LambertConformalConicProjection: Projectable {
     let F: Float
     let n: Float
     let λ0: Float
-    
+
     let λ0_dec: Float
     let ϕ0_dec: Float
     let ϕ1_dec: Float
@@ -14,13 +14,13 @@ struct LambertConformalConicProjection: Projectable {
 
     /// Radius of Earth. Different radiuses may be used for different GRIBS: https://github.com/SciTools/iris-grib/issues/241#issuecomment-1239069695
     let R: Float
-    
+
     func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
         return """
             PROJCRS["Lambert Conic Conformal",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",\(R),298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",\(R),0.0]]],
                 CONVERSION["Lambert Conic Conformal",
                     METHOD["Lambert Conic Conformal (2SP)"],
                     PARAMETER["Latitude of 1st standard parallel",\(ϕ1_dec)],
