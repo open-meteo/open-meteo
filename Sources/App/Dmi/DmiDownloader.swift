@@ -92,6 +92,14 @@ struct DmiDownload: AsyncCommand {
         let trueNorth = grid.getTrueNorthDirection()
         var previous = GribDeaverager()
         let timestamps = TimerangeDt(start: run, nTime: maxForecastHour ?? 60, dtSeconds: 3600).map{$0}
+        
+        /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read(range: nil) else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
 
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,t) -> [GenericVariableHandle] in
             // https://dmigw.govcloud.dk/v1/forecastdata/collections/harmonie_dini_sf/items/HARMONIE_DINI_SF_2025-01-15T090000Z_2025-01-17T210000Z.grib -> assets
@@ -104,6 +112,7 @@ struct DmiDownload: AsyncCommand {
                 /// In case the stream is restarted, keep the old version the deaverager
                 let previousScoped = await previous.copy()
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
+                let inMemorySurface = VariablePerMemberStorage<DmiSurfaceVariable>()
                 let windSpeedCalculator = WindSpeedCalculator<DmiSurfaceVariable>(trueNorth: trueNorth)
                 let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
 
@@ -233,6 +242,30 @@ struct DmiDownload: AsyncCommand {
                         // grib2d.array.data.multiplyAdd(multiply: 1/3600, add: 0) // to W/m2
                     default:
                         break
+                    }
+                    
+                    if let variable = variable as? DmiSurfaceVariable {
+                        /// Lower freezing level height below grid-cell elevation to adjust data to mixed terrain
+                        /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
+                        /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
+                        /// Note: snowfall height is NaN if snowfall height is at ground level
+                        if variable == .freezing_level_height || variable == .temperature_2m {
+                            inMemorySurface.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            if var (t2m, frz, member) = inMemorySurface.getTwoRemoving(first: .temperature_2m, second: .freezing_level_height, timestamp: timestamp) {
+                                for i in t2m.data.indices {
+                                    let freezingLevelHeight = frz.data[i].isNaN ? max(0, domainElevation[i]) : frz.data[i]
+                                    let temperature_2m = t2m.data[i]
+                                    let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
+                                    if newHeight <= domainElevation[i] {
+                                        frz.data[i] = newHeight
+                                    }
+                                }
+                                try await writer.write(member: member, variable: DmiSurfaceVariable.freezing_level_height, data: grib2d.array.data)
+                            }
+                            if variable == .freezing_level_height {
+                                return
+                            }
+                        }
                     }
 
                     // Deaccumulate precipitation
