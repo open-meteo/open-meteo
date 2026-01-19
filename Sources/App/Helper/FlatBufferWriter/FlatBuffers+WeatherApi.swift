@@ -1011,11 +1011,11 @@ extension MultiDomains {
             return .meteoswissIconCh2Ensemble
         case .jma_jaxa_mtg_fci:
             return .jmaJaxaMtgFci
-        case .ecmwf_seasonal_seamless:
+        case .ecmwf_seasonal_seamless, .ecmwf_seasonal_ensemble_mean_seamless:
             return .ecmwfSeasonalSeamless
-        case .ecmwf_seas5:
+        case .ecmwf_seas5, .ecmwf_seas5_ensemble_mean:
             return .ecmwfSeas5
-        case .ecmwf_ec46:
+        case .ecmwf_ec46, .ecmwf_ec46_ensemble_mean:
             return .ecmwfEc46
         case .marine_best_match:
             return .bestMatch
