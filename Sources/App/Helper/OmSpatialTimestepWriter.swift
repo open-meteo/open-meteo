@@ -50,6 +50,10 @@ actor OmSpatialTimestepWriter {
         self.fn = nil
     }
     
+    var variableString: [String] {
+        variables.map(\.omFileNameWithMember).sorted()
+    }
+    
     
     /// Check if a given variable and member is present
     func contains<V: GenericVariable & Equatable>(variable: V, member: Int) -> Bool {
@@ -138,7 +142,7 @@ actor OmSpatialTimestepWriter {
             last_modified_time: Date(),
             completed: completed,
             valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
-            variables: self.variables.map(\.omFileNameWithMember).sorted(),
+            variables: self.variableString,
             crs_wkt: domain.grid.crsWkt2
         )
         let realm = realm.map { "_\($0)" } ?? ""
@@ -289,11 +293,63 @@ actor OmSpatialMultistepWriter {
         return handles
     }
     
+    // Upload om files to AWS from mutliple timesteps
     func writeMetaAndAWSUpload(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
-        for writer in writer {
-            // Only upload META JSON for the last timestamp
-            let isLast = writer.time == validTimes.last
-            try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: isLast)
+        // Upload to AWS S3
+        // The single OM file will be uploaded + meta JSON files
+        guard let directorySpatial = domain.domainRegistry.directorySpatial else {
+            // return early for temporary files that do not need a meta.json
+            return
+        }
+        
+        let meta = DataSpatialJson(
+            reference_time: run.toDate(),
+            last_modified_time: Date(),
+            completed: completed,
+            valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
+            variables: await writer.last?.variableString ?? [],
+            crs_wkt: domain.grid.crsWkt2
+        )
+        let realm = realm.map { "_\($0)" } ?? ""
+        let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
+        let metaRunMeta = "\(path)meta\(realm).json"
+        let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
+        let metaLatest = "\(directorySpatial)latest\(realm).json"
+        
+        try meta.writeTo(path: metaRunMeta)
+        
+        /// Only update `in-progress.json` if there is no older run currently generating files. E.g. HRRR downloads 2 runs in parallel with ~20 minutes overlap
+        let canUpdateInProgress = completed || (try? DataSpatialJson.readFrom(path: metaInProgress).sameRunOrOlderThan5Minutes(run: run)) ?? true
+        
+        if canUpdateInProgress {
+            try meta.writeTo(path: metaInProgress)
+        }
+        if completed {
+            try meta.writeTo(path: metaLatest)
+        }
+        
+        guard let uploadS3Bucket else {
+            return
+        }
+        let domain = domain
+        let run = run
+        try await domain.domainRegistry.parseBucket(uploadS3Bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
+            let destDomain = "s3://\(bucket)/data_spatial/\(domain.domainRegistry.rawValue)/"
+            let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
+            
+            // Sync entire run directory
+            try Process.awsSync(src: "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/", dest: destRun, profile: profile)
+            
+            if uploadMeta {
+                if canUpdateInProgress {
+                    let destInProgress = "\(destDomain)in-progress\(realm).json"
+                    try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
+                }
+                if completed {
+                    let destLatest = "\(destDomain)latest\(realm).json"
+                    try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)
+                }
+            }
         }
     }
 }
