@@ -95,7 +95,7 @@ struct DmiDownload: AsyncCommand {
         
         /// Domain elevation field. Used to calculate sea level pressure from surface level pressure in ICON EPS and ICON EU EPS
         let domainElevation = await {
-            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: client, logger: logger)?.read(range: nil) else {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
             return elevation
@@ -250,8 +250,9 @@ struct DmiDownload: AsyncCommand {
                         /// https://github.com/open-meteo/open-meteo/issues/518#issuecomment-1827381843
                         /// Note: snowfall height is NaN if snowfall height is at ground level
                         if variable == .freezing_level_height || variable == .temperature_2m {
-                            inMemorySurface.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                            if var (t2m, frz, member) = inMemorySurface.getTwoRemoving(first: .temperature_2m, second: .freezing_level_height, timestamp: timestamp) {
+                            await inMemorySurface.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                            if let (t2m, frz, member) = await inMemorySurface.getTwoRemoving(first: .temperature_2m, second: .freezing_level_height, timestamp: timestamp) {
+                                var frz = frz
                                 for i in t2m.data.indices {
                                     let freezingLevelHeight = (frz.data[i].isNaN || frz.data[i] <= -999) ? max(0, domainElevation[i]) : frz.data[i]
                                     let temperature_2m = t2m.data[i]
@@ -260,7 +261,7 @@ struct DmiDownload: AsyncCommand {
                                         frz.data[i] = newHeight
                                     }
                                 }
-                                try await writer.write(member: member, variable: DmiSurfaceVariable.freezing_level_height, data: grib2d.array.data)
+                                try await writer.write(member: member, variable: DmiSurfaceVariable.freezing_level_height, data: frz.data)
                             }
                             if variable == .freezing_level_height {
                                 return
