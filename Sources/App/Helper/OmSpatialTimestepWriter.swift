@@ -280,5 +280,21 @@ actor OmSpatialMultistepWriter {
         })
         return handles
     }
+    
+    /// Finalize the time step
+    func finalise() async throws -> [GenericVariableHandle] {
+        let handles = try await writer.asyncFlatMap({
+            return try await $0.finalise()
+        })
+        return handles
+    }
+    
+    func writeMetaAndAWSUpload(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
+        for writer in writer {
+            // Only upload META JSON for the last timestamp
+            let isLast = writer.time == validTimes.last
+            return try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: isLast)
+        }
+    }
 }
 

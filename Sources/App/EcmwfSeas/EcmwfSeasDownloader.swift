@@ -140,6 +140,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         var handles = [GenericVariableHandle]()
         var handlesEnsembleMean = [GenericVariableHandle]()
         
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
+        
         let package: String
         let types: [String]
         let streams: [String]
@@ -233,12 +236,19 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise(completed: day >= 47, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
+            handles.append(contentsOf: try await writer.finalise())
             if let ensembleMean {
                 try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
-                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise(completed: day >= 47, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
+                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise())
+            }
+            try await uploadTask?.value
+            let validTimes = validTimes
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: day >= 47, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: day >= 47, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
             }
         }
+        try await uploadTask?.value
         if let ensembleMeanDomain = domain.ensembleMeanDomain {
             return [domain: handles, ensembleMeanDomain : handlesEnsembleMean]
         }
@@ -263,6 +273,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         var validTimes = [Timestamp]()
         var handles = [GenericVariableHandle]()
         var handlesEnsembleMean = [GenericVariableHandle]()
+        
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
         
         let deaverager = GribDeaverager()
         for month in 0...6 {
@@ -351,12 +364,19 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             }
             // Control and ensemble for 1 day have been downloaded now
             validTimes.append(contentsOf: await writer.writer.map(\.time))
-            handles.append(contentsOf: try await writer.finalise(completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
+            handles.append(contentsOf: try await writer.finalise())
             if let ensembleMean {
                 try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
-                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise(completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket))
+                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise())
+            }
+            try await uploadTask?.value
+            let validTimes = validTimes
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
             }
         }
+        try await uploadTask?.value
         if let ensembleMeanDomain = domain.ensembleMeanDomain {
             return [domain: handles, ensembleMeanDomain : handlesEnsembleMean]
         }
