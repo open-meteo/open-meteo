@@ -293,7 +293,7 @@ actor OmSpatialMultistepWriter {
         for writer in writer {
             // Only upload META JSON for the last timestamp
             let isLast = writer.time == validTimes.last
-            return try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: isLast)
+            try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: isLast)
         }
     }
 }
