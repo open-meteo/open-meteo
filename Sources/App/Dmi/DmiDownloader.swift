@@ -253,7 +253,7 @@ struct DmiDownload: AsyncCommand {
                             inMemorySurface.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                             if var (t2m, frz, member) = inMemorySurface.getTwoRemoving(first: .temperature_2m, second: .freezing_level_height, timestamp: timestamp) {
                                 for i in t2m.data.indices {
-                                    let freezingLevelHeight = frz.data[i].isNaN ? max(0, domainElevation[i]) : frz.data[i]
+                                    let freezingLevelHeight = (frz.data[i].isNaN || frz.data[i] <= -999) ? max(0, domainElevation[i]) : frz.data[i]
                                     let temperature_2m = t2m.data[i]
                                     let newHeight = freezingLevelHeight - abs(-1 * temperature_2m) * 0.7 * 100
                                     if newHeight <= domainElevation[i] {
