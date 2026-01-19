@@ -62,7 +62,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             fatalError()
         }
         for (domain, handles) in handles {
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: true)
+            let generateFullRun = domain.countEnsembleMember == 1
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun, generateTimeSeries: true)
         }
     }
     

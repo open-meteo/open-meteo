@@ -312,6 +312,7 @@ actor OmSpatialMultistepWriter {
         )
         let realm = realm.map { "_\($0)" } ?? ""
         let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
+        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
         let metaRunMeta = "\(path)meta\(realm).json"
         let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
         let metaLatest = "\(directorySpatial)latest\(realm).json"
@@ -338,7 +339,7 @@ actor OmSpatialMultistepWriter {
             let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
             
             // Sync entire run directory
-            try Process.awsSync(src: "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/", dest: destRun, profile: profile)
+            try Process.awsSync(src: path, dest: destRun, profile: profile)
             
             if uploadMeta {
                 if canUpdateInProgress {
