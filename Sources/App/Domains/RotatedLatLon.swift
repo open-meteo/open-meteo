@@ -13,9 +13,9 @@ struct RotatedLatLonProjection: Projectable {
         let o_lat_p = -(θ.radiansToDegrees - 90)
         return """
             GEOGCRS["Rotated Lat/Lon",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",6371229.0,0.0]]],
                 DERIVINGCONVERSION["Rotated Lat/Lon",
                     METHOD["PROJ ob_tran o_proj=longlat"],
                     PARAMETER["o_lon_p",0],

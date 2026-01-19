@@ -19,7 +19,7 @@ import Testing
         #expect(slice.yRange == 4..<6)
         #expect(slice.xRange == 7..<9)
         #expect(slice.map { $0 } == [47, 48, 57, 58])
-        
+
         /// Cams Europe grid uses negative dy
         let grid2 = RegularGrid(nx: 700, ny: 420, latMin: 71.95, lonMin: -24.95, dx: 0.1, dy: -0.1)
         let slice2 = grid2.findBox(boundingBox: BoundingBoxWGS84(latitude: 45.15..<48.5, longitude: 5.0..<11))!
@@ -92,9 +92,9 @@ import Testing
         let cmcGemContinentalProj4 = GemDomain.gem_hrdps_continental.grid.crsWkt2
         #expect(cmcGemContinentalProj4 == """
             GEOGCRS["Rotated Lat/Lon",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6378137,298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",6371229.0,0.0]]],
                 DERIVINGCONVERSION["Rotated Lat/Lon",
                     METHOD["PROJ ob_tran o_proj=longlat"],
                     PARAMETER["o_lon_p",0],
@@ -112,9 +112,9 @@ import Testing
         let cmcGemRegionalProj4 = GemDomain.gem_regional.grid.crsWkt2
         #expect(cmcGemRegionalProj4 == """
             PROJCRS["Stereographic",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",6371229.0,0.0]]],
                 CONVERSION["Stereographic",
                     METHOD["Stereographic"],
                     PARAMETER["Latitude of natural origin", 90.0],
@@ -134,9 +134,9 @@ import Testing
         let dmiHarmonieProj4 = DmiDomain.harmonie_arome_europe.grid.crsWkt2
         #expect(dmiHarmonieProj4 == """
             PROJCRS["Lambert Conic Conformal",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",6371229.0,0.0]]],
                 CONVERSION["Lambert Conic Conformal",
                     METHOD["Lambert Conic Conformal (2SP)"],
                     PARAMETER["Latitude of 1st standard parallel",55.5],
@@ -155,9 +155,9 @@ import Testing
         let ukmoRegionalDeterministicProj4 = UkmoDomain.uk_deterministic_2km.grid.crsWkt2
         #expect(ukmoRegionalDeterministicProj4 == """
             PROJCRS["Lambert Azimuthal Equal-Area",
-                BASEGEOGCRS["WGS 84",
-                    DATUM["World Geodetic System 1984",
-                        ELLIPSOID["WGS 84",6371229.0,298.257223563]]],
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",6371229.0,0.0]]],
                 CONVERSION["Lambert Azimuthal Equal-Area",
                     METHOD["Lambert Azimuthal Equal-Area"],
                     PARAMETER["Latitude of natural origin", 54.9],
@@ -172,7 +172,7 @@ import Testing
                     SCOPE["grid"],
                     BBOX[44.508755,-17.152863,61.92511,15.352753]]]
             """)
-        
+
         let o1280Proj4 = EcmwfEcpdsDomain.ifs.grid.crsWkt2
         #expect(o1280Proj4 == """
             GEOGCRS["Reduced Gaussian Grid",
