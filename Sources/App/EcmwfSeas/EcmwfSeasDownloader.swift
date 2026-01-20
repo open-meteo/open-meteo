@@ -30,6 +30,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         @Option(name: "email", help: "Email for the ECMWF API service")
         var email: String?
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {
