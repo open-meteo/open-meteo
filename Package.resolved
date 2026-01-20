@@ -176,8 +176,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "bc386b95f2a16ccd0150a8235e7c69eab2b866ca",
-        "version" : "1.8.0"
+        "revision" : "2778fd4e5a12a8aaa30a3ee8285f4ce54c5f3181",
+        "version" : "1.9.1"
       }
     },
     {
@@ -266,8 +266,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "395a77f0aa927f0ff73941d7ac35f2b46d47c9db",
-        "version" : "1.6.3"
+        "revision" : "7c6ad0fc39d0763e0b699210e4124afd5041c5df",
+        "version" : "1.6.4"
       }
     },
     {
@@ -302,8 +302,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "3014d7de87d86939f31c5e88b3aa261a46e1d460",
-        "version" : "4.121.0"
+        "revision" : "6f3db7122ccffb28e11e121c3797a176fcb88796",
+        "version" : "4.121.1"
       }
     },
     {
