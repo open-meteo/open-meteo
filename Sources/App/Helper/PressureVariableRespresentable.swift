@@ -286,3 +286,75 @@ enum VariableOrDerived<Raw: RawRepresentableString & Sendable, Derived: RawRepre
         }
     }
 }
+
+
+struct VariableOrSpread<Variable: RawRepresentableString & Sendable>: RawRepresentableString, Sendable {
+    let variable: Variable
+    let isSpread: Bool
+    
+    init (variable: Variable, isSpread: Bool) {
+        self.variable = variable
+        self.isSpread = isSpread
+    }
+    
+    init?(rawValue: String) {
+        if rawValue.hasSuffix("_spread") {
+            guard let variable = Variable(rawValue: String(rawValue.dropLast(7))) else {
+                return nil
+            }
+            self.variable = variable
+            self.isSpread = true
+            return
+        }
+        guard let variable = Variable(rawValue: rawValue) else {
+            return nil
+        }
+        self.variable = variable
+        self.isSpread = false
+    }
+
+    var rawValue: String {
+        return isSpread ? "\(variable.rawValue)_spread" : variable.rawValue
+    }
+
+    var name: String {
+        return rawValue
+    }
+
+}
+
+extension VariableOrSpread: GenericVariable, GenericVariableMixable where Variable: GenericVariable {
+    var omFileName: (file: String, level: Int) {
+        return (isSpread ? "\(variable.omFileName.file)_spread" : variable.omFileName.file, variable.omFileName.level)
+    }
+    
+    var scalefactor: Float {
+        return variable.scalefactor
+    }
+    
+    var interpolation: ReaderInterpolation {
+        return variable.interpolation
+    }
+    
+    var unit: SiUnit {
+        return variable.unit == .celsius ? .kelvin : variable.unit
+    }
+    
+    var isElevationCorrectable: Bool {
+        return false
+    }
+    
+    var storePreviousForecast: Bool {
+        return variable.storePreviousForecast
+    }
+}
+
+extension GenericVariable {
+    var asSpreadVariable: VariableOrSpread<Self> {
+        return VariableOrSpread(variable: self, isSpread: true)
+    }
+    
+    var asSpreadVariableGeneric: some GenericVariable {
+        return VariableOrSpread(variable: self, isSpread: true)
+    }
+}

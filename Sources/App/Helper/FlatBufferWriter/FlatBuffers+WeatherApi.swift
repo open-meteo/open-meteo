@@ -308,10 +308,14 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 10, previousDay: previousDay)
         case .wind_speed_100m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .wind_speed_200m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .wind_direction_10m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 10, previousDay: previousDay)
         case .wind_direction_100m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .wind_direction_200m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .snowfall_spread:
             return .init(variable: .snowfall, aggregation: .spread, previousDay: previousDay)
         case .temperature_2m_spread:
@@ -536,7 +540,40 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .lightningDensity)
         case .sea_ice_thickness:
             return .init(variable: .seaIceThickness)
-
+        case .sea_surface_temperature_spread:
+            return .init(variable: .seaSurfaceTemperature, aggregation: .spread)
+        case .wind_u_component_10m_spread:
+            return .init(variable: .windUComponent, aggregation: .spread, altitude: 10)
+        case .wind_v_component_10m_spread:
+            return .init(variable: .windVComponent, aggregation: .spread, altitude: 10)
+        case .cloud_cover_spread:
+            return .init(variable: .cloudCover, aggregation: .spread)
+        case .wind_u_component_100m_spread:
+            return .init(variable: .windUComponent, aggregation: .spread, altitude: 100)
+        case .wind_v_component_100m_spread:
+            return .init(variable: .windVComponent, aggregation: .spread, altitude: 100)
+        case .wind_u_component_200m_spread:
+            return .init(variable: .windUComponent, aggregation: .spread, altitude: 200)
+        case .wind_v_component_200m_spread:
+            return .init(variable: .windVComponent, aggregation: .spread, altitude: 200)
+        case .temperature_2m_max_spread:
+            /// TODO this definition should just be `temperatureMax`
+            return .init(variable: .temperatureMax6h, aggregation: .spread, altitude: 2)
+        case .temperature_2m_min_spread:
+            /// TODO this definition should just be `temperatureMin`
+            return .init(variable: .temperatureMin6h, aggregation: .spread, altitude: 2)
+        case .showers_spread:
+            return .init(variable: .showers, aggregation: .spread)
+        case .sunshine_duration_spread:
+            return .init(variable: .sunshineDuration, aggregation: .spread)
+        case .wave_direction_spread:
+            return .init(variable: .waveDirection, aggregation: .spread)
+        case .wave_height_spread:
+            return .init(variable: .waveHeight, aggregation: .spread)
+        case .wave_period_spread:
+            return .init(variable: .wavePeriod, aggregation: .spread)
+        case .wave_peak_period_spread:
+            return .init(variable: .wavePeakPeriod, aggregation: .spread)
         }
     }
 }

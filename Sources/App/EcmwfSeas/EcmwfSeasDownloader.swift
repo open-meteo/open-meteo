@@ -228,13 +228,13 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                             }
                             let count = await inMemoryAccumulated.data.count
                             logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
-                            await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: nil, data: data.data)
+                            await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data.data)
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
                     logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
-                    await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: nil, data: array2d.array.data)
+                    await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: array2d.array.data)
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }
             }
@@ -355,14 +355,14 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                             }
                             let count = await inMemoryAccumulated.data.count
                             logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
-                            await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: nil, data: data.data)
+                            await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data.data)
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
                     let timeOut = variable.shift24h ? time.add(hours: -24) : time
                     logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(timeOut.format_YYYYMMddHH)")
-                    await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: nil, data: array2d.array.data)
+                    await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: array2d.array.data)
                     try await writer.write(time: timeOut, member: member, variable: variable, data: array2d.array.data)
                 }
             }
