@@ -218,13 +218,13 @@ struct GloFasDownloader: AsyncCommand {
         // let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
 
-        try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
+        for message in try SwiftEccodes.getMessages(fileName: gribFile, multiSupport: true) {
             /// Date in ISO timestamp string format `20210101`
             let date = message.get(attribute: "dataDate")!
             logger.info("Converting day \(date)")
             let dailyFile = "\(domain.downloadDirectory)glofas_\(date).om"
             if FileManager.default.fileExists(atPath: dailyFile) {
-                return
+                continue
             }
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()

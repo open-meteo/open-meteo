@@ -93,11 +93,14 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_ifs_analysis_long_window
     case ecmwf_ifs_long_window
     case ecmwf_seas5
+    case ecmwf_seas5_ensemble_mean
     case ecmwf_seas5_12hourly
     case ecmwf_seas5_daily
+    case ecmwf_seas5_daily_ensemble_mean
     case ecmwf_seas5_monthly_upper_level
     case ecmwf_seas5_monthly
     case ecmwf_ec46
+    case ecmwf_ec46_ensemble_mean
     case ecmwf_ec46_weekly
 
     case jma_msm
@@ -446,6 +449,12 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoSwissDomain.icon_ch1_ensemble
         case .meteoswiss_icon_ch2_ensemble:
             return MeteoSwissDomain.icon_ch2_ensemble
+        case .ecmwf_seas5_ensemble_mean:
+            return EcmwfSeasDomain.seas5_ensemble_mean
+        case .ecmwf_seas5_daily_ensemble_mean:
+            return EcmwfSeasDomain.seas5_daily_ensemble_mean
+        case .ecmwf_ec46_ensemble_mean:
+            return EcmwfSeasDomain.ec46_ensemble_mean
         }
     }
 }
@@ -515,7 +524,7 @@ extension DomainRegistry {
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-                let exclude = bucket == "openmeteo" ? ["*~", "*_previous_day*"] : ["*~"]
+                let exclude = bucket == "openmeteo" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket)")
                 let startTimeAws = DispatchTime.now()
                 try Process.awsSync(

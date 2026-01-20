@@ -1,3 +1,5 @@
+import Foundation
+
 /**
  Abstract derived variables into a graph. Allows recursive dependencies between variables. There is no protection against circular dependencies. The graph must be constructed without loops.
  */
@@ -49,6 +51,45 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
         }
         return .two(.raw(u), .raw(v), {u, v, _ in
             return DataAndUnit(Meteorology.windirectionFast(u: u.data, v: v.data), .degreeDirection)
+        })
+    }
+    
+    static func windSpeedSpread(u: Variable?, v: Variable?, uSpread: Variable?, vSpread: Variable?) -> Self? {
+        guard let u, let v, let uSpread, let vSpread else {
+            return nil
+        }
+        return .four(.raw(u), .raw(v), .raw(uSpread), .raw(vSpread), {u, v, σu, σv, _ -> DataAndUnit in
+            /// Calculate propagation of uncertainty. See https://en.wikipedia.org/wiki/Propagation_of_uncertainty
+            /// https://www.wolframalpha.com/input?i=Simplify%5BSqrt%5BFold%5B%231%2B%232+%26%2CD%5B%5B%2F%2Fmath%3Asqrt%28U*U%2BV*V%29%2F%2F%5D%2C%7B%7B%5B%2F%2Fmath%3AU%2CV%2F%2F%5D%7D%7D%5D%5E2*%7B%5B%2F%2Fmath%3Au%2Cv%2F%2F%5D%7D%5E2%5D%5D%5D
+            /// Simplify[Sqrt[Fold[#1+#2 &,D[[//math:sqrt(U*U+V*V)//],{{[//math:U,V//]}}]^2*{[//math:u,v//]}^2]]]
+            /// sqrt((u^2 U^2 + v^2 V^2)/(U^2 + V^2))
+            let σr: [Float] = zip(zip(u.data, v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u, v), (σu, σv)) = arg
+                if (u * u + v * v) == 0 {
+                    return 0
+                }
+                return sqrt((u * u * σu * σu + v * v * σv * σv) / (u * u + v * v))
+            }
+            return DataAndUnit(σr, .metrePerSecond)
+        })
+    }
+    
+    static func windDirectionSpread(u: Variable?, v: Variable?, uSpread: Variable?, vSpread: Variable?) -> Self? {
+        guard let u, let v, let uSpread, let vSpread else {
+            return nil
+        }
+        return .four(.raw(u), .raw(v), .raw(uSpread), .raw(vSpread), {u, v, σu, σv, _ -> DataAndUnit in
+            /// https://www.wolframalpha.com/input?i=Simplify%5BSqrt%5BFold%5B%231%2B%232+%26%2CD%5B%5B%2F%2Fmath%3Aatan2%28U%2CV%29*180%2FPI+%2B+180%2F%2F%5D%2C%7B%7B%5B%2F%2Fmath%3AU%2CV%2F%2F%5D%7D%7D%5D%5E2*%7B%5B%2F%2Fmath%3Au%2Cv%2F%2F%5D%7D%5E2%5D%5D%5D
+            /// Simplify[Sqrt[Fold[#1+#2 &,D[[//math:atan2(U,V)*180/PI + 180//],{{[//math:U,V//]}}]^2*{[//math:u,v//]}^2]]]
+            /// (180 sqrt((u^2 V^2 + U^2 v^2)/(U^2 + V^2)^2))/π
+            let σ = zip(zip(u.data, v.data), zip(σu.data, σv.data)).map { arg -> Float in
+                let ((u, v), (σu, σv)) = arg
+                if (u * u + v * v) == 0 {
+                    return 0
+                }
+                return sqrt((u * u * σv * σv + v * v * σu * σu) / ((u * u + v * v) * (u * u + v * v))) * 180 / .pi
+            }
+            return DataAndUnit(σ, .degreeDirection)
         })
     }
 }
