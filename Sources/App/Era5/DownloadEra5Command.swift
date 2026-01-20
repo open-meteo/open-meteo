@@ -289,7 +289,7 @@ struct DownloadEra5Command: AsyncCommand {
         var elevation: [Float]?
         var soilType: [Float]?
         for file in files {
-            try SwiftEccodes.iterateMessages(fileName: file, multiSupport: true) { message in
+            for message in try SwiftEccodes.getMessages(fileName: file, multiSupport: true) {
                 let shortName = message.get(attribute: "shortName")!
                 var data = try message.to2D(nx: nx, ny: ny, shift180LongitudeAndFlipLatitudeIfRequired: true).array.data
                 switch shortName {
