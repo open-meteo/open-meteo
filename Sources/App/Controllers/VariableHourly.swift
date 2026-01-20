@@ -585,8 +585,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         case .cloudcover:
             return getDeriverMap(variable: .cloud_cover)
-        case .snowfall:
-            guard let snowWater = Reader.variableFromString("snowfall_water_equivalent") else {
+        case .snowfall, .snowfall_spread:
+            guard let snowWater = Reader.variableFromString(variable == .snowfall_spread ? "snowfall_water_equivalent_spread" : "snowfall_water_equivalent") else {
                 return nil
             }
             return .one(.raw(snowWater)) { snowWater, time in
