@@ -358,3 +358,6 @@ extension GenericVariable {
         return VariableOrSpread(variable: self, isSpread: true)
     }
 }
+
+extension VariableOrSpread: Hashable, Equatable where Variable: Hashable {
+}
