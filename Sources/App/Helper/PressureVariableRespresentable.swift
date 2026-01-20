@@ -337,7 +337,7 @@ extension VariableOrSpread: GenericVariable, GenericVariableMixable where Variab
     }
     
     var unit: SiUnit {
-        return variable.unit == .celsius ? .kelvin : variable.unit
+        return isSpread && variable.unit == .celsius ? .kelvin : variable.unit
     }
     
     var isElevationCorrectable: Bool {
