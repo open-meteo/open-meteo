@@ -135,9 +135,19 @@ enum EcmwfSeasDomain: String, GenericDomain, CaseIterable {
     
     var omFileLength: Int {
         switch self {
-        case .ec46:
-            return 46*24 / 6 // 184
-        default:
+        case .ec46, .ec46_ensemble_mean:
+            return 24/6 * 46 // 184
+        case .seas5, .seas5_ensemble_mean:
+            // 6-hourly data for 6 months
+            return 24/6 * 180 // 720
+        case .seas5_daily, .seas5_daily_ensemble_mean:
+             // daily data for 6 months
+            return 180
+        case .seas5_12hourly:
+            return 24/12 * 180 // 360
+        case .ec46_weekly:
+            return 200
+        case .seas5_monthly, .seas5_monthly_upper_level:
             return 200
         }
     }

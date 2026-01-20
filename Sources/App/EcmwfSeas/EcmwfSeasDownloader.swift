@@ -161,7 +161,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         }
                 
         let deaverager = GribDeaverager()
-        for day in 0...47 {
+        for day in 0...46 {
             let dayTimestamp = run.add(days: day)
             
             if domain.dtSeconds == 7*24*3600 && (dayTimestamp.weekday != .monday || day < 7 ) {
@@ -245,8 +245,8 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             try await uploadTask?.value
             let validTimes = validTimes
             uploadTask = Task {
-                try await writer.writeMetaAndAWSUpload(completed: day >= 47, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
-                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: day >= 47, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                try await writer.writeMetaAndAWSUpload(completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
             }
         }
         try await uploadTask?.value
