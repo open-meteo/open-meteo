@@ -827,6 +827,30 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case seamless_v4
     case forecast_v4
     case consolidated_v4
+    
+//    enum DomainReaderMapping {
+//        case single(domain: GenericDomain, variableType: any GenericVariable.Type)
+//        case singleWithPrecipitationProbability(GenericDomain, GenericDomain, any GenericVariable.Type)
+//    }
+    
+    /// Generic domains with hourly data that can use the generic defiver controller
+    func getDomainAndVariable() -> (GenericDomain, any GenericVariable.Type)? {
+        switch self {
+        case .ncep_aigfs025:
+            // TODO AIGFS could use precipitation probability from AIGEFS
+            return (GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self)
+        case .ncep_hgefs025_ensemble_mean:
+            return (GfsGraphCastDomain.hgefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+        case .gfs_graphcast025, .ncep_gfs_graphcast025:
+            return (GfsGraphCastDomain.graphcast025, GfsGraphCastVariable.self)
+        case .ncep_aigefs025:
+            return (GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
+        case .ncep_aigefs025_ensemble_mean:
+            return (GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+        default:
+            return nil
+        }
+    }
 
     
     /// The ensemble API endpoint uses domain names without "_ensemble". Remap to maintain backwards compatibility
@@ -862,6 +886,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
     
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?)? {
+        
+        if let d = getDomainAndVariable() {
+            return try await d.0.makeGenericHourlyDaily(variableType: d.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        }
         
         switch self {
         case .ecmwf_seasonal_seamless, .ecmwf_seasonal_ensemble_mean_seamless:
@@ -967,24 +995,24 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
             
-        case .ncep_hgefs025_ensemble_mean:
-            return try await GfsGraphCastDomain.hgefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        case .gfs_graphcast025, .ncep_gfs_graphcast025:
-            return try await GfsGraphCastDomain.graphcast025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        case .ncep_aigefs025:
-            return try await GfsGraphCastDomain.aigefs025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        case .ncep_aigefs025_ensemble_mean:
-            return try await GfsGraphCastDomain.aigefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-        case .ncep_aigfs025:
-            // Use precipitation_probability from AIGEFS
-            guard
-                let aigfs = try await GenericReader<GfsGraphCastDomain, VariableOrSpread<GfsGraphCastVariable>>(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                let prob: any GenericReaderProtocol = try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
-                return nil
-            }
-            let hourly = GenericReaderMulti<ForecastVariable>(reader: [GenericReaderCached(reader: aigfs), prob])
-            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourly, allowMinMaxTwoAggregations: true)
-            return (hourly, daily, nil, nil)
+//        case .ncep_hgefs025_ensemble_mean:
+//            return try await GfsGraphCastDomain.hgefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+//        case .gfs_graphcast025, .ncep_gfs_graphcast025:
+//            return try await GfsGraphCastDomain.graphcast025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+//        case .ncep_aigefs025:
+//            return try await GfsGraphCastDomain.aigefs025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+//        case .ncep_aigefs025_ensemble_mean:
+//            return try await GfsGraphCastDomain.aigefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+//        case .ncep_aigfs025:
+//            // Use precipitation_probability from AIGEFS
+//            guard
+//                let aigfs = try await GenericReader<GfsGraphCastDomain, VariableOrSpread<GfsGraphCastVariable>>(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+//                let prob: any GenericReaderProtocol = try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+//                return nil
+//            }
+//            let hourly = GenericReaderMulti<ForecastVariable>(reader: [GenericReaderCached(reader: aigfs), prob])
+//            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourly, allowMinMaxTwoAggregations: true)
+//            return (hourly, daily, nil, nil)
         default:
             let readers: [any GenericReaderProtocol] = try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard readers.count > 0 else {
@@ -998,6 +1026,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
     
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
+        
+        if let d = getDomainAndVariable() {
+            return try await d.0.makeGenericHourlyDaily(variableType: d.1, position: gridpoint, options: options)
+        }
         
         switch self {
         case .meteofrance_currents:
@@ -1451,6 +1483,10 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     }
 
     var genericDomain: (any GenericDomain)? {
+        if let d = getDomainAndVariable() {
+            return d.0
+        }
+        
         switch self {
         case .gfs025, .ncep_gfs025:
             return GfsDomain.gfs025
@@ -1712,15 +1748,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_nam_conus:
             return try await GfsReader(domain: .nam_conus, gridpoint: gridpoint, options: options)
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
-            return try await GfsGraphCastReader(domain: .graphcast025, gridpoint: gridpoint, options: options)
+            return nil // defined in the upper function
         case .ncep_aigfs025:
-            return try await GfsGraphCastReader(domain: .aigfs025, gridpoint: gridpoint, options: options)
+            return nil // defined in the upper function
         case .ncep_aigefs025:
-            return try await GfsGraphCastReader(domain: .aigefs025, gridpoint: gridpoint, options: options)
+            return nil // defined in the upper function
         case .ncep_aigefs025_ensemble_mean:
-            return try await GfsGraphCastReader(domain: .aigefs025_ensemble_mean, gridpoint: gridpoint, options: options)
+            return nil // defined in the upper function
         case .ncep_hgefs025_ensemble_mean:
-            return try await GfsGraphCastReader(domain: .hgefs025_ensemble_mean, gridpoint: gridpoint, options: options)
+            return nil // defined in the upper function
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return try await MeteoFranceReader(domain: .arpege_world, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_europe, .arpege_europe, .meteofrance_arome_france0025:
