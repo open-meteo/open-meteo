@@ -56,7 +56,7 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_nam_conus
     case ncep_aigefs025
     case ncep_aigfs025
-    case ncep_hgefs025_stats
+    case ncep_hgefs025_ensemble_mean
     
 
     case glofas_consolidated_v4
@@ -383,8 +383,8 @@ enum DomainRegistry: String, CaseIterable {
             return nil
         case .ncep_gfs_graphcast025:
             return GfsGraphCastDomain.graphcast025
-        case .ncep_hgefs025_stats:
-            return GfsGraphCastDomain.hgefs025_stats
+        case .ncep_hgefs025_ensemble_mean:
+            return GfsGraphCastDomain.hgefs025_ensemble_mean
         case .ecmwf_wam025:
             return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:

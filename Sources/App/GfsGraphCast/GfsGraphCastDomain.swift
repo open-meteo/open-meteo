@@ -4,7 +4,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     case graphcast025
     case aigfs025
     case aigefs025
-    case hgefs025_stats
+    case hgefs025_ensemble_mean
     
     var domainRegistry: DomainRegistry {
         switch self {
@@ -14,8 +14,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return .ncep_aigfs025
         case .aigefs025:
             return .ncep_aigefs025
-        case .hgefs025_stats:
-            return .ncep_hgefs025_stats
+        case .hgefs025_ensemble_mean:
+            return .ncep_hgefs025_ensemble_mean
         }
     }
 
@@ -47,7 +47,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return 1
         case .aigefs025:
             return 30+1
-        case .hgefs025_stats:
+        case .hgefs025_ensemble_mean:
             return 1
         }
     }
@@ -66,7 +66,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         case .aigfs025, .aigefs025:
             // 3:40 delay for AIGFS
             return t.add(hours: -3).floor(toNearestHour: 6)
-        case .hgefs025_stats:
+        case .hgefs025_ensemble_mean:
             // 6:40 delay
             return t.add(hours: -6).floor(toNearestHour: 6)
         }
@@ -76,7 +76,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         switch self {
         case .graphcast025, .aigfs025, .aigefs025:
             return Array(stride(from: 6, through: 384, by: 6))
-        case .hgefs025_stats:
+        case .hgefs025_ensemble_mean:
             return Array(stride(from: 6, through: 240, by: 6))
         }
         
@@ -115,7 +115,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
             let base = "\(server)aigfs/prod/aigfs.\(yyyymmdd)/\(hh)/model/atmos/grib2/"
             return ["\(base)aigfs.t\(hh)z.sfc.f\(fHHH).grib2", "\(base)aigfs.t\(hh)z.pres.f\(fHHH).grib2"]
-        case .hgefs025_stats:
+        case .hgefs025_ensemble_mean:
             let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
             let base = "\(server)hgefs/prod/hgefs.\(yyyymmdd)/\(hh)/ensstat/products/atmos/grib2/"
             // TODO implement spread variables
