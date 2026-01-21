@@ -25,6 +25,9 @@ struct GfsGraphCastDownload: AsyncCommand {
 
         @Option(name: "timeinterval", short: "t", help: "Timeinterval to download past forecasts. Format 20220101-20220131")
         var timeinterval: String?
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {
@@ -47,13 +50,16 @@ struct GfsGraphCastDownload: AsyncCommand {
 
     func downloadRun(using context: CommandContext, signature: Signature, run: Timestamp, domain: GfsGraphCastDomain) async throws {
         let logger = context.application.logger
-        let generateFullRun = domain.countEnsembleMember == 1
 
         logger.info("Downloading domain \(domain) run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
 
         let nConcurrent = signature.concurrent ?? 1
         let handles = try await download(application: context.application, domain: domain, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun)
+        
+        for (domain, handles) in handles {
+            let generateFullRun = domain.countEnsembleMember == 1
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun, generateTimeSeries: true)
+        }
     }
 
     func getCmaVariable(logger: Logger, message: GribMessage) -> GfsGraphCastVariableDownloadable? {
@@ -117,7 +123,7 @@ struct GfsGraphCastDownload: AsyncCommand {
         return nil
     }
 
-    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: GfsGraphCastDomain, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GfsGraphCastDomain: [GenericVariableHandle]] {
         let logger = application.logger
         let deadLineHours: Double = domain == .aigefs025 ? 6 : 4
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
@@ -129,6 +135,8 @@ struct GfsGraphCastDownload: AsyncCommand {
         /// Run AWS upload in the background
         var uploadTask: Task<(), any Error>? = nil
         
+        var handlesEnsembleMean = [GenericVariableHandle]()
+        
         let handles = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let forecastHour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading forecastHour \(forecastHour)")
@@ -136,6 +144,10 @@ struct GfsGraphCastDownload: AsyncCommand {
             let storePrecipMembers = VariablePerMemberStorage<GfsGraphCastSurfaceVariable>()
             let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
+            let ensembleMean = domain.ensembleMeanDomain.map {(
+                writer: OmSpatialTimestepWriter(domain: $0, run: run, time: timestamp, storeOnDisk: true, realm: nil),
+                 calculator: EnsembleMeanCalculator()
+            )}
             
             try await members.foreachConcurrent(nConcurrent: 2) { member in
                 let urls = domain.getGribUrl(run: run, forecastHour: forecastHour, member: member)
@@ -193,6 +205,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                         
                         logger.info("Compressing and writing data \(variable.omFileName.file) hour \(forecastHour) member \(member)")
                         try await writer.write(member: member, variable: variable, data: grib2d.array.data)
+                        await ensembleMean?.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: grib2d.array.data)
                     }
                 }
                 
@@ -213,6 +226,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     // Store to calculate cloud cover
                     await storage.set(variable: rhVariable, timestamp: timestamp, member: member, data: Array2D(data: data, nx: t.nx, ny: t.ny))
                     try await writer.write(member: member, variable: rhVariable, data: data)
+                    await ensembleMean?.calculator.ingest(variable: rhVariable, spreadVariable: rhVariable.asSpreadVariableGeneric, data: data)
                 }
 
                 // convert pressure vertical velocity to geometric velocity
@@ -227,6 +241,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                     }
                     let data = Meteorology.verticalVelocityPressureToGeometric(omega: data.data, temperature: t.data, pressureLevel: Float(level))
                     try await writer.write(member: member, variable: v.variable, data: data)
+                    await ensembleMean?.calculator.ingest(variable:  v.variable, spreadVariable:  v.variable.asSpreadVariableGeneric, data: data)
                 }
 
                 // Calculate cloud cover mid/low/high/total
@@ -273,6 +288,11 @@ struct GfsGraphCastDownload: AsyncCommand {
                 try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, data: cloudcover_mid)
                 try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover_high, data: cloudcover_high)
                 try await writer.write(member: member, variable: GfsGraphCastSurfaceVariable.cloud_cover, data: cloudcover)
+                
+                await ensembleMean?.calculator.ingest(variable: GfsGraphCastSurfaceVariable.cloud_cover_low, spreadVariable: GfsGraphCastSurfaceVariable.cloud_cover_low.asSpreadVariableGeneric, data: cloudcover_low)
+                await ensembleMean?.calculator.ingest(variable: GfsGraphCastSurfaceVariable.cloud_cover_mid, spreadVariable: GfsGraphCastSurfaceVariable.cloud_cover_mid.asSpreadVariableGeneric, data: cloudcover_mid)
+                await ensembleMean?.calculator.ingest(variable: GfsGraphCastSurfaceVariable.cloud_cover_high, spreadVariable: GfsGraphCastSurfaceVariable.cloud_cover_high.asSpreadVariableGeneric, data: cloudcover_high)
+                await ensembleMean?.calculator.ingest(variable: GfsGraphCastSurfaceVariable.cloud_cover, spreadVariable: GfsGraphCastSurfaceVariable.cloud_cover.asSpreadVariableGeneric, data: cloudcover)
             }
             
             if let writerProbabilities {
@@ -283,17 +303,30 @@ struct GfsGraphCastDownload: AsyncCommand {
                     writer: writerProbabilities
                 )
             }
+            
+            if let ensembleMean {
+                try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
+                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise())
+            }
+            
             let completed = i == timestamps.count - 1
             let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
             try await uploadTask?.value
             uploadTask = Task {
                 try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
                 try await writerProbabilities?.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
             }
+            
             return handles
         }
+        try await uploadTask?.value
         await curl.printStatistics()
         Process.alarm(seconds: 0)
-        return handles
+        
+        if let ensembleMeanDomain = domain.ensembleMeanDomain {
+            return [domain: handles, ensembleMeanDomain : handlesEnsembleMean]
+        }
+        return [domain: handles]
     }
 }

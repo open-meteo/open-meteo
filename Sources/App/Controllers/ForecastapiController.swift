@@ -655,6 +655,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case ncep_aigfs025
     case ncep_aigefs025
     case ncep_hgefs025_ensemble_mean
+    case ncep_aigefs025_ensemble_mean
     
     case meteofrance_seamless
     case meteofrance_mix
@@ -972,6 +973,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GfsGraphCastDomain.graphcast025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         case .ncep_aigefs025:
             return try await GfsGraphCastDomain.aigefs025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        case .ncep_aigefs025_ensemble_mean:
+            return try await GfsGraphCastDomain.aigefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
         case .ncep_aigfs025:
             // Use precipitation_probability from AIGEFS
             guard
@@ -1121,7 +1124,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
 //            return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
             return []
-        case .ncep_aigfs025:
+        case .ncep_aigfs025, .ncep_aigefs025_ensemble_mean:
             /// Use precipitation_probability from AIGEFS
 //            return [
 //                try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
@@ -1463,6 +1466,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return GfsGraphCastDomain.graphcast025
         case .ncep_aigfs025:
             return GfsGraphCastDomain.aigfs025
+        case .ncep_aigefs025_ensemble_mean:
+            return GfsGraphCastDomain.aigefs025_ensemble_mean
         case .ncep_aigefs025:
             return GfsGraphCastDomain.aigefs025
         case .ncep_hgefs025_ensemble_mean:
@@ -1712,6 +1717,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return try await GfsGraphCastReader(domain: .aigfs025, gridpoint: gridpoint, options: options)
         case .ncep_aigefs025:
             return try await GfsGraphCastReader(domain: .aigefs025, gridpoint: gridpoint, options: options)
+        case .ncep_aigefs025_ensemble_mean:
+            return try await GfsGraphCastReader(domain: .aigefs025_ensemble_mean, gridpoint: gridpoint, options: options)
         case .ncep_hgefs025_ensemble_mean:
             return try await GfsGraphCastReader(domain: .hgefs025_ensemble_mean, gridpoint: gridpoint, options: options)
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:

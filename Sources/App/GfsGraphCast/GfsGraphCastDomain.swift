@@ -4,6 +4,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
     case graphcast025
     case aigfs025
     case aigefs025
+    case aigefs025_ensemble_mean
     case hgefs025_ensemble_mean
     
     var domainRegistry: DomainRegistry {
@@ -16,6 +17,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return .ncep_aigefs025
         case .hgefs025_ensemble_mean:
             return .ncep_hgefs025_ensemble_mean
+        case .aigefs025_ensemble_mean:
+            return .ncep_aigefs025_ensemble_mean
         }
     }
 
@@ -49,6 +52,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return 30+1
         case .hgefs025_ensemble_mean:
             return 1
+        case .aigefs025_ensemble_mean:
+            return 1
         }
     }
 
@@ -69,6 +74,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         case .hgefs025_ensemble_mean:
             // 6:40 delay
             return t.add(hours: -6).floor(toNearestHour: 6)
+        case .aigefs025_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -78,6 +85,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             return Array(stride(from: 6, through: 384, by: 6))
         case .hgefs025_ensemble_mean:
             return Array(stride(from: 6, through: 240, by: 6))
+        case .aigefs025_ensemble_mean:
+            fatalError()
         }
         
     }
@@ -94,6 +103,15 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
 
     var grid: any Gridable {
         return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
+    }
+    
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .aigefs025:
+            return .aigefs025_ensemble_mean
+        default:
+            return nil
+        }
     }
     
     /// Returns two grib files, in case grib messages are split in two different files
@@ -119,6 +137,8 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
             let base = "\(server)hgefs/prod/hgefs.\(yyyymmdd)/\(hh)/ensstat/products/atmos/grib2/"
             return ["\(base)hgefs.t\(hh)z.sfc.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.spr.f\(fHHH).grib2"]
+        case .aigefs025_ensemble_mean:
+            fatalError()
         }
     }
 }
