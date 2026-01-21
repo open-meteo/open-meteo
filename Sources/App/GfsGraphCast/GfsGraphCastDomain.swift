@@ -118,9 +118,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         case .hgefs025_ensemble_mean:
             let server = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/"
             let base = "\(server)hgefs/prod/hgefs.\(yyyymmdd)/\(hh)/ensstat/products/atmos/grib2/"
-            // TODO implement spread variables
-            // "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2"
-            return ["\(base)hgefs.t\(hh)z.sfc.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.avg.f\(fHHH).grib2"]
+            return ["\(base)hgefs.t\(hh)z.sfc.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.avg.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.sfc.spr.f\(fHHH).grib2", "\(base)hgefs.t\(hh)z.pres.spr.f\(fHHH).grib2"]
         }
     }
 }

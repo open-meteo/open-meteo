@@ -143,9 +143,23 @@ struct GfsGraphCastDownload: AsyncCommand {
                 
                 for url in urls {
                     for try await message in try await curl.getGribStream(url: url, bzip2Decode: false, nConcurrent: min(2, concurrent)) {
-                        guard let variable = getCmaVariable(logger: logger, message: message) else {
+                        guard var variable = getCmaVariable(logger: logger, message: message) else {
                             continue
                         }
+                        /// HGEFS provides std dev directly
+                        let isSpread = message.getLong(attribute: "derivedForecast") == 2
+                        if isSpread, let v = variable as? GfsGraphCastSurfaceVariable {
+                            variable = VariableOrSpread(variable: v, isSpread: true)
+                        }
+                        if isSpread, let v = variable as? GfsGraphCastPressureVariable {
+                            if [GfsGraphCastPressureVariableType.specific_humidity, .vertical_velocity].contains(v.variable) {
+                                // Cannot convert specific humidity spread to relative humidity spread.
+                                // Well could, but too much work because error propagation maths gets complicated
+                                continue
+                            }
+                            variable = VariableOrSpread(variable: v, isSpread: true)
+                        }
+                        
                         guard let stepRange = message.get(attribute: "stepRange") else {
                             fatalError("could not get step range or type")
                         }

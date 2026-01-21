@@ -863,63 +863,48 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?)? {
         
         switch self {
-        case .ecmwf_seasonal_seamless:
-            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: .seas5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourly = try await VariableHourlyDeriver(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>(domain: .seas5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+        case .ecmwf_seasonal_seamless, .ecmwf_seasonal_ensemble_mean_seamless:
+            let isEnsembleMean = self == .ecmwf_seasonal_ensemble_mean_seamless
+            let ec46Domain: EcmwfSeasDomain = isEnsembleMean ? .ec46_ensemble_mean : .ec46
+            let seas5Domain: EcmwfSeasDomain = isEnsembleMean ? .seas5_ensemble_mean : .seas5
+            let seas5DailyDomain: EcmwfSeasDomain = isEnsembleMean ? .seas5_daily_ensemble_mean : .seas5_daily
+            
+            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: seas5DailyDomain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            
+            let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: EcmwfSeasVariableSingleLevel.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
+            
             let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
-            let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let ec46hourly = try await VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let ec46hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, ForecastVariableDaily>(reader: ec46hourly, allowMinMaxTwoAggregations: true)
+            let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: EcmwfEC46Variable6Hourly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
-            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let ec46hourlyToDaily = ec46hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
             
+            let ec46weekly = try await EcmwfSeasDomain.ec46_weekly.makeWeeklyDeriverCached(variableType: EcmwfEC46VariableWeekly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
+                        
             let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [seas6hourly, ec46hourly])
             let daily = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [seas6hourlyToDaily, seas5daily, ec46hourlyToDaily])
             return (hourly, daily, ec46weekly, seas6monthly)
-        case .ecmwf_seas5:
-            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: .seas5_daily, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourly = try await VariableHourlyDeriver(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>(domain: .seas5, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableSingleLevel>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
-            let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+        case .ecmwf_seas5, .ecmwf_seas5_ensemble_mean:
+            let isEnsembleMean = self == .ecmwf_seas5_ensemble_mean
+            let seas5Domain: EcmwfSeasDomain = isEnsembleMean ? .seas5_ensemble_mean : .seas5
+            let seas5DailyDomain: EcmwfSeasDomain = isEnsembleMean ? .seas5_daily_ensemble_mean : .seas5_daily
+            
+            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: seas5DailyDomain, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let seas6hourly = try await seas5Domain.makeHourlyDeriverCached(variableType: EcmwfSeasVariableSingleLevel.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
+            let seas6hourlyToDaily = seas6hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
+            
+            let seas6monthly = try await EcmwfSeasDomain.seas5_monthly.makeMonthlyDeriverCached(variableType: EcmwfSeasVariableMonthly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             let daily = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [seas6hourlyToDaily, seas5daily])
             return (seas6hourly, daily, nil, seas6monthly)
-        case .ecmwf_ec46:
-            let ec46hourly = try await VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>(domain: .ec46, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let ec46hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46Variable6Hourly>>, ForecastVariableDaily>(reader: ec46hourly, allowMinMaxTwoAggregations: true)
+        case .ecmwf_ec46, .ecmwf_ec46_ensemble_mean:
+            let isEnsembleMean = self == .ecmwf_ec46_ensemble_mean
+            let ec46Domain: EcmwfSeasDomain = isEnsembleMean ? .ec46_ensemble_mean : .ec46
             
-            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            
-            return (ec46hourly, ec46hourlyToDaily, ec46weekly, nil)
-            
-        case .ecmwf_seasonal_ensemble_mean_seamless:
-            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: .seas5_daily_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourly = try await VariableHourlyDeriver(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>(domain: .seas5_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
-            let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            
-            let ec46hourly = try await VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>>(reader: GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>(reader: GenericReader<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>(domain: .ec46_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let ec46hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>>, ForecastVariableDaily>(reader: ec46hourly, allowMinMaxTwoAggregations: true)
-            
-            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            
-            let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [seas6hourly, ec46hourly])
-            let daily = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [seas6hourlyToDaily, seas5daily, ec46hourlyToDaily])
-            return (hourly, daily, ec46weekly, seas6monthly)
-        case .ecmwf_seas5_ensemble_mean:
-            let seas5daily = try await VariableDailyDeriver<GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableDailySingleLevel>(domain: .seas5_daily_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourly = try await VariableHourlyDeriver(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>(domain: .seas5_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let seas6hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfSeasVariableSingleLevel>>>, ForecastVariableDaily>(reader: seas6hourly, allowMinMaxTwoAggregations: true)
-            let seas6monthly = try await SeasonalForecastDeriverMonthly(reader: GenericReaderCached(reader: GenericReader<EcmwfSeasDomain, EcmwfSeasVariableMonthly>(domain: .seas5_monthly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            
-            let daily = GenericReaderMultiSameType<ForecastVariableDaily>(reader: [seas6hourlyToDaily, seas5daily])
-            return (seas6hourly, daily, nil, seas6monthly)
-        case .ecmwf_ec46_ensemble_mean:
-            let ec46hourly = try await VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>>(reader: GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>(reader: GenericReader<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>(domain: .ec46_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
-            let ec46hourlyToDaily = DailyReaderConverter<VariableHourlyDeriver<GenericReaderCached<EcmwfSeasDomain, VariableOrSpread<EcmwfEC46Variable6Hourly>>>, ForecastVariableDaily>(reader: ec46hourly, allowMinMaxTwoAggregations: true)
-            
-            let ec46weekly = try await SeasonalForecastDeriverWeekly<GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>>(reader: GenericReaderCached<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(reader: GenericReader<EcmwfSeasDomain, EcmwfEC46VariableWeekly>(domain: .ec46_weekly, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!), options: options)
+            let ec46hourly = try await ec46Domain.makeHourlyDeriverCached(variableType: EcmwfEC46Variable6Hourly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
+            let ec46hourlyToDaily = ec46hourly.makeDailyAggregator(allowMinMaxTwoAggregations: true)
+            let ec46weekly = try await EcmwfSeasDomain.ec46_weekly.makeWeeklyDeriverCached(variableType: EcmwfEC46VariableWeekly.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)!
             
             return (ec46hourly, ec46hourlyToDaily, ec46weekly, nil)
             
@@ -981,6 +966,22 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             }
             return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
             
+        case .ncep_hgefs025_ensemble_mean:
+            return try await GfsGraphCastDomain.hgefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        case .gfs_graphcast025, .ncep_gfs_graphcast025:
+            return try await GfsGraphCastDomain.graphcast025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        case .ncep_aigefs025:
+            return try await GfsGraphCastDomain.aigefs025.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+        case .ncep_aigfs025:
+            // Use precipitation_probability from AIGEFS
+            guard
+                let aigfs = try await GenericReader<GfsGraphCastDomain, VariableOrSpread<GfsGraphCastVariable>>(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
+                let prob: any GenericReaderProtocol = try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                return nil
+            }
+            let hourly = GenericReaderMulti<ForecastVariable>(reader: [GenericReaderCached(reader: aigfs), prob])
+            let daily = DailyReaderConverter<GenericReaderMulti<ForecastVariable>, ForecastVariableDaily>(reader: hourly, allowMinMaxTwoAggregations: true)
+            return (hourly, daily, nil, nil)
         default:
             let readers: [any GenericReaderProtocol] = try await getReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             guard readers.count > 0 else {
@@ -1118,17 +1119,21 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_nam_conus:
             return try await GfsReader(domains: [.nam_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
-            return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+//            return try await GfsGraphCastReader(domain: .graphcast025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return []
         case .ncep_aigfs025:
             /// Use precipitation_probability from AIGEFS
-            return [
-                try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
-                try await GfsGraphCastReader(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
+//            return [
+//                try await ProbabilityReader.makeAigefsReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) as (any GenericReaderProtocol)?,
+//                try await GfsGraphCastReader(domain: .aigfs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+//            ].compactMap({ $0 })
+            return []
         case .ncep_aigefs025:
-            return try await GfsGraphCastReader(domain: .aigefs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return []
+//            return try await GfsGraphCastReader(domain: .aigefs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ncep_hgefs025_ensemble_mean:
-            return try await GfsGraphCastReader(domain: .hgefs025_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return []
+//            return try await GfsGraphCastReader(domain: .hgefs025_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
             let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return ([arpegeProbabilities] + (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
