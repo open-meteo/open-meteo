@@ -510,7 +510,7 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
         case .wind_direction:
             return "wind_direction_on_pressure_levels"
         case .geopotential_height:
-            return "height_ASL_on_pressure_levels"
+            return "geopotential_height_on_pressure_levels"
         case .relative_humidity:
             return "relative_humidity_on_pressure_levels"
         case .vertical_velocity:
