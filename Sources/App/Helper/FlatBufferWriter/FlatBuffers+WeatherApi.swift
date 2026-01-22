@@ -1117,7 +1117,7 @@ extension MultiDomains {
         case .ncep_aigefs025:
             return .ncepAigefs025
         case .ncep_hgefs025_ensemble_mean:
-            return .ncepHgefs025Stats
+            return .ncepHgefs025EnsembleMean
         case .ncep_aigefs025_ensemble_mean:
             return .ncepAigefs025
         }
