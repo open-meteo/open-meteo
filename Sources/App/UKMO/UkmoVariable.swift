@@ -297,12 +297,12 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             return "wind_gust_at_10m"
         case .precipitation:
             // return "precipitation_rate"
-            // hourly until 49, while rain is hourly until hour 57
+            // hourly until 57
             if domain == .global_deterministic_10km {
                 if forecastHour >= 150 {
                     return "precipitation_accumulation-PT06H"
                 }
-                if forecastHour >= 49 {
+                if forecastHour >= 57 {
                     return forecastHour % 3 == 0 ? "precipitation_accumulation-PT03H" : nil
                 }
             }
