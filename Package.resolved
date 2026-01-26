@@ -1,5 +1,5 @@
 {
-  "originHash" : "b8e59345e8591a292da8251fee6268aaf16e2b84325f81b58dd06e042e984c28",
+  "originHash" : "551f3d3f1a4744b0ba7bcf22339655182c6c73e269f0f9ec1f000cb782d432b7",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -77,8 +77,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "d0df344f388f7867c74f340597311dc8805f4ca9",
-        "version" : "1.24.0"
+        "revision" : "9e2595868cadbed849828fcde0592b0d4de0a80b",
+        "version" : "1.25.0"
       }
     },
     {
@@ -194,8 +194,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "4a9a97111099376854a7f8f0f9f88b9d61f52eff",
-        "version" : "2.92.2"
+        "revision" : "233f61bc2cfbb22d0edeb2594da27a20d2ce514e",
+        "version" : "2.93.0"
       }
     },
     {
@@ -203,8 +203,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-extras.git",
       "state" : {
-        "revision" : "f4ea23b6c1c545a6656dbcac8c82a2864075766e",
-        "version" : "1.31.3"
+        "revision" : "cc599775aa85d04340f09b47e5432564f9889ae7",
+        "version" : "1.32.0"
       }
     },
     {
