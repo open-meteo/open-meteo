@@ -81,6 +81,7 @@ struct GfsDownload: AsyncCommand {
         }
 
         let variables: [any GfsVariableDownloadable]
+        let generateFullRun = !signature.secondFlush && domain.countEnsembleMember == 1
 
         switch domain {
         case .gfs05_ens, .gfs025_ens, .gfs013, .hrrr_conus_15min, .hrrr_conus, .gfs025, .nam_conus:
@@ -105,12 +106,12 @@ struct GfsDownload: AsyncCommand {
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
 
             let nConcurrent = signature.concurrent ?? 4
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: !signature.secondFlush)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         case .gfswave025, .gfswave025_ens, .gfswave016:
             variables = GfsWaveVariable.allCases
             let handles = try await downloadGfs(application: context.application, domain: domain, run: run, variables: variables, secondFlush: signature.secondFlush, maxForecastHour: signature.maxForecastHour, skipMissing: signature.skipMissing, downloadFromAws: signature.downloadFromAws, uploadS3Bucket: signature.uploadS3Bucket)
             let nConcurrent = signature.concurrent ?? 1
-            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: !signature.secondFlush)
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         }
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
@@ -285,6 +286,9 @@ struct GfsDownload: AsyncCommand {
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
         let deaverager = GribDeaverager()
+        
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
 
         /// Variables that are kept in memory
         /// For GFS013, keep pressure and temperature in memory to convert specific humidity to relative
@@ -460,7 +464,13 @@ struct GfsDownload: AsyncCommand {
                 )
             }
             let completed = i == timestamps.count - 1
-            return try await writer.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) + (writerProbabilities?.finalise(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket) ?? [])
+            let handles = try await writer.finalise() + (writerProbabilities?.finalise() ?? [])
+            try await uploadTask?.value
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+                try await writerProbabilities?.writeMetaAndAWSUpload(completed: completed, validTimes: Array(timestamps[0...i]), uploadS3Bucket: uploadS3Bucket)
+            }
+            return handles
         }
         await curl.printStatistics()
         return handles

@@ -1,6 +1,7 @@
 import Foundation
 import OmFileFormat
 
+
 public protocol Gridable: Sendable {
     var nx: Int { get }
     var ny: Int { get }
@@ -16,6 +17,22 @@ public protocol Gridable: Sendable {
     
     func findPointTerrainOptimised(lat: Float, lon: Float, elevation: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
     func findPointInSea(lat: Float, lon: Float, elevationFile: any OmFileReaderArrayProtocol<Float>) async throws -> (gridpoint: Int, gridElevation: ElevationOrSea)?
+    
+    /// Coordinate reference system WKT string with projection information
+    var crsWkt2: String { get }
+}
+
+extension Gridable {
+    var gridBounds: GridBounds {
+        let sw = getCoordinates(gridpoint: 0)
+        let ne = getCoordinates(gridpoint: nx * ny - 1)
+        return GridBounds(lat_bounds: sw.latitude...ne.latitude, lon_bounds: sw.longitude...ne.longitude)
+    }
+}
+
+public struct GridBounds: Equatable, Codable, Sendable {
+    let lat_bounds: ClosedRange<Float>
+    let lon_bounds: ClosedRange<Float>
 }
 
 public struct GridPoint2DFraction {

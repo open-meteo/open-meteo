@@ -3,11 +3,41 @@ import OmFileFormat
 
 /// Native grid for ECMWF IFS O1280
 struct GaussianGrid: Gridable {
+    var crsWkt2: String {
+        // Gaussian grids do not have a OGC WTK2 string. Encode the Gaussian grid type as id "gaussian_grid"
+        return """
+            GEOGCRS["Reduced Gaussian Grid",
+                DATUM["World Geodetic System 1984",
+                    ELLIPSOID["WGS 84",6378137,298.257223563]],
+                CS[ellipsoidal,2],
+                    AXIS["latitude",north],
+                    AXIS["longitude",east],
+                    ANGLEUNIT["degree",0.0174532925199433],
+                REMARK["Reduced Gaussian Grid \(type.proj4Title) (ECMWF)"],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[-90,-180.0,90,180]]]
+            """
+    }
+
     enum GridType {
         case o1280
         case o320
         case n320
         case n160
+        
+        var proj4Title: String {
+            switch self {
+            case .o1280:
+                return "O1280"
+            case .o320:
+                return "O320"
+            case .n320:
+                return "N320"
+            case .n160:
+                return "N160"
+            }
+        }
 
         /// Note quite sure if there is an analytical solution for N type grid. https://confluence.ecmwf.int/display/FCST/Gaussian+grid+with+320+latitude+lines+between+pole+and+equator
         /// Therefore here is a lookup table

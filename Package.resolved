@@ -1,13 +1,13 @@
 {
-  "originHash" : "f920af1619fd1af253959086488c999f50354e0289d7816047efbfa1dcc9aadf",
+  "originHash" : "b8e59345e8591a292da8251fee6268aaf16e2b84325f81b58dd06e042e984c28",
   "pins" : [
     {
       "identity" : "async-http-client",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/swift-server/async-http-client.git",
       "state" : {
-        "revision" : "c464bf94eac4273cad7424307a5dc7e44e361905",
-        "version" : "1.30.1"
+        "revision" : "4b99975677236d13f0754339864e5360142ff5a1",
+        "version" : "1.30.3"
       }
     },
     {
@@ -60,7 +60,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/om-file-format.git",
       "state" : {
-        "revision" : "6631ab874603b8a36da8c6ce6372b31b1b98c32a"
+        "revision" : "4de07b5669d41c5ce6269a71a15767a1bf0b3ec2"
       }
     },
     {
@@ -77,8 +77,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/sdk.git",
       "state" : {
-        "revision" : "93b4c452579a05734d047c6187deb7d4b6b39cc8",
-        "version" : "1.23.0"
+        "revision" : "d0df344f388f7867c74f340597311dc8805f4ca9",
+        "version" : "1.24.0"
       }
     },
     {
@@ -122,8 +122,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-certificates.git",
       "state" : {
-        "revision" : "133a347911b6ad0fc8fe3bf46ca90c66cff97130",
-        "version" : "1.17.0"
+        "revision" : "7d5f6124c91a2d06fb63a811695a3400d15a100e",
+        "version" : "1.17.1"
       }
     },
     {
@@ -176,8 +176,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-log.git",
       "state" : {
-        "revision" : "bc386b95f2a16ccd0150a8235e7c69eab2b866ca",
-        "version" : "1.8.0"
+        "revision" : "2778fd4e5a12a8aaa30a3ee8285f4ce54c5f3181",
+        "version" : "1.9.1"
       }
     },
     {
@@ -194,8 +194,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "663ddc80f2081c8f22e417cbac5f80270a93795e",
-        "version" : "2.91.0"
+        "revision" : "4a9a97111099376854a7f8f0f9f88b9d61f52eff",
+        "version" : "2.92.2"
       }
     },
     {
@@ -203,8 +203,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio-extras.git",
       "state" : {
-        "revision" : "1c90641b02b6ab47c6d0db2063a12198b04e83e2",
-        "version" : "1.31.2"
+        "revision" : "f4ea23b6c1c545a6656dbcac8c82a2864075766e",
+        "version" : "1.31.3"
       }
     },
     {
@@ -266,8 +266,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-system.git",
       "state" : {
-        "revision" : "395a77f0aa927f0ff73941d7ac35f2b46d47c9db",
-        "version" : "1.6.3"
+        "revision" : "7c6ad0fc39d0763e0b699210e4124afd5041c5df",
+        "version" : "1.6.4"
       }
     },
     {
@@ -275,8 +275,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftEccodes.git",
       "state" : {
-        "revision" : "fe6ffe28080dde2625e772e3666c5bafcc546936",
-        "version" : "1.0.1"
+        "revision" : "6b4a9b8f2f360c4edec54a2acaeb653c2b3868e8",
+        "version" : "1.1.0"
       }
     },
     {
@@ -302,8 +302,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/vapor/vapor.git",
       "state" : {
-        "revision" : "f7090db27390ebc4cadbff06d76fe8ce79d6ece6",
-        "version" : "4.120.0"
+        "revision" : "6f3db7122ccffb28e11e121c3797a176fcb88796",
+        "version" : "4.121.1"
       }
     },
     {

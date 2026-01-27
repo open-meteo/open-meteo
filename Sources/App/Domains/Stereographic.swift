@@ -2,9 +2,12 @@ import Foundation
 
 /// Stereographic projection
 /// https://mathworld.wolfram.com/StereographicProjection.html
-struct StereograpicProjection: Projectable {
+struct StereographicProjection: Projectable {
     /// Central longitude
     let λ0: Float
+
+    /// Central latitude
+    let ϕ1_dec: Float
 
     /// Sinus of central latitude
     let sinϕ1: Float
@@ -12,11 +15,35 @@ struct StereograpicProjection: Projectable {
     /// Cosine of central latitude
     let cosϕ1: Float
 
-    /// Radius of Earth
+    /// Radius of Earth in meters
     var R: Float
+
+    func crsWkt2(latMin: Float, lonMin: Float, latMax: Float, lonMax: Float) -> String {
+        return """
+            PROJCRS["Stereographic",
+                BASEGEOGCRS["GCS_Sphere",
+                    DATUM["D_Sphere",
+                        ELLIPSOID["Sphere",\(R),0.0]]],
+                CONVERSION["Stereographic",
+                    METHOD["Stereographic"],
+                    PARAMETER["Latitude of natural origin", \(ϕ1_dec)],
+                    PARAMETER["Longitude of natural origin", \(λ0.radiansToDegrees)],
+                    PARAMETER["Scale factor at natural origin", 1.0],
+                    PARAMETER["False easting", 0.0],
+                    PARAMETER["False northing", 0.0]],
+                CS[Cartesian,2],
+                    AXIS["easting",east],
+                    AXIS["northing",north],
+                    LENGTHUNIT["metre",1.0],
+                USAGE[
+                    SCOPE["grid"],
+                    BBOX[\(latMin),\(lonMin),\(latMax),\(lonMax)]]]
+            """
+    }
 
     public init(latitude: Float, longitude: Float, radius: Float) {
         λ0 = longitude.degreesToRadians
+        ϕ1_dec = latitude
         sinϕ1 = sin(latitude.degreesToRadians)
         cosϕ1 = cos(latitude.degreesToRadians)
         R = radius

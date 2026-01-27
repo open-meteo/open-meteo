@@ -86,8 +86,9 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     func get(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> DataAndUnit? {
         /// Max/Min require sampling to 1h data
         let time1h = timeDaily.with(dtSeconds: 3600)
-        let timeModel = timeDaily.with(dtSeconds: reader.modelDtSeconds)
-        let stepsModel = 24 * 3600 / reader.modelDtSeconds
+        let modelDtSeconds = max(3600, reader.modelDtSeconds)
+        let timeModel = timeDaily.with(dtSeconds: modelDtSeconds)
+        let stepsModel = 24 * 3600 / modelDtSeconds
 
         switch variable.aggregation {
         case .none:
@@ -133,12 +134,12 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
                 return nil
             }
             // 3600s only for hourly data of source
-            return DataAndUnit(data.data.map({ $0 * Float(reader.modelDtSeconds) / 1000000 }).sum(by: stepsModel).round(digits: 2), .megajoulePerSquareMetre)
+            return DataAndUnit(data.data.map({ $0 * Float(modelDtSeconds) / 1000000 }).sum(by: stepsModel).round(digits: 2), .megajoulePerSquareMetre)
         case .precipitationHours(let variable):
             guard let data = try await reader.get(variable: variable, time: timeModel) else {
                 return nil
             }
-            return DataAndUnit(data.data.map({ $0 > 0.001 ? Float(reader.modelDtSeconds / 3600) : 0 }).sum(by: stepsModel), .hours)
+            return DataAndUnit(data.data.map({ $0 > 0.001 ? Float(modelDtSeconds / 3600) : 0 }).sum(by: stepsModel), .hours)
         case .dominantDirection(velocity: let velocity, direction: let direction):
             guard let speed = try await reader.get(variable: velocity, time: timeModel)?.data,
                   let direction = try await reader.get(variable: direction, time: timeModel)?.data else {
@@ -158,7 +159,8 @@ struct DailyReaderConverter<Reader: GenericReaderOptionalProtocol, DailyVariable
     }
     
     func prefetchData(variable: DailyVariable, time timeDaily: TimerangeDtAndSettings) async throws -> Bool {
-        let time = timeDaily.with(dtSeconds: reader.modelDtSeconds)
+        let modelDtSeconds = max(3600, reader.modelDtSeconds)
+        let time = timeDaily.with(dtSeconds: modelDtSeconds)
         if let v0 = variable.aggregation.variables.0 {
             let _ = try await reader.prefetchData(variable: v0, time: time)
         }

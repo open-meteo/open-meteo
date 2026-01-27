@@ -194,7 +194,7 @@ struct GloFasDownloader: AsyncCommand {
         }
 
         logger.info("Reading to timeseries")
-        let om = OmFileSplitter(domain)
+        let om = OmFileSplitter(domain, nMembers: 1)
         var data2d = Array2DFastTime(nLocations: nx * ny, nTime: timeinterval.count)
         for (i, date) in timeinterval.enumerated() {
             logger.info("Reading \(date.format_YYYYMMdd)")
@@ -207,7 +207,7 @@ struct GloFasDownloader: AsyncCommand {
             data2d[0..<nx * ny, i] = try await dailyFile.read()
         }
         logger.info("Update om database")
-        try await om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
+        try await om.updateFromTimeOriented(variable: "river_discharge", array2d: data2d, run: timeinterval.range.lowerBound, time: timeinterval, scalefactor: 1000, compression: .pfor_delta2d_int16_logarithmic)
     }
 
     /// Convert a single file
@@ -218,13 +218,13 @@ struct GloFasDownloader: AsyncCommand {
         // let nLocationChunk = nx * ny / 1000
         var grib2d = GribArray2D(nx: nx, ny: ny)
 
-        try SwiftEccodes.iterateMessages(fileName: gribFile, multiSupport: true) { message in
+        for message in try SwiftEccodes.getMessages(fileName: gribFile, multiSupport: true) {
             /// Date in ISO timestamp string format `20210101`
             let date = message.get(attribute: "dataDate")!
             logger.info("Converting day \(date)")
             let dailyFile = "\(domain.downloadDirectory)glofas_\(date).om"
             if FileManager.default.fileExists(atPath: dailyFile) {
-                return
+                continue
             }
             try grib2d.load(message: message)
             grib2d.array.flipLatitude()

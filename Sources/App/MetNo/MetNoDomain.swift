@@ -47,7 +47,7 @@ enum MetNoDomain: String, GenericDomain, CaseIterable {
     var grid: any Gridable {
         switch self {
         case .nordic_pp:
-            return ProjectionGrid(nx: 1796, ny: 2321, latitude: 52.30272...72.18527, longitude: 1.9184653...41.764282, projection: LambertConformalConicProjection(λ0: 15, ϕ0: 63, ϕ1: 63, ϕ2: 63))
+            return ProjectionGrid(nx: 1796, ny: 2321, latitude: 52.30272...72.18527, longitude: 1.9184653...41.764282, projection: LambertConformalConicProjection(λ0: 15, ϕ0: 63, ϕ1: 63, ϕ2: 63, radius: 6371229))
         }
     }
 

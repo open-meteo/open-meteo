@@ -280,13 +280,17 @@ struct MeteoFranceDownload: AsyncCommand {
                 
                 let messages: AnyAsyncSequence<GribMessage>
                 if useGovServer {
-                    messages = try await curl.getGribStream(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: 4)
+                    messages = try await curl.getGribStream(url: urlGov, bzip2Decode: false, nConcurrent: 4)
                 } else {
                     guard let apikey = Environment.get("METEOFRANCE_API_KEY")?.split(separator: ",").map(String.init) else {
                         fatalError("Please specify environment variable 'METEOFRANCE_API_KEY'")
                     }
+                    try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+                    let downloadFile = "\(domain.downloadDirectory)\temp.grib"
+                    
                     // Have to download entire file before processing, because MF API does not allow range requests
-                    messages = try await curl.downloadGrib(url: useGovServer ? urlGov : url, bzip2Decode: false, nConcurrent: 1, headers: [("apikey", apikey.randomElement() ?? "")]).mapStream(nConcurrent: 1){$0}.eraseToAnyAsyncSequence()
+                    try await curl.download(url: url, toFile: downloadFile, bzip2Decode: false, headers:  [("apikey", apikey.randomElement() ?? "")])
+                    messages = try SwiftEccodes.iterateMessages(fileName: downloadFile, multiSupport: true).eraseToAnyAsyncSequence()
                 }
                 try await messages.foreachConcurrent(nConcurrent: 1) { message in
                     guard let shortName = message.get(attribute: "shortName"),

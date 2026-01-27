@@ -289,7 +289,7 @@ struct DownloadCamsCommand: AsyncCommand {
             logger.info("Create om file")
             let startOm = DispatchTime.now()
             let time = TimerangeDt(start: run, nTime: data2d.nTime, dtSeconds: domain.dtSeconds)
-            try await om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, time: time, scalefactor: variable.scalefactor)
+            try await om.updateFromTimeOriented(variable: variable.rawValue, array2d: data2d, run: run, time: time, scalefactor: variable.scalefactor)
             logger.info("Update om finished in \(startOm.timeElapsedPretty())")
         }
     }

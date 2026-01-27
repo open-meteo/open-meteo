@@ -30,6 +30,9 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
 
         @Option(name: "email", help: "Email for the ECMWF API service")
         var email: String?
+        
+        @Flag(name: "upload-s3-only-probabilities", help: "Only upload probabilities files to S3")
+        var uploadS3OnlyProbabilities: Bool
     }
 
     var help: String {
@@ -50,23 +53,21 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
             fatalError("Parameter server is required")
         }
         
-        let generateTimeSeries: Bool
-        switch domain {
-        case .seas5, .seas5_12hourly, .seas5_daily:
-            generateTimeSeries = true
-        case .seas5_monthly, .seas5_monthly_upper_level, .ec46_weekly, .ec46:
-            generateTimeSeries = true
-        }
         try await downloadElevation(application: context.application, apikey: signature.apikey, email: signature.email, domain: domain, createNetCdf: signature.createNetcdf)
         logger.info("Downloading domain ECMWF SEAS5 run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
-        let handles: [GenericVariableHandle]
+        let handles: [EcmwfSeasDomain: [GenericVariableHandle]]
         switch domain {
         case .ec46, .ec46_weekly:
             handles = try await downloadEC46(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
         case .seas5, .seas5_monthly, .seas5_12hourly, .seas5_daily, .seas5_monthly_upper_level:
             handles = try await download(application: context.application, domain: domain, server: server, run: run, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
+            fatalError()
         }
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: false, generateTimeSeries: generateTimeSeries)
+        for (domain, handles) in handles {
+            let generateFullRun = domain.countEnsembleMember == 1
+            try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false, generateFullRun: generateFullRun, generateTimeSeries: true)
+        }
     }
     
     func downloadElevation(application: Application, apikey: String?, email: String?, domain: EcmwfSeasDomain, createNetCdf: Bool) async throws {
@@ -118,7 +119,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         try FileManager.default.removeItemIfExists(at: tempDownloadGribFile)
     }
     
-    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func downloadEC46(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [EcmwfSeasDomain: [GenericVariableHandle]] {
         let logger = application.logger
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
@@ -128,9 +129,23 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         let nx = domain.grid.nx
         let ny = domain.grid.ny
         
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: domain == .ec46_weekly, realm: nil)
+        /*
+         Use `ecmwf_ec46_ensemble_mean` with variables `temperature_2m` and `temperature_2m_spread`
+         PRO: Can be used with forecast API to get ensemble mean easily
+         PRO: ERA5-Ensemble also does it this way
+         CON: Req domain registration
+         CON: Precipitation probability should be moved to new domain
+         */
+                
         //let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
         let isWeekly = domain.dtSeconds == 7*24*3600
+        
+        var validTimes = [Timestamp]()
+        var handles = [GenericVariableHandle]()
+        var handlesEnsembleMean = [GenericVariableHandle]()
+        
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
         
         let package: String
         let types: [String]
@@ -149,7 +164,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         }
                 
         let deaverager = GribDeaverager()
-        for day in 0..<46 {
+        for day in 0...46 {
             let dayTimestamp = run.add(days: day)
             
             if domain.dtSeconds == 7*24*3600 && (dayTimestamp.weekday != .monday || day < 7 ) {
@@ -162,6 +177,11 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 types.map({"\(server)ope_\(package)_ifs-subs_od_\(stream)_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
             }
             
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: domain == .ec46_weekly, realm: nil)
+            let ensembleMean = domain.ensembleMeanDomain.map {(
+                writer: OmSpatialMultistepWriter(domain: $0, run: run, storeOnDisk: true, realm: nil),
+                 calculator: EnsembleMeanCalculatorMultistep()
+            )}
             
             for url in urls {
                 /// Single GRIB files contains multiple time-steps in mixed order
@@ -208,19 +228,38 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                             }
                             let count = await inMemoryAccumulated.data.count
                             logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data.data)
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
                     logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH)")
+                    await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: array2d.array.data)
                     try await writer.write(time: time, member: member, variable: variable, data: array2d.array.data)
                 }
             }
+            // Control and ensemble for 1 day have been downloaded now
+            validTimes.append(contentsOf: await writer.writer.map(\.time))
+            handles.append(contentsOf: try await writer.finalise())
+            if let ensembleMean {
+                try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
+                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise())
+            }
+            try await uploadTask?.value
+            let validTimes = validTimes
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: day >= 46, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+            }
         }
-        return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        try await uploadTask?.value
+        if let ensembleMeanDomain = domain.ensembleMeanDomain {
+            return [domain: handles, ensembleMeanDomain : handlesEnsembleMean]
+        }
+        return [domain: handles]
     }
 
-    func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: EcmwfSeasDomain, server: String, run: Timestamp, concurrent: Int, uploadS3Bucket: String?) async throws -> [EcmwfSeasDomain: [GenericVariableHandle]] {
         let logger = application.logger
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient)
@@ -232,11 +271,24 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         //let runMonth = run.toComponents().month
         let storeOnDisk = domain == .seas5_monthly || domain == .seas5_monthly_upper_level
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
+        
         let isMonthly = domain.dtSeconds >= .dtSecondsMonthly
+        
+        var validTimes = [Timestamp]()
+        var handles = [GenericVariableHandle]()
+        var handlesEnsembleMean = [GenericVariableHandle]()
+        
+        /// Run AWS upload in the background
+        var uploadTask: Task<(), any Error>? = nil
         
         let deaverager = GribDeaverager()
         for month in 0...6 {
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil)
+            let ensembleMean = domain.ensembleMeanDomain.map {(
+                writer: OmSpatialMultistepWriter(domain: $0, run: run, storeOnDisk: true, realm: nil),
+                 calculator: EnsembleMeanCalculatorMultistep()
+            )}
+                        
             let monthTimestamp = run.toYearMonth().advanced(by: month).timestamp
             let monthYYYYMM = "\(monthTimestamp.toComponents().year.zeroPadded(len: 4))\(monthTimestamp.toComponents().month.zeroPadded(len: 2))"
             //let monthToDownload = (runMonth + month - 1) % 12 + 1
@@ -269,7 +321,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                         variable = nil
                     case .seas5_monthly:
                         variable = EcmwfSeasVariableMonthly.from(shortName: attributes.shortName)
-                    case .ec46:
+                    case .ec46, .ec46_ensemble_mean, .seas5_ensemble_mean, .seas5_daily_ensemble_mean:
                         fatalError()
                     case .ec46_weekly:
                         fatalError()
@@ -303,17 +355,36 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                             }
                             let count = await inMemoryAccumulated.data.count
                             logger.debug("Writing accumulated variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
+                            await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data.data)
                             try await writer.write(time: time, member: member, variable: variable, data: data.data)
                         }
                         return
                     }
                     let timeOut = variable.shift24h ? time.add(hours: -24) : time
                     logger.debug("Processing variable \(variable) member \(member) unit=\(attributes.unit) timestamp \(timeOut.format_YYYYMMddHH)")
+                    await ensembleMean?.calculator.ingest(time: time, variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: array2d.array.data)
                     try await writer.write(time: timeOut, member: member, variable: variable, data: array2d.array.data)
                 }
             }
+            // Control and ensemble for 1 day have been downloaded now
+            validTimes.append(contentsOf: await writer.writer.map(\.time))
+            handles.append(contentsOf: try await writer.finalise())
+            if let ensembleMean {
+                try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
+                handlesEnsembleMean.append(contentsOf: try await ensembleMean.writer.finalise())
+            }
+            try await uploadTask?.value
+            let validTimes = validTimes
+            uploadTask = Task {
+                try await writer.writeMetaAndAWSUpload(completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+                try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: month >= 6, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket)
+            }
         }
-        return try await writer.finalise(completed: true, validTimes: nil, uploadS3Bucket: uploadS3Bucket)
+        try await uploadTask?.value
+        if let ensembleMeanDomain = domain.ensembleMeanDomain {
+            return [domain: handles, ensembleMeanDomain : handlesEnsembleMean]
+        }
+        return [domain: handles]
     }
 }
 
@@ -342,16 +413,8 @@ extension EcmwfSeasDomain {
             return []
         //case .seas5_waves_daily: // N160 grid msqs/cdww/dwi/pp1d/swh/mp1/mp2/mwp
         //    return ["ope_s4_ifs-seas_od_wasf_fc"]
-        }
-    }
-    
-    var ensembleMembers: Int {
-        // Note: model levels = 11 member, pressure levels full 51
-        switch self {
-        case .seas5, .seas5_daily, .seas5_monthly, .ec46:
-            return 51
-        case .seas5_12hourly, .seas5_monthly_upper_level, .ec46_weekly:
-            return 11
+        case .seas5_ensemble_mean, .seas5_daily_ensemble_mean, .ec46_ensemble_mean:
+            fatalError()
         }
     }
     

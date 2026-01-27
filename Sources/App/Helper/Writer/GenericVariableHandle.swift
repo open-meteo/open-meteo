@@ -189,6 +189,9 @@ struct GenericVariableHandle: Sendable {
             let createdAt = try writeFile.write(value: Timestamp.now().timeIntervalSince1970, name: "created_at", children: [])
             let coordinates = try writeFile.write(value: coordinatesString, name: "coordinates", children: [])
             let runTime: OmOffsetSize? = try writeFile.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
+            let crs = try writeFile.write(value: domain.grid.crsWkt2, name: "crs_wkt", children: [])
+            let unit = try writeFile.write(value: variable.unit.abbreviation, name: "unit", children: [])
+            
             let validTimeArray = try writeFile.writeArray(
                 data: time.map(\.timeIntervalSince1970),
                 dimensions: [UInt64(nTime)],
@@ -198,7 +201,7 @@ struct GenericVariableHandle: Sendable {
                 add_offset: 0
             )
             let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
-            let root = try writeFile.write(array: arrayFinalised, name: "", children: [runTime, validTime, coordinates, createdAt].compactMap({$0}))
+            let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
             
             try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)
@@ -312,7 +315,7 @@ struct GenericVariableHandle: Sendable {
 
             let progress = TransferAmountTracker(logger: logger, totalSize: nx * ny * time.count * nMembers * MemoryLayout<Float>.size, name: "Convert \(variable.rawValue)\(nMembersStr) \(time.prettyString())")
 
-            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
+            try await om.updateFromTimeOrientedStreaming3D(variable: variable.omFileName.file, run: run ?? time.range.lowerBound, time: time, scalefactor: variable.scalefactor, compression: compression, onlyGeneratePreviousDays: onlyGeneratePreviousDays) { yRange, xRange, memberRange in
                 let nLoc = yRange.count * xRange.count
                 var data3d = Array3DFastTime(nLocations: nLoc, nLevel: memberRange.count, nTime: time.count)
                 var readTemp = [Float](repeating: .nan, count: nLoc * maxTimeStepsPerFile)

@@ -53,6 +53,7 @@ struct DownloadBomCommand: AsyncCommand {
             fatalError("Parameter 'server' is required")
         }
 
+        let generateFullRun = domain.countEnsembleMember == 1
         let nConcurrent = signature.concurrent ?? 1
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         try await downloadElevation(application: context.application, domain: domain, server: server, run: run)
@@ -60,7 +61,7 @@ struct DownloadBomCommand: AsyncCommand {
         try await downloadEnsemble(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) : signature.upperLevel ?
             try await downloadModelLevel(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket) :
             try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, skipFilesIfExisting: signature.skipExisting, uploadS3Bucket: signature.uploadS3Bucket)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
     }
 
     func downloadElevation(application: Application, domain: BomDomain, server: String, run: Timestamp) async throws {

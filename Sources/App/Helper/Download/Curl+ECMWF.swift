@@ -16,10 +16,10 @@ extension Curl {
      Get GRIB data from the ECMWF API
      Important: http client must be configured to disallow redirects!
      */
-    func withEcmwfApi<T>(query: any Encodable, email: String, apikey: String, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
+    func withEcmwfApi<T>(query: any Encodable, email: String, apikey: String, nConcurrent: Int? = nil, body: (AnyAsyncSequence<GribMessage>) async throws -> (T)) async throws -> T {
         let job = try await startEcmwfApiJob(query: query, email: email, apikey: apikey)
         let gribUrl = try await waitForEcmwfJob(job: job, email: email, apikey: apikey)
-        let result = try await withGribStream(url: gribUrl, bzip2Decode: false, body: body)
+        let result = try await withGribStream(url: gribUrl, bzip2Decode: false, nConcurrent: nConcurrent ?? 1, body: body)
         try await cleanupEcmwfApiJob(job: job, email: email, apikey: apikey)
         return result
     }
@@ -35,7 +35,7 @@ extension Curl {
         try await cleanupEcmwfApiJob(job: job, email: email, apikey: apikey)
     }
 
-    fileprivate struct EcmwfApiResponse: Decodable {
+    struct EcmwfApiResponse: Decodable {
         let status: String
         let code: Int
         let name: String
@@ -44,7 +44,7 @@ extension Curl {
     }
 
     /// Start a new job using POST
-    fileprivate func startEcmwfApiJob(query: any Encodable, email: String, apikey: String) async throws -> EcmwfApiResponse {
+    func startEcmwfApiJob(query: any Encodable, email: String, apikey: String) async throws -> EcmwfApiResponse {
         var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests")
         request.method = .POST
         request.headers.add(name: "From", value: email)
@@ -62,7 +62,7 @@ extension Curl {
     }
 
     /// Delete result after download
-    fileprivate func cleanupEcmwfApiJob(job: EcmwfApiResponse, email: String, apikey: String) async throws {
+    func cleanupEcmwfApiJob(job: EcmwfApiResponse, email: String, apikey: String) async throws {
         var request = HTTPClientRequest(url: "https://api.ecmwf.int/v1/services/mars/requests/\(job.name)")
         request.method = .DELETE
         request.headers.add(name: "From", value: email)
@@ -70,8 +70,8 @@ extension Curl {
         _ = try await client.executeRetry(request, logger: logger)
     }
 
-    /// Wait for josb to finish and return download URL
-    fileprivate func waitForEcmwfJob(job: EcmwfApiResponse, email: String, apikey: String) async throws -> String {
+    /// Wait for job to finish and return download URL
+    func waitForEcmwfJob(job: EcmwfApiResponse, email: String, apikey: String) async throws -> String {
         let timeout = TimeoutTracker(logger: self.logger, deadline: .hours(24))
         while true {
             var offset = 0

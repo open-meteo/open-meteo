@@ -27,6 +27,7 @@ enum BomVariableDerived: String, CaseIterable, GenericVariableMixable {
     case vapor_pressure_deficit
     case surface_pressure
     case weathercode
+    case weather_code
     case is_day
     case rain
     case snowfall
@@ -130,7 +131,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
         case .global_tilted_irradiance, .global_tilted_irradiance_instant, .diffuse_radiation, .diffuse_radiation_instant:
             try await prefetchData(raw: .shortwave_radiation, time: time)
             try await prefetchData(raw: .direct_radiation, time: time)
-        case .weathercode:
+        case .weathercode, .weather_code:
             try await prefetchData(raw: .weather_code, time: time)
         case .is_day:
             break
@@ -246,7 +247,7 @@ struct BomReader: GenericReaderDerived, GenericReaderProtocol {
             let diff = try await get(derived: .diffuse_radiation, time: time)
             let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
             return DataAndUnit(zip(diff.data, factor).map(*), diff.unit)
-        case .weathercode:
+        case .weathercode, .weather_code:
             return try await get(raw: .weather_code, time: time)
         case .is_day:
             return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)

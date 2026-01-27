@@ -170,7 +170,7 @@ paths:
                   generationtime_ms:
                     type: number
                     example: 2.2119
-                    description: Generation time of the weather forecast in milli seconds. This is mainly used for performance monitoring and improvements.
+                    description: Generation time of the weather forecast in milliseconds. This is mainly used for performance monitoring and improvements.
                   utc_offset_seconds:
                     type: integer
                     example: 3600
@@ -447,9 +447,9 @@ components:
           type: string
         temperature:
           type: number
-        wind_speed:
+        windspeed:
           type: number
-        wind_direction:
+        winddirection:
           type: number
         weather_code:
           type: integer

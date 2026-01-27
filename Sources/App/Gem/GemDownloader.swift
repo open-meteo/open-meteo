@@ -51,6 +51,7 @@ struct GemDownload: AsyncCommand {
         let logger = context.application.logger
         let domain = try GemDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
+        let generateFullRun = domain.countEnsembleMember == 1
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
 
@@ -87,7 +88,7 @@ struct GemDownload: AsyncCommand {
 
         try await downloadElevation(application: context.application, domain: domain, run: run, server: signature.server, createNetcdf: signature.createNetcdf)
         let handles = try await download(application: context.application, domain: domain, variables: variables, run: run, server: signature.server, uploadS3Bucket: signature.uploadS3Bucket, concurrent: signature.concurrent)
-        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities)
+        try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: signature.uploadS3OnlyProbabilities, generateFullRun: generateFullRun)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
