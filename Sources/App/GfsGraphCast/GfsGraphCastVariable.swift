@@ -106,6 +106,23 @@ enum GfsGraphCastSurfaceVariable: String, CaseIterable, GenericVariableMixable, 
     }
 }
 
+
+extension VariableOrSpread: GfsGraphCastVariableDownloadable where Variable: GfsGraphCastVariableDownloadable {
+    var multiplyAdd: (multiply: Float, add: Float)? {
+        if let variable = variable as? GfsGraphCastSurfaceVariable {
+            switch variable {
+            case .pressure_msl:
+                return (1 / 100, 0)
+            default:
+                return nil
+            }
+        }
+        return nil
+    }
+}
+
+
+
 /**
  Types of pressure level variables
  */

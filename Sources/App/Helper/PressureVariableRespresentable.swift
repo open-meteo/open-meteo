@@ -345,7 +345,7 @@ extension VariableOrSpread: GenericVariable, GenericVariableMixable where Variab
     }
     
     var storePreviousForecast: Bool {
-        return variable.storePreviousForecast
+        return false
     }
 }
 
