@@ -72,7 +72,7 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
             // 3:40 delay for AIGFS
             return t.add(hours: -3).floor(toNearestHour: 6)
         case .hgefs025_ensemble_mean:
-            // 6:40 delay
+            // 6:35 delay
             return t.add(hours: -6).floor(toNearestHour: 6)
         case .aigefs025_ensemble_mean:
             fatalError()
@@ -81,10 +81,12 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
 
     func forecastHours(run: Int) -> [Int] {
         switch self {
-        case .graphcast025, .aigfs025, .aigefs025:
+        case .graphcast025:
             return Array(stride(from: 6, through: 384, by: 6))
+        case .aigfs025, .aigefs025:
+            return Array(stride(from: 0, through: 384, by: 6))
         case .hgefs025_ensemble_mean:
-            return Array(stride(from: 6, through: 240, by: 6))
+            return Array(stride(from: 0, through: 240, by: 6))
         case .aigefs025_ensemble_mean:
             fatalError()
         }
