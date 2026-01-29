@@ -95,8 +95,8 @@ struct GfsGraphCastDownload: AsyncCommand {
                 return GfsGraphCastPressureVariable(variable: .geopotential_height, level: level)
             case "Vertical velocity (pressure)":
                 return GfsGraphCastPressureVariable(variable: .vertical_velocity, level: level)
-            case "Specific humidity":
-                return GfsGraphCastPressureVariable(variable: .specific_humidity, level: level)
+            case "Specific humidity": // specific humidity if converted to relative humidity 
+                return GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
             default:
                 return nil
             }
@@ -164,7 +164,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                             variable = VariableOrSpread(variable: v, isSpread: true)
                         }
                         if isSpread, let v = variable as? GfsGraphCastPressureVariable {
-                            if [GfsGraphCastPressureVariableType.specific_humidity, .vertical_velocity].contains(v.variable) {
+                            if [GfsGraphCastPressureVariableType.relative_humidity, .vertical_velocity].contains(v.variable) {
                                 // Cannot convert specific humidity spread to relative humidity spread.
                                 // Well could, but too much work because error propagation maths gets complicated
                                 continue
@@ -195,9 +195,9 @@ struct GfsGraphCastDownload: AsyncCommand {
                             await storePrecipMembers.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                         }
 
-                        if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .specific_humidity, .vertical_velocity].contains(variable.variable) {
+                        if let variable = variable as? GfsGraphCastPressureVariable, [GfsGraphCastPressureVariableType.temperature, .relative_humidity, .vertical_velocity].contains(variable.variable) {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
-                            if variable.variable == .specific_humidity || variable.variable == .vertical_velocity {
+                            if variable.variable == .relative_humidity || variable.variable == .vertical_velocity {
                                 // do not store specific humidity on disk
                                 continue
                             }
@@ -211,7 +211,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                 
                 /// Convert specific humidity to relative humidity
                 try await storage.data.foreachConcurrent(nConcurrent: concurrent) { v, data in
-                    guard v.variable.variable == .specific_humidity else {
+                    guard v.variable.variable == .relative_humidity else {
                         return
                     }
                     let level = v.variable.level
@@ -220,7 +220,7 @@ struct GfsGraphCastDownload: AsyncCommand {
                         fatalError("Requires temperature in level \(level)")
                     }
 
-                    let data = Meteorology.specificToRelativeHumidity(specificHumidity: data.data, temperature: t.data, pressure: .init(repeating: Float(level), count: t.count))
+                    let data = Meteorology.specificToRelativeHumidity(specificHumidity: data.data, temperature: t.data, pressure: Float(level))
 
                     let rhVariable = GfsGraphCastPressureVariable(variable: .relative_humidity, level: level)
                     // Store to calculate cloud cover

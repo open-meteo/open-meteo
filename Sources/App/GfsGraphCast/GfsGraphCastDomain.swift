@@ -84,9 +84,10 @@ enum GfsGraphCastDomain: String, GenericDomain, CaseIterable {
         case .graphcast025:
             return Array(stride(from: 6, through: 384, by: 6))
         case .aigfs025, .aigefs025:
-            return Array(stride(from: 0, through: 384, by: 6))
+            // forecast hour 0 is skipped, because AI models blur data so badly, that hour 0 seems like an outliner....
+            return Array(stride(from: 6, through: 384, by: 6))
         case .hgefs025_ensemble_mean:
-            return Array(stride(from: 0, through: 240, by: 6))
+            return Array(stride(from: 6, through: 240, by: 6))
         case .aigefs025_ensemble_mean:
             fatalError()
         }

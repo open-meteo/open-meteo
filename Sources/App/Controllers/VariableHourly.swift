@@ -483,6 +483,20 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     let reader: Reader
     let options: GenericReaderOptions
     
+    func getDeriverMap(variable: ForecastPressureVariable) -> DerivedMapping<Reader.MixingVar>? {
+        if let variable = Reader.variableFromString(variable.rawValue) {
+            return .direct(variable)
+        }
+        return nil
+    }
+    
+    func getDeriverMap(variable: ForecastHeightVariable) -> DerivedMapping<Reader.MixingVar>? {
+        if let variable = Reader.variableFromString(variable.rawValue) {
+            return .direct(variable)
+        }
+        return nil
+    }
+    
     func getDeriverMap(variable: ForecastSurfaceVariable) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
@@ -797,10 +811,10 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         switch variable {
         case .surface(let variable):
             return getDeriverMap(variable: variable.variable)
-        case .pressure(_):
-            return nil
-        case .height(_):
-            return nil
+        case .pressure(let variable):
+            return getDeriverMap(variable: variable)
+        case .height(let variable):
+            return getDeriverMap(variable: variable)
         }
         
     }

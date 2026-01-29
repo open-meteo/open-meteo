@@ -202,15 +202,55 @@ enum Meteorology {
     /// Calculate relative humidity. All variables should be on the same level
     /// https://cran.r-project.org/web/packages/humidity/vignettes/humidity-measures.html
     /// humudity in g/kg, temperature in celsius, pressure in hPa
-    @inlinable public static func specificToRelativeHumidity(specificHumidity: Float, temperature: Float, pressure: Float) -> Float {
-        let β = Float(17.625)
-        let λ = Float(243.04)
-
-        /// saturation vapor pressure at air temperature Thr. (kPa)
-        let es = 6.112 * exp((β * temperature) / (temperature + λ))
-        let e = specificHumidity / 1000 * pressure * 100 / (0.378 * specificHumidity / 1000 + 0.622)
-        let rh = e / es
-        return max(min(rh, 100), 0)
+    public static func specificToRelativeHumidity(specificHumidity: [Float], temperature: [Float], pressure: Float) -> [Float] {
+        return zip(temperature, specificHumidity).map {
+            let (temp, qair) = $0
+            return Self.specificToRelativeHumidity(specificHumidity: qair, temperature: temp, pressure: pressure)
+        }
+    }
+    
+    /// Calculate relative humidity. All variables should be on the same level
+    /// humudity in g/kg, temperature in celsius, pressure in hPa
+    @inlinable public static func specificToRelativeHumidity(
+        specificHumidity q_gPerKg: Float,
+        temperature T_C: Float,
+        pressure p_hPa: Float
+    ) -> Float {
+        
+        // 1. Convert units
+        let q = q_gPerKg / 1000.0       // g/kg -> kg/kg
+        let T = T_C + 273.15            // °C -> K
+        let p = p_hPa * 100.0           // hPa -> Pa
+        
+        // 2. Vapor pressure from specific humidity (Pa)
+        let e = (q * p) / (0.622 + 0.378 * q)
+        
+        // 3. Choose saturation formula based on temperature
+        let esi: Float
+        if T_C < 0 {
+            // Saturation over ice (Murphy & Koop 2005)
+            let lnEsi = 9.550426
+                        - (5723.265 / Float(T))
+                        + 3.53068 * log(Float(T))
+                        - 0.00728332 * Float(T)
+            esi = exp(lnEsi)
+        } else {
+            // Saturation over liquid water (Murphy & Koop 2005)
+            let T_d = Float(T)
+            let term1 = 54.842763
+                        - 6763.22 / T_d
+                        - 4.210 * log(T_d)
+                        + 0.000367 * T_d
+            let term2 = tanh(0.0415 * (T_d - 218.8)) *
+                        (53.878 - 1331.22 / T_d - 9.44523 * log(T_d) + 0.014025 * T_d)
+            let lnEsw = term1 + term2
+            esi = exp(lnEsw)
+        }
+        
+        // 4. Relative humidity (%)
+        let rh = min(max(100.0 * Float(e / esi), 0), 100)
+        
+        return rh
     }
 
     /// Calculate relative humidity and correct sea level pressure to surface pressure.
