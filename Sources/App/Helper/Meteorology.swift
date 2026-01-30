@@ -14,12 +14,12 @@ enum Meteorology {
             sqrt($0*$0 + $1*$1) * factor
         }
     }
-
+    
     /// Calculate wind direction in degrees
     // @inlinable static func windirection(u: Float, v: Float) -> Float {
     //    return atan2(u, v).radiansToDegrees + 180
     // }
-
+    
     /// Calculate wind direction in degrees
     @inlinable static func windirectionFast(u: [Float], v: [Float]) -> [Float] {
         precondition(u.count == v.count, "Invalid array dimensions u\(u.count) \(v.count)")
@@ -28,17 +28,17 @@ enum Meteorology {
             initializedCount += u.count
         }
     }
-
+    
     /// Calculate evapotranspiration
     @inlinable static func evapotranspiration(latentHeatFlux: Float) -> Float {
         return max(0, latentHeatFlux * -3600 / 2.5e6)
     }
-
+    
     /// Calculate surface pressure, corrected by temperature.
     static func surfacePressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
         precondition(temperature.count == pressure.count)
         let elevation = elevation.isNaN ? 0 : elevation
-
+        
         return zip(temperature, pressure).map { t, p -> Float in
             /// Sea level temperature in kelvin
             let t0 = (t + 273.15 + 0.0065 * elevation)
@@ -48,7 +48,7 @@ enum Meteorology {
             return p / factor
         }
     }
-
+    
     /// Estimate elevation from sea and surface level pressure
     /// Psurf = Psea / ((1 - (0.0065 * h) / (t + 273.15 + 0.0065 * h))^ -5.25578129287)
     /// h = (153.846 (t (-(Psurf/Psea)^0.1902666690786014) - 273.15 (Psurf/Psea)^0.1902666690786014 + t + 273.15))/(Psurf/Psea)^0.1902666690786014
@@ -56,33 +56,33 @@ enum Meteorology {
         let r = powf(psurf / psea, 0.1902666690786014)
         return (153.846 * (t * (-1 * r) - 273.15 * r + t + 273.15)) / r
     }
-
+    
     /// Estimate elevation from sea and surface level pressure
     /// Psurf = Psea / ((1 - (0.0065 * h) / (t + 273.15 + 0.0065 * h))^ -5.25578129287)
     /// h = (153.846 (t (-(Psurf/Psea)^0.1902666690786014) - 273.15 (Psurf/Psea)^0.1902666690786014 + t + 273.15))/(Psurf/Psea)^0.1902666690786014
     static func elevation(sealevelPressure: [Float], surfacePressure: [Float], temperature_2m: [Float]) -> [Float] {
         return zip(sealevelPressure, zip(surfacePressure, temperature_2m)).map({ elevation(sealevelPressure: $0, surfacePressure: $1.0, temperature_2m: $1.1) })
     }
-
+    
     /// Calculate wind component from speed and direction
     @inlinable static func uWind(speed: Float, directionDegree: Float) -> Float {
         return -1 * speed * sin(directionDegree.degreesToRadians)
     }
-
+    
     /// Calculate wind component from speed and direction
     @inlinable static func vWind(speed: Float, directionDegree: Float) -> Float {
         return -1 * speed * cos(directionDegree.degreesToRadians)
     }
-
+    
     /// Calculate mean sea level pressure, corrected by temperature.
     static func sealevelPressure(temperature: [Float], pressure: [Float], elevation: Float) -> [Float] {
         precondition(temperature.count == pressure.count)
-
+        
         return zip(temperature, pressure).map { t, p -> Float in
             return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: elevation)
         }
     }
-
+    
     /// Calculate mean sea level pressure, corrected by temperature for an entire field
     static func sealevelPressureSpatial(temperature: [Float], pressure: [Float], elevation: [Float]) -> [Float] {
         return zip(elevation, zip(temperature, pressure)).map {
@@ -91,7 +91,7 @@ enum Meteorology {
             return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: e)
         }
     }
-
+    
     /// Calculate mea nsea level pressure, corrected by temperature.
     static func sealevelPressure(temperature2m: Array2DFastTime, surfacePressure: Array2DFastTime, elevation: [Float]) -> [Float] {
         return zip(temperature2m.data, surfacePressure.data).enumerated().map { i, arg1 -> Float in
@@ -100,7 +100,7 @@ enum Meteorology {
             return p * Meteorology.sealevelPressureFactor(temperature: t, elevation: elevation)
         }
     }
-
+    
     /// Calculate mean sea level pressure, corrected by temperature.
     @inlinable static func sealevelPressureFactor(temperature: Float, elevation: Float) -> Float {
         let t0 = (temperature + 273.15 + 0.0065 * elevation)
@@ -109,12 +109,12 @@ enum Meteorology {
         let factor = powf(1 - (0.0065 * elevation) / t0, -5.25578129287)
         return factor
     }
-
+    
     /// Estimate total cloudcover from low, mid and high cloud cover
     static func cloudCoverTotal(low: [Float], mid: [Float], high: [Float]) -> [Float] {
         precondition(low.count == mid.count)
         precondition(low.count == high.count)
-
+        
         var out = [Float]()
         out.reserveCapacity(low.count)
         for i in low.indices {
@@ -122,7 +122,7 @@ enum Meteorology {
         }
         return out
     }
-
+    
     /// Apparent temperature which combines the effects of humidity, solar radiation and wind on the feels-like temperature should be added. It is similar to the Wet-bulb globe temperature
     /// See https://github.com/open-meteo/open-meteo/issues/13
     /// Formular from https://calculator.academy/apparent-temperature-calculator/
@@ -135,7 +135,7 @@ enum Meteorology {
         let AT = temperature_2m + 0.348 * e - 0.70 * windspeed_2m + 0.70 * (Q / (windspeed_2m + 10)) - 4.25
         return AT
     }
-
+    
     /// Caclculate apparent temperature for an array
     @inlinable static func apparentTemperature(temperature_2m: [Float], relativehumidity_2m: [Float], windspeed_10m: [Float], shortwave_radiation: [Float]?) -> [Float] {
         precondition(temperature_2m.count == relativehumidity_2m.count)
@@ -143,7 +143,7 @@ enum Meteorology {
         if let shortwave_radiation {
             precondition(temperature_2m.count == shortwave_radiation.count)
         }
-
+        
         var out = [Float]()
         out.reserveCapacity(temperature_2m.count)
         for i in temperature_2m.indices {
@@ -152,19 +152,19 @@ enum Meteorology {
         }
         return out
     }
-
+    
     /// Calculate vapor pressure deficit from temperature and dewpoint in celesius. Returns kiloPascal (kPa)
     @inlinable public static func vaporPressureDeficit(temperature2mCelsius: Float, dewpointCelsius: Float) -> Float {
         /// saturation vapor pressure at air temperature Thr. (kPa)
         let esat = 0.6108 * exp((17.27 * temperature2mCelsius) / (temperature2mCelsius + 237.3))
-
+        
         /// actual vapour pressure [kPa]
         let ea = 0.6108 * exp((17.27 * dewpointCelsius) / (dewpointCelsius + 237.3))
-
+        
         /// just in case dewpoint is larger than temperature
         return max(esat - ea, 0)
     }
-
+    
     /// Factor that need to be applied to scale wind from one level to another. Only valid for altitude below 100 meters.
     /// http://www.fao.org/3/x0490e/x0490e07.htm
     public static func scaleWindFactor(from: Float, to: Float) -> Float {
@@ -172,7 +172,7 @@ enum Meteorology {
         let factorTo = 4.87 / (log(67.8 * to - 5.42))
         return factorFrom / factorTo
     }
-
+    
     /// Calculate relative humidity from temperature and dewpoint
     /// See https://www.omnicalculator.com/physics/relative-humidity
     @inlinable public static func relativeHumidity(temperature: Float, dewpoint: Float) -> Float {
@@ -180,7 +180,7 @@ enum Meteorology {
         let λ = Float(243.04)
         return max(min(100 * exp((β * dewpoint) / (λ + dewpoint)) / exp((β * temperature) / (λ + temperature)), 100), 0)
     }
-
+    
     /// Calculate relative dewpoint from humidity and temperature
     /// See https://www.omnicalculator.com/physics/relative-humidity
     @inlinable public static func dewpoint(temperature: Float, relativeHumidity: Float) -> Float {
@@ -188,7 +188,7 @@ enum Meteorology {
         let λ = Float(243.04)
         return λ * (log(relativeHumidity / 100) + ((β * temperature) / (λ + temperature))) / (β - log(relativeHumidity / 100) - ((β * temperature) / (λ + temperature)))
     }
-
+    
     /// Calculate relative humidity. All variables should be on the same level
     /// https://cran.r-project.org/web/packages/humidity/vignettes/humidity-measures.html
     /// humudity in g/kg, temperature in celsius, pressure in hPa
@@ -209,71 +209,63 @@ enum Meteorology {
         }
     }
     
-    /// Calculate relative humidity. All variables should be on the same level
+    /// Calculate relative humidity using vapor vapor saturation
+    /// Accounts for saturation pressure over ice. This is critical to use RH for upper level cloud cover fraction.
+    /// Uses ECMWF-like mixed phase transition between -23°C and 0°C
+    /// All variables must be on the same level.
     /// humudity in g/kg, temperature in celsius, pressure in hPa
     @inlinable public static func specificToRelativeHumidity(
         specificHumidity q_gPerKg: Float,
         temperature T_C: Float,
         pressure p_hPa: Float
     ) -> Float {
+        /// Temperature at liquid water. Triple point. 0.01°C. ECMWF IFS since Cy45r1
+        let T0: Float = 273.16
+        /// Temperature for for end mixed freezing phase at -23C
+        let Tice: Float = 250.16
         
-        // 1. Convert units
+        // Convert units
         let q = q_gPerKg / 1000.0       // g/kg -> kg/kg
         let T = T_C + 273.15            // °C -> K
         let p = p_hPa * 100.0           // hPa -> Pa
         
-        // 2. Vapor pressure from specific humidity (Pa)
+        // Vapor pressure from specific humidity (Pa)
         let e = (q * p) / (0.622 + 0.378 * q)
         
-        // 3. Choose saturation formula based on temperature
-        let esi: Float
-        if T_C < 0 {
-            // Saturation over ice (Murphy & Koop 2005)
-            let lnEsi = 9.550426
-                        - (5723.265 / Float(T))
-                        + 3.53068 * log(Float(T))
-                        - 0.00728332 * Float(T)
-            esi = exp(lnEsi)
-        } else {
-            // Saturation over liquid water (Murphy & Koop 2005)
-            let T_d = Float(T)
-            let term1 = 54.842763
-                        - 6763.22 / T_d
-                        - 4.210 * log(T_d)
-                        + 0.000367 * T_d
-            let term2 = tanh(0.0415 * (T_d - 218.8)) *
-                        (53.878 - 1331.22 / T_d - 9.44523 * log(T_d) + 0.014025 * T_d)
-            let lnEsw = term1 + term2
-            esi = exp(lnEsw)
-        }
+        // Saturation over ice (Murphy & Koop 2005). Accurate range from -110°C to 0.01°C
+        let lnEsi = 9.550426
+                    - (5723.265 / Float(T))
+                    + 3.53068 * log(Float(T))
+                    - 0.00728332 * Float(T)
+        let esi = exp(lnEsi)
         
-        // 4. Relative humidity (%)
-        let rh = min(max(100.0 * Float(e / esi), 0), 100)
+        // Saturation over liquid water (Murphy & Koop 2005)
+        let term1 = 54.842763
+                    - 6763.22 / T
+                    - 4.210 * log(T)
+                    + 0.000367 * T
+        let term2 = tanh(0.0415 * (T - 218.8)) *
+                    (53.878 - 1331.22 / T - 9.44523 * log(T) + 0.014025 * T)
+        let lnEsw = term1 + term2
+        let esw = exp(lnEsw)
+        
+        /// Temperature-based liquid or ice fraction. 0 = ice, 1 = liquid
+        let fLiquid: Float
+        if T <= Tice {
+            fLiquid = 0.0
+        } else if T >= T0 {
+            fLiquid = 1.0
+        } else {
+            fLiquid = pow((T-Tice)/(T0-Tice), 2)
+        }
+
+        // Effective saturation vapor pressure
+        let es = fLiquid * esw + (1.0 - fLiquid) * esi
+        
+        // Relative humidity (%)
+        let rh = min(max(100.0 * Float(e / es), 0), 100)
         
         return rh
-    }
-
-    /// Calculate relative humidity and correct sea level pressure to surface pressure.
-    public static func specificToRelativeHumidity(specificHumidity: Array2DFastTime, temperature: Array2DFastTime, sealLevelPressure: Array2DFastTime, elevation: [Float]) -> [Float] {
-        return temperature.data.enumerated().map { i, temp in
-            let asl = elevation[i % sealLevelPressure.nTime]
-            let qair = specificHumidity.data[i]
-
-            let asl0 = asl.isNaN ? 0 : asl
-            /// Sea level temperature in kelvin
-            let t0 = (temp + 273.15 + 0.0065 * asl0)
-            let factor = powf(1 - (0.0065 * asl0) / t0, -5.25578129287)
-            let press = sealLevelPressure.data[i] / factor
-
-            let β = Float(17.625)
-            let λ = Float(243.04)
-
-            /// saturation vapor pressure at air temperature Thr. (kPa)
-            let es = 6.112 * exp((β * temp) / (temp + λ))
-            let e = qair / 1000 * press * 100 / (0.378 * qair / 1000 + 0.622)
-            let rh = e / es
-            return max(min(rh, 100), 0)
-        }
     }
 
     /// Wetbulb temperature Stull’s Approximation
@@ -300,81 +292,6 @@ enum Meteorology {
             let w = -omega / (rho * g)     // array operation
             return w
         }
-    }
-
-    /// Calculate U and V wind vectors using the geostrophic approximation. Uses straight flow at the equator.
-    public static func geostrophicWind(geopotentialHeightMeters gph: [Float], grid: RegularGrid) -> (u: [Float], v: [Float]) {
-        precondition(grid.isGlobal, "Grid must be global to use circular differences")
-
-        let g: Float = 9.80665
-        let earth_radius: Float = 6371e3
-        let nx = grid.nx
-        let ny = grid.ny
-
-        var gphSmooth = [Float](repeating: .nan, count: gph.count)
-        for y in 0..<ny {
-            for x in 0..<nx {
-                gphSmooth[y * nx + x] = (
-                      gph[((y + 0 + ny) % ny) * nx + (x + 2 + nx) % nx]
-                    + gph[((y + 0 + ny) % ny) * nx + (x + 1 + nx) % nx]
-                    + gph[((y + 0 + ny) % ny) * nx + (x + 0 + nx) % nx]
-                    + gph[((y + 0 + ny) % ny) * nx + (x - 1 + nx) % nx]
-                    + gph[((y + 0 + ny) % ny) * nx + (x - 2 + nx) % nx]
-                    + gph[((y + 1 + ny) % ny) * nx + (x + 2 + nx) % nx]
-                    + gph[((y + 1 + ny) % ny) * nx + (x + 1 + nx) % nx]
-                    + gph[((y + 1 + ny) % ny) * nx + (x + 0 + nx) % nx]
-                    + gph[((y + 1 + ny) % ny) * nx + (x - 1 + nx) % nx]
-                    + gph[((y + 1 + ny) % ny) * nx + (x - 2 + nx) % nx]
-                    + gph[((y + 2 + ny) % ny) * nx + (x + 2 + nx) % nx]
-                    + gph[((y + 2 + ny) % ny) * nx + (x + 1 + nx) % nx]
-                    + gph[((y + 2 + ny) % ny) * nx + (x + 0 + nx) % nx]
-                    + gph[((y + 2 + ny) % ny) * nx + (x - 1 + nx) % nx]
-                    + gph[((y + 2 + ny) % ny) * nx + (x - 2 + nx) % nx]
-                    + gph[((y - 1 + ny) % ny) * nx + (x + 2 + nx) % nx]
-                    + gph[((y - 1 + ny) % ny) * nx + (x + 1 + nx) % nx]
-                    + gph[((y - 1 + ny) % ny) * nx + (x + 0 + nx) % nx]
-                    + gph[((y - 1 + ny) % ny) * nx + (x - 1 + nx) % nx]
-                    + gph[((y - 1 + ny) % ny) * nx + (x - 2 + nx) % nx]
-                    + gph[((y - 2 + ny) % ny) * nx + (x + 2 + nx) % nx]
-                    + gph[((y - 2 + ny) % ny) * nx + (x + 1 + nx) % nx]
-                    + gph[((y - 2 + ny) % ny) * nx + (x + 0 + nx) % nx]
-                    + gph[((y - 2 + ny) % ny) * nx + (x - 1 + nx) % nx]
-                    + gph[((y - 2 + ny) % ny) * nx + (x - 2 + nx) % nx]) / 25
-            }
-        }
-
-        var u = [Float](repeating: .nan, count: nx * ny)
-        var v = [Float](repeating: .nan, count: nx * ny)
-        for y in 0..<ny {
-            let latitude = grid.getCoordinates(gridpoint: y * nx).latitude
-            let f = 2 * 7.2921e-5 * sin(latitude.degreesToRadians)  // Coriolis parameter calculation
-
-            for x in 0..<nx {
-                let gridpoint = y * nx + x
-                // calculate gph differences. Handles cyclic grids
-                let z_diff_east = gphSmooth[y * nx + (x + 1) % nx] - gphSmooth[y * nx + (x - 1 + nx) % nx]
-                let z_diff_north = gphSmooth[((y + 1) % ny) * nx + x] - gphSmooth[gridpoint]
-
-                // Calculate grid spacing
-                let dx = earth_radius * Float(grid.dx).degreesToRadians /* cos(latitude.degreesToRadians) */
-                let dy = earth_radius * Float(grid.dy).degreesToRadians
-
-                // geostrophic wind
-                let uGeostropic = f == 0 ? 0 : -(g / (f * dx)) * (z_diff_north /*/ 2*/)
-                let vGeostropic = f == 0 ? 0 : (g / (f * dy)) * ((z_diff_east /*/ 2*/) /*+ omega[gridpoint]*/)
-
-                // straight wind at equator
-                let uStraight = z_diff_north * g / 2
-                let vStraight = -z_diff_east * g / 2
-
-                // 0 = straight flow
-                // 1 = geostropic flow
-                let fraction = (Float(5)..<15).fraction(of: abs(latitude))
-                u[gridpoint] = uGeostropic * fraction + uStraight * (1 - fraction)
-                v[gridpoint] = vGeostropic * fraction + vStraight * (1 - fraction)
-            }
-        }
-        return (u, v)
     }
 
     /// Calculate upper level clouds from relative humidity using Sundqvist et al. (1989):
