@@ -101,7 +101,7 @@ extension GenericDomain {
 /**
  Generic variable for the reader implementation
  */
-protocol GenericVariable: GenericVariableMixable, Sendable {
+protocol GenericVariable: GenericVariableMixable, Sendable, Hashable {
     /// The filename of the variable. Typically just `temperature_2m`. Level is used to store mutliple levels or ensemble members in one file
     /// NOTE: `level` has been replaced with `ensembleMemberLevel` in settings
     var omFileName: (file: String, level: Int) { get }
@@ -121,6 +121,7 @@ protocol GenericVariable: GenericVariableMixable, Sendable {
     /// If true, forecasts from the previous model runs will be preserved
     var storePreviousForecast: Bool { get }
 }
+
 
 enum ReaderInterpolation {
     /// Simple linear interpolation

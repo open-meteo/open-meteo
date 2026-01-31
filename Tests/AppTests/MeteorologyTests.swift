@@ -92,8 +92,12 @@ import Testing
     }
 
     @Test func specificHumidity() {
-        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [6.06], temperature: [23.00], pressure: [1013.25]) == [35.06456])
-        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.06], temperature: [23.00], pressure: [1013.25]) == [0.3484397])
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [6.06], temperature: [23.00], pressure: [1013.25]) == [34.988453])
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.06], temperature: [23.00], pressure: [1013.25]) == [0.34768343])
+        // ice
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [0.3], temperature: [-33], pressure: [300]) == [52.203484])
+        // mixed phase
+        #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [1.5], temperature: [-10], pressure: [750]) == [67.33522])
         // not really possible
         #expect(Meteorology.specificToRelativeHumidity(specificHumidity: [24.06], temperature: [23.00], pressure: [1013.25]) == [100])
     }

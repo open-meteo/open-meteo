@@ -1116,8 +1116,10 @@ extension MultiDomains {
             return .ncepAigfs025
         case .ncep_aigefs025:
             return .ncepAigefs025
-        case .ncep_hgefs025_stats:
-            return .ncepHgefs025Stats
+        case .ncep_hgefs025_ensemble_mean:
+            return .ncepHgefs025EnsembleMean
+        case .ncep_aigefs025_ensemble_mean:
+            return .ncepAigefs025
         }
     }
 }
