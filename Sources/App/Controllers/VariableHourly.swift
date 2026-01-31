@@ -487,7 +487,43 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }
-        return nil
+        switch variable.variable {
+        case .windspeed:
+            return getDeriverMap(variable: ForecastPressureVariable(variable: .wind_speed, level: variable.level))
+        case .wind_speed:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_\(variable.level)hPa"), v: Reader.variableFromString("wind_v_component_\(variable.level)hPa"))
+        case .winddirection:
+            return getDeriverMap(variable: ForecastPressureVariable(variable: .wind_direction, level: variable.level))
+        case .wind_direction:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_\(variable.level)hPa"), v: Reader.variableFromString("wind_v_component_\(variable.level)hPa"))
+        case .dewpoint:
+            return getDeriverMap(variable: ForecastPressureVariable(variable: .dew_point, level: variable.level))
+        case .dew_point:
+            guard
+                let temperature = Reader.variableFromString("temperature_\(variable.level)hPa"),
+                let rh = Reader.variableFromString("relative_humidity_\(variable.level)hPa")
+            else {
+                return nil
+            }
+            return .two(.raw(temperature), .raw(rh)) { temperature, rh, _ in
+                let dewpoint = zip(temperature.data, rh.data).map(Meteorology.dewpoint)
+                return DataAndUnit(dewpoint, .percentage)
+            }
+        case .cloudcover:
+            return getDeriverMap(variable: ForecastPressureVariable(variable: .cloud_cover, level: variable.level))
+        case .cloud_cover:
+            guard
+                let rh = Reader.variableFromString("relative_humidity_\(variable.level)hPa")
+            else {
+                return nil
+            }
+            return .one(.raw(rh)) { rh, _ in
+                let c = rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(variable.level)) })
+                return DataAndUnit(c, .percentage)
+            }
+        default:
+            return nil
+        }
     }
     
     func getDeriverMap(variable: ForecastHeightVariable) -> DerivedMapping<Reader.MixingVar>? {
