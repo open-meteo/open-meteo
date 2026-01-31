@@ -33,6 +33,7 @@ enum ItaliaMeteoArpaeVariableDerivedSurface: String, CaseIterable, GenericVariab
     case windgusts_10m
     case sunshine_duration
     case surface_temperature
+    case weathercode
 }
 
 /**
@@ -162,6 +163,8 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 try await prefetchData(variable: .direct_radiation, time: time)
             case .surface_temperature:
                 try await prefetchData(variable: .soil_temperature_0cm, time: time)
+            case .weathercode:
+                try await prefetchData(variable: .weather_code, time: time)
             }
         case .pressure(let v):
             switch v.variable {
@@ -282,6 +285,8 @@ struct ItaliaMeteoArpaeReader: GenericReaderDerived, GenericReaderProtocol {
                 return DataAndUnit(gti, .wattPerSquareMetre)
             case .surface_temperature:
                 return try await get(raw: .soil_temperature_0cm, time: time)
+            case .weathercode:
+                return try await get(raw: .weather_code, time: time)
             }
         case .pressure(let v):
             switch v.variable {
