@@ -54,6 +54,7 @@ Apps:
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
+- [Mousam](https://amit9838.github.io/mousam/) A weather app for GNU/Linux that displays the weather at a glance
 - [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
 - [Overmorrow](https://github.com/bmaroti9/Overmorrow) A modern material design Android weather app.
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
@@ -66,6 +67,7 @@ Apps:
 - [solXpect](https://github.com/woheller69/solxpect) Android app which forecasts the output of your solar power plant
 - [The Weather](https://weather.jamesdinovo.com) A detailed, installable, progressive web application
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
+- [Typhoon](https://archisman-panigrahi.github.io/typhoon) A stylish weather app for GNU/Linux that acts as a desktop widget
 - [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
 - [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
 - [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
