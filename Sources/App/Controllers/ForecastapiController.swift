@@ -1125,8 +1125,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
             // Northern africa
             if let arpege_europe = try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
-                let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                return [gfsProbabilites, iconProbabilities, arpegeProbabilities, gfs, icon, arpege_europe].compactMap({ $0 })
+                return [gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe].compactMap({ $0 })
             }
 
             // Remaining parts of the world
@@ -1170,18 +1169,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return []
 //            return try await GfsGraphCastReader(domain: .hgefs025_ensemble_mean, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_mix, .meteofrance_seamless:
-            let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return ([arpegeProbabilities] + (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
+            return (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe, .arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []).compactMap({ $0 })
         case .meteofrance_arpege_seamless, .arpege_seamless:
-            let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return ([arpegeProbabilities] + (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])).compactMap({ $0 })
+            return (try await MeteoFranceMixer(domains: [.arpege_world, .arpege_europe], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []).compactMap({ $0 })
         case .meteofrance_arome_seamless, .arome_seamless:
             return try await MeteoFranceMixer(domains: [.arome_france, .arome_france_hd, .arome_france_15min, .arome_france_hd_15min], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .meteofrance_arpege_world, .arpege_world, .meteofrance_arpege_world025:
             return try await MeteoFranceReader(domain: .arpege_world, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .meteofrance_arpege_europe, .arpege_europe:
-            let arpegeProbabilities: (any GenericReaderProtocol)? = try await ProbabilityReader.makeMeteoFranceEuropeReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return ([arpegeProbabilities] + (try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])).compactMap({ $0 })
+            return (try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []).compactMap({ $0 })
         case .meteofrance_arome_france, .arome_france, .meteofrance_arome_france0025:
             // Note: AROME PI 15min is not used for consistency here
             return try await MeteoFranceMixer(domains: [.arome_france], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
