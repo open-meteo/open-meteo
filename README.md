@@ -55,6 +55,7 @@ Apps:
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
 - [Mousam](https://amit9838.github.io/mousam/) A weather app for GNU/Linux that displays the weather at a glance
+- [Munetios Weather](https://weather.munetios.com) A privacy-first, non-commercial weather web app using Open-Meteo data with no tracking.
 - [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
 - [Overmorrow](https://github.com/bmaroti9/Overmorrow) A modern material design Android weather app.
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable

@@ -11,7 +11,9 @@ enum DomainRegistry: String, CaseIterable {
     case meteofrance_arome_france_hd_15min
     case meteofrance_arpege_europe
     case meteofrance_arpege_world025
+    /// Deprecated 2026-01-18. MeteoFrance does not provide this data anymore
     case meteofrance_arpege_europe_probabilities
+    /// Deprecated 2026-01-18. MeteoFrance does not provide this data anymore
     case meteofrance_arpege_world025_probabilities
     case meteofrance_wave
     case meteofrance_currents
