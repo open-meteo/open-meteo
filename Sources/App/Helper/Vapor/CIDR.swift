@@ -101,47 +101,24 @@ public struct CIDR: Equatable {
 
 extension CIDR {
     public struct IPv6: Equatable {
-        // Use four 32-bit words for IPv6 representation to simplify bit masking
-        let w0: UInt32
-        let w1: UInt32
-        let w2: UInt32
-        let w3: UInt32
-        
+        // Two 64-bit words: high (first 8 bytes) and low (last 8 bytes) in big-endian order
+        let hi: UInt64
+        let lo: UInt64
+
         func contains(other: Self, prefix: UInt8) -> Bool {
             if prefix == 0 { return true }
             if prefix >= 128 { return self == other }
-            // How many full 32-bit words are covered
-            let fullWords = Int(prefix / 32)
-            let remBits = Int(prefix % 32)
-            // Compare full words without allocating
-            switch fullWords {
-            case 0:
-                break
-            case 1:
-                if w0 != other.w0 { return false }
-            case 2:
-                if w0 != other.w0 || w1 != other.w1 { return false }
-            case 3:
-                if w0 != other.w0 || w1 != other.w1 || w2 != other.w2 { return false }
-            default:
-                // fullWords >= 4
-                return true
-            }
-            if remBits == 0 { return true }
-            // Apply mask to the next word
-            let nextWordIndex = fullWords
-            let mask: UInt32 = remBits == 32 ? ~UInt32(0) : (~UInt32(0) << (32 - remBits))
-            switch nextWordIndex {
-            case 0:
-                return (w0 & mask) == (other.w0 & mask)
-            case 1:
-                return (w1 & mask) == (other.w1 & mask)
-            case 2:
-                return (w2 & mask) == (other.w2 & mask)
-            case 3:
-                return (w3 & mask) == (other.w3 & mask)
-            default:
-                return true
+            if prefix <= 64 {
+                // Mask the high 64 bits and compare
+                let maskBits = Int(prefix)
+                let mask: UInt64 = maskBits == 0 ? 0 : (~UInt64(0) << (64 - maskBits))
+                return (hi & mask) == (other.hi & mask)
+            } else {
+                // First 64 bits must match entirely, then compare remaining bits in low word
+                if hi != other.hi { return false }
+                let rem = Int(prefix) - 64
+                let mask: UInt64 = rem == 0 ? 0 : (~UInt64(0) << (64 - rem))
+                return (lo & mask) == (other.lo & mask)
             }
         }
     }
@@ -173,15 +150,15 @@ fileprivate func parseIPv6(_ string: String) -> CIDR.IPv6? {
     var addr = in6_addr()
     let res = string.withCString { cs in inet_pton(AF_INET6, cs, &addr) }
     if res == 1 {
-        // Extract four 32-bit big-endian words from the 16-byte IPv6 address
         return withUnsafeBytes(of: addr) { rawPtr -> CIDR.IPv6 in
-            let bytes = rawPtr.bindMemory(to: UInt8.self)
-            let w0 = (UInt32(bytes[0]) << 24) | (UInt32(bytes[1]) << 16) | (UInt32(bytes[2]) << 8) | UInt32(bytes[3])
-            let w1 = (UInt32(bytes[4]) << 24) | (UInt32(bytes[5]) << 16) | (UInt32(bytes[6]) << 8) | UInt32(bytes[7])
-            let w2 = (UInt32(bytes[8]) << 24) | (UInt32(bytes[9]) << 16) | (UInt32(bytes[10]) << 8) | UInt32(bytes[11])
-            let w3 = (UInt32(bytes[12]) << 24) | (UInt32(bytes[13]) << 16) | (UInt32(bytes[14]) << 8) | UInt32(bytes[15])
-            return CIDR.IPv6(w0: w0, w1: w1, w2: w2, w3: w3)
+            let b = rawPtr.bindMemory(to: UInt8.self)
+            let hi1 = (UInt64(b[0]) << 56) | (UInt64(b[1]) << 48) | (UInt64(b[2]) << 40) | (UInt64(b[3]) << 32)
+            let hi = hi1 | (UInt64(b[4]) << 24) | (UInt64(b[5]) << 16) | (UInt64(b[6]) << 8)  |  UInt64(b[7])
+            let lo1 = (UInt64(b[8]) << 56) | (UInt64(b[9]) << 48) | (UInt64(b[10]) << 40) | (UInt64(b[11]) << 32)
+            let lo = lo1 | (UInt64(b[12]) << 24) | (UInt64(b[13]) << 16) | (UInt64(b[14]) << 8) | UInt64(b[15])
+            return CIDR.IPv6(hi: hi, lo: lo)
         }
     }
     return nil
 }
+

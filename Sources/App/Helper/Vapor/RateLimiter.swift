@@ -153,16 +153,7 @@ extension CIDR {
         case .v4(let ip4):
             return self.ipv4.contains(CIDR.IPv4(ip: ip4.address.sin_addr.s_addr.bigEndian))
         case .v6(let ip6):
-            // Read IPv6 bytes portably without relying on union fields
             let v6 = ip6.address.sin6_addr
-            let cidrV6: CIDR.IPv6 = withUnsafeBytes(of: v6) { rawPtr in
-                let b = rawPtr.bindMemory(to: UInt8.self)
-                let w0 = (UInt32(b[0]) << 24) | (UInt32(b[1]) << 16) | (UInt32(b[2]) << 8) | UInt32(b[3])
-                let w1 = (UInt32(b[4]) << 24) | (UInt32(b[5]) << 16) | (UInt32(b[6]) << 8) | UInt32(b[7])
-                let w2 = (UInt32(b[8]) << 24) | (UInt32(b[9]) << 16) | (UInt32(b[10]) << 8) | UInt32(b[11])
-                let w3 = (UInt32(b[12]) << 24) | (UInt32(b[13]) << 16) | (UInt32(b[14]) << 8) | UInt32(b[15])
-                return CIDR.IPv6(w0: w0, w1: w1, w2: w2, w3: w3)
-            }
             // Detect IPv4-mapped IPv6: ::ffff:a.b.c.d => first 10 bytes zero, next two 0xff
             let isV4Mapped = withUnsafeBytes(of: v6) { rawPtr -> Bool in
                 let b = rawPtr.bindMemory(to: UInt8.self)
@@ -180,6 +171,17 @@ extension CIDR {
                 if self.ipv4.contains(v4) {
                     return true
                 }
+            }
+            // Read IPv6 bytes portably and build two 64-bit big-endian words
+            let cidrV6 = withUnsafeBytes(of: v6) { rawPtr -> CIDR.IPv6 in
+                let b = rawPtr.bindMemory(to: UInt8.self)
+                let hi1 = (UInt64(b[0]) << 56) | (UInt64(b[1]) << 48) | (UInt64(b[2]) << 40) | (UInt64(b[3]) << 32)
+                let hi =  hi1 |
+                         (UInt64(b[4]) << 24) | (UInt64(b[5]) << 16) | (UInt64(b[6]) << 8)  |  UInt64(b[7])
+                let lo1 = (UInt64(b[8]) << 56) | (UInt64(b[9]) << 48) | (UInt64(b[10]) << 40) | (UInt64(b[11]) << 32)
+                let lo = lo1 |
+                         (UInt64(b[12]) << 24) | (UInt64(b[13]) << 16) | (UInt64(b[14]) << 8) | UInt64(b[15])
+                return CIDR.IPv6(hi: hi, lo: lo)
             }
             return self.ipv6.contains(cidrV6)
         case .unixDomainSocket(_):
