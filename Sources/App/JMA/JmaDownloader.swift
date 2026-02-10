@@ -192,7 +192,7 @@ extension GribMessage {
 
         switch shortName {
         case "prmsl": return JmaSurfaceVariable.pressure_msl
-        case "sp": return nil
+        case "sp": return JmaSurfaceVariable.surface_pressure
         case "10u": return JmaSurfaceVariable.wind_u_component_10m
         case "10v": return JmaSurfaceVariable.wind_v_component_10m
         case "2t": return JmaSurfaceVariable.temperature_2m
@@ -235,6 +235,7 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
     case cloud_cover_mid
     case cloud_cover_high
     case pressure_msl
+    case surface_pressure
     case relative_humidity_2m
 
     /// not in global model
@@ -251,6 +252,7 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         case .temperature_2m, .relative_humidity_2m: return true
         case .precipitation: return true
         case .pressure_msl: return true
+        case .surface_pressure: return true
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_v_component_10m, .wind_u_component_10m: return true
@@ -280,6 +282,8 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
             return 10
         case .pressure_msl:
             return 10
+        case .surface_pressure:
+            return 10
         case .wind_v_component_10m:
             return 10
         case .wind_u_component_10m:
@@ -294,6 +298,8 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         case .temperature_2m:
             return (1, -273.15)
         case .pressure_msl:
+            return (1 / 100, 0)
+        case .surface_pressure:
             return (1 / 100, 0)
         default:
             return nil
@@ -313,6 +319,8 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         case .cloud_cover_high:
             return .hermite(bounds: 0...100)
         case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .surface_pressure:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
@@ -344,6 +352,8 @@ enum JmaSurfaceVariable: String, CaseIterable, JmaVariableDownloadable, GenericV
         case .precipitation:
             return .millimetre
         case .pressure_msl:
+            return .hectopascal
+        case .surface_pressure:
             return .hectopascal
         case .wind_v_component_10m:
             return .metrePerSecond

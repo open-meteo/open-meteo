@@ -138,6 +138,9 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
                 try await prefetchData(raw: .wind_u_component_10m, time: time)
                 try await prefetchData(raw: .wind_v_component_10m, time: time)
             case .surface_pressure:
+                if reader.targetElevation.isNaN {
+                    _ = try? await prefetchData(raw: .surface_pressure, time: time)
+                }
                 try await prefetchData(raw: .pressure_msl, time: time)
                 try await prefetchData(raw: .temperature_2m, time: time)
             case .dew_point_2m, .dewpoint_2m:
@@ -227,6 +230,10 @@ struct JmaReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             case .relativehumidity_2m:
                 return try await get(raw: .relative_humidity_2m, time: time)
             case .surface_pressure:
+                if reader.targetElevation.isNaN, let pressure = try? await get(raw: .surface_pressure, time: time) {
+                    // Keep backward compatibility for historical runs without raw `sp`.
+                    return pressure
+                }
                 let temperature = try await get(raw: .temperature_2m, time: time).data
                 let pressure = try await get(raw: .pressure_msl, time: time)
                 return DataAndUnit(Meteorology.surfacePressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
