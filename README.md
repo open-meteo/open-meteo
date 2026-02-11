@@ -42,7 +42,6 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 
 Apps:
 
-- [monkeysnow](https://github.com/kcluit/monkeysnow) The most customizable resort/snow forecast website for ski and board!
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
@@ -55,6 +54,7 @@ Apps:
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
 - [Meteo-Fly](https://meteo-fly.com) Free flight-weather charts for paraglider & hang-glider pilots.
 - [MeteoHist](https://yotka.org/meteo-hist) A web app to create interactive temperature and precipitation graphs for places around the world
+- [monkeysnow](https://github.com/kcluit/monkeysnow) The most customizable resort/snow forecast website for ski and board!
 - [Mousam](https://amit9838.github.io/mousam/) A weather app for GNU/Linux that displays the weather at a glance
 - [Munetios Weather](https://weather.munetios.com) A privacy-first, non-commercial weather web app using Open-Meteo data with no tracking.
 - [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
@@ -71,8 +71,8 @@ Apps:
 - [truthclimate](https://www.truthclimate.com) Discover how weather and climate changed all around the world.
 - [Typhoon](https://archisman-panigrahi.github.io/typhoon) A stylish weather app for GNU/Linux that acts as a desktop widget
 - [Weather Please](https://github.com/ggaidelevicius/weather-please/) Clean and minimal new tab replacement for browsers
-- [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
 - [Weather](https://github.com/GustavLindberg99/AndroidWeather) Free, open source, simple and complete weather app for Android
+- [Weather.io](https://weather.roessner.tech) A simple Progressive Web App (PWA) for checking the weather.
 - [WeatherAI](https://play.google.com/store/apps/details?id=com.kingfu.weatherai) WeatherAI offers an intuitive user experience that makes checking the weather a breeze.
 - [WeatherGraph](https://weathergraph.app) Apple Watch App
 - [WeatherMaster](https://github.com/PranshulGG/WeatherMaster) A Weather app for android inspired by the Google Pixel weather app.
@@ -82,14 +82,14 @@ Apps:
 
 Repositories:
 
+- [biome](https://github.com/SqrtMinusOne/biome) Bountiful Interface to Open Meteo for Emacs
 - [Captain Cold](https://github.com/cburton-godaddy/captain-cold) Simple Open-Meteo -> Discord integration
-- [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
-- [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
+- [DIY Arduino esp8266 weather station](https://github.com/AlexeyMal/esp8266-weather-station) esp8266 weather station using Open-Meteo API, an embedded C++ implementation example
 - [Homepage](https://github.com/benphelps/homepage/) A highly customizable homepage (or startpage / application dashboard) with Docker and service API integrations.
 - [Spots Guru](https://www.spots.guru) Weather forecast for lazy, the best wind & wave spots around you.
+- [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
-- [DIY Arduino esp8266 weather station](https://github.com/AlexeyMal/esp8266-weather-station) esp8266 weather station using Open-Meteo API, an embedded C++ implementation example
-- [biome](https://github.com/SqrtMinusOne/biome) Bountiful Interface to Open Meteo for Emacs
+- [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
 
 Other:
 
