@@ -24,10 +24,25 @@ final actor RateLimiter {
     private var minutelyPerIPv4 = [UInt32: Float]()
 
     private var minutelyPerIPv6 = [Int: Float]()
+    
+    /// List of IP addresses / networks to disable rate limited
+    var allowlistedIPs: CIDR?
 
     public static let instance = RateLimiter()
 
-    private init() {}
+    private init() {
+        if let ipAllowlistPath = Environment.get("IP_ALLOWLIST_PATH") {
+            do {
+                let cidr = try CIDR(filename: ipAllowlistPath)
+                allowlistedIPs = cidr
+                print("IP allow list loaded \(cidr.ips.count) address ranges")
+            } catch {
+                print("Failed to load allowlisted IPs from \(ipAllowlistPath): \(error)")
+            }
+        } else {
+            allowlistedIPs = nil
+        }
+    }
 
     /// Called every minute from a life cycle handler
     func minutelyCallback() {
@@ -35,6 +50,16 @@ final actor RateLimiter {
         minutelyPerIPv4.removeAll(keepingCapacity: true)
         minutelyPerIPv6.removeAll(keepingCapacity: true)
         if (now % 3600) < 60 {
+            if let path = Environment.get("IP_ALLOWLIST_PATH") {
+                do {
+                    let allowlistedIPs = try CIDR(filename: path)
+                    if self.allowlistedIPs != allowlistedIPs {
+                        self.allowlistedIPs = allowlistedIPs
+                    }
+                } catch {
+                    print("Failed to load allowlisted IPs from \(path): \(error)")
+                }
+            }
             hourlyPerIPv4.removeAll(keepingCapacity: true)
             hourlyPerIPv6.removeAll(keepingCapacity: true)
         }
@@ -48,6 +73,9 @@ final actor RateLimiter {
     func check(address: SocketAddress) throws {
         guard Self.limitDaily > 0 || Self.limitHourly > 0 || Self.limitMinutely > 0 else {
             return
+        }
+        if allowlistedIPs?.contains(address) == true {
+            return // always allow this IP address
         }
         switch address {
         case .v4(let socket):
@@ -118,6 +146,20 @@ final actor RateLimiter {
     }
 }
 
+extension CIDR {
+    /// Check if the IP is explicitly listed
+    func contains(_ socket: SocketAddress) -> Bool {
+        switch socket {
+        case .v4(let ip4):
+            return self.contains(ip4.address.sin_addr.mappedToV6)
+        case .v6(let ip6):
+            return self.contains(ip6.address.sin6_addr)
+        case .unixDomainSocket(_):
+            return false
+        }
+    }
+}
+
 enum RateLimitError: Error, AbortError {
     case dailyExceeded
     case hourlyExceeded
@@ -141,8 +183,6 @@ enum RateLimitError: Error, AbortError {
         }
     }
 }
-
-fileprivate let isolcationQueue = DispatchQueue(label: "first")
 
 extension Request {
     func incrementRateLimiter(weight: Float, apikey: String?) async {
