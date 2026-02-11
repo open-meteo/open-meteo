@@ -9,12 +9,14 @@ struct CIDRTests {
         let a = CIDR.parseIPv4("192.168.10.5")!.mappedToV6
         let b = CIDR.parseIPv6("::ffff:192.168.10.5")!
         #expect(a == b)
-        let c = CIDR.parseIPv6("::ffff:192.168.10.1")!
+        let c = CIDR.parseIPv6("::ffff:192.168.10.0")!
         #expect(a != c)
         
-        #expect(c.ipv6InPrefix(other: a, prefixLength: 24) == true)
-        print(c.__u6_addr.__u6_addr8, a.__u6_addr.__u6_addr8)
+        #expect(c.ipv6InPrefix(other: a, prefixLength: 96+24) == true)
         #expect(c.ipv6InPrefix(other: a, prefixLength: 96+32) == false)
+        #expect(c.ipv6InPrefix(other: a, prefixLength: 96+31) == false)
+        #expect(c.ipv6InPrefix(other: a, prefixLength: 96+30) == false)
+        #expect(c.ipv6InPrefix(other: a, prefixLength: 96+29) == true)
         
         let cidr = CIDR("192.168.0.0/16,2001:db8::/32,203.0.113.5/32,1501:db8::1/128,198.51.100.7,1001:db8::42")
         #expect(cidr.contains("192.168.10.5"))
