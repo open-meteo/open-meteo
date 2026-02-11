@@ -8,42 +8,23 @@ import Glibc
 import Darwin
 #endif
 
-
-/// Array of CIDR v4 and v6 networks and prefix lengths. Optimised for linear memory
+/// Array of CIDR v6 networks and prefix lengths, including IPv4 mapped to IPv6. Optimised for linear memory
 public struct CIDR: Equatable {
-    let ipv4: V4Array
-    let ipv6: V6Array
+    let ips: [in6_addr]
+    let prefix: [UInt8]
     
-    public struct V4Array: Equatable {
-        let ips: [CIDR.IPv4]
-        let prefix: [UInt8]
-        
-        func contains(_ v4: CIDR.IPv4) -> Bool {
-            return zip(ips, prefix).contains(where: {
-                $0.contains(other: v4, prefix: $1)
-            })
-        }
-        
-        func contains(_ v4: String) -> Bool {
-            guard let ip = parseIPv4(v4) else { return false }
-            return contains(ip)
-        }
+    func contains(_ v6: in6_addr) -> Bool {
+        return zip(ips, prefix).contains(where: {
+            $0.ipv6InPrefix(other: v6, prefixLength: $1)
+        })
     }
     
-    public struct V6Array: Equatable {
-        let ips: [CIDR.IPv6]
-        let prefix: [UInt8]
-        
-        func contains(_ v6: CIDR.IPv6) -> Bool {
-            return zip(ips, prefix).contains(where: {
-                $0.contains(other: v6, prefix: $1)
-            })
+    func contains(_ ip: String) -> Bool {
+        if let ip = Self.parseIPv4(ip) {
+            return contains(ip.mappedToV6)
         }
-        
-        func contains(_ v6: String) -> Bool {
-            guard let ip = parseIPv6(v6) else { return false }
-            return contains(ip)
-        }
+        guard let ip = Self.parseIPv6(ip) else { return false }
+        return contains(ip)
     }
     
     public init(filename: String) throws {
@@ -53,20 +34,18 @@ public struct CIDR: Equatable {
     
     /// Accept CSV encoded CIDR networks. Ignore invalid entries
     public init(_ string: String) {
-        var ipv4 = [CIDR.IPv4]()
-        var ipv4Prefix = [UInt8]()
-        var ipv6 = [CIDR.IPv6]()
+        var ipv6 = [in6_addr]()
         var ipv6Prefix = [UInt8]()
         for string in string.components(separatedBy: ",") {
             let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
             // If there is a slash, parse as CIDR with explicit prefix
             guard let slashIndex = trimmed.firstIndex(of: "/") else  {
                 // No slash: accept a single IP address as a host with full-length prefix
-                if let v4int = parseIPv4(trimmed) {
-                    ipv4.append(v4int)
-                    ipv4Prefix.append(32)
+                if let v4int = Self.parseIPv4(trimmed) {
+                    ipv6.append(v4int.mappedToV6)
+                    ipv6Prefix.append(128)
                     continue
-                } else if let v6addr = parseIPv6(trimmed) {
+                } else if let v6addr = Self.parseIPv6(trimmed) {
                     ipv6.append(v6addr)
                     ipv6Prefix.append(128)
                     continue
@@ -79,14 +58,14 @@ public struct CIDR: Equatable {
             guard let p = UInt8(prefixStr) else {
                 continue
             }
-            // IPv4
-            if let v4int = parseIPv4(addr) {
+            if let v4int = Self.parseIPv4(addr) {
                 guard (0...32).contains(p) else {
                     continue
                 }
-                ipv4.append(v4int)
-                ipv4Prefix.append(p)
-            } else if let v6addr = parseIPv6(addr) {
+                // Map IPv4 prefix to IPv6 prefix by adding 96
+                ipv6.append(v4int.mappedToV6)
+                ipv6Prefix.append(96 + p)
+            } else if let v6addr = Self.parseIPv6(addr) {
                 guard (0...128).contains(p) else {
                     continue
                 }
@@ -94,71 +73,92 @@ public struct CIDR: Equatable {
                 ipv6Prefix.append(p)
             }
         }
-        self.ipv4 = .init(ips: ipv4, prefix: ipv4Prefix)
-        self.ipv6 = .init(ips: ipv6, prefix: ipv6Prefix)
+        self.ips = ipv6
+        self.prefix = ipv6Prefix
     }
 }
 
 extension CIDR {
-    public struct IPv6: Equatable {
-        // Two 64-bit words: high (first 8 bytes) and low (last 8 bytes) in big-endian order
-        let hi: UInt64
-        let lo: UInt64
+    static func parseIPv4(_ string: String) -> in_addr? {
+        var addr = in_addr()
+        let res = string.withCString { cs in inet_pton(AF_INET, cs, &addr) }
+        if res == 1 {
+            return addr
+        }
+        return nil
+    }
 
-        func contains(other: Self, prefix: UInt8) -> Bool {
-            if prefix == 0 { return true }
-            if prefix >= 128 { return self == other }
-            if prefix <= 64 {
-                // Mask the high 64 bits and compare
-                let maskBits = Int(prefix)
-                let mask: UInt64 = maskBits == 0 ? 0 : (~UInt64(0) << (64 - maskBits))
-                return (hi & mask) == (other.hi & mask)
-            } else {
-                // First 64 bits must match entirely, then compare remaining bits in low word
-                if hi != other.hi { return false }
-                let rem = Int(prefix) - 64
-                let mask: UInt64 = rem == 0 ? 0 : (~UInt64(0) << (64 - rem))
-                return (lo & mask) == (other.lo & mask)
+    static func parseIPv6(_ string: String) -> in6_addr? {
+        var addr = in6_addr()
+        let res = string.withCString { cs in inet_pton(AF_INET6, cs, &addr) }
+        if res == 1 {
+            return addr
+        }
+        return nil
+    }
+}
+
+extension in6_addr: @retroactive Equatable {
+    public static func == (lhs: in6_addr, rhs: in6_addr) -> Bool {
+        // Compare the raw bytes
+        return withUnsafeBytes(of: lhs) { lhsBytes in
+            withUnsafeBytes(of: rhs) { rhsBytes in
+                lhsBytes.elementsEqual(rhsBytes)
             }
         }
     }
-    
-    public struct IPv4: Equatable {
-        let ip: UInt32
-        
-        func contains(other: Self, prefix: UInt8) -> Bool {
-            if prefix <= 0 { return true }
-            if prefix >= 32 { return self == other }
-            let mask: UInt32 = prefix == 0 ? 0 : (~UInt32(0) << (32 - prefix))
-            return (self.ip & mask) == (other.ip & mask)
+}
+
+
+extension in6_addr {
+    func ipv6InPrefix(other: in6_addr, prefixLength: UInt8) -> Bool {
+        guard (0...128).contains(prefixLength) else { return false }
+
+        let fullBytes = Int(prefixLength) / 8
+        let remainingBits = Int(prefixLength) % 8
+
+        return withUnsafeBytes(of: self) { ipBytes in
+            withUnsafeBytes(of: other) { netBytes in
+
+                // Compare full bytes in one shot
+                if fullBytes > 0 &&
+                   memcmp(ipBytes.baseAddress,
+                          netBytes.baseAddress,
+                          Int(fullBytes)) != 0 {
+                    return false
+                }
+
+                // No partial byte → exact match so far
+                if remainingBits == 0 {
+                    return true
+                }
+
+                // Mask the next byte
+                let mask: UInt8 = 0xFF << (8 - remainingBits)
+
+                return (ipBytes[fullBytes] & mask) ==
+                       (netBytes[fullBytes] & mask)
+            }
         }
     }
 }
 
+extension in_addr {
+    var mappedToV6: in6_addr {
+        var ipv6 = in6_addr()
+        withUnsafeBytes(of: self) { v4bytes in
+            withUnsafeMutableBytes(of: &ipv6) { v6bytes in
+                // ::ffff:0:0/96 prefix
+                v6bytes[10] = 0xff
+                v6bytes[11] = 0xff
 
-fileprivate func parseIPv4(_ string: String) -> CIDR.IPv4? {
-    var addr = in_addr()
-    let res = string.withCString { cs in inet_pton(AF_INET, cs, &addr) }
-    if res == 1 {
-        // inet_pton stores in network byte order (big endian)
-        return CIDR.IPv4(ip: UInt32(addr.s_addr).bigEndian)
-    }
-    return nil
-}
-
-fileprivate func parseIPv6(_ string: String) -> CIDR.IPv6? {
-    var addr = in6_addr()
-    let res = string.withCString { cs in inet_pton(AF_INET6, cs, &addr) }
-    if res == 1 {
-        return withUnsafeBytes(of: addr) { rawPtr -> CIDR.IPv6 in
-            let b = rawPtr.bindMemory(to: UInt8.self)
-            let hi1 = (UInt64(b[0]) << 56) | (UInt64(b[1]) << 48) | (UInt64(b[2]) << 40) | (UInt64(b[3]) << 32)
-            let hi = hi1 | (UInt64(b[4]) << 24) | (UInt64(b[5]) << 16) | (UInt64(b[6]) << 8)  |  UInt64(b[7])
-            let lo1 = (UInt64(b[8]) << 56) | (UInt64(b[9]) << 48) | (UInt64(b[10]) << 40) | (UInt64(b[11]) << 32)
-            let lo = lo1 | (UInt64(b[12]) << 24) | (UInt64(b[13]) << 16) | (UInt64(b[14]) << 8) | UInt64(b[15])
-            return CIDR.IPv6(hi: hi, lo: lo)
+                // copy IPv4 into last 4 bytes
+                v6bytes[12] = v4bytes[0]
+                v6bytes[13] = v4bytes[1]
+                v6bytes[14] = v4bytes[2]
+                v6bytes[15] = v4bytes[3]
+            }
         }
+        return ipv6
     }
-    return nil
 }
-
