@@ -42,6 +42,7 @@ The API is available for non-commercial use at no cost. Despite being free of ch
 
 Apps:
 
+- [monkeysnow](https://github.com/kcluit/monkeysnow) The most customizable resort/snow forecast website for ski and board!
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
