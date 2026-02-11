@@ -121,10 +121,10 @@ extension in6_addr {
             withUnsafeBytes(of: other) { netBytes in
 
                 // Compare full bytes in one shot
-                if fullBytes > 0 &&
-                   memcmp(ipBytes.baseAddress,
-                          netBytes.baseAddress,
-                          Int(fullBytes)) != 0 {
+                if let ipBytes = ipBytes.baseAddress,
+                    let netBytes = netBytes.baseAddress,
+                    fullBytes > 0 &&
+                    memcmp(ipBytes, netBytes, Int(fullBytes)) != 0 {
                     return false
                 }
 

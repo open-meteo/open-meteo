@@ -10,6 +10,7 @@ struct CIDRTests {
         let b = CIDR.parseIPv6("::ffff:192.168.10.5")!
         #expect(a == b)
         let c = CIDR.parseIPv6("::ffff:192.168.10.1")!
+        #expect(a != c)
         
         #expect(c.ipv6InPrefix(other: a, prefixLength: 24) == true)
         print(c.__u6_addr.__u6_addr8, a.__u6_addr.__u6_addr8)
