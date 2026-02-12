@@ -40,12 +40,14 @@ struct S3DataController: RouteCollection {
         let delimiter: String
         let prefix: String
         let apikey: String?
+        let continuation_token: String?
 
         enum CodingKeys: String, CodingKey {
             case list_type = "list-type"
             case delimiter
             case prefix
             case apikey
+            case continuation_token = "continuation-token"
         }
     }
 

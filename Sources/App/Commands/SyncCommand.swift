@@ -423,30 +423,46 @@ extension StringProtocol {
 fileprivate extension Curl {
     /// Use the AWS ListObjectsV2 to list files and directories inside a bucket with a prefix. No support more than 1000 objects yet
     func s3list(server: String, prefix: String, apikey: String?, deadLineHours: Double) async throws -> (files: [S3DataController.S3ListV2File], directories: [String]) {
-        var request = ClientRequest(method: .GET, url: URI("\(server)"))
-        let params = S3DataController.S3ListV2(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey)
-        try request.query.encode(params)
-        var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours, quiet: true)
-        guard let body = response.readString(length: response.readableBytes) else {
-            return ([], [])
-        }
-        let files = body.xmlSection("Contents").map {
-            guard let name = $0.xmlFirst("Key"),
-                  let modificationTimeString = $0.xmlFirst("LastModified"),
-                  let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)),
-                  let fileSizeString = $0.xmlFirst("Size"),
-                  let fileSize = Int(fileSizeString)
-            else {
-                fatalError()
+        var allFiles: [S3DataController.S3ListV2File] = []
+        var allDirectories: [String] = []
+        var continuation: String? = nil
+        while true {
+            var request = ClientRequest(method: .GET, url: URI("\(server)"))
+            let params = S3DataController.S3ListV2(list_type: 2, delimiter: "/", prefix: prefix, apikey: apikey, continuation_token: continuation)
+            try request.query.encode(params)
+            var response = try await downloadInMemoryAsync(url: request.url.string, minSize: nil, deadLineHours: deadLineHours, quiet: true)
+            guard let body = response.readString(length: response.readableBytes) else {
+                return (allFiles, allDirectories)
             }
-            return S3DataController.S3ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize)
-        }
-        let directories = body.xmlSection("CommonPrefixes").map {
-            guard let prefix = $0.xmlFirst("Prefix") else {
-                fatalError()
+            
+            let files = body.xmlSection("Contents").map {
+                guard let name = $0.xmlFirst("Key"),
+                      let modificationTimeString = $0.xmlFirst("LastModified"),
+                      let modificationTime = DateFormatter.awsS3DateTime.date(from: String(modificationTimeString)),
+                      let fileSizeString = $0.xmlFirst("Size"),
+                      let fileSize = Int(fileSizeString)
+                else {
+                    fatalError()
+                }
+                return S3DataController.S3ListV2File(name: String(name), modificationTime: modificationTime, fileSize: fileSize)
             }
-            return String(prefix)
+            let directories = body.xmlSection("CommonPrefixes").map {
+                guard let prefix = $0.xmlFirst("Prefix") else {
+                    fatalError()
+                }
+                return String(prefix)
+            }
+            allFiles.append(contentsOf: files)
+            allDirectories.append(contentsOf: directories)
+
+            // Check if more files are available
+            if body.contains("<IsTruncated>true</IsTruncated>"),
+                let token = body.xmlFirst("NextContinuationToken") {
+                continuation = String(token)
+            } else {
+                break
+            }
         }
-        return (files, directories)
+        return (allFiles, allDirectories)
     }
 }
