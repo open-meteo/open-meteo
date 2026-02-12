@@ -4,11 +4,7 @@ import OmFileFormat
 @preconcurrency import SwiftEccodes
 
 /**
-Jma Downloader
- 
- TODO:
- - elevation download
- - 3h MSM pressue level data
+JMA Downloader
  */
 struct JmaDownload: AsyncCommand {
     struct Signature: CommandSignature {
@@ -55,21 +51,21 @@ struct JmaDownload: AsyncCommand {
 
         if let timeinterval = signature.timeinterval {
             for run in try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4) {
-                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: nil)
+                let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: nil, createNetCdf: signature.createNetcdf)
                 try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: false, uploadS3Bucket: nil, uploadS3OnlyProbabilities: false)
             }
             return
         }
 
         let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) ?? domain.lastRun
-        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket)
+        let handles = try await download(application: context.application, domain: domain, run: run, server: server, concurrent: nConcurrent, uploadS3Bucket: signature.uploadS3Bucket, createNetCdf: signature.createNetcdf)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: run, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
         logger.info("Finished in \(start.timeElapsedPretty())")
     }
 
     /// MSM or GSM domain
     /// Return open file handles, to ensure overlapping runs are not conflicting
-    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
+    func download(application: Application, domain: JmaDomain, run: Timestamp, server: String, concurrent: Int, uploadS3Bucket: String?, createNetCdf: Bool) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         logger.info("Downloading domain '\(domain.rawValue)' run '\(run.iso8601_YYYY_MM_dd_HH_mm)'")
         let deadLineHours: Double = domain == .gsm ? 3 : 6
@@ -105,6 +101,21 @@ struct JmaDownload: AsyncCommand {
             filesToDownload = range.map { hour in
                 "Z__C_RJTD_\(run.format_YYYYMMddHH)0000_MSM_GPV_Rjp_L-pall_FH\(hour)_grib2.bin"
             }
+        }
+        
+        if !domain.surfaceElevationFileOm.exists() && domain != .msm_upper_level {
+            let messages = try await curl.downloadGrib(url: "\(server)\(filesToDownload.first!)", bzip2Decode: false)
+            guard let sp = try messages.first(where: {$0.get(attribute: "shortName") == "sp"})?.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true),
+                  let prmsl = try messages.first(where: {$0.get(attribute: "shortName") == "prmsl"})?.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true),
+                  let t2m = try messages.first(where: {$0.get(attribute: "shortName") == "2t" || ($0.get(attribute: "shortName") == "t" && $0.getLong(attribute: "level") == 2)})?.to2D(nx: domain.grid.nx, ny: domain.grid.ny, shift180LongitudeAndFlipLatitudeIfRequired: true)
+            else {
+                fatalError("missing variable in grib file")
+            }
+            let elevation = zip(sp.array.data, zip(prmsl.array.data, t2m.array.data)).map {
+                Meteorology.elevation(sealevelPressure: $1.0 / 100, surfacePressure: $0 / 100, temperature_2m: $1.1 - 273.15)
+            }
+            try domain.surfaceElevationFileOm.createDirectory()
+            try elevation.writeOmFile2D(file: domain.surfaceElevationFileOm.getFilePath(), grid: domain.grid, createNetCdf: createNetCdf)
         }
 
         /// Keep values from previous timestep. Actori isolated, because of concurrent data conversion
