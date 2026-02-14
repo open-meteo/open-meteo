@@ -30,6 +30,10 @@ struct DwdSisDownloader: AsyncCommand {
         let logger = context.application.logger
         let domain = try DwdSisDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
+        
+        /// Cronjob every 10 minutes. Make sure there is no overlap.
+        Process.alarm(seconds: 10*60)
+        defer { Process.alarm(seconds: 0) }
 
         let timestampFile = "\(domain.downloadDirectory)last.txt"
         let firstAvailableTimeStep = Timestamp.now().subtract(hours: 1).floor(toNearestHour: 1)
