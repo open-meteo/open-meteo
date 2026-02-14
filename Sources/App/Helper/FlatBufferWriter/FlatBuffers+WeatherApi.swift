@@ -1120,6 +1120,9 @@ extension MultiDomains {
             return .ncepHgefs025EnsembleMean
         case .ncep_aigefs025_ensemble_mean:
             return .ncepAigefs025
+        case .dwd_sis_europe_africa_v4:
+            // TODO register domain in SDK
+            return .iconD2
         }
     }
 }

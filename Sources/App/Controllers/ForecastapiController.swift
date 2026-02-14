@@ -703,6 +703,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
     case ecmwf_ifs025
@@ -847,6 +848,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return (GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
         case .ncep_aigefs025_ensemble_mean:
             return (GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+        case .dwd_sis_europe_africa_v4:
+            return (DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
         default:
             return nil
         }
@@ -1475,6 +1478,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return []
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
             return []
+        case .dwd_sis_europe_africa_v4:
+            return []
         }
     }
 
@@ -1728,6 +1733,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
             return nil
+        case .dwd_sis_europe_africa_v4:
+            return nil
         }
     }
 
@@ -1977,6 +1984,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
+            return nil
+        case .dwd_sis_europe_africa_v4:
             return nil
         }
     }
