@@ -22,7 +22,7 @@ struct DwdSisDownloader: AsyncCommand {
     }
 
     var help: String {
-        "Download Jaxa Himawari satellite data download"
+        "Download DWD satellite radiation data"
     }
 
     func run(using context: CommandContext, signature: Signature) async throws {
@@ -37,7 +37,7 @@ struct DwdSisDownloader: AsyncCommand {
 
         let timestampFile = "\(domain.downloadDirectory)last.txt"
         let firstAvailableTimeStep = Timestamp.now().subtract(hours: 1).floor(toNearestHour: 1)
-        let endTime = Timestamp.now().subtract(minutes: 20).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
+        let endTime = Timestamp.now().subtract(minutes: 10).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
         let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
         let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
         guard startTime <= endTime else {
