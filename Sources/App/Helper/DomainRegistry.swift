@@ -80,6 +80,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_d2_eps
     case dwd_ewam
     case dwd_gwam
+    case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs
     case ecmwf_ifs04
@@ -460,6 +461,8 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfSeasDomain.seas5_daily_ensemble_mean
         case .ecmwf_ec46_ensemble_mean:
             return EcmwfSeasDomain.ec46_ensemble_mean
+        case .dwd_sis_europe_africa_v4:
+            return DwdSisDomain.europe_africa_v4
         }
     }
 }
