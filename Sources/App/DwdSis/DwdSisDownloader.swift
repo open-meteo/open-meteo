@@ -186,8 +186,8 @@ enum DwdSisDomain: String, CaseIterable, GenericDomain {
     }
     
     var omFileLength: Int {
-        // one day per file
-        return 6*24
+        // two days of 10 minutely data per file
+        return 2*6*24
     }
     
     var countEnsembleMember: Int {
