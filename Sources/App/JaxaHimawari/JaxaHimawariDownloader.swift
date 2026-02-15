@@ -95,12 +95,16 @@ struct JaxaHimawariDownload: AsyncCommand {
             downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
             lastTimestampFile = timestampFile
         }
+        if signature.run == nil && signature.timeinterval == nil {
+            /// Cronjob every 10 minutes. Make sure there is no overlap.
+            Process.alarm(seconds: 10*60)
+        }
         logger.info("Downloading range \(downloadRange.prettyString())")
         let handles = try await downloadRange.enumerated().asyncFlatMap { i, run in
             // If the first step is missing, download the previous one to allow interpolation
             let h = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
             if i == 0 && h.isEmpty && downloadRange.count > 1 {
-                logger.info("Fist step missing, download previoud step for interpolation")
+                logger.info("Fist step missing, download previous step for interpolation")
                 return try await downloadRun(application: context.application, run: run.add(-1 * domain.dtSeconds), domain: domain, variables: variables, downloader: downloader)
             }
             return h
@@ -109,6 +113,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
+        Process.alarm(seconds: 0)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
