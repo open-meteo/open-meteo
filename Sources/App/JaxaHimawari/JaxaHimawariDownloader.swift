@@ -21,6 +21,9 @@ struct JaxaHimawariDownload: AsyncCommand {
 
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
+        
+        @Flag(name: "no-timeout")
+        var noTimeout: Bool
 
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -95,7 +98,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
             lastTimestampFile = timestampFile
         }
-        if signature.run == nil && signature.timeinterval == nil {
+        if signature.run == nil && signature.timeinterval == nil && signature.noTimeout == false {
             /// Cronjob every 10 minutes. Make sure there is no overlap. Minus 5 seconds to prevent race conditions
             Process.alarm(seconds: 10*60 - 5)
         }
