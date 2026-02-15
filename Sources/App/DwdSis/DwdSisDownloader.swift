@@ -31,10 +31,8 @@ struct DwdSisDownloader: AsyncCommand {
         let domain = try DwdSisDomain.load(rawValue: signature.domain)
         let nConcurrent = signature.concurrent ?? 1
         
-        /// Cronjob every 10 minutes. Make sure there is no overlap.
-        Process.alarm(seconds: 10*60)
-        defer { Process.alarm(seconds: 0) }
-
+        /// Cronjob every 10 minutes. Make sure there is no overlap. Minus 5 seconds to prevent race conditions
+        Process.alarm(seconds: 10*60 - 5)
         let timestampFile = "\(domain.downloadDirectory)last.txt"
         let firstAvailableTimeStep = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds)
         let endTime = Timestamp.now().subtract(minutes: 10).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
@@ -53,6 +51,7 @@ struct DwdSisDownloader: AsyncCommand {
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
         let last = downloadRange.range.upperBound.subtract(seconds: domain.dtSeconds)
         try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
+        Process.alarm(seconds: 0)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     

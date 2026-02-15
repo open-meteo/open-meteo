@@ -56,6 +56,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case sensible_heat_flux
     case shortwave_radiation
     case shortwave_radiation_instant
+    case shortwave_radiation_clear_sky_instant
     case showers
     case skin_temperature
     case snow_density
@@ -773,6 +774,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             })
         case .shortwave_radiation_instant:
             guard let radiation = getDeriverMap(variable: .shortwave_radiation) else {
+                return nil
+            }
+            return .one(.mapped(radiation)) { sw, time in
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
+                return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+            }
+        case .shortwave_radiation_clear_sky_instant:
+            guard let radiation = getDeriverMap(variable: .shortwave_radiation_clear_sky) else {
                 return nil
             }
             return .one(.mapped(radiation)) { sw, time in

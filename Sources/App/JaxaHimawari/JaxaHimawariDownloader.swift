@@ -96,8 +96,8 @@ struct JaxaHimawariDownload: AsyncCommand {
             lastTimestampFile = timestampFile
         }
         if signature.run == nil && signature.timeinterval == nil {
-            /// Cronjob every 10 minutes. Make sure there is no overlap.
-            Process.alarm(seconds: 10*60)
+            /// Cronjob every 10 minutes. Make sure there is no overlap. Minus 5 seconds to prevent race conditions
+            Process.alarm(seconds: 10*60 - 5)
         }
         logger.info("Downloading range \(downloadRange.prettyString())")
         let handles = try await downloadRange.enumerated().asyncFlatMap { i, run in

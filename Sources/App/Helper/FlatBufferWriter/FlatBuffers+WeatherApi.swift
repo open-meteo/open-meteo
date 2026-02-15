@@ -574,6 +574,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .wavePeriod, aggregation: .spread)
         case .wave_peak_period_spread:
             return .init(variable: .wavePeakPeriod, aggregation: .spread)
+        case .shortwave_radiation_clear_sky_instant:
+            // TODO: register in sdk shortwave_radiation_clear_sky_instant
+            return .init(variable: .shortwaveRadiationClearSky)
         }
     }
 }
