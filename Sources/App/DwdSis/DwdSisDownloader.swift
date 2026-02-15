@@ -36,10 +36,10 @@ struct DwdSisDownloader: AsyncCommand {
         defer { Process.alarm(seconds: 0) }
 
         let timestampFile = "\(domain.downloadDirectory)last.txt"
-        let firstAvailableTimeStep = Timestamp.now().subtract(hours: 1).floor(toNearestHour: 1)
+        let firstAvailableTimeStep = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds)
         let endTime = Timestamp.now().subtract(minutes: 10).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
         let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
-        let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
+        let startTime = max(lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep, firstAvailableTimeStep)
         guard startTime <= endTime else {
             logger.info("All steps already downloaded")
             return
