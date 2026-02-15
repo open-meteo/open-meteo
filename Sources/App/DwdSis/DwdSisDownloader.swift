@@ -50,10 +50,9 @@ struct DwdSisDownloader: AsyncCommand {
         let handles = try await downloadRange.enumerated().asyncFlatMap { i, run -> [GenericVariableHandle] in
             return try await downloadRun(application: context.application, run: run, domain: domain)
         }
-        if let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound {
-            try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
-            try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
-        }
+        try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        let last = downloadRange.range.upperBound.subtract(seconds: domain.dtSeconds)
+        try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
     
@@ -61,6 +60,11 @@ struct DwdSisDownloader: AsyncCommand {
         let logger = application.logger
         let curl = Curl(logger: application.logger, client: application.dedicatedHttpClient)
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
+        /// We add 10 minutes to the downloaded timestamp. We use backwards averaged values while `run` refers to scan start time
+        /// E.g. The 10:00 run contains values for Europe at around 10:08. We project data for an average value between 10:00 and 10:10.
+        /// The final values is then stored in the 10:10 step.
+        let time = run.add(domain.dtSeconds)
+        let timerange = TimerangeDt(start: time, nTime: 1, dtSeconds: domain.dtSeconds)
         
         /// MTG FCI image scans are performed from South to North. Scan time is around 9 minutes 30 seconds
         /// Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 8 minutes.
@@ -75,7 +79,8 @@ struct DwdSisDownloader: AsyncCommand {
         let timeDifference: [Double] = (0..<3201 * 4121).map {
             let line = $0 / 3201
             let lineFraction = Double(line) / (4121-1)
-            return (3*60 + lineFraction * sweepTimeOfLimitedLatitudeRangeSeconds) / 3600
+            /// subtract from 10 minutes, because we project data forwards
+            return (10*60 - 3*60 - lineFraction * sweepTimeOfLimitedLatitudeRangeSeconds) / 3600
         }
         
         let sisFile = "https://opendata.dwd.de/weather/satellite/radiation/sis/SISin\(run.format_YYYYMMddHHmm)EAv4.nc"
@@ -103,7 +108,6 @@ struct DwdSisDownloader: AsyncCommand {
         // Transform instant solar radiation values to backwards averaged values
         // Instant values have a scan time difference which needs to be corrected for
         let start = DispatchTime.now()
-        let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
         Zensun.instantaneousSolarRadiationToBackwardsAverages(
             timeOrientedData: &sis,
             grid: domain.grid,
@@ -133,21 +137,21 @@ struct DwdSisDownloader: AsyncCommand {
         return [
             try await GenericVariableHandle(
                 variable: DwdSisVariable.shortwave_radiation,
-                time: run,
+                time: time,
                 member: 0,
                 fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: sis),
                 domain: domain
             ),
             try await GenericVariableHandle(
                 variable: DwdSisVariable.shortwave_radiation_clear_sky,
-                time: run,
+                time: time,
                 member: 0,
                 fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: sisc),
                 domain: domain
             ),
             try await GenericVariableHandle(
                 variable: DwdSisVariable.direct_radiation,
-                time: run,
+                time: time,
                 member: 0,
                 fn: writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: 1, all: sid),
                 domain: domain
