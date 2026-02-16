@@ -79,7 +79,7 @@ struct DwdSisDownloader: AsyncCommand {
             let line = $0 / 3201
             let lineFraction = Double(line) / (4121-1)
             /// subtract from 10 minutes, because we project data forwards
-            return (10*60 - 3*60 - lineFraction * sweepTimeOfLimitedLatitudeRangeSeconds) / 3600
+            return (-10*60 + 3*60 + lineFraction * sweepTimeOfLimitedLatitudeRangeSeconds) / 3600
         }
         
         let sisFile = "https://opendata.dwd.de/weather/satellite/radiation/sis/SISin\(run.format_YYYYMMddHHmm)EAv4.nc"
