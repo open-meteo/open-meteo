@@ -61,6 +61,7 @@ Apps:
 - [OSS Weather](https://github.com/Akylas/oss-weather) - Multi-model/multi-provider Open Source Android/iOS Weather app
 - [Overmorrow](https://github.com/bmaroti9/Overmorrow) A modern material design Android weather app.
 - [PointWx](https://hh.guidocioni.it/pointwx/) Dash application with interactive plots (from beginner-friendly to weather-enthusiast level) easily deployable
+- [Precip] (https://precip.ai) Hyperlocal weather history and forecast app for Android, iOS, and Web.
 - [QuickWeather](https://github.com/TylerWilliamson/QuickWeather) Fast, free, and open source Android app
 - [Rain](https://github.com/DarkMooNight/Rain) Free, open source, beautiful, minimal and fast weather app
 - [Raindrop](https://github.com/metalfoxdev/Raindrop) Simple and intuitive weather app for the linux terminal.
