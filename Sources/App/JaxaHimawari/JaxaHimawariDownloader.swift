@@ -87,7 +87,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             lastTimestampFile = nil
         } else {
             let timestampFile = "\(domain.downloadDirectory)last.txt"
-            let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
+            let firstAvailableTimeStep = Timestamp.now().subtract(minutes: signature.noTimeout ? 360 : 30).floor(toNearest: domain.dtSeconds)
             let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
             let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
             let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
@@ -227,7 +227,7 @@ fileprivate struct JaxaFtpDownloader {
 
     public init(username: String, password: String) {
         self.auth = "\(username):\(password)"
-        self.ftp = .init()
+        self.ftp = .init(resourceTimeout: 120, retryDelaySeconds: 1, retryDelay404Seconds: 1)
     }
 
     public func get(logger: Logger, path: String) async throws -> Data? {
