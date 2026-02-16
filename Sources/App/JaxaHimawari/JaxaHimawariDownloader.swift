@@ -112,7 +112,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             }
             return h
         }
-        if let lastTimestampFile, let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound {
+        if let lastTimestampFile, let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.subtract(seconds: domain.dtSeconds) {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
@@ -139,7 +139,8 @@ struct JaxaHimawariDownload: AsyncCommand {
                 let data = try await downloader.get(logger: logger, path: path)
                 try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
             }
-            timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")!.data.map(Double.init)
+            // Subtract 10 minutes because we forward project data
+            timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")!.data.map({Double($0) - Double(domain.dtSeconds) / 3600})
         case .mtg_fci_10min:
             /// MTG FCI image scans are performed from South to North. Scan time is around 9 minutes 30 seconds
             /// Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 8 minutes.
@@ -149,7 +150,8 @@ struct JaxaHimawariDownload: AsyncCommand {
             timeDifference = (0..<2801 * 2401).map {
                 let line = $0 / 2801
                 let lineFraction = Double(line) / (2401-1)
-                return (15 + lineFraction * (9.5*60) ) / 3600
+                // Subtract 10 minutes because we forward project data
+                return (15 + lineFraction * (9.5*60) - Double(domain.dtSeconds)) / 3600
             }
         }
 
@@ -178,12 +180,16 @@ struct JaxaHimawariDownload: AsyncCommand {
                     logger.warning("warning: Could not open variable SWR. Skipping")
                     return nil
                 }
+                /// We add 10 minutes to the downloaded timestamp. We use backwards averaged values while `run` refers to scan start time
+                /// E.g. The 10:00 run contains values for Japan at around 10:08. We project data for an average value between 10:00 and 10:10.
+                /// The final values is then stored in the 10:10 step.
+                let time = run.add(domain.dtSeconds)
 
                 // Transform instant solar radiation values to backwards averaged values
                 // Instant values have a scan time difference which needs to be corrected for
                 if variable == .shortwave_radiation {
                     let start = DispatchTime.now()
-                    let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+                    let timerange = TimerangeDt(start: time, nTime: 1, dtSeconds: domain.dtSeconds)
                     Zensun.instantaneousSolarRadiationToBackwardsAverages(
                         timeOrientedData: &sw.data,
                         grid: domain.grid,
@@ -199,7 +205,7 @@ struct JaxaHimawariDownload: AsyncCommand {
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
                 return try await GenericVariableHandle(
                     variable: variable,
-                    time: run,
+                    time: time,
                     member: 0,
                     fn: fn,
                     domain: domain

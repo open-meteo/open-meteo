@@ -82,7 +82,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let handles = try await downloadRange.asyncFlatMap { run in
             try await downloadRun(application: context.application, run: run, domain: domain, username: username, password: password)
         }
-        if let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound {
+        if let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.subtract(seconds: domain.dtSeconds) {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
@@ -121,9 +121,10 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         /// SEVIRI image scans are performed from South to North. Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 12 minutes.
         /// OpenMeteo grids are ordered South to North, therefore the scan time should increase with the line number
         /// Europe is at scan line 2570 => (760-(3201-2570)/5) = 633 seconds
+        /// Subtract dtSeconds because we forward project data
         let scanTimeDifferenceHours = (0..<3201 * 3201).map {
             let line = $0 / 3201
-            return (760 - Double(3201 - line) / 5) / 3600
+            return (760 - Double(3201 - line) / 5 - Double(domain.dtSeconds)) / 3600
         }
 
         guard let nc = try NetCDF.open(memory: data) else {
@@ -155,8 +156,13 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         }
         diffuse_fraction.flipLatitude(nt: 1, ny: ny, nx: nx)
 
+        /// We add 15 minutes to the downloaded timestamp. We use backwards averaged values while `run` refers to scan start time
+        /// E.g. The 10:00 run contains values for Europe at around 10:15. We project data for an average value between 10:00 and 10:15.
+        /// The final values is then stored in the 10:15 step.
+        let time = run.add(domain.dtSeconds)
+        
         let start = DispatchTime.now()
-        let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+        let timerange = TimerangeDt(start: time, nTime: 1, dtSeconds: domain.dtSeconds)
         Zensun.instantaneousSolarRadiationToBackwardsAverages(
             timeOrientedData: &shortwave_radiation,
             grid: domain.grid,
@@ -174,14 +180,14 @@ struct EumetsatLsaSafDownload: AsyncCommand {
         let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
         let sw = try await GenericVariableHandle(
             variable: EumetsatLsaSafVariable.shortwave_radiation,
-            time: run,
+            time: time,
             member: 0,
             fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: EumetsatLsaSafVariable.shortwave_radiation.scalefactor, all: shortwave_radiation),
             domain: domain
         )
         let direct = try await GenericVariableHandle(
             variable: EumetsatLsaSafVariable.direct_radiation,
-            time: run,
+            time: time,
             member: 0,
             fn: try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: EumetsatLsaSafVariable.direct_radiation.scalefactor, all: direct_radiation),
             domain: domain
