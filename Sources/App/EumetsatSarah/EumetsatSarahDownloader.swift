@@ -123,6 +123,7 @@ struct EumetsatSarahDownload: AsyncCommand {
             if variable == .direct_radiation || variable == .shortwave_radiation {
                 let start = DispatchTime.now()
                 let timerange = TimerangeDt(start: run, nTime: time.count, dtSeconds: domain.dtSeconds)
+                // Note: `timeDifference` is negative. Therefore we do not need to forward project timestamps
                 Zensun.instantaneousSolarRadiationToBackwardsAverages(
                     timeOrientedData: &dataFastTime,
                     grid: domain.grid,
