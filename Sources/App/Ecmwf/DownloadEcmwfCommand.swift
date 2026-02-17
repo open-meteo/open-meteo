@@ -285,6 +285,15 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
                     }
                     
+                    // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
+                    if ["sd", "rsn"].contains(shortName) {
+                        await inMemory.set(variable: variable, timestamp: timestamp, member: member, data: grib2d.array)
+                        try await inMemory.calculateSnowDepth(density: .snow_depth, waterEquivalent: .snow_depth_water_equivalent, outVariable: EcmwfVariable.snow_depth, writer: writer)
+                        if variable == .snow_depth {
+                            return
+                        }
+                    }
+                    
                     // Calculate geometric vertical velocity
                     if ["t", "w"].contains(shortName) {
                         let level = Float(levelhPa)
