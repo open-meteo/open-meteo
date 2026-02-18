@@ -472,7 +472,7 @@ extension GenericDomain {
     }
 }
 
-extension VariableHourlyDeriver {
+extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariable {
     func makeDailyAggregator(allowMinMaxTwoAggregations: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
         return .init(reader: self, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
     }
