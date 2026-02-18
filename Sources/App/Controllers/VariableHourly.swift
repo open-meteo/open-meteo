@@ -670,6 +670,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let direct = zip(swrad.data, diffuse).map(-)
                 return DataAndUnit(direct, .wattPerSquareMetre)
             }
+        case .sunshine_duration:
+            guard let directRadiation = getDeriverMap(variable: .direct_radiation) else {
+                return nil
+            }
+            return .one(.mapped(directRadiation)) { dhi, time in
+                let sunshine = Zensun.calculateBackwardsSunshineDuration(directRadiation: dhi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                return DataAndUnit(sunshine, .wattPerSquareMetre)
+            }
         case .surface_pressure:
             guard
                 let temperature = Reader.variableFromString("temperature_2m"),
