@@ -703,6 +703,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case dwd_icon_eu
     case dwd_icon_d2
     case dwd_icon_d2_15min
+    case dwd_sis_europe_africa_v4
 
     case ecmwf_ifs04
     case ecmwf_ifs025
@@ -847,6 +848,16 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return (GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
         case .ncep_aigefs025_ensemble_mean:
             return (GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+        case .dwd_sis_europe_africa_v4:
+            return (DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
+        case .eumetsat_sarah3:
+            return (EumetsatSarahDomain.sarah3_30min, EumetsatSarahVariable.self)
+        case .jma_jaxa_mtg_fci:
+            return (JaxaHimawariDomain.mtg_fci_10min, JaxaHimawariVariable.self)
+        case .eumetsat_lsa_saf_msg:
+            return (EumetsatLsaSafDomain.msg, EumetsatLsaSafVariable.self)
+        case .eumetsat_lsa_saf_iodc:
+            return (EumetsatLsaSafDomain.iodc, EumetsatLsaSafVariable.self)
         default:
             return nil
         }
@@ -994,6 +1005,29 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return (nil, nil, nil, nil)
             }
             return (nil, GenericReaderMulti<ForecastVariableDaily>(reader: [reader]), nil, nil)
+            
+        case .satellite_radiation_seamless:
+            if (-20..<60).contains(lon) { // DWD MTG on 0°
+                return try await DwdSisDomain.europe_africa_v4.makeGenericHourlyDaily(variableType: DwdSisVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            }
+            if (-60..<50).contains(lon) { // MSG on 0°
+                return try await EumetsatLsaSafDomain.msg.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            }
+            if (50..<90).contains(lon) { // IODC on 41.5°
+                return try await EumetsatLsaSafDomain.iodc.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            }
+            if (90...).contains(lon) { // Himawari on 140°
+                let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let reader70e = try await JaxaHimawariDomain.himawari_70e_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, reader70e].compactMap({$0}))
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            }
+            return (nil, nil, nil, nil)
+        case .jma_jaxa_himawari:
+            let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+              let redaer70e = try await JaxaHimawariDomain.himawari_70e_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, redaer70e].compactMap({$0}))
+            return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             
 //        case .ncep_hgefs025_ensemble_mean:
 //            return try await GfsGraphCastDomain.hgefs025_ensemble_mean.makeGenericHourlyDaily(variableType: VariableOrSpread<GfsGraphCastVariable>.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1306,37 +1340,17 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ncep_nbm_conus:
             return try await NbmReader(domains: [.nbm_conus], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .eumetsat_sarah3:
-            let sarah3 = try await EumetsatSarahReader(domain: EumetsatSarahDomain.sarah3_30min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sarah3].compactMap({ $0 })
+            return [] // migrated to upper level
         case .jma_jaxa_himawari:
-            return [
-                try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_70e_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            ].compactMap({ $0 })
+            return [] // migrated to upper level
         case .jma_jaxa_mtg_fci:
-            let sat = try await JaxaHimawariReader(domain: JaxaHimawariDomain.mtg_fci_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({ $0 })
+            return [] // migrated to upper level
         case .eumetsat_lsa_saf_msg:
-            let sat = try await EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({ $0 })
+            return [] // migrated to upper level
         case .eumetsat_lsa_saf_iodc:
-            let sat = try await EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [sat].compactMap({ $0 })
+            return [] // migrated to upper level
         case .satellite_radiation_seamless:
-            if (-60..<50).contains(lon) { // MSG on 0°
-                return [try await EumetsatLsaSafReader(domain: .msg, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
-            }
-            if (50..<90).contains(lon) { // IODC on 41.5°
-                return [try await EumetsatLsaSafReader(domain: .iodc, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)].compactMap({ $0 })
-            }
-            if (90...).contains(lon) { // Himawari on 140°
-                return [
-                    try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_70e_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options),
-                    try await JaxaHimawariReader(domain: JaxaHimawariDomain.himawari_10min, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                ].compactMap({ $0 })
-            }
-            // TODO GOES east + west
-            return []
+            return [] // migrated to upper level
         case .kma_seamless:
             let ldps = try await KmaReader(domain: .ldps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let gdps = try await KmaReader(domain: .gdps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1474,6 +1488,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return []
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
+            return []
+        case .dwd_sis_europe_africa_v4:
             return []
         }
     }
@@ -1629,15 +1645,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .satellite_radiation_seamless:
             return nil
         case .eumetsat_sarah3:
-            return EumetsatSarahDomain.sarah3_30min
+            return nil
         case .eumetsat_lsa_saf_msg:
-            return EumetsatLsaSafDomain.msg
+            return nil
         case .eumetsat_lsa_saf_iodc:
-            return EumetsatLsaSafDomain.iodc
+            return nil
         case .jma_jaxa_himawari:
-            return JaxaHimawariDomain.himawari_10min
+            return nil
         case .jma_jaxa_mtg_fci:
-            return JaxaHimawariDomain.mtg_fci_10min
+            return nil
         case .kma_seamless:
             return nil
         case .kma_gdps:
@@ -1727,6 +1743,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
+            return nil
+        case .dwd_sis_europe_africa_v4:
             return nil
         }
     }
@@ -1877,15 +1895,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .satellite_radiation_seamless:
             return nil
         case .eumetsat_sarah3:
-            return try await EumetsatSarahReader(domain: .sarah3_30min, gridpoint: gridpoint, options: options)
+            return nil
         case .eumetsat_lsa_saf_msg:
-            return try await EumetsatLsaSafReader(domain: .msg, gridpoint: gridpoint, options: options)
+            return nil
         case .eumetsat_lsa_saf_iodc:
-            return try await EumetsatLsaSafReader(domain: .iodc, gridpoint: gridpoint, options: options)
+            return nil
         case .jma_jaxa_himawari:
-            return try await JaxaHimawariReader(domain: .himawari_10min, gridpoint: gridpoint, options: options)
+            return nil
         case .jma_jaxa_mtg_fci:
-            return try await JaxaHimawariReader(domain: .mtg_fci_10min, gridpoint: gridpoint, options: options)
+            return nil
         case .kma_seamless:
             return nil
         case .kma_gdps:
@@ -1977,6 +1995,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .CMCC_CM2_VHR4, .FGOALS_f3_H, .HiRAM_SIT_HR, .MRI_AGCM3_2_S, .EC_Earth3P_HR, .MPI_ESM1_2_XR, .NICAM16_8S:
             return nil
         case .flood_best_match, .seamless_v3, .forecast_v3, .consolidated_v3, .seamless_v4, .forecast_v4, .consolidated_v4:
+            return nil
+        case .dwd_sis_europe_africa_v4:
             return nil
         }
     }

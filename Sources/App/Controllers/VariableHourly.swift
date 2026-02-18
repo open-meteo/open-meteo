@@ -56,6 +56,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case sensible_heat_flux
     case shortwave_radiation
     case shortwave_radiation_instant
+    case shortwave_radiation_clear_sky_instant
     case showers
     case skin_temperature
     case snow_density
@@ -471,7 +472,7 @@ extension GenericDomain {
     }
 }
 
-extension VariableHourlyDeriver {
+extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariable {
     func makeDailyAggregator(allowMinMaxTwoAggregations: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
         return .init(reader: self, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
     }
@@ -669,6 +670,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let direct = zip(swrad.data, diffuse).map(-)
                 return DataAndUnit(direct, .wattPerSquareMetre)
             }
+        case .sunshine_duration:
+            guard let directRadiation = getDeriverMap(variable: .direct_radiation) else {
+                return nil
+            }
+            return .one(.mapped(directRadiation)) { dhi, time in
+                let sunshine = Zensun.calculateBackwardsSunshineDuration(directRadiation: dhi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
+                return DataAndUnit(sunshine, .seconds)
+            }
         case .surface_pressure:
             guard
                 let temperature = Reader.variableFromString("temperature_2m"),
@@ -773,6 +782,14 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             })
         case .shortwave_radiation_instant:
             guard let radiation = getDeriverMap(variable: .shortwave_radiation) else {
+                return nil
+            }
+            return .one(.mapped(radiation)) { sw, time in
+                let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
+                return DataAndUnit(zip(sw.data, factor).map(*), sw.unit)
+            }
+        case .shortwave_radiation_clear_sky_instant:
+            guard let radiation = getDeriverMap(variable: .shortwave_radiation_clear_sky) else {
                 return nil
             }
             return .one(.mapped(radiation)) { sw, time in

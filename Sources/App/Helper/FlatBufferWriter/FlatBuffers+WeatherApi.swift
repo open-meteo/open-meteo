@@ -574,6 +574,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .wavePeriod, aggregation: .spread)
         case .wave_peak_period_spread:
             return .init(variable: .wavePeakPeriod, aggregation: .spread)
+        case .shortwave_radiation_clear_sky_instant:
+            // TODO: register in sdk shortwave_radiation_clear_sky_instant
+            return .init(variable: .shortwaveRadiationClearSky)
         }
     }
 }
@@ -1120,6 +1123,9 @@ extension MultiDomains {
             return .ncepHgefs025EnsembleMean
         case .ncep_aigefs025_ensemble_mean:
             return .ncepAigefs025
+        case .dwd_sis_europe_africa_v4:
+            // TODO register domain in SDK
+            return .iconD2
         }
     }
 }

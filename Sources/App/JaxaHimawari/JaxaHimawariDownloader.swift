@@ -21,6 +21,9 @@ struct JaxaHimawariDownload: AsyncCommand {
 
         @Flag(name: "create-netcdf")
         var createNetcdf: Bool
+        
+        @Flag(name: "no-timeout")
+        var noTimeout: Bool
 
         @Option(name: "only-variables")
         var onlyVariables: String?
@@ -84,7 +87,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             lastTimestampFile = nil
         } else {
             let timestampFile = "\(domain.downloadDirectory)last.txt"
-            let firstAvailableTimeStep = Timestamp.now().subtract(hours: 6).floor(toNearestHour: 1)
+            let firstAvailableTimeStep = Timestamp.now().subtract(minutes: signature.noTimeout ? 360 : 30).floor(toNearest: domain.dtSeconds)
             let endTime = Timestamp.now().subtract(minutes: 30).floor(toNearest: domain.dtSeconds).add(domain.dtSeconds)
             let lastDownloadedTimeStep = ((try? String(contentsOfFile: timestampFile, encoding: .utf8))?.toTimestamp())
             let startTime = lastDownloadedTimeStep?.add(domain.dtSeconds) ?? firstAvailableTimeStep
@@ -95,20 +98,25 @@ struct JaxaHimawariDownload: AsyncCommand {
             downloadRange = TimerangeDt(range: startTime ..< endTime, dtSeconds: domain.dtSeconds)
             lastTimestampFile = timestampFile
         }
+        if signature.run == nil && signature.timeinterval == nil && signature.noTimeout == false {
+            /// Cronjob every 10 minutes. Make sure there is no overlap. Minus 5 seconds to prevent race conditions
+            Process.alarm(seconds: 10*60 - 5)
+        }
         logger.info("Downloading range \(downloadRange.prettyString())")
         let handles = try await downloadRange.enumerated().asyncFlatMap { i, run in
             // If the first step is missing, download the previous one to allow interpolation
             let h = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
             if i == 0 && h.isEmpty && downloadRange.count > 1 {
-                logger.info("Fist step missing, download previoud step for interpolation")
+                logger.info("Fist step missing, download previous step for interpolation")
                 return try await downloadRun(application: context.application, run: run.add(-1 * domain.dtSeconds), domain: domain, variables: variables, downloader: downloader)
             }
             return h
         }
-        if let lastTimestampFile, let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound {
+        if let lastTimestampFile, let last = handles.max(by: { $0.time.range.lowerBound < $1.time.range.lowerBound })?.time.range.lowerBound.subtract(seconds: domain.dtSeconds) {
             try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
             try "\(last.timeIntervalSince1970)".write(toFile: lastTimestampFile, atomically: true, encoding: .utf8)
         }
+        Process.alarm(seconds: 0)
         try await GenericVariableHandle.convert(logger: logger, domain: domain, createNetcdf: signature.createNetcdf, run: nil, handles: handles, concurrent: nConcurrent, writeUpdateJson: true, uploadS3Bucket: signature.uploadS3Bucket, uploadS3OnlyProbabilities: false)
     }
 
@@ -131,7 +139,8 @@ struct JaxaHimawariDownload: AsyncCommand {
                 let data = try await downloader.get(logger: logger, path: path)
                 try data?.write(to: URL(fileURLWithPath: metaDataFile), options: .atomic)
             }
-            timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")!.data.map(Double.init)
+            // Subtract 10 minutes because we forward project data
+            timeDifference = try Data(contentsOf: URL(fileURLWithPath: metaDataFile)).readNetcdf(name: "Hour")!.data.map({Double($0) - Double(domain.dtSeconds) / 3600})
         case .mtg_fci_10min:
             /// MTG FCI image scans are performed from South to North. Scan time is around 9 minutes 30 seconds
             /// Hence in Northern Europe the line acquisition time deviates from the slot time by approximately 8 minutes.
@@ -141,7 +150,8 @@ struct JaxaHimawariDownload: AsyncCommand {
             timeDifference = (0..<2801 * 2401).map {
                 let line = $0 / 2801
                 let lineFraction = Double(line) / (2401-1)
-                return (15 + lineFraction * (9.5*60) ) / 3600
+                // Subtract 10 minutes because we forward project data
+                return (15 + lineFraction * (9.5*60) - Double(domain.dtSeconds)) / 3600
             }
         }
 
@@ -170,12 +180,16 @@ struct JaxaHimawariDownload: AsyncCommand {
                     logger.warning("warning: Could not open variable SWR. Skipping")
                     return nil
                 }
+                /// We add 10 minutes to the downloaded timestamp. We use backwards averaged values while `run` refers to scan start time
+                /// E.g. The 10:00 run contains values for Japan at around 10:08. We project data for an average value between 10:00 and 10:10.
+                /// The final values is then stored in the 10:10 step.
+                let time = run.add(domain.dtSeconds)
 
                 // Transform instant solar radiation values to backwards averaged values
                 // Instant values have a scan time difference which needs to be corrected for
                 if variable == .shortwave_radiation {
                     let start = DispatchTime.now()
-                    let timerange = TimerangeDt(start: run, nTime: 1, dtSeconds: domain.dtSeconds)
+                    let timerange = TimerangeDt(start: time, nTime: 1, dtSeconds: domain.dtSeconds)
                     Zensun.instantaneousSolarRadiationToBackwardsAverages(
                         timeOrientedData: &sw.data,
                         grid: domain.grid,
@@ -191,7 +205,7 @@ struct JaxaHimawariDownload: AsyncCommand {
                 let fn = try writer.writeTemporary(compressionType: .pfor_delta2d_int16, scalefactor: variable.scalefactor, all: sw.data)
                 return try await GenericVariableHandle(
                     variable: variable,
-                    time: run,
+                    time: time,
                     member: 0,
                     fn: fn,
                     domain: domain
@@ -213,7 +227,7 @@ fileprivate struct JaxaFtpDownloader {
 
     public init(username: String, password: String) {
         self.auth = "\(username):\(password)"
-        self.ftp = .init()
+        self.ftp = .init(resourceTimeout: 120, retryDelaySeconds: 1, retryDelay404Seconds: 1)
     }
 
     public func get(logger: Logger, path: String) async throws -> Data? {
