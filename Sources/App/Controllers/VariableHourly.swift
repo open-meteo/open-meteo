@@ -676,7 +676,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             return .one(.mapped(directRadiation)) { dhi, time in
                 let sunshine = Zensun.calculateBackwardsSunshineDuration(directRadiation: dhi.data, latitude: reader.modelLat, longitude: reader.modelLon, timerange: time.time)
-                return DataAndUnit(sunshine, .wattPerSquareMetre)
+                return DataAndUnit(sunshine, .seconds)
             }
         case .surface_pressure:
             guard
