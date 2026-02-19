@@ -28,8 +28,12 @@ actor OmSpatialTimestepWriter {
     var fn: FileHandle?
     let storeOnDisk: Bool
     
+    /// Separate ensemble mean+spread calculator and writer. Data is automatically ingested on write() call
+    /// AWS upload and finalise also process ensemble mean
+    let ensembleMean: (writer: OmSpatialTimestepWriter, calculator: EnsembleMeanCalculator)?
+    
     struct VariableWithOffset {
-        let variable: GenericVariable
+        let variable: any GenericVariable
         let member: Int
         let writer: OmFileWriterArray<Float, FileHandle>
         
@@ -40,7 +44,7 @@ actor OmSpatialTimestepWriter {
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?) {
+    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, ensembleMeanDomain: GenericDomain? = nil) {
         self.writer = nil
         self.domain = domain
         self.run = run
@@ -48,6 +52,9 @@ actor OmSpatialTimestepWriter {
         self.realm = realm
         self.storeOnDisk = storeOnDisk
         self.fn = nil
+        self.ensembleMean = ensembleMeanDomain.map { ens in
+            (OmSpatialTimestepWriter(domain: ens, run: run, time: time, storeOnDisk: true, realm: nil), EnsembleMeanCalculator())
+        }
     }
     
     var variableString: [String] {
@@ -88,12 +95,12 @@ actor OmSpatialTimestepWriter {
         return writer
     }
     
-    func contains(member: Int, variable: GenericVariable) -> Bool {
+    func contains(member: Int, variable: any GenericVariable) -> Bool {
         return variables.contains(where: { "\($0.variable)" == "\(variable)" && $0.member == member})
     }
     
     /// Write a single variable to the file
-    func write(member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
+    func write(member: Int, variable: any GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
         if contains(member: member, variable: variable) {
             return
         }
@@ -117,6 +124,8 @@ actor OmSpatialTimestepWriter {
         )
         try arrayWriter.writeData(array: data)
         self.variables.append(VariableWithOffset(variable: variable, member: member, writer: arrayWriter))
+        
+        await ensembleMean?.calculator.ingest(variable: variable, spreadVariable: variable.asSpreadVariableGeneric, data: data)
     }
     
     /// Finalize and upload
@@ -129,7 +138,9 @@ actor OmSpatialTimestepWriter {
         return handles
     }
     
-    func writeMetaAndAWSUpload(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
+    func writeMetaAndAWSUpload(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true, forceAllTimestampUpload: Bool = false) async throws {
+        try await ensembleMean?.writer.writeMetaAndAWSUpload(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: forceAllTimestampUpload)
+        
         // Upload to AWS S3
         // The single OM file will be uploaded + meta JSON files
         guard let filename, let directorySpatial = domain.domainRegistry.directorySpatial else {
@@ -174,7 +185,13 @@ actor OmSpatialTimestepWriter {
             let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
             let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
             
-            try Process.awsCopy(src: filename, dest: destFile, profile: profile)
+            if forceAllTimestampUpload {
+                // Sync entire run directory
+                try Process.awsSync(src: directorySpatial, dest: destDomain, profile: profile)
+            } else {
+                try Process.awsCopy(src: filename, dest: destFile, profile: profile)
+            }
+            
             if uploadMeta {
                 let destMeta = "\(destRun)meta\(realm).json"
                 try Process.awsCopy(src: metaRunMeta, dest: destMeta, profile: profile)
@@ -195,15 +212,17 @@ actor OmSpatialTimestepWriter {
     
     /// Finalize the time step
     func finalise() async throws -> [GenericVariableHandle] {
+        let ensembleMean = try await finaliseEnsembleMean()
+        
         guard let writer, let fn else {
-            return []
+            return ensembleMean
         }
         
         guard variables.count > 0 else {
             if let filename = filename {
                 try FileManager.default.removeItemIfExists(at: "\(filename)~")
             }
-            return []
+            return ensembleMean
         }
         
         let runTime = try writer.write(value: run.timeIntervalSince1970, name: "forecast_reference_time", children: [])
@@ -231,13 +250,23 @@ actor OmSpatialTimestepWriter {
         let reader = try await OmFileReader(fn: try MmapFile(fn: fn))
         let time = self.time
         let dtSeconds = domain.dtSeconds
-        let variablesAndMember: [(variable: GenericVariable, member: Int)] = variables.map { ($0.variable, $0.member) }
-        return try await variablesAndMember.enumerated().asyncMap { (i, variable) in
+        let variablesAndMember: [(variable: any GenericVariable, member: Int)] = variables.map { ($0.variable, $0.member) }
+        let domain = domain
+        let handles = try await variablesAndMember.enumerated().asyncMap { (i, variable) in
             guard let arrayReader = try await reader.getChild(UInt32(i))?.asArray(of: Float.self) else {
                 fatalError("Could not read variable \(variable.variable.omFileName.file) as Float array")
             }
-            return GenericVariableHandle(variable: variable.variable, time: TimerangeDt(start: time, nTime: 1, dtSeconds: dtSeconds), member: variable.member, reader: arrayReader)
+            return GenericVariableHandle(variable: variable.variable, time: TimerangeDt(start: time, nTime: 1, dtSeconds: dtSeconds), member: variable.member, reader: arrayReader, domain: domain)
         }
+        return handles + ensembleMean
+    }
+    
+    private func finaliseEnsembleMean() async throws -> [GenericVariableHandle] {
+        guard let ensembleMean else {
+            return []
+        }
+        try await ensembleMean.calculator.calculateAndWrite(to: ensembleMean.writer)
+        return try await ensembleMean.writer.finalise()
     }
 }
 
@@ -249,17 +278,19 @@ actor OmSpatialMultistepWriter {
     let realm: String?
     let run: Timestamp
     let domain: GenericDomain
+    let ensembleMeanDomain: GenericDomain?
     
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?) {
+    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, ensembleMeanDomain: GenericDomain? = nil) {
         self.storeOnDisk = storeOnDisk
         self.realm = realm
         self.domain = domain
         self.run = run
+        self.ensembleMeanDomain = ensembleMeanDomain
     }
     
     /// Write a single variable to the file
-    func write(time: Timestamp, member: Int, variable: GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
+    func write(time: Timestamp, member: Int, variable: any GenericVariable, data: [Float], compressionType: OmCompressionType = .pfor_delta2d_int16) async throws {
         try await getWriter(time: time).write(member: member, variable: variable, data: data, compressionType: compressionType)
     }
     
@@ -295,63 +326,7 @@ actor OmSpatialMultistepWriter {
     
     // Upload om files to AWS from mutliple timesteps
     func writeMetaAndAWSUpload(completed: Bool, validTimes: [Timestamp], uploadS3Bucket: String?, uploadMeta: Bool = true) async throws {
-        // Upload to AWS S3
-        // The single OM file will be uploaded + meta JSON files
-        guard let directorySpatial = domain.domainRegistry.directorySpatial else {
-            // return early for temporary files that do not need a meta.json
-            return
-        }
-        
-        let meta = DataSpatialJson(
-            reference_time: run.toDate(),
-            last_modified_time: Date(),
-            completed: completed,
-            valid_times: validTimes.map(\.iso8601_YYYY_MM_dd_HH_mmZ),
-            variables: await writer.last?.variableString ?? [],
-            crs_wkt: domain.grid.crsWkt2
-        )
-        let realm = realm.map { "_\($0)" } ?? ""
-        let path = "\(directorySpatial)\(run.format_directoriesYYYYMMddhhmm)/"
-        try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
-        let metaRunMeta = "\(path)meta\(realm).json"
-        let metaInProgress = "\(directorySpatial)in-progress\(realm).json"
-        let metaLatest = "\(directorySpatial)latest\(realm).json"
-        
-        try meta.writeTo(path: metaRunMeta)
-        
-        /// Only update `in-progress.json` if there is no older run currently generating files. E.g. HRRR downloads 2 runs in parallel with ~20 minutes overlap
-        let canUpdateInProgress = completed || (try? DataSpatialJson.readFrom(path: metaInProgress).sameRunOrOlderThan5Minutes(run: run)) ?? true
-        
-        if canUpdateInProgress {
-            try meta.writeTo(path: metaInProgress)
-        }
-        if completed {
-            try meta.writeTo(path: metaLatest)
-        }
-        
-        guard let uploadS3Bucket else {
-            return
-        }
-        let domain = domain
-        let run = run
-        try await domain.domainRegistry.parseBucket(uploadS3Bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-            let destDomain = "s3://\(bucket)/data_spatial/\(domain.domainRegistry.rawValue)/"
-            let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
-            
-            // Sync entire run directory
-            try Process.awsSync(src: path, dest: destRun, profile: profile)
-            
-            if uploadMeta {
-                if canUpdateInProgress {
-                    let destInProgress = "\(destDomain)in-progress\(realm).json"
-                    try Process.awsCopy(src: metaInProgress, dest: destInProgress, profile: profile)
-                }
-                if completed {
-                    let destLatest = "\(destDomain)latest\(realm).json"
-                    try Process.awsCopy(src: metaLatest, dest: destLatest, profile: profile)
-                }
-            }
-        }
+        try await writer.last?.writeMetaAndAWSUpload(completed: completed, validTimes: validTimes, uploadS3Bucket: uploadS3Bucket, uploadMeta: uploadMeta, forceAllTimestampUpload: true)
     }
 }
 

@@ -87,12 +87,15 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_ifs04_ensemble
     case ecmwf_ifs025
     case ecmwf_ifs025_ensemble
+    case ecmwf_ifs025_ensemble_mean
     case ecmwf_aifs025
     case ecmwf_aifs025_single
     case ecmwf_aifs025_ensemble
+    case ecmwf_aifs025_ensemble_mean
     case ecmwf_wam
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
+    case ecmwf_wam025_ensemble_mean
     case ecmwf_ifs_analysis
     case ecmwf_ifs_analysis_long_window
     case ecmwf_ifs_long_window
@@ -324,11 +327,15 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.ifs025
         case .ecmwf_ifs025_ensemble:
             return EcmwfDomain.ifs025_ensemble
+        case .ecmwf_ifs025_ensemble_mean:
+            return EcmwfDomain.ifs025_ensemble
         case .ecmwf_aifs025:
             return EcmwfDomain.aifs025
         case .ecmwf_aifs025_single:
             return EcmwfDomain.aifs025_single
         case .ecmwf_aifs025_ensemble:
+            return EcmwfDomain.aifs025_ensemble
+        case .ecmwf_aifs025_ensemble_mean:
             return EcmwfDomain.aifs025_ensemble
         case .ecmwf_seas5:
             return EcmwfSeasDomain.seas5
@@ -395,6 +402,8 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble
+        case .ecmwf_wam025_ensemble_mean:
+            return EcmwfDomain.wam025_ensemble_mean
         case .ncep_gfswave025:
             return GfsDomain.gfswave025
         case .ncep_gefswave025:
