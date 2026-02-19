@@ -82,6 +82,9 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
+    case dwd_icon_eps_ensemble_mean
+    case dwd_icon_eu_eps_ensemble_mean
+    case dwd_icon_d2_eps_ensemble_mean
     case dwd_ewam
     case dwd_gwam
     case dwd_sis_europe_africa_v4
@@ -484,6 +487,12 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.gefs025_ensemble_mean
         case .ncep_gefs05_ensemble_mean:
             return GfsDomain.gefs05_ensemble_mean
+        case .dwd_icon_eps_ensemble_mean:
+            return IconDomains.iconEpsEnsembleMean
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return IconDomains.iconEuEpsEnsembleMean
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return IconDomains.iconD2EpsEnsembleMean
         }
     }
 }
