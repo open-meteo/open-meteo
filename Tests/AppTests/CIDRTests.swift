@@ -34,5 +34,12 @@ struct CIDRTests {
         #expect(cidr.contains("1001:db8::42"))
         #expect(!cidr.contains("1001:db8::43"))
     }
+    
+    @Test("Test CFRWoker CIDR Array")
+    func cfWorker() throws {
+        #expect(!RateLimiter.cloudFlareWorkerIPs.contains(CIDR.parseIPv4("192.168.10.5")!.mappedToV6))
+        #expect(RateLimiter.cloudFlareWorkerIPs.contains(CIDR.parseIPv4("103.31.4.0")!.mappedToV6))
+        #expect(RateLimiter.cloudFlareWorkerIPs.contains(CIDR.parseIPv6("2c0f:f248::1")!))
+    }
 }
 

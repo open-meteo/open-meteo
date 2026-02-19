@@ -27,6 +27,10 @@ final actor RateLimiter {
     
     /// List of IP addresses / networks to disable rate limited
     var allowlistedIPs: CIDR?
+    
+    /// See https://www.cloudflare.com/en-gb/ips/
+    /// Last updated 2026-02-19
+    nonisolated(unsafe) static let cloudFlareWorkerIPs = CIDR("173.245.48.0/20,103.21.244.0/22,103.22.200.0/22,103.31.4.0/22,141.101.64.0/18,108.162.192.0/18,190.93.240.0/20,188.114.96.0/20,197.234.240.0/22,198.41.128.0/17,162.158.0.0/15,104.16.0.0/13,104.24.0.0/14,172.64.0.0/13,131.0.72.0/22,2400:cb00::/32,2606:4700::/32,2803:f800::/32,2405:b500::/32,2405:8100::/32,2a06:98c0::/29,2c0f:f248::/32")
 
     public static let instance = RateLimiter()
 
@@ -79,33 +83,38 @@ final actor RateLimiter {
         }
         switch address {
         case .v4(let socket):
-            let ip: UInt32 = socket.address.sin_addr.s_addr
-            if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
-                throw RateLimitError.minutelyExceeded
-            }
-
-            if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
-                throw RateLimitError.hourlyExceeded
-            }
-
-            if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
-                throw RateLimitError.dailyExceeded
-            }
+            try check(uint32: socket.address.sin_addr.s_addr)
         case .v6:
             var hasher = Hasher()
             address.hash(into: &hasher)
             let ip = hasher.finalize()
-            if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
-                throw RateLimitError.minutelyExceeded
-            }
-            if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
-                throw RateLimitError.hourlyExceeded
-            }
-            if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
-                throw RateLimitError.dailyExceeded
-            }
+            try check(int64: ip)
         case .unixDomainSocket:
             break
+        }
+    }
+    
+    func check(uint32 ip: UInt32) throws {
+        if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv4[ip], usageMinutely >= Self.limitMinutely {
+            throw RateLimitError.minutelyExceeded
+        }
+        if Self.limitHourly > 0, let usageHourly = hourlyPerIPv4[ip], usageHourly >= Self.limitHourly {
+            throw RateLimitError.hourlyExceeded
+        }
+        if Self.limitDaily > 0, let usageDaily = dailyPerIPv4[ip], usageDaily >= Self.limitDaily {
+            throw RateLimitError.dailyExceeded
+        }
+    }
+    
+    func check(int64 ip: Int) throws {
+        if Self.limitMinutely > 0, let usageMinutely = minutelyPerIPv6[ip], usageMinutely >= Self.limitMinutely {
+            throw RateLimitError.minutelyExceeded
+        }
+        if Self.limitHourly > 0, let usageHourly = hourlyPerIPv6[ip], usageHourly >= Self.limitHourly {
+            throw RateLimitError.hourlyExceeded
+        }
+        if Self.limitDaily > 0, let usageDaily = dailyPerIPv6[ip], usageDaily >= Self.limitDaily {
+            throw RateLimitError.dailyExceeded
         }
     }
 
@@ -117,31 +126,38 @@ final actor RateLimiter {
         }
         switch address {
         case .v4(let socket):
-            let ip: UInt32 = socket.address.sin_addr.s_addr
-            if Self.limitMinutely > 0 {
-                minutelyPerIPv4[ip] = count + (minutelyPerIPv4[ip] ?? 0)
-            }
-            if Self.limitHourly > 0 {
-                hourlyPerIPv4[ip] = count + (hourlyPerIPv4[ip] ?? 0)
-            }
-            if Self.limitDaily > 0 {
-                dailyPerIPv4[ip] = count + (dailyPerIPv4[ip] ?? 0)
-            }
+            increment(uint32: socket.address.sin_addr.s_addr, count: count)
         case .v6:
             var hasher = Hasher()
             address.hash(into: &hasher)
             let ip = hasher.finalize()
-            if Self.limitMinutely > 0 {
-                minutelyPerIPv6[ip] = count + (minutelyPerIPv6[ip] ?? 0)
-            }
-            if Self.limitHourly > 0 {
-                hourlyPerIPv6[ip] = count + (hourlyPerIPv6[ip] ?? 0)
-            }
-            if Self.limitDaily > 0 {
-                dailyPerIPv6[ip] = count + (dailyPerIPv6[ip] ?? 0)
-            }
+            increment(int64: ip, count: count)
         case .unixDomainSocket:
             break
+        }
+    }
+    
+    func increment(uint32 ip: UInt32, count: Float) {
+        if Self.limitMinutely > 0 {
+            minutelyPerIPv4[ip] = count + (minutelyPerIPv4[ip] ?? 0)
+        }
+        if Self.limitHourly > 0 {
+            hourlyPerIPv4[ip] = count + (hourlyPerIPv4[ip] ?? 0)
+        }
+        if Self.limitDaily > 0 {
+            dailyPerIPv4[ip] = count + (dailyPerIPv4[ip] ?? 0)
+        }
+    }
+    
+    func increment(int64 ip: Int, count: Float) {
+        if Self.limitMinutely > 0 {
+            minutelyPerIPv6[ip] = count + (minutelyPerIPv6[ip] ?? 0)
+        }
+        if Self.limitHourly > 0 {
+            hourlyPerIPv6[ip] = count + (hourlyPerIPv6[ip] ?? 0)
+        }
+        if Self.limitDaily > 0 {
+            dailyPerIPv6[ip] = count + (dailyPerIPv6[ip] ?? 0)
         }
     }
 }
