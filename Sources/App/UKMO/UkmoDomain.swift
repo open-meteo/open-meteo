@@ -8,8 +8,22 @@ import Foundation
 enum UkmoDomain: String, GenericDomain, CaseIterable {
     case global_deterministic_10km
     case global_ensemble_20km
+    case global_ensemble_mean_20km
+    
     case uk_deterministic_2km
     case uk_ensemble_2km
+    case uk_ensemble_mean_2km
+    
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .uk_ensemble_2km:
+            return .uk_ensemble_mean_2km
+        case .global_ensemble_20km:
+            return .global_ensemble_mean_20km
+        default:
+            return nil
+        }
+    }
 
     var grid: any Gridable {
         switch self {
@@ -22,7 +36,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
                 dx: 360 / 2560,
                 dy: 180 / 1920
             )
-        case .global_ensemble_20km:
+        case .global_ensemble_20km, .global_ensemble_mean_20km:
             return RegularGrid(
                 nx: 1280,
                 ny: 960,
@@ -31,7 +45,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
                 dx: 360 / 1280,
                 dy: 180 / 960
             )
-        case .uk_deterministic_2km, .uk_ensemble_2km:
+        case .uk_deterministic_2km, .uk_ensemble_2km, .uk_ensemble_mean_2km:
             let projection = LambertAzimuthalEqualAreaProjection(λ0: -2.5, ϕ1: 54.9, radius: 6371229)
             return ProjectionGrid(
                 nx: 1042,
@@ -55,6 +69,10 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return .ukmo_global_ensemble_20km
         case .uk_ensemble_2km:
             return .ukmo_uk_ensemble_2km
+        case .global_ensemble_mean_20km:
+            return .ukmo_global_ensemble_mean_20km
+        case .uk_ensemble_mean_2km:
+            return .ukmo_uk_ensemble_mean_2km
         }
     }
 
@@ -64,7 +82,7 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
 
     var dtSeconds: Int {
         switch self {
-        case .global_deterministic_10km, .uk_deterministic_2km, .global_ensemble_20km, .uk_ensemble_2km:
+        case .global_deterministic_10km, .uk_deterministic_2km, .global_ensemble_20km, .uk_ensemble_2km, .global_ensemble_mean_20km, .uk_ensemble_mean_2km:
             return 3600
         }
     }
@@ -83,16 +101,16 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return 168 + 1 + 24
         case .uk_deterministic_2km:
             return 55 + 24
-        case .global_ensemble_20km:
+        case .global_ensemble_20km, .global_ensemble_mean_20km:
             return 198 + 1
-        case .uk_ensemble_2km:
+        case .uk_ensemble_2km, .uk_ensemble_mean_2km:
             return 126 + 24
         }
     }
 
     var countEnsembleMember: Int {
         switch self {
-        case .uk_deterministic_2km, .global_deterministic_10km:
+        case .uk_deterministic_2km, .global_deterministic_10km, .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
             return 1
         case .global_ensemble_20km:
             return 18
@@ -103,9 +121,9 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .global_deterministic_10km, .global_ensemble_20km:
+        case .global_deterministic_10km, .global_ensemble_20km, .global_ensemble_mean_20km:
             return 6 * 3600
-        case .uk_deterministic_2km,. uk_ensemble_2km:
+        case .uk_deterministic_2km,. uk_ensemble_2km, .uk_ensemble_mean_2km:
             return 3600
         }
     }
@@ -120,6 +138,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         case .uk_deterministic_2km, .uk_ensemble_2km:
             // Delay of 4:15-4:45 hours after initialisation, updates every hour. Cronjobs start at minute 0 of every hour
             return t.add(hours: -4).floor(toNearestHour: 1)
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
     }
 
@@ -133,6 +153,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return "global-ensemble"
         case .uk_ensemble_2km:
             return "uk-ensemble"
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
     }
 
@@ -144,6 +166,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return "met-office-global-ensemble-model-data"
         case .uk_ensemble_2km:
             return "met-office-uk-ensemble-model-data"
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
     }
 
@@ -166,6 +190,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
         case .global_ensemble_20km:
             let through = run.hour % 12 == 6 ? 180 : 198
             return (Array(0..<54) + stride(from: 54, to: 144, by: 3) + stride(from: 144, through: through, by: 6)).map({ run.add(hours: $0) })
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
     }
 
@@ -175,6 +201,8 @@ enum UkmoDomain: String, GenericDomain, CaseIterable {
             return 4
         case .uk_deterministic_2km, .uk_ensemble_2km:
             return 24
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
     }
 }

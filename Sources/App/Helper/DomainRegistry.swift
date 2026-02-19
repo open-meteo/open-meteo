@@ -148,8 +148,10 @@ enum DomainRegistry: String, CaseIterable {
 
     case ukmo_global_deterministic_10km
     case ukmo_global_ensemble_20km
+    case ukmo_global_ensemble_mean_20km
     case ukmo_uk_deterministic_2km
     case ukmo_uk_ensemble_2km
+    case ukmo_uk_ensemble_mean_2km
 
     case eumetsat_sarah3_30min
     case jma_jaxa_himawari_10min
@@ -167,6 +169,8 @@ enum DomainRegistry: String, CaseIterable {
     case meteoswiss_icon_ch2
     case meteoswiss_icon_ch1_ensemble
     case meteoswiss_icon_ch2_ensemble
+    case meteoswiss_icon_ch1_ensemble_mean
+    case meteoswiss_icon_ch2_ensemble_mean
 
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
@@ -471,6 +475,10 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoSwissDomain.icon_ch1_ensemble
         case .meteoswiss_icon_ch2_ensemble:
             return MeteoSwissDomain.icon_ch2_ensemble
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return MeteoSwissDomain.icon_ch1_ensemble_mean
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return MeteoSwissDomain.icon_ch2_ensemble_mean
         case .ecmwf_seas5_ensemble_mean:
             return EcmwfSeasDomain.seas5_ensemble_mean
         case .ecmwf_seas5_daily_ensemble_mean:
@@ -493,6 +501,10 @@ enum DomainRegistry: String, CaseIterable {
             return IconDomains.iconEuEpsEnsembleMean
         case .dwd_icon_d2_eps_ensemble_mean:
             return IconDomains.iconD2EpsEnsembleMean
+        case .ukmo_global_ensemble_mean_20km:
+            return UkmoDomain.global_ensemble_mean_20km
+        case .ukmo_uk_ensemble_mean_2km:
+            return UkmoDomain.uk_ensemble_mean_2km
         }
     }
 }
