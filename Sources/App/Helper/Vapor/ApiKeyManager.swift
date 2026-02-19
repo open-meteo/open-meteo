@@ -129,12 +129,24 @@ extension Request {
             guard let address = peerAddress ?? remoteAddress else {
                 throw ForecastApiError.generic(message: "Could not get remote address")
             }
-            let slot = address.rateLimitSlot
+            /// For CloudFlare worker applications, use the `CF-Worker` header for rate limiting instead of IP address
+            let isCFWorker = RateLimiter.cloudFlareWorkerIPs.contains(address)
+            let slot: Int
+            if isCFWorker, let cfHash = self.headers["CF-Worker"].first?.hashValue {
+                slot = cfHash
+            } else {
+                slot = address.rateLimitSlot
+            }
             try await apiConcurrencyLimiter.wait(slot: slot, maxConcurrent: 1, maxConcurrentHard: 5)
             defer {
                 apiConcurrencyLimiter.release(slot: slot)
             }
-            try await RateLimiter.instance.check(address: address)
+            if isCFWorker {
+                try await RateLimiter.instance.check(int64: slot)
+            } else {
+                try await RateLimiter.instance.check(address: address)
+            }
+            
             let params = try parseApiParams()
             guard params.apikey == nil else {
                 guard self.method != .POST else {
@@ -148,7 +160,11 @@ extension Request {
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
             let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot)
-            await RateLimiter.instance.increment(address: address, count: weight)
+            if isCFWorker {
+                await RateLimiter.instance.increment(int64: slot, count: weight)
+            } else {
+                await RateLimiter.instance.increment(address: address, count: weight)
+            }
             return response
         }
 
