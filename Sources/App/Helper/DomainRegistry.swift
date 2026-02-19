@@ -38,6 +38,7 @@ enum DomainRegistry: String, CaseIterable {
 
     case cmc_gem_gdps
     case cmc_gem_geps
+    case cmc_gem_geps_ensemble_mean
     case cmc_gem_hrdps
     case cmc_gem_hrdps_west
     case cmc_gem_rdps
@@ -47,8 +48,11 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_gfswave025
     case ncep_gfswave016
     case ncep_gefswave025
+    case ncep_gefswave025_ensemble_mean
     case ncep_gefs025
+    case ncep_gefs025_ensemble_mean
     case ncep_gefs05
+    case ncep_gefs05_ensemble_mean
     case ncep_hrrr_conus
     case ncep_hrrr_conus_15min
     case ncep_cfsv2
@@ -472,6 +476,14 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfSeasDomain.ec46_ensemble_mean
         case .dwd_sis_europe_africa_v4:
             return DwdSisDomain.europe_africa_v4
+        case .cmc_gem_geps_ensemble_mean:
+            return GemDomain.gem_global_ensemble_mean
+        case .ncep_gefswave025_ensemble_mean:
+            return GfsDomain.gefswave025_ensemble_mean
+        case .ncep_gefs025_ensemble_mean:
+            return GfsDomain.gefs025_ensemble_mean
+        case .ncep_gefs05_ensemble_mean:
+            return GfsDomain.gefs05_ensemble_mean
         }
     }
 }
@@ -514,7 +526,7 @@ extension DomainRegistry {
     }
     
     /// Upload all data to a specified S3 bucket
-    func syncToS3(logger: Logger, bucket: String, variables: [GenericVariable]?) async throws {
+    func syncToS3(logger: Logger, bucket: String, variables: [any GenericVariable]?) async throws {
         let dir = rawValue
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]
