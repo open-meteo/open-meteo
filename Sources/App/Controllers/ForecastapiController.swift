@@ -879,35 +879,38 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case forecast_v4
     case consolidated_v4
     
-//    enum DomainReaderMapping {
-//        case single(domain: GenericDomain, variableType: any GenericVariable.Type)
-//        case singleWithPrecipitationProbability(GenericDomain, GenericDomain, any GenericVariable.Type)
-//    }
+    enum DomainReaderMapping {
+        case single(GenericDomain, any GenericVariable.Type)
+        case singleWithPrecipitationProbability(GenericDomain, any GenericVariable.Type, precipitationProb: GenericDomain)
+    }
     
     /// Generic domains with hourly data that can use the generic defiver controller
-    func getDomainAndVariable() -> (GenericDomain, any GenericVariable.Type)? {
+    func getDomainAndVariable() -> DomainReaderMapping? {
         switch self {
         case .ncep_aigfs025:
-            // TODO AIGFS could use precipitation probability from AIGEFS
-            return (GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self)
+            return .singleWithPrecipitationProbability(GfsGraphCastDomain.aigfs025, GfsGraphCastVariable.self, precipitationProb: GfsGraphCastDomain.aigefs025)
         case .ncep_hgefs025_ensemble_mean:
-            return (GfsGraphCastDomain.hgefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+            return .single(GfsGraphCastDomain.hgefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
         case .gfs_graphcast025, .ncep_gfs_graphcast025:
-            return (GfsGraphCastDomain.graphcast025, GfsGraphCastVariable.self)
+            return .single(GfsGraphCastDomain.graphcast025, GfsGraphCastVariable.self)
         case .ncep_aigefs025:
-            return (GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
+            return .single(GfsGraphCastDomain.aigefs025, GfsGraphCastVariable.self)
         case .ncep_aigefs025_ensemble_mean:
-            return (GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
+            return .single(GfsGraphCastDomain.aigefs025_ensemble_mean, VariableOrSpread<GfsGraphCastVariable>.self)
         case .dwd_sis_europe_africa_v4:
-            return (DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
+            return .single(DwdSisDomain.europe_africa_v4, DwdSisVariable.self)
         case .eumetsat_sarah3:
-            return (EumetsatSarahDomain.sarah3_30min, EumetsatSarahVariable.self)
+            return .single(EumetsatSarahDomain.sarah3_30min, EumetsatSarahVariable.self)
         case .jma_jaxa_mtg_fci:
-            return (JaxaHimawariDomain.mtg_fci_10min, JaxaHimawariVariable.self)
+            return .single(JaxaHimawariDomain.mtg_fci_10min, JaxaHimawariVariable.self)
         case .eumetsat_lsa_saf_msg:
-            return (EumetsatLsaSafDomain.msg, EumetsatLsaSafVariable.self)
+            return .single(EumetsatLsaSafDomain.msg, EumetsatLsaSafVariable.self)
         case .eumetsat_lsa_saf_iodc:
-            return (EumetsatLsaSafDomain.iodc, EumetsatLsaSafVariable.self)
+            return .single(EumetsatLsaSafDomain.iodc, EumetsatLsaSafVariable.self)
+        case .bom_access_global_ensemble:
+            return .single(BomDomain.access_global_ensemble, BomVariable.self)
+        case .bom_access_global:
+            return .singleWithPrecipitationProbability(BomDomain.access_global, BomVariable.self, precipitationProb: BomDomain.access_global_ensemble)
         default:
             return nil
         }
@@ -949,7 +952,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getReaders(lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions, biasCorrection: Bool) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?)? {
         
         if let d = getDomainAndVariable() {
-            return try await d.0.makeGenericHourlyDaily(variableType: d.1, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            switch d {
+            case .single(let domain, let variable):
+                return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+            case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
+                let a = try await domain.makeGenericHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let prob = try await precipitationProb.makeGenericHourly(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [a, prob].compactMap({$0}))
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            }
         }
         
         switch self {
@@ -1112,7 +1123,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     func getReaders(gridpoint: Int, options: GenericReaderOptions) async throws -> (hourly: (any GenericReaderOptionalProtocol<ForecastVariable>)?, daily: (any GenericReaderOptionalProtocol<ForecastVariableDaily>)?, weekly: (any GenericReaderOptionalProtocol<ForecastVariableWeekly>)?, monthly: (any GenericReaderOptionalProtocol<ForecastVariableMonthly>)?) {
         
         if let d = getDomainAndVariable() {
-            return try await d.0.makeGenericHourlyDaily(variableType: d.1, position: gridpoint, options: options)
+            switch d {
+            case .single(let domain, let variable):
+                return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
+            case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: _):
+                return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
+            }
         }
         
         switch self {
@@ -1340,8 +1356,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .cma_grapes_global:
             return try await CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global:
-            let probabilities = try await ProbabilityReader.makeBomReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities] + (try await BomReader(domain: .access_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? [])
+            return [] // migrated
         case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .knmi_harmonie_arome_europe:
@@ -1451,7 +1466,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .gem_global_ensemble:
             return try await GemReader(domain: .gem_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .bom_access_global_ensemble:
-            return try await BomReader(domain: .access_global_ensemble, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .ukmo_global_ensemble_20km:
             return try await UkmoReader(domain: .global_ensemble_20km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ukmo_uk_ensemble_2km:
@@ -1546,7 +1561,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
 
     var genericDomain: (any GenericDomain)? {
         if let d = getDomainAndVariable() {
-            return d.0
+            switch d {
+            case .single(let domain, _):
+                return domain
+            case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _):
+                return domain
+            }
         }
         
         switch self {
@@ -1882,7 +1902,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .cma_grapes_global:
             return try await CmaReader(domain: .grapes_global, gridpoint: gridpoint, options: options)
         case .bom_access_global:
-            return try await BomReader(domain: .access_global, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m, .arpae_cosmo_seamless:
             throw ForecastApiError.generic(message: "ARPAE COSMO models are not available anymore")
         case .best_match:
