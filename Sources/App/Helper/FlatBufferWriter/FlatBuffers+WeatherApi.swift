@@ -306,6 +306,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .massDensity, altitude: 8, previousDay: previousDay)
         case .wind_speed_10m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_speed_40m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 40, previousDay: previousDay)
         case .wind_speed_80m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 80, previousDay: previousDay)
         case .wind_speed_100m_spread:
@@ -316,6 +318,8 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .wind_direction_10m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_direction_40m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 40, previousDay: previousDay)
         case .wind_direction_80m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 80, previousDay: previousDay)
         case .wind_direction_100m_spread:

@@ -216,11 +216,13 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case potential_evapotranspiration
 
     case wind_speed_10m_spread
+    case wind_speed_40m_spread
     case wind_speed_80m_spread
     case wind_speed_100m_spread
     case wind_speed_120m_spread
     case wind_speed_200m_spread
     case wind_direction_10m_spread
+    case wind_direction_40m_spread
     case wind_direction_80m_spread
     case wind_direction_100m_spread
     case wind_direction_120m_spread
@@ -552,45 +554,83 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return getDeriverMap(variable: .wind_direction_10m)
         case .wind_direction_10m:
             return .windDirection(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"))
-            
+        case .windspeed_20m:
+            return getDeriverMap(variable: .wind_speed_20m)
+        case .wind_speed_20m:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_20m"), v: Reader.variableFromString("wind_v_component_20m"))
+        case .winddirection_20m:
+            return getDeriverMap(variable: .wind_direction_20m)
+        case .wind_direction_20m:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_20m"), v: Reader.variableFromString("wind_v_component_20m"))
+        case .windspeed_40m:
+            return getDeriverMap(variable: .wind_speed_40m)
+        case .wind_speed_40m:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"))
+        case .winddirection_40m:
+            return getDeriverMap(variable: .wind_direction_40m)
+        case .wind_direction_40m:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"))
+        case .windspeed_50m:
+            return getDeriverMap(variable: .wind_speed_50m)
+        case .wind_speed_50m:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_50m"), v: Reader.variableFromString("wind_v_component_50m"))
+        case .winddirection_50m:
+            return getDeriverMap(variable: .wind_direction_50m)
+        case .wind_direction_50m:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_50m"), v: Reader.variableFromString("wind_v_component_50m"))
         case .windspeed_80m:
             return getDeriverMap(variable: .wind_speed_80m)
         case .wind_speed_80m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"))
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"))  ?? .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 80)
         case .winddirection_80m:
             return getDeriverMap(variable: .wind_direction_80m)
         case .wind_direction_80m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"))
-            
+            return .windDirection(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"))
         case .windspeed_100m:
             return getDeriverMap(variable: .wind_speed_100m)
         case .wind_speed_100m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), levelFrom: 70, levelTo: 100)
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"), levelFrom: 70, levelTo: 100) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"), levelFrom: 120, levelTo: 100)
         case .winddirection_100m:
             return getDeriverMap(variable: .wind_direction_100m)
         case .wind_direction_100m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m"))
-            
+            return .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_70m"), v: Reader.variableFromString("wind_v_component_70m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m"))
         case .windspeed_120m:
             return getDeriverMap(variable: .wind_speed_120m)
         case .wind_speed_120m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 120)
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"), levelFrom: 100, levelTo: 120)  ?? .windSpeed(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"), levelFrom: 150, levelTo: 120)
         case .winddirection_120m:
             return getDeriverMap(variable: .wind_direction_120m)
         case .wind_direction_120m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m"))
-            
+            return .windDirection(u: Reader.variableFromString("wind_u_component_120m"), v: Reader.variableFromString("wind_v_component_120m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_100m"), v: Reader.variableFromString("wind_v_component_100m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+        case .windspeed_150m:
+            return getDeriverMap(variable: .wind_speed_150m)
+        case .wind_speed_150m:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+        case .winddirection_150m:
+            return getDeriverMap(variable: .wind_direction_150m)
+        case .wind_direction_150m:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_150m"), v: Reader.variableFromString("wind_v_component_150m"))
+        case .windspeed_180m:
+            return getDeriverMap(variable: .wind_speed_180m)
+        case .wind_speed_180m:
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), levelFrom: 200, levelTo: 180)
+        case .winddirection_180m:
+            return getDeriverMap(variable: .wind_direction_180m)
+        case .wind_direction_180m:
+            return .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"))
         case .windspeed_200m:
             return getDeriverMap(variable: .wind_speed_200m)
         case .wind_speed_200m:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"), levelFrom: 170, levelTo: 200)
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"), levelFrom: 170, levelTo: 200) ?? .windSpeed(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"), levelFrom: 180, levelTo: 200)
         case .winddirection_200m:
             return getDeriverMap(variable: .wind_direction_200m)
         case .wind_direction_200m:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m"))
-        
+            return .windDirection(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_170m"), v: Reader.variableFromString("wind_v_component_170m")) ?? .windDirection(u: Reader.variableFromString("wind_u_component_180m"), v: Reader.variableFromString("wind_v_component_180m"))
+            
         case .wind_speed_10m_spread:
             return .windSpeedSpread(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), uSpread: Reader.variableFromString("wind_u_component_10m_spread"), vSpread: Reader.variableFromString("wind_v_component_10m_spread"))
+        case .wind_speed_40m_spread:
+            return .windSpeedSpread(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"), uSpread: Reader.variableFromString("wind_u_component_40m_spread"), vSpread: Reader.variableFromString("wind_v_component_40m_spread"))
         case .wind_speed_80m_spread:
             return .windSpeedSpread(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"), uSpread: Reader.variableFromString("wind_u_component_80m_spread"), vSpread: Reader.variableFromString("wind_v_component_80m_spread"))
         case .wind_speed_100m_spread:
@@ -601,6 +641,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             return .windSpeedSpread(u: Reader.variableFromString("wind_u_component_200m"), v: Reader.variableFromString("wind_v_component_200m"), uSpread: Reader.variableFromString("wind_u_component_200m_spread"), vSpread: Reader.variableFromString("wind_v_component_200m_spread"))
         case .wind_direction_10m_spread:
             return .windDirectionSpread(u: Reader.variableFromString("wind_u_component_10m"), v: Reader.variableFromString("wind_v_component_10m"), uSpread: Reader.variableFromString("wind_u_component_10m_spread"), vSpread: Reader.variableFromString("wind_v_component_10m_spread"))
+        case .wind_direction_40m_spread:
+            return .windDirectionSpread(u: Reader.variableFromString("wind_u_component_40m"), v: Reader.variableFromString("wind_v_component_40m"), uSpread: Reader.variableFromString("wind_u_component_40m_spread"), vSpread: Reader.variableFromString("wind_v_component_40m_spread"))
         case .wind_direction_80m_spread:
             return .windDirectionSpread(u: Reader.variableFromString("wind_u_component_80m"), v: Reader.variableFromString("wind_v_component_80m"), uSpread: Reader.variableFromString("wind_u_component_80m_spread"), vSpread: Reader.variableFromString("wind_v_component_80m_spread"))
         case .wind_direction_100m_spread:
@@ -881,6 +923,75 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
         case .freezinglevel_height:
             return getDeriverMap(variable: .freezing_level_height)
+            
+        case .ocean_current_velocity:
+            return .windSpeed(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
+        case .ocean_current_direction:
+            return .windDirection(u: Reader.variableFromString("ocean_u_current"), v: Reader.variableFromString("ocean_v_current"))
+            
+            
+        case .soil_moisture_0_to_100cm:
+            guard
+                let sm0_7 = self.getDeriverMap(variable: .soil_moisture_0_to_7cm),
+                let sm7_28 = self.getDeriverMap(variable: .soil_moisture_7_to_28cm),
+                let sm28_100 = self.getDeriverMap(variable: .soil_moisture_28_to_100cm)
+            else {
+                return nil
+            }
+            return .three(.mapped(sm0_7), .mapped(sm7_28), .mapped(sm28_100)) { sm0_7, sm7_28, sm28_100, _ in
+                return DataAndUnit(zip(sm0_7.data, zip(sm7_28.data, sm28_100.data)).map({
+                    let (sm0_7, (sm7_28, sm28_100)) = $0
+                    return sm0_7 * 0.07 + sm7_28 * (0.28 - 0.07) + sm28_100 * (1 - 0.28)
+                }), sm0_7.unit)
+            }
+        case .soil_temperature_0_to_100cm:
+            guard
+                let st0_7 = self.getDeriverMap(variable: .soil_temperature_0_to_7cm),
+                let st7_28 = self.getDeriverMap(variable: .soil_temperature_7_to_28cm),
+                let st28_100 = self.getDeriverMap(variable: .soil_temperature_28_to_100cm)
+            else {
+                return nil
+            }
+            return .three(.mapped(st0_7), .mapped(st7_28), .mapped(st28_100)) { st0_7, st7_28, st28_100, _ in
+                return DataAndUnit(zip(st0_7.data, zip(st7_28.data, st28_100.data)).map({
+                    let (st0_7, (st7_28, st28_100)) = $0
+                    return st0_7 * 0.07 + st7_28 * (0.28 - 0.07) + st28_100 * (1 - 0.28)
+                }), st0_7.unit)
+            }
+        case .leaf_wetness_probability:
+            guard
+                let temperature = Reader.variableFromString("temperature_2m"),
+                let dewpoint = self.getDeriverMap(variable: .dewpoint_2m),
+                let precipitation = Reader.variableFromString("precipitation")
+            else {
+                return nil
+            }
+            return .three(.raw(temperature), .mapped(dewpoint), .raw(precipitation)) { temperature, dewpoint, precipitation, _ in
+                return DataAndUnit(zip(zip(temperature.data, dewpoint.data), precipitation.data).map( {
+                    let ((temperature, dewpoint), precipitation) = $0
+                    return Meteorology.leafwetnessPorbability(temperature2mCelsius: temperature, dewpointCelsius: dewpoint, precipitation: precipitation)
+                }), .percentage)
+            }
+//        case .soil_moisture_index_0_to_7cm:
+//            guard let soilMoisture = getDeriverMap(variable: .soil_moisture_0_to_7cm) else {
+//                return nil
+//            }
+//            return .one(.mapped(soilMoisture)) { soilMoisture, _ in
+//                let soilMoisture = try await get(raw: .soil_moisture_7_to_28cm, time: time)
+//                return DataAndUnit(type.calculateSoilMoistureIndex(soilMoisture.data), .fraction)
+//            }
+        case .snow_depth_water_equivalent:
+            // snow depth in metre
+            // water equivalent in millimetre, density in kg/m3
+            guard
+                let depth = Reader.variableFromString("snow_depth"),
+                let density = Reader.variableFromString("density")
+            else {
+                return nil
+            }
+            return .two(.raw(depth), .raw(density)) { depth, density, _ in
+                return DataAndUnit(zip(depth.data, density.data).map({$0*$1}), .millimetre)
+            }
         default:
             return nil
         }
