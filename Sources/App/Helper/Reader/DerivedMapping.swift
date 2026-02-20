@@ -11,7 +11,7 @@ indirect enum DerivedMapping<Variable>: GenericVariableMixable {
     
     case direct(Variable)
     case directShift24Hour(Variable)
-    case independent((TimerangeDtAndSettings) -> DataAndUnit)
+    //case independent((TimerangeDtAndSettings) -> DataAndUnit)
     case one(RawOrMapped, (DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case two(RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
     case three(RawOrMapped, RawOrMapped, RawOrMapped, (DataAndUnit, DataAndUnit, DataAndUnit, TimerangeDtAndSettings) -> (DataAndUnit))
@@ -163,8 +163,8 @@ extension GenericDeriverProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .independent(let fn):
-            return fn(time)
+//        case .independent(let fn):
+//            return fn(time)
         case .one(let a, let fn):
             let a = try await get(mapping: a, time: time)
             return fn(a, time)
@@ -226,8 +226,8 @@ extension GenericDeriverProtocol {
             try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .independent(_):
-            break
+//        case .independent(_):
+//            break
         case .one(let a, _):
             try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):
@@ -326,8 +326,8 @@ extension GenericDeriverOptionalProtocol {
             return try await reader.get(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await reader.get(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .independent(let fn):
-            return fn(time)
+//        case .independent(let fn):
+//            return fn(time)
         case .one(let a, let fn):
             guard let a = try await get(mapping: a, time: time) else {
                 return nil
@@ -403,8 +403,8 @@ extension GenericDeriverOptionalProtocol {
             return try await prefetchData(variable: variable, time: time)
         case .directShift24Hour(let variable):
             return try await prefetchData(variable: variable, time: time.with(time: time.time.add(-86400)))
-        case .independent(_):
-            return true
+//        case .independent(_):
+//            return true
         case .one(let a, _):
             return try await prefetchData(mapping: a, time: time)
         case .two(let a, let b, _):

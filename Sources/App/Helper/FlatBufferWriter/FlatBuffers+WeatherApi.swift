@@ -306,14 +306,22 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .massDensity, altitude: 8, previousDay: previousDay)
         case .wind_speed_10m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_speed_80m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 80, previousDay: previousDay)
         case .wind_speed_100m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .wind_speed_120m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 120, previousDay: previousDay)
         case .wind_speed_200m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .wind_direction_10m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_direction_80m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 80, previousDay: previousDay)
         case .wind_direction_100m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .wind_direction_120m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 120, previousDay: previousDay)
         case .wind_direction_200m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .snowfall_spread:
