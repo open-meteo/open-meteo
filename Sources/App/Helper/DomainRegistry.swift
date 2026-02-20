@@ -534,7 +534,40 @@ extension Process {
 
 extension DomainRegistry {
     var bucketName: String {
-        return rawValue.replacing("_", with: "-").lowercased()
+        switch self {
+        case .cmc_gem_geps_ensemble_mean:
+            return "cmc-gem-geps"
+        case .ncep_gefswave025_ensemble_mean:
+            return "ncep_gefswave025"
+        case .ncep_gefs025_ensemble_mean:
+            return "ncep_gefs025"
+        case .ncep_gefs05_ensemble_mean:
+            return "ncep_gefs05"
+        case .dwd_icon_eps_ensemble_mean:
+            return "dwd-icon-eps"
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return "dwd-icon-eu-eps"
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return "dwd-icon-d2-eps"
+        case .ukmo_global_ensemble_mean_20km:
+            return "ukmo-global-ensemble-20km"
+        case .ukmo_uk_ensemble_mean_2km:
+            return "ukmo-uk-ensemble-2km"
+        case .ncep_aigefs025_ensemble_mean:
+            return "ncep-aigefs025"
+        case .ecmwf_ifs025_ensemble_mean:
+            return "ecmwf-ifs025-ensemble"
+        case .ecmwf_aifs025_ensemble_mean:
+            return "ecmwf-aifs025-ensemble"
+        case .ecmwf_wam025_ensemble_mean:
+            return "ecmwf-wam025-ensemble"
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return "meteoswiss-icon-ch1-ensemble"
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return "meteoswiss-icon-ch2-ensemble"
+        default:
+            return rawValue.replacing("_", with: "-").lowercased()
+        }
     }
     
     func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
