@@ -911,6 +911,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(BomDomain.access_global_ensemble, BomVariable.self)
         case .bom_access_global:
             return .singleWithPrecipitationProbability(BomDomain.access_global, BomVariable.self, precipitationProb: BomDomain.access_global_ensemble)
+        case .cma_grapes_global:
+            return .single(CmaDomain.grapes_global, CmaVariable.self)
         default:
             return nil
         }
@@ -1354,7 +1356,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let wam: (any GenericReaderProtocol)? = try await GenericReader<EcmwfEcpdsDomain, EcmwfEcdpsWamVariable>(domain: .wam, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [wam].compactMap({ $0 })
         case .cma_grapes_global:
-            return try await CmaReader(domain: .grapes_global, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .bom_access_global:
             return [] // migrated
         case .arpae_cosmo_seamless, .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m:
@@ -1633,9 +1635,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_wam:
             return EcmwfEcpdsDomain.wam
         case .cma_grapes_global:
-            return CmaDomain.grapes_global
+            return nil // migrated
         case .bom_access_global:
-            return BomDomain.access_global
+            return nil // migrated
         case .best_match:
             return nil
         case .gfs_seamless, .gfs_mix, .ncep_seamless:
@@ -1900,7 +1902,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .ecmwf_wam:
             return try await GenericReader<EcmwfEcpdsDomain, EcmwfEcdpsWamVariable>(domain: .wam, position: gridpoint, options: options)
         case .cma_grapes_global:
-            return try await CmaReader(domain: .grapes_global, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .bom_access_global:
             return nil // migrated
         case .arpae_cosmo_2i, .arpae_cosmo_2i_ruc, .arpae_cosmo_5m, .arpae_cosmo_seamless:
