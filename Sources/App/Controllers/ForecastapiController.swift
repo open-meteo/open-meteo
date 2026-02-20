@@ -478,6 +478,14 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         return .init(name: params.current_weather == true ? "current_weather" : "current", time: currentTimeRange.range.lowerBound, dtSeconds: currentTimeRange.dtSeconds, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let timeRead = currentTimeRange.toSettings(previousDay: previousDay, run: run)
+            
+            if case .surface(let v) = v {
+                if v.variable == .is_day {
+                    let isDay = Zensun.calculateIsDay(timeRange: currentTimeRange, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
+                    return .init(variable: variable, unit: .dimensionless, value: isDay.first ?? .nan)
+                }
+            }
+            
             guard let d = try await readerHourly.get(variable: v, time: timeRead)?.convertAndRound(params: params) else {
                 return .init(variable: variable, unit: .undefined, value: .nan)
             }
@@ -495,6 +503,13 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         return .init(name: "hourly", time: timeHourlyDisplay, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
+            
+            if case .surface(let v) = v {
+                if v.variable == .is_day {
+                    let isDay = Zensun.calculateIsDay(timeRange: timeHourlyRead, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
+                    return .init(variable: variable, unit: .dimensionless, variables: [ApiArray.float(isDay)])
+                }
+            }
             
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
@@ -568,6 +583,14 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
         return .init(name: "minutely_15", time: time.minutely15, columns: try await variables.asyncMap { variable in
             let (v, previousDay) = variable.variableAndPreviousDay
             let members = variable.onlySingleMember ? 0..<1 : 0..<domain.countEnsembleMember
+            
+            if case .surface(let v) = v {
+                if v.variable == .is_day {
+                    let isDay = Zensun.calculateIsDay(timeRange: time.minutely15, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
+                    return .init(variable: variable, unit: .dimensionless, variables: [ApiArray.float(isDay)])
+                }
+            }
+            
             var unit: SiUnit?
             let allMembers: [ApiArray] = try await members.asyncCompactMap { member in
                 let timeRead = time.minutely15.toSettings(previousDay: previousDay, ensembleMemberLevel: member, run: run)
