@@ -459,13 +459,18 @@ extension GenericDomain {
         return SeasonalForecastDeriverMonthly<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
     }
     
-    /// Make a default reader for a single domain with hourly data
-    func makeGenericHourly<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
+    /// Make a default reader for a single domain with hourly data with cache and deriver
+    func makeDerivedHourly<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderOptionalProtocol<ForecastVariable>)? {
         
         guard let reader = try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
             return nil
         }
         return VariableHourlyDeriver<GenericReaderCached<Self, Variable>>(reader: GenericReaderCached(reader: reader), options: options)
+    }
+    
+    /// Make a default reader for a single domain with hourly data
+    func makeHourlyReader<Variable: GenericVariable & Hashable>(variableType: Variable.Type, lat: Float, lon: Float, elevation: Float, mode: GridSelectionMode, options: GenericReaderOptions) async throws -> (any GenericReaderProtocol)? {
+        return try await GenericReader<Self, Variable>(domain: self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
     }
     
     /// Make a default reader for a single domain with hourly data and inject a daily deriver
@@ -490,6 +495,50 @@ extension GenericDomain {
 extension GenericReaderOptionalProtocol where Self.VariableOpt == ForecastVariable {
     func makeDailyAggregator(allowMinMaxTwoAggregations: Bool) -> DailyReaderConverter<Self, ForecastVariableDaily> {
         return .init(reader: self, allowMinMaxTwoAggregations: allowMinMaxTwoAggregations)
+    }
+}
+
+extension GenericReaderProtocol {
+    var asOptionalReader: some GenericReaderOptionalProtocol<ForecastVariable> {
+        return GenericReaderProtocolOptionally(reader: self)
+    }
+}
+
+struct GenericReaderProtocolOptionally<Reader: GenericReaderProtocol>: GenericReaderOptionalProtocol {
+    typealias VariableOpt = ForecastVariable
+    
+    let reader: Reader
+    
+    func get(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> DataAndUnit? {
+        try await reader.get(mixed: variable.rawValue, time: time)
+    }
+    
+    func prefetchData(variable: ForecastVariable, time: TimerangeDtAndSettings) async throws -> Bool {
+        return try await reader.prefetchData(mixed: variable.rawValue, time: time)
+    }
+    
+    var modelLat: Float {
+        reader.modelLat
+    }
+    
+    var modelLon: Float {
+        reader.modelLon
+    }
+    
+    var modelElevation: ElevationOrSea {
+        reader.modelElevation
+    }
+    
+    var targetElevation: Float {
+        reader.targetElevation
+    }
+    
+    var modelDtSeconds: Int {
+        reader.modelDtSeconds
+    }
+    
+    func getStatic(type: ReaderStaticVariable) async throws -> Float? {
+        try await reader.getStatic(type: type)
     }
 }
 

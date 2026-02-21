@@ -880,8 +880,9 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case consolidated_v4
     
     enum DomainReaderMapping {
-        case single(GenericDomain, any GenericVariable.Type)
-        case singleWithPrecipitationProbability(GenericDomain, any GenericVariable.Type, precipitationProb: GenericDomain)
+        case single(any GenericDomain, any GenericVariable.Type)
+        case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
+        case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
     }
     
     /// Generic domains with hourly data that can use the generic defiver controller
@@ -913,6 +914,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .singleWithPrecipitationProbability(BomDomain.access_global, BomVariable.self, precipitationProb: BomDomain.access_global_ensemble)
         case .cma_grapes_global:
             return .single(CmaDomain.grapes_global, CmaVariable.self)
+        case .dmi_harmonie_arome_europe:
+            return .single(DmiDomain.harmonie_arome_europe, DmiVariable.self)
+        case .dmi_seamless:
+            return .multipleWithPrecipitationProbability([
+                (EcmwfDomain.aifs025, EcmwfVariable.self),
+                (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
+                (DmiDomain.harmonie_arome_europe, DmiVariable.self)
+            ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         default:
             return nil
         }
@@ -958,9 +967,18 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             case .single(let domain, let variable):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
-                let a = try await domain.makeGenericHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let prob = try await precipitationProb.makeGenericHourly(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [a, prob].compactMap({$0}))
+                let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, prob].compactMap({$0}))
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            case .multipleWithPrecipitationProbability(let domains, precipitationProb: let precipitationProb):
+                let readers = try await domains.asyncCompactMap { d in
+                    let domain: any GenericDomain = d.0
+                    let variable: any GenericVariable.Type = d.1
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+                let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers + [prob].compactMap({$0}))
                 return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             }
         }
@@ -1130,6 +1148,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
             case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
+            case .multipleWithPrecipitationProbability(_, precipitationProb: _):
+                return (nil, nil, nil, nil)
             }
         }
         
@@ -1366,7 +1386,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .knmi_harmonie_arome_netherlands:
             return try await KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .dmi_harmonie_arome_europe:
-            return try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .knmi_seamless:
             let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let knmiNetherlands: (any GenericReaderProtocol)? = try await KnmiReader(domain: KnmiDomain.harmonie_arome_netherlands, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1375,11 +1395,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities, ecmwf, ifsHres, knmiEurope, knmiNetherlands].compactMap({ $0 })
         case .dmi_seamless:
-            let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let dmiEurope: (any GenericReaderProtocol)? = try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ecmwf = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
-            return [probabilities, ecmwf, ifsHres, dmiEurope].compactMap({ $0 })
+            return [] // migrated
         case .metno_seamless:
             let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             let metno: (any GenericReaderProtocol)? = try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
@@ -1568,6 +1584,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 return domain
             case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _):
                 return domain
+            case .multipleWithPrecipitationProbability(_, precipitationProb: _):
+                return nil
             }
         }
         
@@ -1701,11 +1719,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .knmi_harmonie_arome_netherlands:
             return KnmiDomain.harmonie_arome_netherlands
         case .dmi_harmonie_arome_europe:
-            return DmiDomain.harmonie_arome_europe
+            return nil // migrated
         case .knmi_seamless:
             return nil
         case .dmi_seamless:
-            return nil
+            return nil // migrated
         case .metno_seamless:
             return nil
         case .ukmo_seamless:
@@ -1951,11 +1969,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .knmi_harmonie_arome_netherlands:
             return try await KnmiReader(domain: .harmonie_arome_netherlands, gridpoint: gridpoint, options: options)
         case .dmi_harmonie_arome_europe:
-            return try await DmiReader(domain: .harmonie_arome_europe, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .knmi_seamless:
             return nil
         case .dmi_seamless:
-            return nil
+            return nil // migrated
         case .metno_seamless:
             return nil
         case .ukmo_seamless:
