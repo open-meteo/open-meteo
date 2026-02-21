@@ -538,11 +538,11 @@ extension DomainRegistry {
         case .cmc_gem_geps_ensemble_mean:
             return "cmc-gem-geps"
         case .ncep_gefswave025_ensemble_mean:
-            return "ncep_gefswave025"
+            return "ncep-gefswave025"
         case .ncep_gefs025_ensemble_mean:
-            return "ncep_gefs025"
+            return "ncep-gefs025"
         case .ncep_gefs05_ensemble_mean:
-            return "ncep_gefs05"
+            return "ncep-gefs05"
         case .dwd_icon_eps_ensemble_mean:
             return "dwd-icon-eps"
         case .dwd_icon_eu_eps_ensemble_mean:
