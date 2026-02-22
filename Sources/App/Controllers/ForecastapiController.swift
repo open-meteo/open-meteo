@@ -1134,6 +1134,15 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let arpege_europe = try await MeteoFranceReader(domain: .arpege_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return Array([gfsProbabilites, iconProbabilities, gfs, icon, arpege_europe, arome_france, arome_france_hd, arome_france_15min, arome_france_hd_15min].compacted())
             }
+            // For UK, use MetOffice UK
+            if (49..<61).contains(lat), (-11..<3).contains(lon), let ukmoUk = try await UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+                let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let ecmwf = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let iconEu = try await IconReader(domain: .iconEu, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                let ukmoGlobal: (any GenericReaderProtocol)? = try await UkmoReader(domain: UkmoDomain.global_deterministic_10km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, ecmwf, ifsHres, ukmoGlobal, ukmoUk].compacted())
+            }
             // For Northern Europe and Iceland use DMI Harmonie
             if (44..<66).contains(lat), let dmiEurope = try await DmiReader(domain: DmiDomain.harmonie_arome_europe, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
