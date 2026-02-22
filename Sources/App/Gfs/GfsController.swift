@@ -457,7 +457,7 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                 let visibility = try await get(raw: .surface(.visibility), time: time).data
                 let categoricalFreezingRain = try await get(raw: .surface(.categorical_freezing_rain), time: time).data
                 let liftedIndex = try await get(raw: .surface(.lifted_index), time: time).data
-                return DataAndUnit(WeatherCode.calculate(
+                var weatherCode = WeatherCode.calculate(
                     cloudcover: cloudcover,
                     precipitation: precipitation,
                     convectivePrecipitation: showers,
@@ -467,8 +467,18 @@ struct GfsReader: GenericReaderDerived, GenericReaderProtocol {
                     liftedIndex: liftedIndex,
                     visibilityMeters: visibility,
                     categoricalFreezingRain: categoricalFreezingRain,
-                    modelDtSeconds: time.dtSeconds), .wmoCode
-                )
+                    modelDtSeconds: time.dtSeconds)
+                // Correct snow/rain in weather code according to temperature.
+                // GFS CPOFP (frozen precipitation %) can be unreliable at very small
+                // precipitation amounts, causing rain codes at sub-freezing temperatures.
+                let temperature = try await get(raw: .surface(.temperature_2m), time: time).data
+                for i in weatherCode.indices {
+                    guard weatherCode[i].isFinite, let wc = WeatherCode(rawValue: Int(weatherCode[i])) else {
+                        continue
+                    }
+                    weatherCode[i] = Float(wc.correctSnowRainHardCutOff(temperature_2m: temperature[i]).rawValue)
+                }
+                return DataAndUnit(weatherCode, .wmoCode)
             case .is_day:
                 return DataAndUnit(Zensun.calculateIsDay(timeRange: time.time, lat: reader.modelLat, lon: reader.modelLon), .dimensionlessInteger)
             case .temperature_120m:
