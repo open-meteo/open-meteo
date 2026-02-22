@@ -53,7 +53,7 @@ actor OmSpatialTimestepWriter {
         self.storeOnDisk = storeOnDisk
         self.fn = nil
         self.ensembleMean = ensembleMeanDomain.map { ens in
-            (OmSpatialTimestepWriter(domain: ens, run: run, time: time, storeOnDisk: true, realm: nil), EnsembleMeanCalculator())
+            (OmSpatialTimestepWriter(domain: ens, run: run, time: time, storeOnDisk: false, realm: nil), EnsembleMeanCalculator())
         }
     }
     
