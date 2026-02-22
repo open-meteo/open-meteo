@@ -370,7 +370,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .uv_index:
             // 0.025 m2/W to get the uv index
             // compared to https://www.aemet.es/es/eltiempo/prediccion/radiacionuv
-            return (0, 1 / 0.25)
+            return (0, 1 / 0.025)
         case .pressure_msl:
             return (0, 1 / 100)
         default:
