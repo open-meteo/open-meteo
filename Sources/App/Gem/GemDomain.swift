@@ -10,6 +10,16 @@ enum GemDomain: String, GenericDomain, CaseIterable {
     case gem_hrdps_continental
     case gem_hrdps_west
     case gem_global_ensemble
+    case gem_global_ensemble_mean
+    
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .gem_global_ensemble:
+            return .gem_global_ensemble_mean
+        default:
+            return nil
+        }
+    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -23,11 +33,18 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return .cmc_gem_hrdps_west
         case .gem_global_ensemble:
             return .cmc_gem_geps
+        case .gem_global_ensemble_mean:
+            return .cmc_gem_geps_ensemble_mean
         }
     }
 
     var domainRegistryStatic: DomainRegistry? {
-        return domainRegistry
+        switch self {
+        case .gem_global_ensemble_mean:
+            return .cmc_gem_geps
+        default:
+            return domainRegistry
+        }
     }
 
     var hasYearlyFiles: Bool {
@@ -48,7 +65,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .gem_hrdps_west:
             return 3600
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
             return 3 * 3600
         }
     }
@@ -62,7 +79,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return false
         case .gem_hrdps_west:
             return false
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
             return true
         }
     }
@@ -75,7 +92,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return 6 * 3600
         case .gem_hrdps_west:
             return 12 * 3600
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
             return 12 * 3600
         }
     }
@@ -102,6 +119,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return t.add(-6 * 3600).floor(toNearest: 12 * 3600)
         case .gem_global_ensemble:
             return t.add(-3 * 3600).floor(toNearest: 12 * 3600)
+        case .gem_global_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -118,6 +137,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
         case .gem_global_ensemble:
             let through = run.hour == 0 && (run.weekday == .thursday || run.weekday == .monday) ? 936 : 384
             return Array(stride(from: 0, to: 192, by: 3)) + Array(stride(from: 192, through: through, by: 6))
+        case .gem_global_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -130,7 +151,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return [1015, 1000, 985, 970, 950, 925, 900, 875, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
         case .gem_hrdps_west:
             return [1015, 1000, 985, 970, 950, 925, 900, 850, 800, 750, 700, 650, 600, 550, 500, 450, 400, 350, 300, 275, 250, 225, 200, 175, 150, 100, 50].reversed()
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
             /// Smaller selection, same as ECMWF IFS04
             return [50, 200, 250, 300, 500, 700, 850, 925, 1000]
         }
@@ -148,6 +169,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return 1
         case .gem_global_ensemble:
             return 20 + 1
+        case .gem_global_ensemble_mean:
+            return 1
         }
     }
 
@@ -168,6 +191,8 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return "\(alphaServer)model_hrdps/west/1km/grib2/\(run.hh)/\(h3)/CMC_hrdps_west_\(gribName)_rotated_latlon0.009x0.009_\(run.format_YYYYMMdd)T\(run.hh)Z_P\(h3)-00.grib2"
         case .gem_global_ensemble:
             return "\(server)ensemble/geps/grib2/raw/\(run.hh)/\(h3)/CMC_geps-raw_\(gribName)_latlon0p5x0p5_\(yyyymmddhh)_P\(h3)_allmbrs.grib2"
+        case .gem_global_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -181,7 +206,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
             return 48 + 36
         case .gem_hrdps_west:
             return 48 + 36
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
             return 384 / 3 + 48 / 3 // 144
         }
     }
@@ -208,7 +233,7 @@ enum GemDomain: String, GenericDomain, CaseIterable {
                 dy: 0.00899,
                 projection: RotatedLatLonProjection(latitude: 33.443381, longitude: 86.463574)
             )
-        case .gem_global_ensemble:
+        case .gem_global_ensemble, .gem_global_ensemble_mean:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         }
     }

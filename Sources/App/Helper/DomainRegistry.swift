@@ -38,6 +38,7 @@ enum DomainRegistry: String, CaseIterable {
 
     case cmc_gem_gdps
     case cmc_gem_geps
+    case cmc_gem_geps_ensemble_mean
     case cmc_gem_hrdps
     case cmc_gem_hrdps_west
     case cmc_gem_rdps
@@ -47,8 +48,11 @@ enum DomainRegistry: String, CaseIterable {
     case ncep_gfswave025
     case ncep_gfswave016
     case ncep_gefswave025
+    case ncep_gefswave025_ensemble_mean
     case ncep_gefs025
+    case ncep_gefs025_ensemble_mean
     case ncep_gefs05
+    case ncep_gefs05_ensemble_mean
     case ncep_hrrr_conus
     case ncep_hrrr_conus_15min
     case ncep_cfsv2
@@ -78,6 +82,9 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_icon_eps
     case dwd_icon_eu_eps
     case dwd_icon_d2_eps
+    case dwd_icon_eps_ensemble_mean
+    case dwd_icon_eu_eps_ensemble_mean
+    case dwd_icon_d2_eps_ensemble_mean
     case dwd_ewam
     case dwd_gwam
     case dwd_sis_europe_africa_v4
@@ -87,12 +94,15 @@ enum DomainRegistry: String, CaseIterable {
     case ecmwf_ifs04_ensemble
     case ecmwf_ifs025
     case ecmwf_ifs025_ensemble
+    case ecmwf_ifs025_ensemble_mean
     case ecmwf_aifs025
     case ecmwf_aifs025_single
     case ecmwf_aifs025_ensemble
+    case ecmwf_aifs025_ensemble_mean
     case ecmwf_wam
     case ecmwf_wam025
     case ecmwf_wam025_ensemble
+    case ecmwf_wam025_ensemble_mean
     case ecmwf_ifs_analysis
     case ecmwf_ifs_analysis_long_window
     case ecmwf_ifs_long_window
@@ -138,8 +148,10 @@ enum DomainRegistry: String, CaseIterable {
 
     case ukmo_global_deterministic_10km
     case ukmo_global_ensemble_20km
+    case ukmo_global_ensemble_mean_20km
     case ukmo_uk_deterministic_2km
     case ukmo_uk_ensemble_2km
+    case ukmo_uk_ensemble_mean_2km
 
     case eumetsat_sarah3_30min
     case jma_jaxa_himawari_10min
@@ -157,6 +169,8 @@ enum DomainRegistry: String, CaseIterable {
     case meteoswiss_icon_ch2
     case meteoswiss_icon_ch1_ensemble
     case meteoswiss_icon_ch2_ensemble
+    case meteoswiss_icon_ch1_ensemble_mean
+    case meteoswiss_icon_ch2_ensemble_mean
 
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
@@ -324,11 +338,15 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.ifs025
         case .ecmwf_ifs025_ensemble:
             return EcmwfDomain.ifs025_ensemble
+        case .ecmwf_ifs025_ensemble_mean:
+            return EcmwfDomain.ifs025_ensemble
         case .ecmwf_aifs025:
             return EcmwfDomain.aifs025
         case .ecmwf_aifs025_single:
             return EcmwfDomain.aifs025_single
         case .ecmwf_aifs025_ensemble:
+            return EcmwfDomain.aifs025_ensemble
+        case .ecmwf_aifs025_ensemble_mean:
             return EcmwfDomain.aifs025_ensemble
         case .ecmwf_seas5:
             return EcmwfSeasDomain.seas5
@@ -395,6 +413,8 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfDomain.wam025
         case .ecmwf_wam025_ensemble:
             return EcmwfDomain.wam025_ensemble
+        case .ecmwf_wam025_ensemble_mean:
+            return EcmwfDomain.wam025_ensemble_mean
         case .ncep_gfswave025:
             return GfsDomain.gfswave025
         case .ncep_gefswave025:
@@ -455,6 +475,10 @@ enum DomainRegistry: String, CaseIterable {
             return MeteoSwissDomain.icon_ch1_ensemble
         case .meteoswiss_icon_ch2_ensemble:
             return MeteoSwissDomain.icon_ch2_ensemble
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return MeteoSwissDomain.icon_ch1_ensemble_mean
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return MeteoSwissDomain.icon_ch2_ensemble_mean
         case .ecmwf_seas5_ensemble_mean:
             return EcmwfSeasDomain.seas5_ensemble_mean
         case .ecmwf_seas5_daily_ensemble_mean:
@@ -463,6 +487,24 @@ enum DomainRegistry: String, CaseIterable {
             return EcmwfSeasDomain.ec46_ensemble_mean
         case .dwd_sis_europe_africa_v4:
             return DwdSisDomain.europe_africa_v4
+        case .cmc_gem_geps_ensemble_mean:
+            return GemDomain.gem_global_ensemble_mean
+        case .ncep_gefswave025_ensemble_mean:
+            return GfsDomain.gefswave025_ensemble_mean
+        case .ncep_gefs025_ensemble_mean:
+            return GfsDomain.gefs025_ensemble_mean
+        case .ncep_gefs05_ensemble_mean:
+            return GfsDomain.gefs05_ensemble_mean
+        case .dwd_icon_eps_ensemble_mean:
+            return IconDomains.iconEpsEnsembleMean
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return IconDomains.iconEuEpsEnsembleMean
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return IconDomains.iconD2EpsEnsembleMean
+        case .ukmo_global_ensemble_mean_20km:
+            return UkmoDomain.global_ensemble_mean_20km
+        case .ukmo_uk_ensemble_mean_2km:
+            return UkmoDomain.uk_ensemble_mean_2km
         }
     }
 }
@@ -492,7 +534,40 @@ extension Process {
 
 extension DomainRegistry {
     var bucketName: String {
-        return rawValue.replacing("_", with: "-").lowercased()
+        switch self {
+        case .cmc_gem_geps_ensemble_mean:
+            return "cmc-gem-geps"
+        case .ncep_gefswave025_ensemble_mean:
+            return "ncep-gefswave025"
+        case .ncep_gefs025_ensemble_mean:
+            return "ncep-gefs025"
+        case .ncep_gefs05_ensemble_mean:
+            return "ncep-gefs05"
+        case .dwd_icon_eps_ensemble_mean:
+            return "dwd-icon-eps"
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return "dwd-icon-eu-eps"
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return "dwd-icon-d2-eps"
+        case .ukmo_global_ensemble_mean_20km:
+            return "ukmo-global-ensemble-20km"
+        case .ukmo_uk_ensemble_mean_2km:
+            return "ukmo-uk-ensemble-2km"
+        case .ncep_aigefs025_ensemble_mean:
+            return "ncep-aigefs025"
+        case .ecmwf_ifs025_ensemble_mean:
+            return "ecmwf-ifs025-ensemble"
+        case .ecmwf_aifs025_ensemble_mean:
+            return "ecmwf-aifs025-ensemble"
+        case .ecmwf_wam025_ensemble_mean:
+            return "ecmwf-wam025-ensemble"
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return "meteoswiss-icon-ch1-ensemble"
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return "meteoswiss-icon-ch2-ensemble"
+        default:
+            return rawValue.replacing("_", with: "-").lowercased()
+        }
     }
     
     func parseBucket(_ buckets: String) -> [(bucket: String, profile: String?)] {
@@ -505,7 +580,7 @@ extension DomainRegistry {
     }
     
     /// Upload all data to a specified S3 bucket
-    func syncToS3(logger: Logger, bucket: String, variables: [GenericVariable]?) async throws {
+    func syncToS3(logger: Logger, bucket: String, variables: [any GenericVariable]?) async throws {
         let dir = rawValue
         if let variables {
             let vDirectories = variables.map { $0.omFileName.file } + ["static"]

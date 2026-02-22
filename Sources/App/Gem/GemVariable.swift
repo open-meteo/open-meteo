@@ -280,6 +280,8 @@ enum GemSurfaceVariable: String, CaseIterable, GemVariableDownloadable, GenericV
             case .snow_depth:
                 return "SNOD_SFC_0"
             }
+        case .gem_global_ensemble_mean:
+            fatalError()
         }
     }
 
