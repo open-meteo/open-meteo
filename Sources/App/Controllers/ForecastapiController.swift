@@ -1117,8 +1117,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let iconD2 = try await IconReader(domain: .iconD2, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 return Array([gfsProbabilites, probabilities, gfs, icon, iconEu, iconD2, ecmwf, ifsHres, metno].compacted())
             }
-            // For UK, use MetOffice UK
-            if (49.9..<61).contains(lat), (-11..<1.8).contains(lon), let ukmoUk = try await UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
+            // For UK, use MetOffice UK, but cut out the English channel triangle for Northern France
+            let isInUkRectangle = RegionGeometry.isInRectangle(lat: lat, lon: lon, latitude: 49.9..<61, longitude: -11..<1.8)
+            let channelTriangleA = (lat: Float(49.9), lon: Float(-0.2))
+            let channelTriangleB = (lat: Float(49.9), lon: Float(1.8))
+            let channelTriangleC = (lat: Float(51.1), lon: Float(1.8))
+            let isInChannelCutOutTriangle = RegionGeometry.isInTriangle(lat: lat, lon: lon, a: channelTriangleA, b: channelTriangleB, c: channelTriangleC)
+            if isInUkRectangle, !isInChannelCutOutTriangle, let ukmoUk = try await UkmoReader(domain: UkmoDomain.uk_deterministic_2km, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) {
                 let probabilities = try await ProbabilityReader.makeEcmwfReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let ecmwf = try await EcmwfReader(domain: .ifs025, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 let ifsHres = try await EcmwfEcpdsReader(domain: .ifs, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
