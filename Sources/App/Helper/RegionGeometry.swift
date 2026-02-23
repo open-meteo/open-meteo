@@ -11,20 +11,38 @@ enum RegionGeometry {
         b: (lat: Float, lon: Float),
         c: (lat: Float, lon: Float)
     ) -> Bool {
+        @inline(__always)
+        func cross(
+            _ a: (x: Float, y: Float),
+            _ b: (x: Float, y: Float),
+            _ p: (x: Float, y: Float)
+        ) -> Float {
+            (p.x - a.x) * (b.y - a.y) - (p.y - a.y) * (b.x - a.x)
+        }
+
         let p = (x: lon, y: lat)
         let a = (x: a.lon, y: a.lat)
         let b = (x: b.lon, y: b.lat)
         let c = (x: c.lon, y: c.lat)
 
-        let denominator = ((b.y - c.y) * (a.x - c.x) + (c.x - b.x) * (a.y - c.y))
-        if denominator == 0 {
+        // Degenerate triangle (zero area)
+        let area2 = cross(a, b, c)
+        if area2 == 0 {
             return false
         }
 
-        let alpha = ((b.y - c.y) * (p.x - c.x) + (c.x - b.x) * (p.y - c.y)) / denominator
-        let beta = ((c.y - a.y) * (p.x - c.x) + (a.x - c.x) * (p.y - c.y)) / denominator
-        let gamma = 1 - alpha - beta
+        let d1 = cross(a, b, p)
+        let d2 = cross(b, c, p)
+        
+        // If d1 and d2 have different signs, the point is definitely outside.
+        if (d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0) { return false }
 
-        return alpha >= 0 && beta >= 0 && gamma >= 0
+        let d3 = cross(c, a, p)
+
+        let hasNegative = d1 < 0 || d2 < 0 || d3 < 0
+        let hasPositive = d1 > 0 || d2 > 0 || d3 > 0
+
+        // Inside or on edge when all signs are consistent.
+        return !(hasNegative && hasPositive)
     }
 }
