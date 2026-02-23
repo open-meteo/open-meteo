@@ -247,6 +247,14 @@ struct UkmoDownload: AsyncCommand {
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
+        /// Domain elevation field, needed to correct freezing level height
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation
+        }()
+
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
         let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
@@ -296,9 +304,8 @@ struct UkmoDownload: AsyncCommand {
                         }
                         // UKMO provides freezing level as AGL. Convert to ASL
                         if variable == .freezing_level_height {
-                            let elevation = try await domain.getStaticFile(type: .elevation, httpClient: application.http1Client, logger: logger)!.read(range: nil)
                             for i in data.indices {
-                                data[i] += elevation[i]
+                                data[i] += domainElevation[i]
                             }
                         }
                     }
