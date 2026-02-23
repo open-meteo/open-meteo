@@ -252,7 +252,7 @@ struct UkmoDownload: AsyncCommand {
             guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
                 fatalError("cannot read elevation for domain \(domain)")
             }
-            return elevation
+            return elevation.map { $0.isApproximatelyEqual(to: -999) ? 0 : $0 }
         }()
 
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
