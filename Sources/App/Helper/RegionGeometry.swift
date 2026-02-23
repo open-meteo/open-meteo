@@ -25,18 +25,8 @@ enum RegionGeometry {
         let b = (x: b.lon, y: b.lat)
         let c = (x: c.lon, y: c.lat)
 
-        // Degenerate triangle (zero area)
-        let area2 = cross(a, b, c)
-        if area2 == 0 {
-            return false
-        }
-
         let d1 = cross(a, b, p)
         let d2 = cross(b, c, p)
-        
-        // If d1 and d2 have different signs, the point is definitely outside.
-        if (d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0) { return false }
-
         let d3 = cross(c, a, p)
 
         let hasNegative = d1 < 0 || d2 < 0 || d3 < 0
