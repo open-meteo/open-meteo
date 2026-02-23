@@ -1138,6 +1138,40 @@ extension MultiDomains {
         case .dwd_sis_europe_africa_v4:
             // TODO register domain in SDK
             return .iconD2
+        case .dwd_icon_eps_ensemble_mean_seamless:
+            return .dwdIconEpsEnsembleMeanSeamless
+        case .dwd_icon_eps_ensemble_mean:
+            return .dwdIconEpsEnsembleMean
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return .dwdIconEuEpsEnsembleMean
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return .dwdIconD2EpsEnsembleMean
+        case .ecmwf_ifs025_ensemble_mean:
+            return .ecmwfIfs025EnsembleMean
+        case .ecmwf_aifs025_ensemble_mean:
+            return .ecmwfAifs025EnsembleMean
+        case .ncep_gefs025_ensemble_mean:
+            return .ncepGefs025EnsembleMean
+        case .ncep_gefs05_ensemble_mean:
+            return .ncepGefs05EnsembleMean
+        case .ncep_gefs_ensemble_mean_seamless:
+            return .ncepGefsEnsembleMeanSeamless
+        case .cmc_gem_geps_ensemble_mean:
+            return .cmcGemGepsEnsembleMean
+        case .bom_access_global_ensemble_mean:
+            return .bomAccessGlobalEnsemble // TODO mean domain in SDK
+        case .ukmo_global_ensemble_mean_20km:
+            return .ukmoGlobalEnsembleMean20km
+        case .ukmo_uk_ensemble_mean_2km:
+            return .ukmoUkEnsembleMean2km
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return .meteoswissIconCh1EnsembleMean
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return .meteoswissIconCh2EnsembleMean
+        case .ecmwf_wam025_ensemble_mean:
+            return .ecmwfWam025Ensemble // TODO register mean
+        case .ncep_gefswave025_ensemble_mean:
+            return .ncepGefswave025 // TODO register mean
         }
     }
 }

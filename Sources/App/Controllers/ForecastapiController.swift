@@ -879,13 +879,32 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
     case forecast_v4
     case consolidated_v4
     
+    case dwd_icon_eps_ensemble_mean_seamless
+    case dwd_icon_eps_ensemble_mean
+    case dwd_icon_eu_eps_ensemble_mean
+    case dwd_icon_d2_eps_ensemble_mean
+    case ecmwf_ifs025_ensemble_mean
+    case ecmwf_aifs025_ensemble_mean
+    case ncep_gefs025_ensemble_mean
+    case ncep_gefs05_ensemble_mean
+    case ncep_gefs_ensemble_mean_seamless
+    case cmc_gem_geps_ensemble_mean
+    case bom_access_global_ensemble_mean
+    case ukmo_global_ensemble_mean_20km
+    case ukmo_uk_ensemble_mean_2km
+    case meteoswiss_icon_ch1_ensemble_mean
+    case meteoswiss_icon_ch2_ensemble_mean
+    case ecmwf_wam025_ensemble_mean
+    case ncep_gefswave025_ensemble_mean
+    
     enum DomainReaderMapping {
         case single(any GenericDomain, any GenericVariable.Type)
+        case multiple([(any GenericDomain, any GenericVariable.Type)])
         case singleWithPrecipitationProbability(any GenericDomain, any GenericVariable.Type, precipitationProb: any GenericDomain)
         case multipleWithPrecipitationProbability([(any GenericDomain, any GenericVariable.Type)], precipitationProb: any GenericDomain)
     }
     
-    /// Generic domains with hourly data that can use the generic defiver controller
+    /// Generic domains with hourly data that can use the generic deriver controller
     func getDomainAndVariable() -> DomainReaderMapping? {
         switch self {
         case .ncep_aigfs025:
@@ -922,6 +941,46 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 (EcmwfEcpdsDomain.ifs, EcmwfEcdpsIfsVariable.self),
                 (DmiDomain.harmonie_arome_europe, DmiVariable.self)
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
+        case .dwd_icon_eps_ensemble_mean_seamless:
+            return .multiple([
+                (IconDomains.iconEpsEnsembleMean, VariableOrSpread<IconVariable>.self),
+                (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+            ])
+        case .dwd_icon_eps_ensemble_mean:
+            return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return .single(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return .single(IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+        case .ecmwf_ifs025_ensemble_mean:
+            return .single(EcmwfDomain.ifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
+        case .ecmwf_aifs025_ensemble_mean:
+            return .single(EcmwfDomain.aifs025_ensemble_mean, VariableOrSpread<EcmwfVariable>.self)
+        case .ncep_gefs025_ensemble_mean:
+            return .single(GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+        case .ncep_gefs05_ensemble_mean:
+            return .single(GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+        case .ncep_gefs_ensemble_mean_seamless:
+            return .multiple([
+                (GfsDomain.gefs05_ensemble_mean, VariableOrSpread<GfsVariable>.self),
+                (GfsDomain.gefs025_ensemble_mean, VariableOrSpread<GfsVariable>.self)
+            ])
+        case .cmc_gem_geps_ensemble_mean:
+            return .single(GemDomain.gem_global_ensemble_mean, VariableOrSpread<GemVariable>.self)
+        case .bom_access_global_ensemble_mean:
+            return .single(BomDomain.access_global_ensemble, VariableOrSpread<BomVariable>.self)
+        case .ukmo_global_ensemble_mean_20km:
+            return .single(UkmoDomain.global_ensemble_mean_20km, VariableOrSpread<UkmoVariable>.self)
+        case .ukmo_uk_ensemble_mean_2km:
+            return .single(UkmoDomain.uk_ensemble_mean_2km, VariableOrSpread<UkmoVariable>.self)
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return .single(MeteoSwissDomain.icon_ch1_ensemble_mean, VariableOrSpread<MeteoSwissVariable>.self)
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return .single(MeteoSwissDomain.icon_ch2_ensemble_mean, VariableOrSpread<MeteoSwissVariable>.self)
+        case .ecmwf_wam025_ensemble_mean:
+            return .single(EcmwfDomain.wam025_ensemble_mean, VariableOrSpread<EcmwfWaveVariable>.self)
+        case .ncep_gefswave025_ensemble_mean:
+            return .single(GfsDomain.gefswave025_ensemble_mean, VariableOrSpread<GfsWaveVariable>.self)
         default:
             return nil
         }
@@ -979,6 +1038,14 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 }
                 let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
                 let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers + [prob].compactMap({$0}))
+                return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
+            case .multiple(let domains):
+                let readers = try await domains.asyncCompactMap { d in
+                    let domain: any GenericDomain = d.0
+                    let variable: any GenericVariable.Type = d.1
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
+                }
+                let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
                 return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
             }
         }
@@ -1149,6 +1216,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: _):
                 return try await domain.makeGenericHourlyDaily(variableType: variable, position: gridpoint, options: options)
             case .multipleWithPrecipitationProbability(_, precipitationProb: _):
+                return (nil, nil, nil, nil)
+            case .multiple(_):
                 return (nil, nil, nil, nil)
             }
         }
@@ -1574,6 +1643,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return []
         case .dwd_sis_europe_africa_v4:
             return []
+        case .dwd_icon_eps_ensemble_mean_seamless, .dwd_icon_eps_ensemble_mean, .dwd_icon_eu_eps_ensemble_mean, .dwd_icon_d2_eps_ensemble_mean, .ecmwf_ifs025_ensemble_mean, .ecmwf_aifs025_ensemble_mean, .ncep_gefs025_ensemble_mean, .ncep_gefs05_ensemble_mean, .ncep_gefs_ensemble_mean_seamless, .cmc_gem_geps_ensemble_mean, .bom_access_global_ensemble_mean, .ukmo_global_ensemble_mean_20km, .ukmo_uk_ensemble_mean_2km, .meteoswiss_icon_ch1_ensemble_mean, .meteoswiss_icon_ch2_ensemble_mean, .ecmwf_wam025_ensemble_mean, .ncep_gefswave025_ensemble_mean:
+            return [] // migrated
         }
     }
 
@@ -1585,6 +1656,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             case .singleWithPrecipitationProbability(let domain, _, precipitationProb: _):
                 return domain
             case .multipleWithPrecipitationProbability(_, precipitationProb: _):
+                return nil
+            case .multiple(_):
                 return nil
             }
         }
@@ -1836,6 +1909,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .dwd_sis_europe_africa_v4:
             return nil
+        case .dwd_icon_eps_ensemble_mean_seamless, .dwd_icon_eps_ensemble_mean, .dwd_icon_eu_eps_ensemble_mean, .dwd_icon_d2_eps_ensemble_mean, .ecmwf_ifs025_ensemble_mean, .ecmwf_aifs025_ensemble_mean, .ncep_gefs025_ensemble_mean, .ncep_gefs05_ensemble_mean, .ncep_gefs_ensemble_mean_seamless, .cmc_gem_geps_ensemble_mean, .bom_access_global_ensemble_mean, .ukmo_global_ensemble_mean_20km, .ukmo_uk_ensemble_mean_2km, .meteoswiss_icon_ch1_ensemble_mean, .meteoswiss_icon_ch2_ensemble_mean, .ecmwf_wam025_ensemble_mean, .ncep_gefswave025_ensemble_mean:
+            return nil // migrated
         }
     }
 
@@ -2088,6 +2163,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return nil
         case .dwd_sis_europe_africa_v4:
             return nil
+        case .dwd_icon_eps_ensemble_mean_seamless, .dwd_icon_eps_ensemble_mean, .dwd_icon_eu_eps_ensemble_mean, .dwd_icon_d2_eps_ensemble_mean, .ecmwf_ifs025_ensemble_mean, .ecmwf_aifs025_ensemble_mean, .ncep_gefs025_ensemble_mean, .ncep_gefs05_ensemble_mean, .ncep_gefs_ensemble_mean_seamless, .cmc_gem_geps_ensemble_mean, .bom_access_global_ensemble_mean, .ukmo_global_ensemble_mean_20km, .ukmo_uk_ensemble_mean_2km, .meteoswiss_icon_ch1_ensemble_mean, .meteoswiss_icon_ch2_ensemble_mean, .ecmwf_wam025_ensemble_mean, .ncep_gefswave025_ensemble_mean:
+            return nil // migrated
         }
     }
 
