@@ -181,6 +181,15 @@
       }
     },
     {
+      "identity" : "swift-hdf5",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-meteo/swift-hdf5.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "037a8c5901e638865a3f24e73987d1b6b81d8d0d"
+      }
+    },
+    {
       "identity" : "swift-http-structured-headers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-structured-headers.git",
