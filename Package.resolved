@@ -1,5 +1,5 @@
 {
-  "originHash" : "ac46c4963f41df0bec5dd167c57eda947c442d5813b4d85a547f81e0f896363a",
+  "originHash" : "cd83ea0014132d5340be0ed314d728f25525302dd8984bfb1748ddb560345e89",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -163,6 +163,15 @@
       }
     },
     {
+      "identity" : "swift-hdf5",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-meteo/swift-hdf5.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "037a8c5901e638865a3f24e73987d1b6b81d8d0d"
+      }
+    },
+    {
       "identity" : "swift-http-structured-headers",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-http-structured-headers.git",
@@ -284,8 +293,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftEccodes.git",
       "state" : {
-        "revision" : "6b4a9b8f2f360c4edec54a2acaeb653c2b3868e8",
-        "version" : "1.1.0"
+        "revision" : "98b77f84a2f5a890eb9a7d0c584174decfd66ce7",
+        "version" : "1.1.1"
       }
     },
     {
