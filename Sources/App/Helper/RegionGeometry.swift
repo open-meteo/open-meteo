@@ -35,4 +35,15 @@ enum RegionGeometry {
         // Inside or on edge when all signs are consistent.
         return !(hasNegative && hasPositive)
     }
+    
+    static func isInUKVArea(lat: Float, lon: Float) -> Bool {
+        let isInUkRectangle = RegionGeometry.isInRectangle(lat: lat, lon: lon, latitude: 49.9..<61, longitude: -11..<1.8)
+        let channelTriangleA = (lat: Float(49.9), lon: Float(-0.2))
+        let channelTriangleB = (lat: Float(49.9), lon: Float(1.8))
+        let channelTriangleC = (lat: Float(51.1), lon: Float(1.8))
+        let isInChannelCutOutTriangle = RegionGeometry.isInTriangle(lat: lat, lon: lon, a: channelTriangleA, b: channelTriangleB, c: channelTriangleC)
+        return isInUkRectangle && !isInChannelCutOutTriangle
+    }
 }
+
+
