@@ -1,5 +1,5 @@
 {
-  "originHash" : "ac46c4963f41df0bec5dd167c57eda947c442d5813b4d85a547f81e0f896363a",
+  "originHash" : "aa3e94a2f8d7fc8316c141a54d9f3a557e7a133895082ee5d9ae0de2ac45488a",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -284,8 +284,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftEccodes.git",
       "state" : {
-        "revision" : "6b4a9b8f2f360c4edec54a2acaeb653c2b3868e8",
-        "version" : "1.1.0"
+        "revision" : "98b77f84a2f5a890eb9a7d0c584174decfd66ce7",
+        "version" : "1.1.1"
       }
     },
     {
