@@ -81,7 +81,7 @@ struct UkmoDownload: AsyncCommand {
         let allHeight = UkmoHeightVariableType.allCases.map { UkmoHeightVariable(variable: $0, level: -1) }
         let variables = onlyVariables ?? (signature.surface ? allSurface : []) + (signature.pressure ? allPressure : []) + (signature.height ? allHeight : [])
         let generateFullRun = domain.countEnsembleMember == 1
-        
+
         /// Process a range of runs
         if let timeinterval = signature.timeinterval {
             /*if signature.fixSolar {
@@ -111,7 +111,7 @@ struct UkmoDownload: AsyncCommand {
     /*func fixSolarFiles(application: Application, domain: UkmoDomain, timerange: ClosedRange<Timestamp>) throws {
         let nTimePerFile = domain.omFileLength
         let indexTime = timerange.toRange(dt: domain.dtSeconds).toIndexTime()
-        
+
         for variable in [UkmoSurfaceVariable.shortwave_radiation, .direct_radiation] {
             for timeChunk in indexTime.divideRoundedUp(divisor: nTimePerFile) {
                 for previousDay in 1..<10 { // 0..<10}
@@ -125,10 +125,10 @@ struct UkmoDownload: AsyncCommand {
                     let tempFile = fileName + "~"
                     try FileManager.default.removeItemIfExists(at: tempFile)
                     let fn = try FileHandle.createNewFile(file: tempFile)
-                    
+
                     let writer = try OmFileWriterState<FileHandle>(fn: fn, dim0: omRead.dim0, dim1: omRead.dim1, chunk0: omRead.chunk0, chunk1: omRead.chunk1, compression: omRead.compression, scalefactor: omRead.scalefactor, fsync: true)
                     try writer.writeHeader()
-                    
+
                     // loop over data in chunks
                     for locations in (0..<omRead.dim0).chunks(ofCount: omRead.chunk0) {
                         var data = try omRead.read(dim0Slow: locations, dim1: nil)
@@ -141,10 +141,10 @@ struct UkmoDownload: AsyncCommand {
                         }
                         try writer.write(ArraySlice(data))
                     }
-                    
+
                     try writer.writeTail()
                     try writer.fn.close()
-                    
+
                     // Overwrite existing file, with newly created
                     try FileManager.default.moveFileOverwrite(from: tempFile, to: fileName)
                 }
@@ -249,6 +249,14 @@ struct UkmoDownload: AsyncCommand {
 
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours, retryError4xx: !skipMissing)
 
+        /// Domain elevation field, needed to correct freezing level height
+        let domainElevation = await {
+            guard let elevation = try? await domain.getStaticFile(type: .elevation, httpClient: curl.client, logger: logger)?.read(range: nil) else {
+                fatalError("cannot read elevation for domain \(domain)")
+            }
+            return elevation.map { $0 == -999 ? 0 : $0 }
+        }()
+
         let server = server ?? "https://\(domain.s3Bucket).s3-eu-west-2.amazonaws.com/"
         let timeStr = (domain == .global_ensemble_20km || domain == .uk_ensemble_2km) ? "\(run.format_directoriesYYYYMMdd)/T\(run.hh)00" : run.iso8601_YYYYMMddTHHmm
         let baseUrl = "\(server)\(domain.modelNameOnS3)/\(timeStr)Z/"
@@ -294,6 +302,12 @@ struct UkmoDownload: AsyncCommand {
                                     continue
                                 }
                                 data[i] /= factor.data[i]
+                            }
+                        }
+                        // UKMO provides freezing level as AGL. Convert to ASL
+                        if variable == .freezing_level_height {
+                            for i in data.indices {
+                                data[i] += domainElevation[i]
                             }
                         }
                     }

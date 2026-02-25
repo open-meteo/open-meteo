@@ -211,4 +211,10 @@ import Testing
         let ukmoRegionalDeterministicGridBounds = UkmoDomain.uk_deterministic_2km.grid.gridBounds
         #expect(ukmoRegionalDeterministicGridBounds == GridBounds(lat_bounds: 44.508755...61.92511, lon_bounds: -17.152863...15.352753))
     }
+    
+    @Test func ukvArea() {
+        #expect(RegionGeometry.isInUKVArea(lat: 50.413732848903294, lon: 0.18312197439166766))
+        #expect(!RegionGeometry.isInUKVArea(lat: 50.26080458809449, lon: 1.1836113344081411))
+        #expect(!RegionGeometry.isInUKVArea(lat: 49.553874448314076, lon: 2.289155264059019))
+    }
 }
