@@ -1,4 +1,15 @@
 enum RegionGeometry {
+    struct Point {
+        let lat: Float
+        let lon: Float
+    }
+
+    struct Triangle {
+        let a: Point
+        let b: Point
+        let c: Point
+    }
+
     // Region checks used by best_match routing.
     @inlinable static func isInRectangle(lat: Float, lon: Float, latitude: Range<Float>, longitude: Range<Float>) -> Bool {
         latitude.contains(lat) && longitude.contains(lon)
@@ -7,9 +18,7 @@ enum RegionGeometry {
     @inlinable static func isInTriangle(
         lat: Float,
         lon: Float,
-        a: (lat: Float, lon: Float),
-        b: (lat: Float, lon: Float),
-        c: (lat: Float, lon: Float)
+        triangle: Triangle
     ) -> Bool {
         @inline(__always)
         func cross(
@@ -21,9 +30,9 @@ enum RegionGeometry {
         }
 
         let p = (x: lon, y: lat)
-        let a = (x: a.lon, y: a.lat)
-        let b = (x: b.lon, y: b.lat)
-        let c = (x: c.lon, y: c.lat)
+        let a = (x: triangle.a.lon, y: triangle.a.lat)
+        let b = (x: triangle.b.lon, y: triangle.b.lat)
+        let c = (x: triangle.c.lon, y: triangle.c.lat)
 
         let d1 = cross(a, b, p)
         let d2 = cross(b, c, p)
@@ -38,10 +47,12 @@ enum RegionGeometry {
     
     static func isInUKVArea(lat: Float, lon: Float) -> Bool {
         let isInUkRectangle = RegionGeometry.isInRectangle(lat: lat, lon: lon, latitude: 49.9..<61, longitude: -11..<1.8)
-        let channelTriangleA = (lat: Float(49.9), lon: Float(-0.2))
-        let channelTriangleB = (lat: Float(49.9), lon: Float(1.8))
-        let channelTriangleC = (lat: Float(51.1), lon: Float(1.8))
-        let isInChannelCutOutTriangle = RegionGeometry.isInTriangle(lat: lat, lon: lon, a: channelTriangleA, b: channelTriangleB, c: channelTriangleC)
+        let channelTriangle = Triangle(
+            a: Point(lat: 49.9, lon: -0.2),
+            b: Point(lat: 49.9, lon: 1.8),
+            c: Point(lat: 51.1, lon: 1.8)
+        )
+        let isInChannelCutOutTriangle = RegionGeometry.isInTriangle(lat: lat, lon: lon, triangle: channelTriangle)
         return isInUkRectangle && !isInChannelCutOutTriangle
     }
 }
