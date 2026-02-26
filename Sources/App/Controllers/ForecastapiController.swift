@@ -483,7 +483,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 switch v.variable {
                 case .is_day:
                     let isDay = Zensun.calculateIsDay(timeRange: currentTimeRange, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
-                    return .init(variable: variable, unit: .dimensionless, value: isDay.first ?? .nan)
+                    return .init(variable: variable, unit: .dimensionlessInteger, value: isDay.first ?? .nan)
                 case .terrestrial_radiation:
                     let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: currentTimeRange)
                     return .init(variable: variable, unit: .wattPerSquareMetre, value: solar.first ?? .nan)
@@ -517,7 +517,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 switch v.variable {
                 case .is_day:
                     let isDay = Zensun.calculateIsDay(timeRange: timeHourlyRead, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
-                    return .init(variable: variable, unit: .dimensionless, variables: [ApiArray.float(isDay)])
+                    return .init(variable: variable, unit: .dimensionlessInteger, variables: [ApiArray.float(isDay)])
                 case .terrestrial_radiation:
                     let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: timeHourlyRead)
                     return .init(variable: variable, unit: .wattPerSquareMetre, variables: [ApiArray.float(solar)])
@@ -606,7 +606,7 @@ struct MultiDomainsReader: ModelFlatbufferSerialisable {
                 switch v.variable {
                 case .is_day:
                     let isDay = Zensun.calculateIsDay(timeRange: time.minutely15, lat: readerHourly.modelLat, lon: readerHourly.modelLon)
-                    return .init(variable: variable, unit: .dimensionless, variables: [ApiArray.float(isDay)])
+                    return .init(variable: variable, unit: .dimensionlessInteger, variables: [ApiArray.float(isDay)])
                 case .terrestrial_radiation:
                     let solar = Zensun.extraTerrestrialRadiationBackwards(latitude: readerHourly.modelLat, longitude: readerHourly.modelLon, timerange: time.minutely15)
                     return .init(variable: variable, unit: .wattPerSquareMetre, variables: [ApiArray.float(solar)])
