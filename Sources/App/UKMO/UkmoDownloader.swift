@@ -240,6 +240,8 @@ struct UkmoDownload: AsyncCommand {
             deadLineHours = 8
         case .uk_deterministic_2km, .uk_ensemble_2km:
             deadLineHours = 3.5
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError("Ensemble mean domains cannot be downloaded directly")
         }
         Process.alarm(seconds: Int(deadLineHours + 0.1) * 3600)
         defer { Process.alarm(seconds: 0) }
@@ -266,7 +268,7 @@ struct UkmoDownload: AsyncCommand {
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 if variable.skipHour0, timestamp == run {
                     return

@@ -5,6 +5,20 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
     
     case icon_ch1_ensemble
     case icon_ch2_ensemble
+    
+    case icon_ch1_ensemble_mean
+    case icon_ch2_ensemble_mean
+    
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .icon_ch1_ensemble_mean:
+            return .icon_ch1_ensemble_mean
+        case .icon_ch2_ensemble_mean:
+            return .icon_ch2_ensemble_mean
+        default:
+            return nil
+        }
+    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -16,14 +30,18 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             return .meteoswiss_icon_ch1_ensemble
         case .icon_ch2_ensemble:
             return .meteoswiss_icon_ch2_ensemble
+        case .icon_ch1_ensemble_mean:
+            return .meteoswiss_icon_ch1_ensemble_mean
+        case .icon_ch2_ensemble_mean:
+            return .meteoswiss_icon_ch2_ensemble_mean
         }
     }
 
     var domainRegistryStatic: DomainRegistry? {
         switch self {
-        case .icon_ch1, .icon_ch1_ensemble:
+        case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
             return .meteoswiss_icon_ch1
-        case .icon_ch2, .icon_ch2_ensemble:
+        case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
             return .meteoswiss_icon_ch2
         }
     }
@@ -52,23 +70,25 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         case .icon_ch2, .icon_ch2_ensemble:
             // 2:30 delay, update every 6 hours
             return t.subtract(hours: 2, minutes: 30).floor(toNearestHour: 3)
+        case .icon_ch1_ensemble_mean, .icon_ch2_ensemble_mean:
+            fatalError()
         }
     }
     
     var forecastLength: Int {
         switch self {
-        case .icon_ch1, .icon_ch1_ensemble:
+        case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
             return 33
-        case .icon_ch2, .icon_ch2_ensemble:
+        case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
             return 120
         }
     }
 
     var omFileLength: Int {
         switch self {
-        case .icon_ch1, .icon_ch1_ensemble:
+        case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
             return 48
-        case .icon_ch2, .icon_ch2_ensemble:
+        case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
             return 144
         }
     }
@@ -78,7 +98,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
         // Domain area selected by OpenMeteo to exclude
         // ICON CH2: 2 pixel at the boarder contain invalid data. Additional 18 pixel are removed because the model is not stable at the border
         switch self {
-        case .icon_ch1, .icon_ch1_ensemble:
+        case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
             let dx: Float = 0.01, dy: Float = 0.01
             return ProjectionGrid(
                 nx: 1089,
@@ -89,7 +109,7 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
                 dy: dy,
                 projection: projection
             )
-        case .icon_ch2, .icon_ch2_ensemble:
+        case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
             let dx: Float = 0.02, dy: Float = 0.02
             return ProjectionGrid(
                 nx: 545,
@@ -105,9 +125,9 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
 
     var updateIntervalSeconds: Int {
         switch self {
-        case .icon_ch1, .icon_ch1_ensemble:
+        case .icon_ch1, .icon_ch1_ensemble, .icon_ch1_ensemble_mean:
             return 3*3600
-        case .icon_ch2, .icon_ch2_ensemble:
+        case .icon_ch2, .icon_ch2_ensemble, .icon_ch2_ensemble_mean:
             return 6*3600
         }
     }
@@ -118,14 +138,16 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
             "ch.meteoschweiz.ogd-forecasting-icon-ch1"
         case .icon_ch2, .icon_ch2_ensemble:
             "ch.meteoschweiz.ogd-forecasting-icon-ch2"
+        case .icon_ch1_ensemble_mean, .icon_ch2_ensemble_mean:
+            fatalError()
         }
     }
     
     var countEnsembleMember: Int {
         switch self {
-        case .icon_ch1:
+        case .icon_ch1, .icon_ch1_ensemble_mean:
             return 1
-        case .icon_ch2:
+        case .icon_ch2, .icon_ch2_ensemble_mean:
             return 1
         case .icon_ch1_ensemble:
             return 11

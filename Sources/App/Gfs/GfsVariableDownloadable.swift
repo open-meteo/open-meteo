@@ -417,6 +417,8 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             default:
                 return nil
             }
+        case .gefs025_ensemble_mean, .gefs05_ensemble_mean, .gefswave025_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -462,12 +464,12 @@ extension GfsSurfaceVariable: GfsVariableDownloadable {
             return (1, -273.15)
         case .showers, .precipitation:
             switch domain {
-            case .gfswave025, .gfswave025_ens, .gfswave016, .nam_conus:
+            case .gfswave025, .gfswave025_ens, .gfswave016, .nam_conus, .gefswave025_ensemble_mean:
                 return nil
             case .gfs013, .gfs025, .hrrr_conus_15min, .hrrr_conus:
                 // precipitation rate per second to hourly precipitation
                 return (Float(domain.dtSeconds), 0)
-            case .gfs025_ens, .gfs05_ens:
+            case .gfs025_ens, .gfs05_ens, .gefs05_ensemble_mean, .gefs025_ensemble_mean:
                 return nil
             }
         case .uv_index, .uv_index_clear_sky:
@@ -507,7 +509,7 @@ extension GfsPressureVariable: GfsVariableDownloadable {
             return ":RH:\(level) mb:"
         case .vertical_velocity:
             switch domain {
-            case .gfswave025, .gfswave025_ens, .gfswave016:
+            case .gfswave025, .gfswave025_ens, .gfswave016, .gefs05_ensemble_mean, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
                 return nil
             case .gfs013:
                 return nil

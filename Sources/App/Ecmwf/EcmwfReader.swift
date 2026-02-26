@@ -244,48 +244,13 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             let rh = try await get(raw: .relative_humidity_50hPa, time: time)
             return DataAndUnit(rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: 50) }), .percentage)
         case .snowfall:
-            if reader.domain == .aifs025_single || reader.domain == .aifs025_ensemble {
-                let snow = try await get(raw: .snowfall_water_equivalent, time: time).data.map({ $0 * 0.7 })
-                return DataAndUnit(snow, .centimetre)
-            }
-            let temperature = try await get(raw: .temperature_2m, time: time)
-            let precipitation = try await get(raw: .precipitation, time: time)
-            let precipitationType = try await get(raw: .precipitation_type, time: time)
-            return DataAndUnit(zip(zip(temperature.data, precipitationType.data), precipitation.data).map({
-                let ptype = $0.1
-                let temp = $0.0
-                let precip = $1
-                if ptype.isNaN {
-                    return precip * (temp >= 0 ? 0 : 0.7)
-                }
-                // freezing rain, snow, wet snow, ice pellets, freezing drizzle
-                let isSnow = ptype == 3 || ptype == 5 || ptype == 8 || ptype == 12
-                // mixed, wet snow
-                let isMixed = ptype == 7 || ptype == 6
-                return precip * (isMixed ? 0.7 / 2 : isSnow ? 0.7 : 0)
-            }), .centimetre)
+            let snow = try await get(raw: .snowfall_water_equivalent, time: time).data.map({ $0 * 0.7 })
+            return DataAndUnit(snow, .centimetre)
         case .rain:
             let precipitation = try await get(raw: .precipitation, time: time)
-            if reader.domain == .aifs025_single || reader.domain == .aifs025_ensemble {
-                let snow = try await get(raw: .snowfall_water_equivalent, time: time).data
-                let showers = try await get(raw: .showers, time: time).data
-                return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map { max($0 - $1.0 - $1.1, 0) }, .millimetre)
-            }
-            let temperature = try await get(raw: .temperature_2m, time: time)
-            let precipitationType = try await get(raw: .precipitation_type, time: time)
-            return DataAndUnit(zip(zip(temperature.data, precipitationType.data), precipitation.data).map({
-                let ptype = $0.1
-                let temp = $0.0
-                let precip = $1
-                if ptype.isNaN {
-                    return precip * (temp >= 0 ? 1 : 0)
-                }
-                // freezing rain, snow, wet snow, ice pellets, freezing drizzle
-                let isSnow = ptype == 3 || ptype == 5 || ptype == 8 || ptype == 12
-                // mixed, wet snow
-                let isMixed = ptype == 7 || ptype == 6
-                return precip * (isMixed ? 1 / 2 : isSnow ? 0 : 1)
-            }), .millimetre)
+            let snow = try await get(raw: .snowfall_water_equivalent, time: time).data
+            let showers = try await get(raw: .showers, time: time).data
+            return DataAndUnit(zip(precipitation.data, zip(snow, showers)).map { max($0 - $1.0 - ($1.1.isNaN ? 0 : $1.1), 0) }, .millimetre)
         case .showers:
             if reader.domain == .aifs025_single || reader.domain == .aifs025_ensemble {
                 return try await get(raw: .showers, time: time)
@@ -678,21 +643,10 @@ struct EcmwfReader: GenericReaderDerived, GenericReaderProtocol {
             try await prefetchData(raw: .cape, time: time)
         case .rain:
             try await prefetchData(raw: .precipitation, time: time)
-            if reader.domain == .aifs025_single || reader.domain == .aifs025_ensemble {
-                try await prefetchData(raw: .snowfall_water_equivalent, time: time)
-                try await prefetchData(raw: .showers, time: time)
-            } else {
-                try await prefetchData(raw: .temperature_2m, time: time)
-                try await prefetchData(raw: .precipitation_type, time: time)
-            }
+            try await prefetchData(raw: .snowfall_water_equivalent, time: time)
+            try await prefetchData(raw: .showers, time: time)
         case .snowfall:
-            if reader.domain == .aifs025_single || reader.domain == .aifs025_ensemble {
-                try await prefetchData(raw: .snowfall_water_equivalent, time: time)
-            } else {
-                try await prefetchData(raw: .precipitation, time: time)
-                try await prefetchData(raw: .temperature_2m, time: time)
-                try await prefetchData(raw: .precipitation_type, time: time)
-            }
+            try await prefetchData(raw: .snowfall_water_equivalent, time: time)
         case .showers:
             if reader.domain == .aifs025_single || reader.domain == .aifs025_ensemble {
                 try await prefetchData(raw: .showers, time: time)

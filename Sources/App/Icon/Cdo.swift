@@ -62,6 +62,8 @@ extension IconDomains {
             return "0037_R03B07_N02"
         case .iconD2Eps:
             return "0047_R19B07_L"
+        default:
+            return nil
         }
     }
 }

@@ -264,6 +264,8 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
             default:
                 return nil
             }
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
 
         switch self {
@@ -500,6 +502,8 @@ struct UkmoPressureVariable: PressureVariableRespresentable, UkmoVariableDownloa
             if variable == .vertical_velocity {
                 return nil
             }
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
 
         switch variable {
@@ -618,6 +622,8 @@ struct UkmoHeightVariable: HeightVariableRespresentable, UkmoVariableDownloadabl
             return nil
         case .uk_deterministic_2km, .uk_ensemble_2km:
             break
+        case .uk_ensemble_mean_2km, .global_ensemble_mean_20km:
+            fatalError()
         }
         switch variable {
         case .temperature:

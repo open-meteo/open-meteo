@@ -187,7 +187,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             
             
             let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
 
             if variables.isEmpty {
                 return []
@@ -505,6 +505,8 @@ extension EcmwfDomain {
         case .aifs025, .aifs025_single, .aifs025_ensemble:
             // AIFS025 has a delay of 5-7 hours after initialisation
             return t.subtract(hours: 4).floor(toNearestHour: 6)
+        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+            fatalError()
         }
     }
     /// Get download url for a given domain and timestep
@@ -539,6 +541,8 @@ extension EcmwfDomain {
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-cf.grib2",
                 "\(base)\(dateStr)/\(runStr)z/aifs-ens/0p25/enfo/\(dateStr)\(runStr)0000-\(hour)h-enfo-pf.grib2"
             ]
+        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
+            fatalError()
         }
     }
 }
