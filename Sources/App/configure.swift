@@ -204,6 +204,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(ConvertOmCommand(), as: "convert-om")
     app.asyncCommands.use(DownloadEcmwfSeasCommand(), as: "download-ecmwf-seas")
     app.asyncCommands.use(DwdSisDownloader(), as: "download-dwd-sis")
+    app.asyncCommands.use(EumetnetDownloader(), as: "download-eumetnet")
 
     app.http.server.configuration.hostname = "0.0.0.0"
 
