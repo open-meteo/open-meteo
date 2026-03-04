@@ -65,8 +65,12 @@ public enum Zensun {
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                 let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                 let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                /// Can get close to 0 if limited by sunrise/set
+                let pDelta = p1_l - p10_l
                 /// sun elevation (`zz = sin(alpha)`)
-                let zz = (left - right) / (p1_l - p10_l)
+                let zz = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+                
+//                print("i: \(i), sunrise: \(sunrise.radiansToDegrees), sunset: \(sunset.radiansToDegrees), p0: \(p0), p1_l: \(p1_l.radiansToDegrees), p10_l: \(p10_l.radiansToDegrees), pDelta: \(pDelta.radiansToDegrees), left: \(left), right: \(right), zz: \(zz), rsun: \(rsun), value \(zz <= 0 ? 0 : zz / (rsun * rsun))")
 
                 out[i, t] = zz <= 0 ? 0 : zz / (rsun * rsun)
             }
@@ -127,8 +131,10 @@ public enum Zensun {
                     // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                     let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                     let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                    /// Can get close to 0 if limited by sunrise/set
+                    let pDelta = p1_l - p10_l
                     /// sun elevation (`zz = sin(alpha)`)
-                    let zz = (left - right) / (p1_l - p10_l)
+                    let zz = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
 
                     out[l, t] = zz
                     l += 1
@@ -259,8 +265,10 @@ public enum Zensun {
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                 let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                 let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                /// Can get close to 0 if limited by sunrise/set
+                let pDelta = p1_l - p10_l
                 /// sun elevation (`zz = sin(alpha)`)
-                let zzBackwards = (left - right) / (p1_l - p10_l)
+                let zzBackwards = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
 
                 /// Instant sun elevation
                 let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1 - p0)
@@ -346,8 +354,10 @@ public enum Zensun {
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                 let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                 let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                /// Can get close to 0 if limited by sunrise/set
+                let pDelta = p1_l - p10_l
                 /// sun elevation (`zz = sin(alpha)`)
-                let zzBackwards = (left - right) / (p1_l - p10_l)
+                let zzBackwards = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
 
                 /// Instant sun elevation
                 let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1Scan - p0)
@@ -428,8 +438,10 @@ public enum Zensun {
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+            /// Can get close to 0 if limited by sunrise/set
+            let pDelta = p1_l - p10_l
             /// sun elevation (`zz = sin(alpha)`)
-            let zzBackwards = (left - right) / (p1_l - p10_l)
+            let zzBackwards = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
 
             /// Instant sun elevation
             let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1 - p0)
