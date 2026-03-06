@@ -195,8 +195,7 @@ struct JaxaHimawariDownload: AsyncCommand {
                         grid: domain.grid,
                         locationRange: 0..<domain.grid.count,
                         timerange: timerange,
-                        scanTimeDifferenceHours: timeDifference,
-                        sunDeclinationCutOffDegrees: 1
+                        scanTimeDifferenceHours: timeDifference
                     )
                     logger.info("\(variable) conversion took \(start.timeElapsedPretty())")
                 }

@@ -77,8 +77,8 @@ extension Zensun {
                 return 0
             }
 
-            /// DNI is typically limted to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
-            /// The parallax is then use to limit integral coefficients to sun rise/set
+            /// DNI is typically limited to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
+            /// The parallax is then used to limit integral coefficients to sun rise/set
             let alpha = Float(0.83333 - 5).degreesToRadians
 
             let decang = timestamp.getSunDeclination()
@@ -110,30 +110,53 @@ extension Zensun {
                 p0 -= 2 * .pi
             }
 
-            // limit p1 and p10 to sunrise/set
+            // limit p1 and p10 to sunrise/set and limited to 85° zenith for DNI calculation
             let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
             let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
             let sunrise = p0 + carg
             let sunset = p0 - carg
             let p1_l = min(sunrise, p10)
             let p10_l = max(sunset, p1)
+            if p10 < sunset || p1 > sunrise {
+                return 0
+            }
 
             // solve integral to get sun elevation dt
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            let zzBackwards = (left - right) / (p1_l - p10_l)
-            let dni = dhi / zzBackwards
+            /// Only consider sun angle during sunshine time, because DNI is only available during sunshine time. Can get close to 0 if limited by sunrise/set
+            let pDelta = p1_l - p10_l
+            let zzDaylight = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+            let dni = dhi / zzDaylight
 
             // Prevent possible division by zero
             // See https://github.com/open-meteo/open-meteo/discussions/395
-            if zzBackwards <= 0.0001 {
+            if zzDaylight <= 0.0001 {
                 return dhi
             }
-
-            /// Instant sun elevation
-            let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1 - p0)
-            return convertToInstant ? dni * max(zzInstant, 0) / zzBackwards : dni
+            
+            if convertToInstant {
+                // limit p1 and p10 to sunrise/set
+                // This time without 85° zenith cutoff
+                let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+                let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                let sunrise = p0 + carg
+                let sunset = p0 - carg
+                let p1_l = min(sunrise, p10)
+                let p10_l = max(sunset, p1)
+                
+                let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
+                let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
+                
+                /// sun elevation (`zz = sin(alpha)`) limited to daylight, but scaled correctly for dtSeconds
+                let zzBackwards = abs((left - right) / (p10 - p1))
+                /// Instant sun elevation
+                let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1 - p0)
+                return dni * max(zzInstant, 0) / zzBackwards
+            }
+            
+            return dni
         }
     }
 }

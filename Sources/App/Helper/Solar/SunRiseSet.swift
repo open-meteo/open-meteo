@@ -122,10 +122,6 @@ extension Zensun {
                 return 0
             }
 
-            /// DNI is typically limted to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
-            /// The parallax is then use to limit integral coefficients to sun rise/set
-            let alpha = Float(0.83333 - 5).degreesToRadians
-
             let decang = timestamp.getSunDeclination()
             let eqtime = timestamp.getSunEquationOfTime()
 
@@ -156,10 +152,13 @@ extension Zensun {
             }
 
             // limit p1 and p10 to sunrise/set
-            let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+            let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
             let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
             let sunrise = p0 + carg
             let sunset = p0 - carg
+            if p10 < sunset || p1 > sunrise {
+                return 0
+            }
             let p1_l = min(sunrise, p10)
             let p10_l = max(sunset, p1)
 
@@ -170,11 +169,13 @@ extension Zensun {
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            let zzBackwards = (left - right) / (p1_l - p10_l)
-            let dni = dhi / zzBackwards
+            /// Only consider sun angle during sunshine time. Can get close to 0 if limited by sunrise/set
+            let pDelta = p1_l - p10_l
+            let zzDaylight = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+            let dni = dhi / zzDaylight
             // Prevent possible division by zero
             // See https://github.com/open-meteo/open-meteo/discussions/395
-            let dniBounded = zzBackwards <= 0.0001 ? dhi : dni
+            let dniBounded = zzDaylight <= 0.0001 ? dhi : dni
             // >120 watts would be a "hard-cut" and not realistic as data is averaged over 1 hours. Instead, linearly interpolate between 60 and 180 watts.
             return min(max(dniBounded - 60, 0) / (180 - 60) * dtBound, dtBound)
         }
