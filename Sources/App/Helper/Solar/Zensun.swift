@@ -12,6 +12,7 @@ public enum Zensun {
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// This function is performance critical for updates. This explains redundant code.
+    /// Considers sun elevation also during night. Do not use for DNI, because DNI only needs the sun elevation during sunlight
     public static func calculateRadiationBackwardsAveraged(grid: any Gridable, locationRange: some RandomAccessCollection<Int>, timerange: TimerangeDt) -> Array2DFastTime {
         var out = Array2DFastTime(nLocations: locationRange.count, nTime: timerange.count)
 
@@ -21,9 +22,6 @@ public enum Zensun {
 
             /// earth-sun distance in AU
             let rsun = timestamp.getSunRadius()
-
-            /// solar disk half-angle
-            let alpha = Float(0.83333).degreesToRadians
 
             let latsun = decang
             /// universal time
@@ -39,6 +37,8 @@ public enum Zensun {
             let lonsun0 = -15.0 * (ut0 - 12.0 + eqtime)
 
             let p10 = lonsun0.degreesToRadians
+            
+            assert(p10 > p1)
 
             for (i, gridpoint) in locationRange.enumerated() {
                 let (lat, lon) = grid.getCoordinates(gridpoint: gridpoint)
@@ -53,11 +53,17 @@ public enum Zensun {
                     p0 -= 2 * .pi
                 }
 
-                // limit p1 and p10 to sunrise/set
-                let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+                // limit p1 and p10 to sunrise/set -> do not use half disk alpha angle, breaks integral equation
+                let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
                 let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                assert(carg >= 0)
+                
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
+                if p10 < sunset || p1 > sunrise {
+                    out[i, t] = 0
+                    continue
+                }
                 let p1_l = min(sunrise, p10)
                 let p10_l = max(sunset, p1)
 
@@ -65,14 +71,12 @@ public enum Zensun {
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                 let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                 let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-                /// Can get close to 0 if limited by sunrise/set
-                let pDelta = p1_l - p10_l
                 /// sun elevation (`zz = sin(alpha)`)
-                let zz = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+                let zzBackwards = (left - right) / (p10 - p1)
                 
-//                print("i: \(i), sunrise: \(sunrise.radiansToDegrees), sunset: \(sunset.radiansToDegrees), p0: \(p0), p1_l: \(p1_l.radiansToDegrees), p10_l: \(p10_l.radiansToDegrees), pDelta: \(pDelta.radiansToDegrees), left: \(left), right: \(right), zz: \(zz), rsun: \(rsun), value \(zz <= 0 ? 0 : zz / (rsun * rsun))")
+//                print("t: \(timestamp.iso8601_YYYY_MM_dd_HH_mm), sunrise: \(sunrise.radiansToDegrees), sunset: \(sunset.radiansToDegrees), p1: \(p1.radiansToDegrees), p10: \(p10.radiansToDegrees), p1_l: \(p1_l.radiansToDegrees), p10_l: \(p10_l.radiansToDegrees), left: \(left), right: \(right), zz: \(zz), rsun: \(rsun), value \(zz / (rsun * rsun))")
 
-                out[i, t] = zz <= 0 ? 0 : zz / (rsun * rsun)
+                out[i, t] = zzBackwards / (rsun * rsun)
             }
         }
         return out
@@ -80,6 +84,7 @@ public enum Zensun {
 
     /// Calculate a 2d (space and time) solar factor field for interpolation to hourly data. Data is time oriented!
     /// To get zenith angle, use `acos`
+    /// Only considers sun elevation during sunlight!
     public static func calculateSunElevationBackwards(grid: any Gridable, timerange: TimerangeDt, yrange: Range<Int>? = nil) -> Array2DFastTime {
         let yrange = yrange ?? 0..<grid.ny
         var out = Array2DFastTime(nLocations: yrange.count * grid.nx, nTime: timerange.count)
@@ -87,7 +92,6 @@ public enum Zensun {
         for (t, timestamp) in timerange.enumerated() {
             let decang = timestamp.getSunDeclination()
             let eqtime = timestamp.getSunEquationOfTime()
-            let alpha = Float(0.83333).degreesToRadians
 
             let latsun = decang
             /// universal time
@@ -120,7 +124,7 @@ public enum Zensun {
                     }
 
                     // limit p1 and p10 to sunrise/set
-                    let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+                    let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
                     let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
                     let sunrise = p0 + carg
                     let sunset = p0 - carg
@@ -223,8 +227,6 @@ public enum Zensun {
             let decang = timestamp.getSunDeclination()
             let eqtime = timestamp.getSunEquationOfTime()
 
-            let alpha = Float(0.83333).degreesToRadians
-
             let latsun = decang
             /// universal time
             let ut = timestamp.hourWithFraction
@@ -254,10 +256,14 @@ public enum Zensun {
                 }
 
                 // limit p1 and p10 to sunrise/set
-                let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+                let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
                 let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
+                if p10 < sunset || p1 > sunrise {
+                    out[i, t] = 0
+                    continue
+                }
                 let p1_l = min(sunrise, p10)
                 let p10_l = max(sunset, p1)
 
@@ -265,10 +271,8 @@ public enum Zensun {
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                 let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                 let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-                /// Can get close to 0 if limited by sunrise/set
-                let pDelta = p1_l - p10_l
-                /// sun elevation (`zz = sin(alpha)`)
-                let zzBackwards = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+                /// sun elevation (`zz = sin(alpha)`) limited to daylight, but scaled correctly for dtSeconds
+                let zzBackwards = abs((left - right) / (p10 - p1))
 
                 /// Instant sun elevation
                 let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1 - p0)
@@ -308,7 +312,7 @@ public enum Zensun {
                 let decang = decang[t]
                 let eqtime = eqtime[t]
 
-                let alpha = Float(0.83333).degreesToRadians - sunDeclinationCutOffDegrees.degreesToRadians
+//                let alpha = Float(0.83333).degreesToRadians - sunDeclinationCutOffDegrees.degreesToRadians
 
                 let latsun = decang
                 /// universal time
@@ -343,10 +347,15 @@ public enum Zensun {
                 }
 
                 // limit p1 and p10 to sunrise/set
-                let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+                let arg = -(/*sin(alpha) + */cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
                 let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
+                if p10 < sunset || p1 > sunrise {
+                    data[pos] = 0
+                    ktPrevious = .nan
+                    continue
+                }
                 let p1_l = min(sunrise, p10)
                 let p10_l = max(sunset, p1)
 
@@ -354,10 +363,8 @@ public enum Zensun {
                 // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
                 let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
                 let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-                /// Can get close to 0 if limited by sunrise/set
-                let pDelta = p1_l - p10_l
                 /// sun elevation (`zz = sin(alpha)`)
-                let zzBackwards = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+                let zzBackwards = abs((left - right) / (p10 - p1))
 
                 /// Instant sun elevation
                 let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1Scan - p0)
@@ -398,8 +405,6 @@ public enum Zensun {
             let decang = timestamp.getSunDeclination()
             let eqtime = timestamp.getSunEquationOfTime()
 
-            let alpha = Float(0.83333).degreesToRadians
-
             let latsun = decang
             /// universal time
             let ut = timestamp.hourWithFraction
@@ -427,10 +432,13 @@ public enum Zensun {
             }
 
             // limit p1 and p10 to sunrise/set
-            let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+            let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
             let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
             let sunrise = p0 + carg
             let sunset = p0 - carg
+            if p10 < sunset || p1 > sunrise {
+                return 0
+            }
             let p1_l = min(sunrise, p10)
             let p10_l = max(sunset, p1)
 
@@ -438,10 +446,8 @@ public enum Zensun {
             // integral(cos(t0) cos(t1) + sin(t0) sin(t1) cos(p - p0)) dp = sin(t0) sin(t1) sin(p - p0) + p cos(t0) cos(t1) + constant
             let left = sin(t0) * sin(t1) * sin(p1_l - p0) + p1_l * cos(t0) * cos(t1)
             let right = sin(t0) * sin(t1) * sin(p10_l - p0) + p10_l * cos(t0) * cos(t1)
-            /// Can get close to 0 if limited by sunrise/set
-            let pDelta = p1_l - p10_l
             /// sun elevation (`zz = sin(alpha)`)
-            let zzBackwards = (left - right) / (pDelta < 0 ? min(-0.001, pDelta) : max(0.001, pDelta))
+            let zzBackwards = abs((left - right) / (p10 - p1))
 
             /// Instant sun elevation
             let zzInstant = cos(t0) * cos(t1) + sin(t0) * sin(t1) * cos(p1 - p0)
