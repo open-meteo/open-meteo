@@ -291,9 +291,8 @@ public enum Zensun {
     /// Corrects for missing averages radiation values at sunset assuming the cloudiness index `kt` from the previous step. This only works for `t>0` timesteps
     ///
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
-    /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them....
-    /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
-    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double], sunDeclinationCutOffDegrees: Float) {
+    /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them.
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double]) {
         let decang = timerange.map { $0.getSunDeclination() }
         let eqtime = timerange.map { $0.getSunEquationOfTime() }
 
@@ -311,8 +310,6 @@ public enum Zensun {
                 }
                 let decang = decang[t]
                 let eqtime = eqtime[t]
-
-//                let alpha = Float(0.83333).degreesToRadians - sunDeclinationCutOffDegrees.degreesToRadians
 
                 let latsun = decang
                 /// universal time
