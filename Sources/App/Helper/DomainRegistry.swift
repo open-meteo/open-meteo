@@ -148,6 +148,8 @@ enum DomainRegistry: String, CaseIterable {
     case eumetsat_lsa_saf_msg_15min
     case eumetsat_lsa_saf_iodc_15min
 
+    case eumetnet_opera
+
     case kma_gdps
     case kma_ldps
 
@@ -437,6 +439,8 @@ enum DomainRegistry: String, CaseIterable {
             return EumetsatLsaSafDomain.msg
         case .eumetsat_lsa_saf_iodc_15min:
             return EumetsatLsaSafDomain.iodc
+        case .eumetnet_opera:
+            return EumetnetDomain.opera_composite
         case .meteofrance_sea_surface_temperature:
             return MfWaveDomain.mfsst
         case .kma_gdps:
