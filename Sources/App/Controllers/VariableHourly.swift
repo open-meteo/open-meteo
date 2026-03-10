@@ -288,6 +288,14 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case convective_inhibition_spread
     case freezing_level_height_spread
     case snowfall_height_spread
+    case diffuse_radiation_spread
+    case shortwave_radiation_instant_spread
+    case direct_radiation_instant_spread
+    case diffuse_radiation_instant_spread
+    case direct_normal_irradiance_spread
+    case direct_normal_irradiance_instant_spread
+    case global_tilted_irradiance_spread
+    case global_tilted_irradiance_instant_spread
     
     case sea_surface_temperature
     case sea_water_salinity

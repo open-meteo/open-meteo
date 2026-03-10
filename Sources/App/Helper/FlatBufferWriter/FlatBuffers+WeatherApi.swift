@@ -638,6 +638,22 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .freezingLevelHeight, aggregation: .spread)
         case .snowfall_height_spread:
             return .init(variable: .snowfallHeight, aggregation: .spread)
+        case .diffuse_radiation_spread:
+            return .init(variable: .diffuseRadiation, aggregation: .spread)
+        case .shortwave_radiation_instant_spread:
+            return .init(variable: .shortwaveRadiationInstant, aggregation: .spread)
+        case .direct_radiation_instant_spread:
+            return .init(variable: .directRadiationInstant, aggregation: .spread)
+        case .diffuse_radiation_instant_spread:
+            return .init(variable: .diffuseRadiationInstant, aggregation: .spread)
+        case .direct_normal_irradiance_spread:
+            return .init(variable: .directNormalIrradiance, aggregation: .spread)
+        case .direct_normal_irradiance_instant_spread:
+            return .init(variable: .directNormalIrradianceInstant, aggregation: .spread)
+        case .global_tilted_irradiance_spread:
+            return .init(variable: .globalTiltedIrradiance, aggregation: .spread)
+        case .global_tilted_irradiance_instant_spread:
+            return .init(variable: .globalTiltedIrradianceInstant, aggregation: .spread)
         }
     }
 }
