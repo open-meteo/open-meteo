@@ -592,6 +592,52 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .sea_water_salinity:
             // TODO: register in sdk sea_water_salinity
             return .init(variable: .seaSaltAerosol)
+        case .relative_humidity_2m_spread:
+            return .init(variable: .relativeHumidity, aggregation: .spread, altitude: 2)
+        case .apparent_temperature_spread:
+            return .init(variable: .apparentTemperature, aggregation: .spread, altitude: 2)
+        case .soil_temperature_0_to_10cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 0, depthTo: 10)
+        case .soil_temperature_10_to_40cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 10, depthTo: 40)
+        case .soil_temperature_40_to_100cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 40, depthTo: 100)
+        case .soil_temperature_100_to_200cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 100, depthTo: 200)
+        case .soil_moisture_0_to_10cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 0, depthTo: 10)
+        case .soil_moisture_10_to_40cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 10, depthTo: 40)
+        case .soil_moisture_40_to_100cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 40, depthTo: 100)
+        case .soil_moisture_100_to_200cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 100, depthTo: 200)
+        case .rain_spread:
+            return .init(variable: .rain, aggregation: .spread)
+        case .surface_pressure_spread:
+            return .init(variable: .surfacePressure, aggregation: .spread)
+        case .et0_fao_evapotranspiration_spread:
+            return .init(variable: .et0FaoEvapotranspiration, aggregation: .spread)
+        case .vapour_pressure_deficit_spread:
+            return .init(variable: .vapourPressureDeficit, aggregation: .spread)
+        case .visibility_spread:
+            return .init(variable: .visibility, aggregation: .spread)
+        case .surface_temperature_spread:
+            return .init(variable: .surfaceTemperature, aggregation: .spread)
+        case .uv_index_spread:
+            return .init(variable: .uvIndex, aggregation: .spread)
+        case .uv_index_clear_sky_spread:
+            return .init(variable: .uvIndexClearSky, aggregation: .spread)
+        case .wet_bulb_temperature_2m_spread:
+            return .init(variable: .wetBulbTemperature, aggregation: .spread, altitude: 2)
+        case .cape_spread:
+            return .init(variable: .cape, aggregation: .spread)
+        case .convective_inhibition_spread:
+            return .init(variable: .convectiveInhibition, aggregation: .spread)
+        case .freezing_level_height_spread:
+            return .init(variable: .freezingLevelHeight, aggregation: .spread)
+        case .snowfall_height_spread:
+            return .init(variable: .snowfallHeight, aggregation: .spread)
         }
     }
 }
@@ -1178,3 +1224,4 @@ extension MultiDomains {
         }
     }
 }
+

@@ -231,6 +231,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case temperature_2m_spread
     case wind_gusts_10m_spread
     case dew_point_2m_spread
+    case relative_humidity_2m_spread
+    case apparent_temperature_spread
     case cloud_cover_low_spread
     case cloud_cover_mid_spread
     case cloud_cover_high_spread
@@ -238,10 +240,18 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case snowfall_water_equivalent_spread
     case snow_depth_spread
     case soil_temperature_0_to_7cm_spread
+    case soil_temperature_0_to_10cm_spread
+    case soil_temperature_10_to_40cm_spread
+    case soil_temperature_40_to_100cm_spread
+    case soil_temperature_100_to_200cm_spread
     case soil_temperature_7_to_28cm_spread
     case soil_temperature_28_to_100cm_spread
     case soil_temperature_100_to_255cm_spread
     case soil_moisture_0_to_7cm_spread
+    case soil_moisture_0_to_10cm_spread
+    case soil_moisture_10_to_40cm_spread
+    case soil_moisture_40_to_100cm_spread
+    case soil_moisture_100_to_200cm_spread
     case soil_moisture_7_to_28cm_spread
     case soil_moisture_28_to_100cm_spread
     case soil_moisture_100_to_255cm_spread
@@ -265,7 +275,19 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wave_height_spread
     case wave_period_spread
     case wave_peak_period_spread
-    
+    case rain_spread
+    case surface_pressure_spread
+    case et0_fao_evapotranspiration_spread
+    case vapour_pressure_deficit_spread
+    case visibility_spread
+    case surface_temperature_spread
+    case uv_index_spread
+    case uv_index_clear_sky_spread
+    case wet_bulb_temperature_2m_spread
+    case cape_spread
+    case convective_inhibition_spread
+    case freezing_level_height_spread
+    case snowfall_height_spread
     
     case sea_surface_temperature
     case sea_water_salinity
@@ -423,7 +445,7 @@ struct ForecastHeightVariable: HeightVariableRespresentable, GenericVariableMixa
     let level: Int
 }
 
-typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, ForecastPressureVariable, ForecastHeightVariable>
+typealias ForecastVariable = SurfacePressureAndHeightVariable<VariableAndPreviousDay, VariableOrSpread<ForecastPressureVariable>, ForecastHeightVariable>
 
 extension ForecastVariable {
     var variableAndPreviousDay: (ForecastVariable, Int) {
@@ -549,25 +571,30 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
     let reader: Reader
     let options: GenericReaderOptions
     
-    func getDeriverMap(variable: ForecastPressureVariable) -> DerivedMapping<Reader.MixingVar>? {
+    func getDeriverMap(variable: VariableOrSpread<ForecastPressureVariable>) -> DerivedMapping<Reader.MixingVar>? {
         if let variable = Reader.variableFromString(variable.rawValue) {
             return .direct(variable)
         }
-        switch variable.variable {
+        guard variable.isSpread == false else {
+            // TODO implement derived spread variables
+            return nil
+        }
+        let v = variable.variable
+        switch v.variable {
         case .windspeed:
-            return getDeriverMap(variable: ForecastPressureVariable(variable: .wind_speed, level: variable.level))
+            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .wind_speed, level: v.level), isSpread: false))
         case .wind_speed:
-            return .windSpeed(u: Reader.variableFromString("wind_u_component_\(variable.level)hPa"), v: Reader.variableFromString("wind_v_component_\(variable.level)hPa"))
+            return .windSpeed(u: Reader.variableFromString("wind_u_component_\(v.level)hPa"), v: Reader.variableFromString("wind_v_component_\(v.level)hPa"))
         case .winddirection:
-            return getDeriverMap(variable: ForecastPressureVariable(variable: .wind_direction, level: variable.level))
+            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .wind_direction, level: v.level), isSpread: false))
         case .wind_direction:
-            return .windDirection(u: Reader.variableFromString("wind_u_component_\(variable.level)hPa"), v: Reader.variableFromString("wind_v_component_\(variable.level)hPa"))
+            return .windDirection(u: Reader.variableFromString("wind_u_component_\(v.level)hPa"), v: Reader.variableFromString("wind_v_component_\(v.level)hPa"))
         case .dewpoint:
-            return getDeriverMap(variable: ForecastPressureVariable(variable: .dew_point, level: variable.level))
+            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .dew_point, level: v.level), isSpread: false))
         case .dew_point:
             guard
-                let temperature = Reader.variableFromString("temperature_\(variable.level)hPa"),
-                let rh = Reader.variableFromString("relative_humidity_\(variable.level)hPa")
+                let temperature = Reader.variableFromString("temperature_\(v.level)hPa"),
+                let rh = Reader.variableFromString("relative_humidity_\(v.level)hPa")
             else {
                 return nil
             }
@@ -576,15 +603,15 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 return DataAndUnit(dewpoint, .percentage)
             }
         case .cloudcover:
-            return getDeriverMap(variable: ForecastPressureVariable(variable: .cloud_cover, level: variable.level))
+            return getDeriverMap(variable: VariableOrSpread(variable: ForecastPressureVariable(variable: .cloud_cover, level: v.level), isSpread: false))
         case .cloud_cover:
             guard
-                let rh = Reader.variableFromString("relative_humidity_\(variable.level)hPa")
+                let rh = Reader.variableFromString("relative_humidity_\(v.level)hPa")
             else {
                 return nil
             }
             return .one(.raw(rh)) { rh, _ in
-                let c = rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(variable.level)) })
+                let c = rh.data.map({ Meteorology.relativeHumidityToCloudCover(relativeHumidity: $0, pressureHPa: Float(v.level)) })
                 return DataAndUnit(c, .percentage)
             }
         default:
