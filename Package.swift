@@ -40,7 +40,7 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
-        .package(url: "https://github.com/open-meteo/swift-hdf5.git", branch: "actor-based-thread-safety"),
+        .package(url: "https://github.com/open-meteo/swift-hdf5.git", branch: "main"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
