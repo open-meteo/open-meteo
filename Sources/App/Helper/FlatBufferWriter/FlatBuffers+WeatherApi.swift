@@ -654,6 +654,12 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .globalTiltedIrradiance, aggregation: .spread)
         case .global_tilted_irradiance_instant_spread:
             return .init(variable: .globalTiltedIrradianceInstant, aggregation: .spread)
+        case .temperature_80m_spread:
+            return .init(variable: .temperature, aggregation: .spread, altitude: 80)
+        case .temperature_120m_spread:
+            return .init(variable: .temperature, aggregation: .spread, altitude: 120)
+        case .snow_depth_water_equivalent_spread:
+            return .init(variable: .snowDepthWaterEquivalent, aggregation: .spread)
         }
     }
 }

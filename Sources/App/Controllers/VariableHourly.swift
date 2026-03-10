@@ -229,6 +229,8 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case wind_direction_200m_spread
     case snowfall_spread
     case temperature_2m_spread
+    case temperature_80m_spread
+    case temperature_120m_spread
     case wind_gusts_10m_spread
     case dew_point_2m_spread
     case relative_humidity_2m_spread
@@ -239,6 +241,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     case pressure_msl_spread
     case snowfall_water_equivalent_spread
     case snow_depth_spread
+    case snow_depth_water_equivalent_spread
     case soil_temperature_0_to_7cm_spread
     case soil_temperature_0_to_10cm_spread
     case soil_temperature_10_to_40cm_spread
