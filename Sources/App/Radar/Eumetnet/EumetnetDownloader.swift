@@ -155,24 +155,24 @@ struct EumetnetDownloader: AsyncCommand {
         logger.info("Processing \(filename)")
 
         // Open HDF5 file and read ODIM precipitation rate data
-        let h5 = try SwiftHDF.open(file: tempFile, mode: .readOnly)
+        let h5 = try await HDF5.openFile(tempFile, mode: .readOnly)
 
         // Read scale parameters from /dataset1/data1/what attributes
-        let whatGroup = try h5.openGroup("dataset1").openGroup("data1").openGroup("what")
-        let gain: Double = try whatGroup.readAttribute("gain")
-        let offset: Double = try whatGroup.readAttribute("offset")
-        let nodata: Double = try whatGroup.readAttribute("nodata")
-        let undetect: Double = try whatGroup.readAttribute("undetect")
+        let whatGroup = try await h5.openGroup("dataset1").openGroup("data1").openGroup("what")
+        let gain: Double = try await whatGroup.readAttribute("gain")
+        let offset: Double = try await whatGroup.readAttribute("offset")
+        let nodata: Double = try await whatGroup.readAttribute("nodata")
+        let undetect: Double = try await whatGroup.readAttribute("undetect")
 
         // Read raw data array
-        let dataset = try h5.openGroup("dataset1").openGroup("data1").openDataset("data")
-        let dims = try dataset.getSpace().getDimensions()
+        let dataset = try await h5.openGroup("dataset1").openGroup("data1").openDataset("data")
+        let dims = try await dataset.space.dimensions
 
         guard dims.count == 2, dims[0] == domain.grid.ny, dims[1] == domain.grid.nx else {
             fatalError("Data Layout not as expected: dims \(dims)")
         }
 
-        let rawData: [Double] = try dataset.read()
+        let rawData: [Double] = try await dataset.readDataset()
 
         guard rawData.count == domain.grid.nx * domain.grid.ny else {
             logger.warning("Unexpected data size \(rawData.count), expected \(domain.grid.nx * domain.grid.ny). Skipping.")

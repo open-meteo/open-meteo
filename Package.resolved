@@ -1,5 +1,5 @@
 {
-  "originHash" : "31744c4335a2b02954a6e46f0a64f67d3927ad9c3ed32c4f820879450486753a",
+  "originHash" : "cb6e6611348799159aa8db4bc0b809b5d26106ca0281d79bd0592e9bd72cd688",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -185,8 +185,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/open-meteo/swift-hdf5.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "037a8c5901e638865a3f24e73987d1b6b81d8d0d"
+        "branch" : "actor-based-thread-safety",
+        "revision" : "2ee60926cd03f89a39785e4e931feace48b6fafa"
       }
     },
     {
