@@ -207,8 +207,11 @@ extension VariablePerMemberStorage {
         }
     }
     
-    /// Snowfall is given in percent. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`. Used for GFS
+    /// Calculate snowfall water equivalent based on precipitation and frozen precipitation percent
+    /// `frozen_precipitation_percent` is given in percent [0-100]. Multiply with precipitation to get the amount. Note: For whatever reason it can be `-50%`. Used for GFS, NAM and HRRR
+    /// Correct for rounding issues to prevent 0.1mm rain
     func calculateSnowfallAmount(precipitation: V, frozen_precipitation_percent: V, outVariable: GenericVariable, writer: OmSpatialTimestepWriter) async throws {
+        let scalefactor = outVariable.scalefactor
         for (t, handles) in self.data.groupedPreservedOrder(by: { $0.key.timestampAndMember }) {
             guard
                 t.timestamp == writer.time,
@@ -216,10 +219,18 @@ extension VariablePerMemberStorage {
                 let frozen_precipitation_percent = handles.first(where: { $0.key.variable == frozen_precipitation_percent }) else {
                 continue
             }
-            let snowfall = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
-                max($0 / 100 * $1 * 0.7, 0)
+            let snowWater = zip(frozen_precipitation_percent.value.data, precipitation.value.data).map({
+                let precip = $1
+                let snowWater = min(max($0 / 100 * $1, 0), $1)
+                let snowWaterScaled = round(snowWater * scalefactor) / scalefactor
+                let precipScaled = round(precip * scalefactor) / scalefactor
+                /// Calculate scaled rainfall amount
+                let rainScaled = precipScaled - snowWaterScaled
+                /// If frozen precip probability is >50%, but a small rain amount remains due to rounding (0.1mm rain), remove it
+                /// Checking for 0.11 and 0.21 to prevent floating point issues
+                return ($0 >= 50 && precipScaled >= 0.21 && rainScaled <= 0.11) ? precip : snowWater
             })
-            try await writer.write(member: t.member, variable: outVariable, data: snowfall)
+            try await writer.write(member: t.member, variable: outVariable, data: snowWater)
         }
     }
     

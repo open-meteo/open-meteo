@@ -112,24 +112,21 @@ struct DwdSisDownloader: AsyncCommand {
             grid: domain.grid,
             locationRange: 0..<domain.grid.count,
             timerange: timerange,
-            scanTimeDifferenceHours: timeDifference,
-            sunDeclinationCutOffDegrees: 1
+            scanTimeDifferenceHours: timeDifference
         )
         Zensun.instantaneousSolarRadiationToBackwardsAverages(
             timeOrientedData: &sisc,
             grid: domain.grid,
             locationRange: 0..<domain.grid.count,
             timerange: timerange,
-            scanTimeDifferenceHours: timeDifference,
-            sunDeclinationCutOffDegrees: 1
+            scanTimeDifferenceHours: timeDifference
         )
         Zensun.instantaneousSolarRadiationToBackwardsAverages(
             timeOrientedData: &sid,
             grid: domain.grid,
             locationRange: 0..<domain.grid.count,
             timerange: timerange,
-            scanTimeDifferenceHours: timeDifference,
-            sunDeclinationCutOffDegrees: 1
+            scanTimeDifferenceHours: timeDifference
         )
         logger.info("instantaneousSolarRadiationToBackwardsAverages took \(start.timeElapsedPretty())")
         
