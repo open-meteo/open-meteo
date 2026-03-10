@@ -268,6 +268,7 @@ enum ForecastSurfaceVariable: String, GenericVariableMixable {
     
     
     case sea_surface_temperature
+    case sea_water_salinity
     
     /*case wind_u_component_10m
     case wind_v_component_10m

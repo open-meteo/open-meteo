@@ -589,6 +589,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .shortwave_radiation_clear_sky_instant:
             // TODO: register in sdk shortwave_radiation_clear_sky_instant
             return .init(variable: .shortwaveRadiationClearSky)
+        case .sea_water_salinity:
+            // TODO: register in sdk sea_water_salinity
+            return .init(variable: .seaSaltAerosol)
         }
     }
 }
