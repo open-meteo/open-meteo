@@ -123,7 +123,7 @@ struct EumetnetDownloader: AsyncCommand {
 
     fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetnetDomain) async throws -> [GenericVariableHandle] {
         let logger = application.logger
-        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryError4xx: false, stripPasswords: false)
+        let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryError4xx: false)
 
         let server = "https://s3.waw3-1.cloudferro.com/openradar-24h"
         let dateDir = run.format_directoriesYYYYMMdd
