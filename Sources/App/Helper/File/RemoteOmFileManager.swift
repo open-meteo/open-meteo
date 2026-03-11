@@ -27,7 +27,7 @@ final class RemoteFileManager: Sendable {
     private let cache = RemoteFileManagerCache()
     
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
-    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
+    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
         guard let value = try await get(file: file, client: client, logger: logger, forceNew: false) else {
             return nil
         }
@@ -44,7 +44,7 @@ final class RemoteFileManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
+    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
         guard let backend = try await cache.get(key: file, client: client, logger: logger, forceNew: forceNew) else {
             return nil
         }
@@ -155,7 +155,7 @@ fileprivate final actor RemoteFileManagerCache {
     
     /// On cache miss, create a new reader
     /// If `forceNew` is set, do not use cached meta data
-    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
+    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
         let localFile = key.getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
             let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
@@ -168,7 +168,7 @@ fileprivate final actor RemoteFileManagerCache {
             }
         }
         
-        guard let remoteFile = key.getRemoteUrl() else {
+        guard let client, let remoteFile = key.getRemoteUrl() else {
             return (nil, .now())
         }
         let now = Timestamp.now()
@@ -220,7 +220,7 @@ fileprivate final actor RemoteFileManagerCache {
     /**
      Get a resource identified by a key. If the request is currently being requested, enqueue the request
      */
-    func get<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> LocalOrRemote? {
+    func get<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> LocalOrRemote? {
         let key = AnyRemoteFileManageable(key: key)
         guard let state = cache[key], !(forceNew == true && state.isCached) else {
             // Value not cached or needs to be refreshed

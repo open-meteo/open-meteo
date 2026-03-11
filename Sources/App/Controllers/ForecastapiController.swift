@@ -181,6 +181,7 @@ struct WeatherApiController {
             let historyStartDate: Timestamp
             let historyEndDate: Timestamp? = type == .climate ? Timestamp(2051, 1, 1) : nil
             let temporalResolutionDefault: ApiTemporalResolution
+            let allowRemoteArchive = !(OpenMeteo.remoteDataDirectoryMinimumAge ?? 0 >= 24*3600 && type == .forecast)
             switch type {
             case .none:
                 forecastDaysMax = 217
@@ -299,7 +300,7 @@ struct WeatherApiController {
             let nVariables = (nParamsHourly + nParamsMinutely + nParamsCurrent + nParamsDaily) * domains.reduce(0, { $0 + $1.countEnsembleMember }) + nVariableNonEnsemble
             // Currently the old calculation basically blocks climate data access very early. Adjust weigthing a bit
             let nVariablesAdjusted = type == .seasonal ? nVariables / 24 / 5 : nVariables
-            let options = try params.readerOptions(for: req)
+            let options = try params.readerOptions(for: req, allowRemoteArchive: allowRemoteArchive)
             let temporalResolution = params.temporal_resolution ?? temporalResolutionDefault
             
             let prepared = try await params.prepareCoordinates(allowTimezones: true, logger: options.logger, httpClient: options.httpClient)
