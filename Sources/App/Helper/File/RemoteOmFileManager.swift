@@ -173,13 +173,9 @@ fileprivate final actor RemoteFileManagerCache {
         }
         let now = Timestamp.now()
         let cachedFileMeta = forceNew ? HttpMetaCache.State.missing(lastValidated: Timestamp(0)) : HttpMetaCache.get(url: remoteFile)
-        let minimumAgeSeconds = OpenMeteo.remoteDataDirectoryMinimumAge
         switch cachedFileMeta {
         case .missing(let lastValidated):
             let revalidateSeconds = key.revalidateEverySeconds(modificationTime: nil, now: now)
-            if let minimumAgeSeconds, minimumAgeSeconds >= 24*3600, revalidateSeconds < 24*3600 {
-                return (nil, .now())
-            }
             if lastValidated >= now.subtract(seconds: revalidateSeconds) {
                 // safe to assume the file is still missing
                 return (nil, lastValidated)
@@ -269,8 +265,6 @@ fileprivate final actor RemoteFileManagerCache {
         
         let now = Timestamp.now()
         let removeLastAccessedThan = now.subtract(minutes: 15)
-        let minimumAgeSeconds = OpenMeteo.remoteDataDirectoryMinimumAge
-        
         for (key, state) in cache {
             let key2 = key.key
             total += 1
@@ -346,9 +340,6 @@ fileprivate final actor RemoteFileManagerCache {
                 if entry.value == nil {
                     // Check if a remote file is now available on the remote server
                     let revalidateSeconds = key2.revalidateEverySeconds(modificationTime: nil, now: now)
-                    if let minimumAgeSeconds, minimumAgeSeconds >= 24*3600, revalidateSeconds < 24*3600 {
-                        continue
-                    }
                     if entry.lastValidated < now.subtract(seconds: revalidateSeconds) {
                         entry.lastValidated = .now()
                         statistics.remoteCheckedExist += 1
