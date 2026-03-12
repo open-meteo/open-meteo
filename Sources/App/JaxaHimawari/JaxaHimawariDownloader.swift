@@ -80,6 +80,7 @@ struct JaxaHimawariDownload: AsyncCommand {
             return
         }
 
+        let start = Timestamp.now()
         let downloadRange: TimerangeDt
         let lastTimestampFile: String?
         if let run = try signature.run.flatMap(Timestamp.fromRunHourOrYYYYMMDD) {
@@ -103,7 +104,10 @@ struct JaxaHimawariDownload: AsyncCommand {
             Process.alarm(seconds: 10*60 - 5)
         }
         logger.info("Downloading range \(downloadRange.prettyString())")
-        let handles = try await downloadRange.enumerated().asyncFlatMap { i, run in
+        let handles = try await downloadRange.enumerated().asyncFlatMap { i, run -> [GenericVariableHandle] in
+            if Timestamp.now() > start.add(8*60) {
+                return [] // skip downloading after 8 minutes and proceed with conversion of already downloaded files
+            }
             // If the first step is missing, download the previous one to allow interpolation
             let h = try await downloadRun(application: context.application, run: run, domain: domain, variables: variables, downloader: downloader)
             if i == 0 && h.isEmpty && downloadRange.count > 1 {
@@ -195,6 +199,7 @@ struct JaxaHimawariDownload: AsyncCommand {
                         grid: domain.grid,
                         locationRange: 0..<domain.grid.count,
                         timerange: timerange,
+                        sunDeclinationCutOffDegrees: 1,
                         scanTimeDifferenceHours: timeDifference
                     )
                     logger.info("\(variable) conversion took \(start.timeElapsedPretty())")

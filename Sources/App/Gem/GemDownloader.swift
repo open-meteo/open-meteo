@@ -171,7 +171,7 @@ struct GemDownload: AsyncCommand {
             /// Keep wind vectors in memory to calculate wind speed / direction for ensemble
             ///
             let windCalculator = WindSpeedCalculator<GemSurfaceVariable>()
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
 
             try await variables.foreachConcurrent(nConcurrent: concurrent ?? 1) { variable in

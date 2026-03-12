@@ -434,3 +434,90 @@ enum IconSurfaceVariable: String, CaseIterable, GenericVariableMixable, Sendable
             self == .soil_temperature_18cm || self == .soil_temperature_54cm
     }
 }
+
+
+enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
+    case precipitation
+    case shortwave_radiation
+    case direct_radiation
+    case pressure_msl
+    case wind_v_component_10m
+    case wind_u_component_10m
+    case temperature_2m
+    case cloud_cover
+    case relative_humidity_2m
+
+    var storePreviousForecast: Bool {
+        return false
+    }
+
+    var isElevationCorrectable: Bool {
+        switch self {
+        case .temperature_2m:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    var unit: SiUnit {
+        switch self {
+        case .precipitation: return .millimetre
+        case .pressure_msl: return .hectopascal
+        case .wind_v_component_10m: return .metrePerSecond
+        case .wind_u_component_10m: return .metrePerSecond
+        case .temperature_2m: return .celsius
+        case .cloud_cover:
+            return .percentage
+        case .relative_humidity_2m:
+            return .percentage
+        case .shortwave_radiation, .direct_radiation:
+            return .wattPerSquareMetre
+        }
+    }
+    
+    var scalefactor: Float {
+        switch self {
+        case .precipitation: return 10
+        case .pressure_msl: return 10
+        case .temperature_2m: return 20
+        case .cloud_cover:
+            return 1
+        case .relative_humidity_2m:
+            return 1
+        case .shortwave_radiation, .direct_radiation:
+            return 1
+        case .wind_v_component_10m:
+            return 10
+        case .wind_u_component_10m:
+            return 10
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m:
+            return .hermite(bounds: nil)
+        case .cloud_cover:
+            return .linear
+        case .pressure_msl:
+            return .hermite(bounds: nil)
+        case .precipitation:
+            return .backwards_sum
+        case .wind_v_component_10m:
+            return .hermite(bounds: nil)
+        case .wind_u_component_10m:
+            return .hermite(bounds: nil)
+        case .relative_humidity_2m:
+            return .hermite(bounds: 0...100)
+        case .shortwave_radiation:
+            return .solar_backwards_averaged
+        case .direct_radiation:
+            return .solar_backwards_averaged
+        }
+    }
+}

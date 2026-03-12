@@ -299,14 +299,22 @@ import Testing
         let time = TimerangeDt(start: Timestamp(2022, 7, 31), nTime: 24, dtSeconds: 3600)
         let dni = Zensun.calculateBackwardsDNISupersampled(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, samples: 4)
         // At low sample counts, DNI is not calculated correctly, but we keep tests simple
-        #expect(arraysEqual(dni, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 127.46005, 518.34283, 725.5642, 836.6179, 888.55334, 908.3525, 907.0859, 842.14484, 752.32007, 655.0936, 410.60168, 28.567308, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(dni, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 150.55544, 518.34283, 725.5642, 836.6179, 888.55334, 908.3525, 907.0859, 842.14484, 752.32007, 655.0936, 410.60168, 47.573414, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
 
         /// Analytical solution is fairly close to supersampled solution. Smaller difference at sun rise/set
         let dni2 = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time)
-        #expect(arraysEqual(dni2, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 75.31125, 525.6257, 730.035, 838.7038, 889.7469, 908.00757, 911.16675, 843.0275, 749.2078, 665.61414, 414.24954, 34.339397, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(dni2, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 88.22421, 525.6257, 730.035, 838.7038, 889.7469, 908.00757, 911.16675, 843.0275, 749.2078, 665.61414, 414.24954, 40.669086, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
         
         let dniInstant = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: -22.5, longitude: 17, timerange: time, convertToInstant: true)
-        #expect(arraysEqual(dniInstant, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 297.9151, 772.2604, 882.58014, 933.1149, 939.24207, 919.1415, 885.91315, 782.6327, 651.7093, 511.8239, 201.10855, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(dniInstant, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 348.99603, 772.2604, 882.58014, 933.1149, 939.24207, 919.1415, 885.91315, 782.6327, 651.7093, 511.8239, 201.10855, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+    }
+    
+    /// Make sure DNI it limited to 87° zenith angle, otherwise it would show peaks at sunset
+    @Test func dniCloseToSunset() {
+        let directRadiation = [Float(32), 11, 1]
+        let time = TimerangeDt(start: Timestamp(2026, 3, 13, 18, 0), nTime: 3, dtSeconds: 900)
+        let dni = Zensun.calculateBackwardsDNI(directRadiation: directRadiation, latitude: 36.5, longitude: -4.875, timerange: time)
+        #expect(arraysEqual(dni, [324.32886, 191.8275, 0.0], accuracy: 0.01))
     }
 
     @Test func gTI() {
@@ -320,13 +328,13 @@ import Testing
         #expect(arraysEqual(gtiInstant, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 7.795708, 173.61362, 136.74342, 235.82225, 354.7455, 365.43063, 352.53616, 279.27585, 176.0145, 100.48777, 18.381063, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
 
         let gtiTrackHorizontal = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: 45, azimuth: .nan, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
-        #expect(arraysEqual(gtiTrackHorizontal, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 59.943016, 562.70105, 797.77844, 1038.7473, 1185.6353, 1205.2142, 1210.2856, 1106.8444, 939.80383, 752.5834, 385.76602, 27.280811, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(gtiTrackHorizontal, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 69.10773, 562.70105, 797.77844, 1038.7473, 1185.6353, 1205.2142, 1210.2856, 1106.8444, 939.80383, 752.5834, 385.76602, 31.77107, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
 
         let gtiTrackVertical = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: .nan, azimuth: 0, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
         #expect(arraysEqual(gtiTrackVertical, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.9056834, 98.515854, 108.27706, 206.66702, 316.56372, 418.15967, 417.75742, 277.57715, 196.47887, 122.20553, 34.23313, 0.90512145, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
 
         let gtiBiAxialTracking = Zensun.calculateTiltedIrradiance(directRadiation: directRadiation, diffuseRadiation: diffuseRadiation, tilt: .nan, azimuth: .nan, latitude: -22.5, longitude: 17, timerange: time, convertBackwardsToInstant: false)
-        #expect(arraysEqual(gtiBiAxialTracking, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 77.22054, 624.1415, 838.312, 1045.3708, 1184.8297, 1209.3428, 1214.2375, 1106.0839, 945.6867, 787.81964, 448.48267, 35.248135, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
+        #expect(arraysEqual(gtiBiAxialTracking, [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 90.13215, 624.1415, 838.312, 1045.3708, 1184.8297, 1209.3428, 1214.2375, 1106.0839, 945.6867, 787.81964, 448.48267, 41.57647, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0], accuracy: 0.01))
     }
 
     @Test func diffuseRadiation() {

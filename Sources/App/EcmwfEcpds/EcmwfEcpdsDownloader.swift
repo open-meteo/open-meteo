@@ -37,6 +37,10 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
 
         @Option(name: "email", help: "Email for the ECMWF API service")
         var email: String?
+        
+        @Option(name: "params", help: "ECMWF params list for downloading")
+        var downloadParams: String?
+
     }
 
     var help: String {
@@ -61,7 +65,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 fatalError("Email and key required")
             }
             let runs = try Timestamp.parseRange(yyyymmdd: timeinterval).toRange(dt: 86400).with(dtSeconds: 86400 / 4)
-            try await downloadMars(application: context.application, domain: domain, runs: runs, concurrent: nConcurrent, key: key, email: email, uploadS3Bucket: signature.uploadS3Bucket)
+            try await downloadMars(application: context.application, domain: domain, runs: runs, concurrent: nConcurrent, key: key, email: email, uploadS3Bucket: signature.uploadS3Bucket, params: signature.downloadParams)
             return
         }
         guard let server = signature.server else {
@@ -140,7 +144,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
     }
     
     /// Download multiple runs from ECMWF MARS archives, convert them and upload to S3
-    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadS3Bucket: String?) async throws {
+    func downloadMars(application: Application, domain: EcmwfEcpdsDomain, runs: TimerangeDt, concurrent: Int, key: String, email: String, uploadS3Bucket: String?, params: String?) async throws {
         let logger = application.logger
         let dtSeconds = domain.dtSeconds
         
@@ -166,6 +170,8 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         /// Split 0z/12z runs into 2 requests, because MARS transfers are limited to 75 GB
         let fullRunSteps = [sideRunSteps[0], "150/156/162/168/174/180/186/192/198/204/210/216/222/228/234/240/246/252/258/264/270/276/282/288/294/300/306/312/318/324/330/336/342/348/354/360"]
         
+        let params = params ?? "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151/130.151/34.128"
+        
         /// Run process task in the background
         var processTask: Task<(), any Error>? = nil
         
@@ -181,9 +187,12 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 // 98.174 = Sea ice thickness
                 // 228051 = litota1
                 // 228057 = litota3 + litota6 -> disabled because MARS query fails with wrong number of fields. Need to use a different timerange
+                // 34.128 = sst
+                // 130.151 = salinity
+                
                 let query = EcmwfQuery(
                     date: run.iso8601_YYYY_MM_dd,
-                    param: "100u/100v/10fg/10u/10v/200u/200v/2d/2t/cp/fal/fdir/fsr/hcc/kx/lcc/mcc/mn2t/msl/mucape/mucin/mx2t/pev/ptype/ro/rsn/sd/sf/skt/ssrd/stl1/stl2/stl3/stl4/swvl1/swvl2/swvl3/swvl4/tcc/tcwv/tp/20.3/blh/98.174/ocu/ocv/145.151",
+                    param: params,
                     step: steps,
                     stream: run.hour % 12 == 0 ? "oper" : "scda",
                     time: "\(run.hh)00",

@@ -292,12 +292,16 @@ public enum Zensun {
     ///
     /// Used for SARAH-3 shortwave and direct radiation and processes 24 hours at once.
     /// The scan time differences are particular annoying. Probably most users of satellite radiation completely ignore them.
-    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, scanTimeDifferenceHours: [Double]) {
+    /// SARAH-3 appears to have a 1° solar declination cut off. `sunDeclinationCutOffDegrees` is set to 1.
+    public static func instantaneousSolarRadiationToBackwardsAverages(timeOrientedData data: inout [Float], grid: any Gridable, locationRange: Range<Int>, timerange: TimerangeDt, sunDeclinationCutOffDegrees: Float, scanTimeDifferenceHours: [Double]) {
         let decang = timerange.map { $0.getSunDeclination() }
         let eqtime = timerange.map { $0.getSunEquationOfTime() }
 
         /// At low solar inclination angles (less than 5 watts), reuse clearness factors from other timesteps
         let radMinium = 5 / Zensun.solarConstant
+        
+        /// Limit DNI to 87° zenith, as it is very unstable close to sunrise/set, and usually not useful for solar applications. Can get close to 0 if limited by sunrise/set
+        let zenithCutOff = Float(sunDeclinationCutOffDegrees).degreesToRadians
 
         for (i, gridpoint) in locationRange.enumerated() {
             var ktPrevious = Float.nan
@@ -345,7 +349,7 @@ public enum Zensun {
 
                 // limit p1 and p10 to sunrise/set
                 let arg = -(/*sin(alpha) + */cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
-                let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+                let carg = arg > 1 || arg < -1 ? .pi : (acos(arg) - zenithCutOff)
                 let sunrise = p0 + carg
                 let sunset = p0 - carg
                 if p10 < sunset || p1 > sunrise {

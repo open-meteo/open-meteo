@@ -129,6 +129,7 @@ struct EumetsatSarahDownload: AsyncCommand {
                     grid: domain.grid,
                     locationRange: 0..<domain.grid.count,
                     timerange: timerange,
+                    sunDeclinationCutOffDegrees: 1,
                     scanTimeDifferenceHours: meta.timeDifference
                 )
                 logger.info("\(variable) conversion took \(start.timeElapsedPretty())")

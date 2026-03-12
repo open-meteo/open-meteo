@@ -153,7 +153,7 @@ struct DownloadIconCommand: AsyncCommand {
             let storage = VariablePerMemberStorage<IconSurfaceVariable>()
             let storage15min = VariablePerMemberStorage<IconSurfaceVariable>()
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: realm, ensembleMeanDomain: domain.ensembleMeanDomain)
             let writerProbabilities = isEnsemble ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
             let writer15Min = OmSpatialMultistepWriter(domain: IconDomains.iconD2_15min, run: run, storeOnDisk: true, realm: nil)
 
@@ -233,7 +233,14 @@ struct DownloadIconCommand: AsyncCommand {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                             continue
                         }
+                        
+                        // ICON EPS downloads shortwave radiation under the name of diffuse radiation
+                        if variable == .diffuse_radiation, domain == .iconEps {
+                            try await writer.write(member: member, variable: DwdIconEpsGlobalVariable.shortwave_radiation, data: array2d.data)
+                            continue
+                        }
                     }
+                    
                     // logger.info("Compressing and writing data to \(filenameDest)")
                     try await writer.write(member: member, variable: variable, data: array2d.data)
                 }
@@ -527,6 +534,8 @@ extension IconDomains {
             return t.floor(toNearestHour: 3)
         case .iconD2_15min:
             fatalError("ICON-D2 15minute data can not be downloaded individually")
+        case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
+            fatalError()
         }
     }
 
