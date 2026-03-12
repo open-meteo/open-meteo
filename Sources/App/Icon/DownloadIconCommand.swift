@@ -233,7 +233,14 @@ struct DownloadIconCommand: AsyncCommand {
                             await storage.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                             continue
                         }
+                        
+                        // ICON EPS downloads shortwave radiation under the name of diffuse radiation
+                        if variable == .diffuse_radiation, domain == .iconEps {
+                            try await writer.write(member: member, variable: DwdIconEpsGlobalVariable.shortwave_radiation, data: array2d.data)
+                            continue
+                        }
                     }
+                    
                     // logger.info("Compressing and writing data to \(filenameDest)")
                     try await writer.write(member: member, variable: variable, data: array2d.data)
                 }

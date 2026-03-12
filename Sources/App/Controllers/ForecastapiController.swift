@@ -944,11 +944,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ], precipitationProb: EcmwfDomain.ifs025_ensemble)
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .multiple([
-                (IconDomains.iconEpsEnsembleMean, VariableOrSpread<IconVariable>.self),
+                (IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self),
                 (IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
             ])
+        case .icon_global_eps:
+            return .single(IconDomains.iconEps, DwdIconEpsGlobalVariable.self)
         case .dwd_icon_eps_ensemble_mean:
-            return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+            return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self)
         case .dwd_icon_eu_eps_ensemble_mean:
             return .single(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
         case .dwd_icon_d2_eps_ensemble_mean:
@@ -1545,7 +1547,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             /// See: https://github.com/open-meteo/open-meteo/issues/876
             return try await IconMixer(domains: [.iconEps, .iconEuEps], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? []
         case .icon_global_eps:
-            return try await IconReader(domain: .iconEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .icon_eu_eps:
             return try await IconReader(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .icon_d2_eps:
