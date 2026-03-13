@@ -192,6 +192,7 @@ public func configure(_ app: Application) throws {
     app.asyncCommands.use(NbmDownload(), as: "download-nbm")
     app.asyncCommands.use(JmaDownload(), as: "download-jma")
     app.asyncCommands.use(MetNoDownloader(), as: "download-metno")
+    app.asyncCommands.use(GeoSphereDownloader(), as: "download-geosphere")
     app.asyncCommands.use(KmaDownload(), as: "download-kma")
     app.asyncCommands.use(GloFasDownloader(), as: "download-glofas")
     app.asyncCommands.use(GemDownload(), as: "download-gem")
