@@ -138,7 +138,7 @@ struct ModelUpdateMetaFile: RemoteFileManageableJson {
     }
     
     func getFilePath() -> String {
-        return "\(OpenMeteo.dataDirectory)\(domain.rawValue)/static/meta.json"
+        return "\(domain.directoryStatic)/meta.json"
     }
     
     func getRemoteUrl() -> String? {
