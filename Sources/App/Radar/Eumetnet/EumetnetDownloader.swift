@@ -47,7 +47,7 @@ struct EumetnetDownloader: AsyncCommand {
             for (_, runs) in timerange.groupedPreservedOrder(by: { $0.timeIntervalSince1970 / chunkDt }) {
                 logger.info("Downloading runs \(runs.iso8601_YYYYMMddHHmm)")
                 let handles = try await runs.asyncFlatMap { run in
-                    return try await downloadRun(application: context.application, run: run, domain: domain)
+                    return try await downloadRun(application: context.application, run: run, domain: domain, uploadS3Bucket: nil)
                 }
                 try await GenericVariableHandle.convert(
                     logger: logger,
@@ -66,7 +66,7 @@ struct EumetnetDownloader: AsyncCommand {
 
         if let runStr = signature.run {
             let run = try Timestamp.fromRunHourOrYYYYMMDD(runStr)
-            let handles = try await downloadRun(application: context.application, run: run, domain: domain)
+            let handles = try await downloadRun(application: context.application, run: run, domain: domain, uploadS3Bucket: nil)
             try await GenericVariableHandle.convert(
                 logger: logger,
                 domain: domain,
@@ -100,7 +100,7 @@ struct EumetnetDownloader: AsyncCommand {
         logger.info("Downloading range \(downloadRange.prettyString())")
 
         let handles = try await downloadRange.asyncFlatMap { run in
-            return try await downloadRun(application: context.application, run: run, domain: domain)
+            return try await downloadRun(application: context.application, run: run, domain: domain, uploadS3Bucket: signature.uploadS3Bucket)
         }
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
@@ -121,7 +121,7 @@ struct EumetnetDownloader: AsyncCommand {
         )
     }
 
-    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetnetDomain) async throws -> [GenericVariableHandle] {
+    fileprivate func downloadRun(application: Application, run: Timestamp, domain: EumetnetDomain, uploadS3Bucket: String?) async throws -> [GenericVariableHandle] {
         let logger = application.logger
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, retryError4xx: false)
 
@@ -201,7 +201,7 @@ struct EumetnetDownloader: AsyncCommand {
 
         let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: run, storeOnDisk: true, realm: nil)
         try await writer.write(member: 0, variable: EumetnetVariable.precipitation, data: precipData)
-        return try await writer.finalise(completed: true, validTimes: [run], uploadS3Bucket: nil)
+        return try await writer.finalise(completed: true, validTimes: [run], uploadS3Bucket: uploadS3Bucket)
     }
 }
 
