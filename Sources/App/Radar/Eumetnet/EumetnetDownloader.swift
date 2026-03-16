@@ -129,10 +129,7 @@ struct EumetnetDownloader: AsyncCommand {
         let dateDir = run.format_directoriesYYYYMMdd
         // e.g. OPERA@20260224T1445@0@RATE.h5
         let filename = "OPERA@\(run.format_YYYYMMdd)T\(run.hh)\(run.mm)@0@RATE.h5"
-        // let url = "\(server)/\(dateDir)/OPERA/COMP/\(filename)"
-
-        // FIXME: hardcoded file for local testing
-        let url = "file:///home/fred/Downloads/opera/opera-files/OPERA@20260220T1645@0@RATE.h5"
+        let url = "\(server)/\(dateDir)/OPERA/COMP/\(filename)"
 
         let tempFile = "\(domain.downloadDirectory)\(filename)"
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
