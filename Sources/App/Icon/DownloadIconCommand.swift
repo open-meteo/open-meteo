@@ -69,7 +69,7 @@ struct DownloadIconCommand: AsyncCommand {
         if FileManager.default.fileExists(atPath: surfaceElevationFileOm) {
             return
         }
-        try domain.surfaceElevationFileOm.createDirectory()
+        try FileManager.default.createDirectory(atPath: domain.domainRegistry.directoryStatic, withIntermediateDirectories: true)
 
         let downloadDirectory = domain.downloadDirectory
         try FileManager.default.createDirectory(atPath: downloadDirectory, withIntermediateDirectories: true)

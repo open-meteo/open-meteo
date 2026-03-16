@@ -81,6 +81,7 @@ enum DomainRegistry: String, CaseIterable {
     case dwd_ewam
     case dwd_gwam
     case dwd_sis_europe_africa_v4
+    case dwd_aicon_global
 
     case ecmwf_ifs
     case ecmwf_ifs04
@@ -160,6 +161,10 @@ enum DomainRegistry: String, CaseIterable {
 
     var directory: String {
         return "\(OpenMeteo.dataDirectory)\(rawValue)/"
+    }
+    
+    var directoryStatic: String {
+        return "\(self.directory)/static/"
     }
     
     var directorySpatial: String? {
@@ -302,6 +307,8 @@ enum DomainRegistry: String, CaseIterable {
             return GfsDomain.hrrr_conus
         case .ncep_hrrr_conus_15min:
             return GfsDomain.hrrr_conus_15min
+        case .dwd_aicon_global:
+            return AiconDomain.aicon_global
         case .dwd_icon:
             return IconDomains.icon
         case .dwd_icon_d2:
