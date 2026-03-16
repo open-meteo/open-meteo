@@ -199,21 +199,9 @@ struct EumetnetDownloader: AsyncCommand {
         // so we need to flip the latitude axis.
         precipData.flipLatitude(nt: 1, ny: domain.grid.ny, nx: domain.grid.nx)
 
-        let writer = OmFileSplitter.makeSpatialWriter(domain: domain, nTime: 1)
-        let fn = try writer.writeTemporary(
-            compressionType: .pfor_delta2d_int16,
-            scalefactor: EumetnetVariable.precipitation.scalefactor,
-            all: precipData
-        )
-        return [
-            try await GenericVariableHandle(
-                variable: EumetnetVariable.precipitation,
-                time: run,
-                member: 0,
-                fn: fn,
-                domain: domain
-            )
-        ]
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: run, storeOnDisk: true, realm: nil)
+        try await writer.write(member: 0, variable: EumetnetVariable.precipitation, data: precipData)
+        return try await writer.finalise(completed: true, validTimes: [run], uploadS3Bucket: nil)
     }
 }
 
@@ -224,14 +212,12 @@ enum EumetnetDomain: String, GenericDomain, CaseIterable {
     var grid: any Gridable {
         switch self {
         case .opera_composite:
-            let projection = LambertAzimuthalEqualAreaProjection(λ0: 10, ϕ1: 55.0, radius: 6371229)
+            let projection = LambertAzimuthalEqualAreaProjection(λ0: 10.0, ϕ1: 55.0, radius: 6371229)
             return ProjectionGrid(
                 nx: 1900,
                 ny: 2200,
-                latitudeProjectionOrigin: -2100000,
-                longitudeProjectionOrigin: 1950000,
-                dx: 2000,
-                dy: 2000,
+                latitude: 31.7462153182675...67.6210371071631,
+                longitude: 	-10.4345768386404...57.8119647501499,
                 projection: projection
             )
         }
