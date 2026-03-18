@@ -93,6 +93,7 @@ Repositories:
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
 - [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
+- [weather-cli-dualprovider](https://github.com/jimishol/weather-cli-dualprovider) Minimal Bash CLI (single-file core; requires weather.en) fetching Open‑Meteo forecasts with a fallback provider; localized WMO descriptions. License: GPL‑3.0.
 
 Other:
 
