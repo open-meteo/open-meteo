@@ -298,7 +298,7 @@ actor OmSpatialMultistepWriter {
         if let writer = writer.first(where: {$0.time == time}) {
             return writer
         }
-        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm)
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, ensembleMeanDomain: ensembleMeanDomain)
         self.writer.append(writer)
         return writer
     }
