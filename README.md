@@ -94,7 +94,7 @@ Repositories:
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
 - [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
-- [FlyDecision] (https://github.com/flydecision) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping. Web and Android app
+- [FlyDecision](https://github.com/flydecision) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with takeoff mapping. Web and Android app
 
 Other:
 
