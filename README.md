@@ -82,6 +82,7 @@ Apps:
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
 - [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
 - [WorldWeatherMonitor](https://world-weather-monitor.vercel.app/) An interactive world weather map that displays real-time weather conditions for cities around the globe.
+- [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
 
 Repositories:
 
@@ -93,6 +94,7 @@ Repositories:
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
 - [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
+- [FlyDecision] (https://github.com/flydecision) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping. Web and Android app
 
 Other:
 
