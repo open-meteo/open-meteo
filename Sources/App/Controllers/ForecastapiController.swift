@@ -949,10 +949,12 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             ])
         case .icon_global_eps:
             return .single(IconDomains.iconEps, DwdIconEpsGlobalVariable.self)
+        case .icon_eu_eps:
+            return .single(IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self)
         case .dwd_icon_eps_ensemble_mean:
             return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self)
         case .dwd_icon_eu_eps_ensemble_mean:
-            return .single(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<IconVariable>.self)
+            return .single(IconDomains.iconEuEpsEnsembleMean, VariableOrSpread<DwdIconEuEpsGlobalVariable>.self)
         case .dwd_icon_d2_eps_ensemble_mean:
             return .single(IconDomains.iconD2EpsEnsembleMean, VariableOrSpread<IconVariable>.self)
         case .ecmwf_ifs025_ensemble_mean:
@@ -1549,7 +1551,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_global_eps:
             return [] // migrated
         case .icon_eu_eps:
-            return try await IconReader(domain: .iconEuEps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .icon_d2_eps:
             return try await IconReader(domain: .iconD2Eps, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .ecmwf_ifs025_ensemble:

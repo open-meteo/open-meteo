@@ -521,3 +521,95 @@ enum DwdIconEpsGlobalVariable: String, Hashable, GenericVariable {
         }
     }
 }
+
+enum DwdIconEuEpsGlobalVariable: String, Hashable, GenericVariable {
+    case precipitation
+    case direct_radiation
+    case diffuse_radiation
+    case pressure_msl
+    case wind_v_component_10m
+    case wind_u_component_10m
+    case wind_v_component_80m
+    case wind_u_component_80m
+    case wind_gusts_10m
+    case temperature_2m
+    case temperature_80m
+    case cloud_cover
+    case relative_humidity_2m
+    case cape
+    case snowfall_water_equivalent
+    
+    var storePreviousForecast: Bool {
+        return false
+    }
+
+    var isElevationCorrectable: Bool {
+        switch self {
+        case .temperature_2m:
+            return true
+        default:
+            return false
+        }
+    }
+
+    var omFileName: (file: String, level: Int) {
+        return (rawValue, 0)
+    }
+
+    var unit: SiUnit {
+        switch self {
+        case .precipitation: return .millimetre
+        case .snowfall_water_equivalent: return .millimetre
+        case .pressure_msl: return .hectopascal
+        case .wind_v_component_10m: return .metrePerSecond
+        case .wind_u_component_10m: return .metrePerSecond
+        case .wind_v_component_80m: return .metrePerSecond
+        case .wind_u_component_80m: return .metrePerSecond
+        case .wind_gusts_10m: return .metrePerSecond
+        case .temperature_2m: return .celsius
+        case .temperature_80m: return .celsius
+        case .cloud_cover: return .percentage
+        case .relative_humidity_2m: return .percentage
+        case .direct_radiation, .diffuse_radiation: return .wattPerSquareMetre
+        case .cape: return .joulePerKilogram
+        }
+    }
+
+    var scalefactor: Float {
+        switch self {
+        case .precipitation: return 10
+        case .snowfall_water_equivalent: return 10
+        case .pressure_msl: return 10
+        case .temperature_2m: return 20
+        case .temperature_80m: return 10
+        case .cloud_cover: return 1
+        case .relative_humidity_2m: return 1
+        case .direct_radiation, .diffuse_radiation: return 1
+        case .wind_v_component_10m: return 10
+        case .wind_u_component_10m: return 10
+        case .wind_v_component_80m: return 10
+        case .wind_u_component_80m: return 10
+        case .wind_gusts_10m: return 10
+        case .cape: return 0.1
+        }
+    }
+
+    var interpolation: ReaderInterpolation {
+        switch self {
+        case .temperature_2m: return .hermite(bounds: nil)
+        case .temperature_80m: return .hermite(bounds: nil)
+        case .cloud_cover: return .linear
+        case .pressure_msl: return .hermite(bounds: nil)
+        case .precipitation: return .backwards_sum
+        case .snowfall_water_equivalent: return .backwards_sum
+        case .wind_v_component_10m: return .hermite(bounds: nil)
+        case .wind_u_component_10m: return .hermite(bounds: nil)
+        case .wind_v_component_80m: return .hermite(bounds: nil)
+        case .wind_u_component_80m: return .hermite(bounds: nil)
+        case .wind_gusts_10m: return .hermite(bounds: 0...10e9)
+        case .relative_humidity_2m: return .hermite(bounds: 0...100)
+        case .direct_radiation, .diffuse_radiation: return .solar_backwards_averaged
+        case .cape: return .hermite(bounds: 0...10e9)
+        }
+    }
+}

@@ -844,6 +844,18 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 }
                 return DataAndUnit(et0, .millimetre)
             }
+        case .shortwave_radiation:
+            // DWD ICON models store direct_radiation and diffuse_radiation
+            guard
+                let direct = Reader.variableFromString("direct_radiation"),
+                let diffuse = Reader.variableFromString("diffuse_radiation")
+            else {
+                return nil
+            }
+            return .two(.raw(direct), .raw(diffuse)) { direct, diffuse, _ in
+                let ghi = zip(direct.data, diffuse.data).map(+)
+                return DataAndUnit(ghi, direct.unit)
+            }
         case .diffuse_radiation:
             guard let swrad = Reader.variableFromString("shortwave_radiation") else {
                 return nil
