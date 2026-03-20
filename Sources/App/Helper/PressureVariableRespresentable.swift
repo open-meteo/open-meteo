@@ -400,7 +400,8 @@ extension VariableOrSpread: GenericVariable where Variable: GenericVariable {
     }
 
     var storePreviousForecast: Bool {
-        return false
+        // Also store previous forecast for spread variables
+        return variable.storePreviousForecast
     }
 }
 
