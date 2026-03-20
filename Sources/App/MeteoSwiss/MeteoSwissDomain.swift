@@ -11,9 +11,9 @@ enum MeteoSwissDomain: String, GenericDomain, CaseIterable {
     
     var ensembleMeanDomain: Self? {
         switch self {
-        case .icon_ch1_ensemble_mean:
+        case .icon_ch1_ensemble:
             return .icon_ch1_ensemble_mean
-        case .icon_ch2_ensemble_mean:
+        case .icon_ch2_ensemble:
             return .icon_ch2_ensemble_mean
         default:
             return nil
