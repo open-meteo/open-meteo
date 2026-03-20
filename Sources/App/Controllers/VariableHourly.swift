@@ -1,3 +1,5 @@
+import Foundation
+
 /// Define all available surface weather variables
 enum ForecastSurfaceVariable: String, GenericVariableMixable {
     /// Maps to `temperature_2m`. Used for compatibility with `current_weather` block
@@ -856,6 +858,18 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let ghi = zip(direct.data, diffuse.data).map(+)
                 return DataAndUnit(ghi, direct.unit)
             }
+        case .shortwave_radiation_spread:
+            // DWD ICON models store direct_radiation and diffuse_radiation
+            guard
+                let direct = Reader.variableFromString("direct_radiation_spread"),
+                let diffuse = Reader.variableFromString("diffuse_radiation_spread")
+            else {
+                return nil
+            }
+            return .two(.raw(direct), .raw(diffuse)) { direct, diffuse, _ in
+                let ghi = zip(direct.data, diffuse.data).map({ sqrt($0*$0 + $1*$1) })
+                return DataAndUnit(ghi, direct.unit)
+            }
         case .diffuse_radiation:
             guard let swrad = Reader.variableFromString("shortwave_radiation") else {
                 return nil
@@ -917,8 +931,8 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
                 let snowfall = snowWater.data.map { $0 * 0.7 }
                 return DataAndUnit(snowfall, .centimetre)
             }
-        case .direct_normal_irradiance:
-            guard let directRadiation  = getDeriverMap(variable: .direct_radiation) else {
+        case .direct_normal_irradiance, .direct_normal_irradiance_spread:
+            guard let directRadiation  = getDeriverMap(variable: variable == .direct_normal_irradiance ? .direct_radiation : .direct_radiation_spread) else {
                 return nil
             }
             return .one(.mapped(directRadiation)) { dhi, time in
