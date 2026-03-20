@@ -217,6 +217,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
                             snowfallHeightAboveGrid: t2m.data[i] > 0 && snowfallHeight.data[i] > max(0, domainElevation[i]) + 50
                         ).rawValue)
                     }
+                    try await writer.write(time: time, member: 0, variable: ItaliaMeteoArpaeSurfaceVariable.weather_code, data: array2d.array.data)
                 }
 
                 /// Add snow to liquid rain if temperature is > 1.5°C or snowfall height is higher than 50 metre above ground
