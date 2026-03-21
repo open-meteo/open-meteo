@@ -116,7 +116,7 @@ struct GenericReader<Domain: GenericDomain, Variable: GenericVariable>: GenericR
     
     let logger: Logger
     
-    let httpClient: HTTPClient
+    let httpClient: HTTPClient?
 
     var modelDtSeconds: Int {
         return domain.dtSeconds

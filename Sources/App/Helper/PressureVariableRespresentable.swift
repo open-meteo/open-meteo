@@ -1,7 +1,8 @@
 import Foundation
 
 /// Represent a variable combined with a pressure level and helps decoding it
-protocol PressureVariableRespresentable: RawRepresentable where RawValue == String, Variable.RawValue == String {
+protocol PressureVariableRespresentable: RawRepresentable
+where RawValue == String, Variable.RawValue == String {
     associatedtype Variable: RawRepresentable
 
     var variable: Variable { get }
@@ -12,10 +13,12 @@ protocol PressureVariableRespresentable: RawRepresentable where RawValue == Stri
 
 extension PressureVariableRespresentable {
     init?(rawValue: String) {
-        guard let pos = rawValue.lastIndex(of: "_"), let posEnd = rawValue[pos..<rawValue.endIndex].range(of: "hPa") else {
+        guard let pos = rawValue.lastIndex(of: "_"),
+            let posEnd = rawValue[pos..<rawValue.endIndex].range(of: "hPa")
+        else {
             return nil
         }
-        let variableString = rawValue[rawValue.startIndex ..< pos]
+        let variableString = rawValue[rawValue.startIndex..<pos]
         guard let variable = Variable(rawValue: String(variableString)) else {
             return nil
         }
@@ -35,7 +38,14 @@ extension PressureVariableRespresentable {
     init(from decoder: Decoder) throws {
         let s = try decoder.singleValueContainer().decode(String.self)
         guard let initialised = Self(rawValue: s) else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot initialize \(Self.self) from invalid String value \(s)", underlyingError: nil))
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription:
+                        "Cannot initialize \(Self.self) from invalid String value \(s)",
+                    underlyingError: nil
+                )
+            )
         }
         self = initialised
     }
@@ -47,7 +57,8 @@ extension PressureVariableRespresentable {
 }
 
 /// Represent a variable combined with a pressure level and helps decoding it
-protocol HeightVariableRespresentable: RawRepresentable where RawValue == String, Variable.RawValue == String {
+protocol HeightVariableRespresentable: RawRepresentable
+where RawValue == String, Variable.RawValue == String {
     associatedtype Variable: RawRepresentable
 
     var variable: Variable { get }
@@ -58,10 +69,12 @@ protocol HeightVariableRespresentable: RawRepresentable where RawValue == String
 
 extension HeightVariableRespresentable {
     init?(rawValue: String) {
-        guard let pos = rawValue.lastIndex(of: "_"), let posEnd = rawValue[pos..<rawValue.endIndex].range(of: "m") else {
+        guard let pos = rawValue.lastIndex(of: "_"),
+            let posEnd = rawValue[pos..<rawValue.endIndex].range(of: "m")
+        else {
             return nil
         }
-        let variableString = rawValue[rawValue.startIndex ..< pos]
+        let variableString = rawValue[rawValue.startIndex..<pos]
         guard let variable = Variable(rawValue: String(variableString)) else {
             return nil
         }
@@ -81,7 +94,14 @@ extension HeightVariableRespresentable {
     init(from decoder: Decoder) throws {
         let s = try decoder.singleValueContainer().decode(String.self)
         guard let initialised = Self(rawValue: s) else {
-            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Cannot initialize \(Self.self) from invalid String value \(s)", underlyingError: nil))
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: decoder.codingPath,
+                    debugDescription:
+                        "Cannot initialize \(Self.self) from invalid String value \(s)",
+                    underlyingError: nil
+                )
+            )
         }
         self = initialised
     }
@@ -98,12 +118,14 @@ protocol RawRepresentableString {
 }
 
 /// Enum with surface and pressure variable
-enum SurfaceAndPressureVariable<Surface: Sendable, Pressure: Sendable>: Sendable {
+enum SurfaceAndPressureVariable<Surface: Sendable, Pressure: Sendable>: Sendable
+{
     case surface(Surface)
     case pressure(Pressure)
 }
 
-extension SurfaceAndPressureVariable: RawRepresentableString where Pressure: RawRepresentableString, Surface: RawRepresentableString {
+extension SurfaceAndPressureVariable: RawRepresentableString
+where Pressure: RawRepresentableString, Surface: RawRepresentableString {
     init?(rawValue: String) {
         if let variable = Pressure(rawValue: rawValue) {
             self = .pressure(variable)
@@ -124,11 +146,13 @@ extension SurfaceAndPressureVariable: RawRepresentableString where Pressure: Raw
     }
 }
 
-extension SurfaceAndPressureVariable: Hashable, Equatable where Pressure: Hashable, Surface: Hashable {
+extension SurfaceAndPressureVariable: Hashable, Equatable
+where Pressure: Hashable, Surface: Hashable {
 }
 
-extension SurfaceAndPressureVariable: GenericVariable where Surface: GenericVariable, Pressure: GenericVariable {
-    var asGenericVariable: GenericVariable {
+extension SurfaceAndPressureVariable: GenericVariable
+where Surface: GenericVariable, Pressure: GenericVariable {
+    var asGenericVariable: any GenericVariable {
         switch self {
         case .surface(let surface):
             return surface
@@ -162,17 +186,26 @@ extension SurfaceAndPressureVariable: GenericVariable where Surface: GenericVari
     }
 }
 
-extension SurfaceAndPressureVariable: GenericVariableMixable where Surface: GenericVariableMixable, Pressure: GenericVariableMixable {
+extension SurfaceAndPressureVariable: GenericVariableMixable
+where Surface: GenericVariableMixable, Pressure: GenericVariableMixable {
 }
 
 /// Enum with surface and pressure variable
-enum SurfacePressureAndHeightVariable<Surface: Sendable, Pressure: Sendable, Height: Sendable>: Sendable {
+enum SurfacePressureAndHeightVariable<
+    Surface: Sendable,
+    Pressure: Sendable,
+    Height: Sendable
+>: Sendable {
     case surface(Surface)
     case pressure(Pressure)
     case height(Height)
 }
 
-extension SurfacePressureAndHeightVariable: RawRepresentableString where Pressure: RawRepresentableString, Surface: RawRepresentableString, Height: RawRepresentableString {
+extension SurfacePressureAndHeightVariable: RawRepresentableString
+where
+    Pressure: RawRepresentableString, Surface: RawRepresentableString,
+    Height: RawRepresentableString
+{
     init?(rawValue: String) {
         if let variable = Pressure(rawValue: rawValue) {
             self = .pressure(variable)
@@ -198,7 +231,11 @@ extension SurfacePressureAndHeightVariable: RawRepresentableString where Pressur
     }
 }
 
-extension SurfacePressureAndHeightVariable: FlatBuffersVariable where Pressure: FlatBuffersVariable, Surface: FlatBuffersVariable, Height: FlatBuffersVariable {
+extension SurfacePressureAndHeightVariable: FlatBuffersVariable
+where
+    Pressure: FlatBuffersVariable, Surface: FlatBuffersVariable,
+    Height: FlatBuffersVariable
+{
     func getFlatBuffersMeta() -> FlatBufferVariableMeta {
         switch self {
         case .surface(let surface):
@@ -211,11 +248,15 @@ extension SurfacePressureAndHeightVariable: FlatBuffersVariable where Pressure: 
     }
 }
 
-extension SurfacePressureAndHeightVariable: Hashable, Equatable where Pressure: Hashable, Surface: Hashable, Height: Hashable {
+extension SurfacePressureAndHeightVariable: Hashable, Equatable
+where Pressure: Hashable, Surface: Hashable, Height: Hashable {
 }
 
-extension SurfacePressureAndHeightVariable: GenericVariable where Surface: GenericVariable, Pressure: GenericVariable, Height: GenericVariable {
-    var asGenericVariable: GenericVariable {
+extension SurfacePressureAndHeightVariable: GenericVariable
+where
+    Surface: GenericVariable, Pressure: GenericVariable, Height: GenericVariable
+{
+    var asGenericVariable: any GenericVariable {
         switch self {
         case .surface(let surface):
             return surface
@@ -251,10 +292,17 @@ extension SurfacePressureAndHeightVariable: GenericVariable where Surface: Gener
     }
 }
 
-extension SurfacePressureAndHeightVariable: GenericVariableMixable where Surface: GenericVariableMixable, Pressure: GenericVariableMixable, Height: GenericVariableMixable {
+extension SurfacePressureAndHeightVariable: GenericVariableMixable
+where
+    Surface: GenericVariableMixable, Pressure: GenericVariableMixable,
+    Height: GenericVariableMixable
+{
 }
 
-enum VariableOrDerived<Raw: RawRepresentableString & Sendable, Derived: RawRepresentableString & Sendable>: RawRepresentableString, Sendable {
+enum VariableOrDerived<
+    Raw: RawRepresentableString & Sendable,
+    Derived: RawRepresentableString & Sendable
+>: RawRepresentableString, Sendable {
     case raw(Raw)
     case derived(Derived)
 
@@ -287,19 +335,22 @@ enum VariableOrDerived<Raw: RawRepresentableString & Sendable, Derived: RawRepre
     }
 }
 
-
-struct VariableOrSpread<Variable: RawRepresentableString & Sendable>: RawRepresentableString, Sendable {
+struct VariableOrSpread<Variable: RawRepresentableString & Sendable>:
+    RawRepresentableString, Sendable
+{
     let variable: Variable
     let isSpread: Bool
-    
-    init (variable: Variable, isSpread: Bool) {
+
+    init(variable: Variable, isSpread: Bool) {
         self.variable = variable
         self.isSpread = isSpread
     }
-    
+
     init?(rawValue: String) {
         if rawValue.hasSuffix("_spread") {
-            guard let variable = Variable(rawValue: String(rawValue.dropLast(7))) else {
+            guard
+                let variable = Variable(rawValue: String(rawValue.dropLast(7)))
+            else {
                 return nil
             }
             self.variable = variable
@@ -323,37 +374,64 @@ struct VariableOrSpread<Variable: RawRepresentableString & Sendable>: RawReprese
 
 }
 
-extension VariableOrSpread: GenericVariable, GenericVariableMixable where Variable: GenericVariable {
+extension VariableOrSpread: GenericVariable where Variable: GenericVariable {
     var omFileName: (file: String, level: Int) {
-        return (isSpread ? "\(variable.omFileName.file)_spread" : variable.omFileName.file, variable.omFileName.level)
+        return (
+            isSpread
+                ? "\(variable.omFileName.file)_spread"
+                : variable.omFileName.file, variable.omFileName.level
+        )
     }
-    
+
     var scalefactor: Float {
         return variable.scalefactor
     }
-    
+
     var interpolation: ReaderInterpolation {
         return variable.interpolation
     }
-    
+
     var unit: SiUnit {
         return isSpread && variable.unit == .celsius ? .kelvin : variable.unit
     }
-    
+
     var isElevationCorrectable: Bool {
         return false
     }
-    
+
     var storePreviousForecast: Bool {
-        return false
+        // Also store previous forecast for spread variables
+        return variable.storePreviousForecast
     }
+}
+
+extension VariableOrSpread: FlatBuffersVariable
+where Variable: FlatBuffersVariable {
+    func getFlatBuffersMeta() -> FlatBufferVariableMeta {
+        let f = variable.getFlatBuffersMeta()
+        return FlatBufferVariableMeta(
+            variable: f.variable,
+            aggregation: isSpread ? .spread : f.aggregation,
+            probability: f.probability,
+            altitude: f.altitude,
+            depth: f.depth,
+            depthTo: f.depthTo,
+            previousDay: f.previousDay
+        )
+    }
+
+}
+
+extension VariableOrSpread: GenericVariableMixable
+where Variable: GenericVariableMixable {
+
 }
 
 extension GenericVariable {
     var asSpreadVariable: VariableOrSpread<Self> {
         return VariableOrSpread(variable: self, isSpread: true)
     }
-    
+
     var asSpreadVariableGeneric: some GenericVariable {
         return VariableOrSpread(variable: self, isSpread: true)
     }

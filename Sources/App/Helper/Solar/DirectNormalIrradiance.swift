@@ -38,7 +38,7 @@ extension Zensun {
                 out.append(0)
                 continue
             }
-            let b = max(zz, cos(Float(85).degreesToRadians))
+            let b = max(zz, cos(Float(87).degreesToRadians))
             let dni = dhi / b
             out.append(dni)
         }
@@ -77,9 +77,8 @@ extension Zensun {
                 return 0
             }
 
-            /// DNI is typically limited to 85° zenith. We apply 5° to the parallax in addition to atmospheric refraction
-            /// The parallax is then used to limit integral coefficients to sun rise/set
-            let alpha = Float(0.83333 - 5).degreesToRadians
+            /// Limit DNI to 87° zenith, as it is very unstable close to sunrise/set, and usually not useful for solar applications. Can get close to 0 if limited by sunrise/set
+            let zenithCutOff = Float(3).degreesToRadians
 
             let decang = timestamp.getSunDeclination()
             let eqtime = timestamp.getSunEquationOfTime()
@@ -110,9 +109,9 @@ extension Zensun {
                 p0 -= 2 * .pi
             }
 
-            // limit p1 and p10 to sunrise/set and limited to 85° zenith for DNI calculation
-            let arg = -(sin(alpha) + cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
-            let carg = arg > 1 || arg < -1 ? .pi : acos(arg)
+            // limit p1 and p10 to sunrise/set
+            let arg = -(cos(t0) * cos(t1)) / (sin(t0) * sin(t1))
+            let carg = arg > 1 || arg < -1 ? .pi : (acos(arg) - zenithCutOff)
             let sunrise = p0 + carg
             let sunset = p0 - carg
             let p1_l = min(sunrise, p10)

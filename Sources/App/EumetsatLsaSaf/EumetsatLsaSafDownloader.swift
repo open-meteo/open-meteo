@@ -168,6 +168,7 @@ struct EumetsatLsaSafDownload: AsyncCommand {
             grid: domain.grid,
             locationRange: 0..<domain.grid.count,
             timerange: timerange,
+            sunDeclinationCutOffDegrees: 1,
             scanTimeDifferenceHours: scanTimeDifferenceHours
         )
         logger.info("conversion took \(start.timeElapsedPretty())")

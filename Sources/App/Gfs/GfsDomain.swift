@@ -31,6 +31,23 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     case gfswave016
 
     case gfswave025_ens
+    
+    case gefs025_ensemble_mean
+    case gefs05_ensemble_mean
+    case gefswave025_ensemble_mean
+    
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .gfs025_ens:
+            return .gefs025_ensemble_mean
+        case .gfs05_ens:
+            return .gefs05_ensemble_mean
+        case .gfswave025_ens:
+            return .gefswave025_ensemble_mean
+        default:
+            return nil
+        }
+    }
 
     var domainRegistry: DomainRegistry {
         switch self {
@@ -54,6 +71,12 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return .ncep_gfswave016
         case .nam_conus:
             return .ncep_nam_conus
+        case .gefs025_ensemble_mean:
+            return .ncep_gefs025_ensemble_mean
+        case .gefs05_ensemble_mean:
+            return .ncep_gefs05_ensemble_mean
+        case .gefswave025_ensemble_mean:
+            return .ncep_gefswave025_ensemble_mean
         }
     }
 
@@ -63,6 +86,12 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return .ncep_hrrr_conus
         case .gfswave025, .gfswave025_ens:
             return .ncep_gefs025
+        case .gefs025_ensemble_mean:
+            return .ncep_gefs025
+        case .gefs05_ensemble_mean:
+            return .ncep_gefs05
+        case .gefswave025_ensemble_mean:
+            return .ncep_gefswave025
         default:
             return domainRegistry
         }
@@ -86,9 +115,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 6 * 3600
         case .hrrr_conus, .hrrr_conus_15min:
             return 3600
-        case .gfs025_ens, .gfs05_ens, .nam_conus:
+        case .gfs025_ens, .gfs05_ens, .nam_conus, .gefs05_ensemble_mean, .gefs025_ensemble_mean:
             return 6 * 3600
-        case .gfswave025, .gfswave025_ens, .gfswave016:
+        case .gfswave025, .gfswave025_ens, .gfswave016, .gefswave025_ensemble_mean:
             return 6 * 3600
         }
     }
@@ -101,9 +130,9 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 3600
         case .hrrr_conus, .nam_conus:
             return 3600
-        case .gfs025_ens, .gfswave025_ens:
+        case .gfs025_ens, .gfswave025_ens, .gefswave025_ensemble_mean, .gefs025_ensemble_mean:
             return 3 * 3600
-        case .gfs05_ens:
+        case .gfs05_ens, .gefs05_ensemble_mean:
             return 3 * 3600
         case .hrrr_conus_15min:
             return 3600 / 4
@@ -120,7 +149,7 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return true
         case .hrrr_conus, .nam_conus:
             return false
-        case .gfs025_ens, .gfswave025_ens:
+        case .gfs025_ens, .gfswave025_ens, .gefs05_ensemble_mean, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
             return true
         case .gfs05_ens:
             return true
@@ -144,6 +173,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
         case .hrrr_conus_15min, .hrrr_conus:
             // HRRR has a delay of 55 minutes after initlisation. Cronjob starts at xx:55
             return t.with(hour: t.hour)
+        case .gefs05_ensemble_mean, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -178,6 +209,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return Array(0...18 * 4)
         case .gfswave025, .gfswave016:
             return Array(stride(from: 0, to: 120, by: 1)) + Array(stride(from: 120, through: 384, by: 3))
+        case .gefs05_ensemble_mean, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
+            fatalError()
         }
     }
 
@@ -187,12 +220,12 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
     /// https://www.ecmwf.int/sites/default/files/elibrary/2005/16958-parametrization-cloud-cover.pdf
     var levels: [Int] {
         switch self {
-        case .gfs05_ens:
+        case .gfs05_ens, .gefs05_ensemble_mean:
             /// a files: 10,50,100,200,250,300,400,500,700,850,925,1000
             /// b files: 1,2,3,5,7,20,30,70,150,350,450,550,600,750,800,900,950,975
             /// ecmwf open data: 50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000
             return [50, 100, 150, 200, 250, 300, 400, 500, 600, 700, 850, 925, 1000]
-        case .gfs025_ens:
+        case .gfs025_ens, .gefs025_ensemble_mean:
             return []
         case .gfs013:
             return []
@@ -212,18 +245,18 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             // return [50, 75, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500, 525, 550, 575, 600, 625, 650, 675, 700, 725, 750, 775, 800, 825, 850, 875, 900, 925, 950, 975, 1000]
         case .hrrr_conus_15min:
             return []
-        case .gfswave025, .gfswave025_ens, .gfswave016:
+        case .gfswave025, .gfswave025_ens, .gfswave016, .gefswave025_ensemble_mean:
             return []
         }
     }
 
     var omFileLength: Int {
         switch self {
-        case .gfs05_ens:
+        case .gfs05_ens, .gefs05_ensemble_mean:
             return (840 + 4 * 24) / 3 + 1 // 313
         case .nam_conus:
             return 60 + 4*24
-        case .gfs013, .gfs025, .gfs025_ens:
+        case .gfs013, .gfs025, .gfs025_ens, .gefs025_ensemble_mean:
             return 384 + 1 + 4 * 24
         case .hrrr_conus:
             return 48 + 1 + 4 * 24
@@ -231,19 +264,19 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return 48 * 4 * 2
         case .gfswave025, .gfswave016:
             return 384 + 1 + 4 * 24
-        case .gfswave025_ens:
+        case .gfswave025_ens, .gefswave025_ensemble_mean:
             return (384 + 4 * 24) / 3 + 1
         }
     }
 
     var grid: any Gridable {
         switch self {
-        case .gfs05_ens:
+        case .gfs05_ens ,.gefs05_ensemble_mean:
             return RegularGrid(nx: 720, ny: 361, latMin: -90, lonMin: -180, dx: 0.5, dy: 0.5)
         case .gfs013:
             // Coordinates confirmed with eccodes coordinate output
             return RegularGrid(nx: 3072, ny: 1536, latMin: -0.11714935 * (1536 - 1) / 2, lonMin: -180, dx: 360 / 3072, dy: 0.11714935)
-        case .gfs025_ens, .gfs025, .gfswave025, .gfswave025_ens:
+        case .gfs025_ens, .gfs025, .gfswave025, .gfswave025_ens, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
         case .nam_conus:
             /// labert conformal grid https://www.emc.ncep.noaa.gov/mmb/namgrids/hrrrspecs.html
@@ -323,6 +356,8 @@ enum GfsDomain: String, GenericDomain, CaseIterable {
             return ["\(hrrrServer)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfprsf\(fHH).grib2"]
         case .hrrr_conus_15min:
             return ["\(hrrrServer)hrrr.\(yyyymmdd)/conus/hrrr.t\(hh)z.wrfsubhf\(fHH).grib2"]
+        case .gefs05_ensemble_mean, .gefs025_ensemble_mean, .gefswave025_ensemble_mean:
+            fatalError()
         }
     }
 }

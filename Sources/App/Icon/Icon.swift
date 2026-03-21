@@ -14,7 +14,24 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     case iconEps = "icon-eps"
     case iconEuEps = "icon-eu-eps"
     case iconD2Eps = "icon-d2-eps"
+    
+    case iconEpsEnsembleMean = "icon-eps-ensemble-mean"
+    case iconEuEpsEnsembleMean = "icon-eu-eps-ensemble-mean"
+    case iconD2EpsEnsembleMean = "icon-d2-epss-ensemble-mean"
 
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .iconEps:
+            return .iconEpsEnsembleMean
+        case .iconEuEps:
+            return .iconEuEpsEnsembleMean
+        case .iconD2Eps:
+            return .iconD2EpsEnsembleMean
+        default:
+            return nil
+        }
+    }
+    
     var dtSeconds: Int {
         if self == .iconD2_15min {
             return 3600 / 4
@@ -38,6 +55,12 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return .dwd_icon_eu_eps
         case .iconD2Eps:
             return .dwd_icon_d2_eps
+        case .iconEpsEnsembleMean:
+            return .dwd_icon_eps_ensemble_mean
+        case .iconEuEpsEnsembleMean:
+            return .dwd_icon_eu_eps_ensemble_mean
+        case .iconD2EpsEnsembleMean:
+            return .dwd_icon_d2_eps_ensemble_mean
         }
     }
 
@@ -45,6 +68,12 @@ enum IconDomains: String, CaseIterable, GenericDomain {
         switch self {
         case .iconD2_15min:
             return .dwd_icon_d2
+        case .iconEpsEnsembleMean:
+            return .dwd_icon_eps_ensemble_mean
+        case .iconEuEpsEnsembleMean:
+            return .dwd_icon_eu_eps_ensemble_mean
+        case .iconD2EpsEnsembleMean:
+            return .dwd_icon_d2_eps_ensemble_mean
         default:
             return domainRegistry
         }
@@ -61,11 +90,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// How many hourly timesteps to keep in each compressed chunk
     var omFileLength: Int {
         switch self {
-        case .icon, .iconEps:
+        case .icon, .iconEps, .iconEpsEnsembleMean:
             return 180 + 1 + 3 * 24
-        case .iconEu, .iconEuEps:
+        case .iconEu, .iconEuEps, .iconEuEpsEnsembleMean:
             return 120 + 1 + 3 * 24
-        case .iconD2, .iconD2Eps:
+        case .iconD2, .iconD2Eps, .iconD2EpsEnsembleMean:
             return 48 + 1 + 3 * 24
         case .iconD2_15min:
             return 48 * 4 + 3 * 24
@@ -83,11 +112,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return [                      200, 250, 300, 400, 500, 600, 700, 850, 950, 975, 1000]
         case .iconD2_15min:
             return []
-        case .iconEps:
+        case .iconEps, .iconEpsEnsembleMean:
             return []
-        case .iconEuEps:
+        case .iconEuEps, .iconEuEpsEnsembleMean:
             return [] // 300, 500, 850 only temperature and wind
-        case .iconD2Eps:
+        case .iconD2Eps, .iconD2EpsEnsembleMean:
             return [] // 500, 700, 850, 950, 975, 1000
         }
     }
@@ -98,11 +127,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return 6 * 3600
         case .iconEu, .iconD2, .iconD2_15min:
             return 3 * 3600
-        case .iconEps:
+        case .iconEps, .iconEpsEnsembleMean:
             return 12 * 3600
-        case .iconEuEps:
+        case .iconEuEps, .iconEuEpsEnsembleMean:
             return 6 * 3600
-        case .iconD2Eps:
+        case .iconD2Eps, .iconD2EpsEnsembleMean:
             return 3 * 3600
         }
     }
@@ -137,6 +166,8 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return Array(0...48 * 4 - 1)
         case .iconD2Eps, .iconD2:
             return Array(0...48)
+        case .iconEpsEnsembleMean, .iconD2EpsEnsembleMean, .iconEuEpsEnsembleMean:
+            fatalError()
         }
     }
 
@@ -148,13 +179,13 @@ enum IconDomains: String, CaseIterable, GenericDomain {
             return RegularGrid(nx: 1377, ny: 657, latMin: 29.5, lonMin: -23.5, dx: 0.0625, dy: 0.0625)
         case .iconD2_15min, .iconD2:
             return RegularGrid(nx: 1215, ny: 746, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
-        case .iconEps:
+        case .iconEps, .iconEpsEnsembleMean:
             // R03B06 avg 26.5 km
             return RegularGrid(nx: 1439, ny: 721, latMin: -90, lonMin: -180, dx: 0.25, dy: 0.25)
-        case .iconEuEps:
+        case .iconEuEps, .iconEuEpsEnsembleMean:
             // R03B07 avg 13.2 km
             return RegularGrid(nx: 689, ny: 329, latMin: 29.5, lonMin: -23.5, dx: 0.125, dy: 0.125)
-        case .iconD2Eps:
+        case .iconD2Eps, .iconD2EpsEnsembleMean:
             // R19B07 avg 2 km
             // Note: 1px difference to use the same weights as official
             return RegularGrid(nx: 1214, ny: 745, latMin: 43.18, lonMin: -3.94, dx: 0.02, dy: 0.02)
@@ -164,9 +195,9 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// name in the filenames
     var region: String {
         switch self {
-        case .iconEps, .icon: return "global"
-        case .iconEuEps, .iconEu: return "europe"
-        case .iconD2Eps, .iconD2_15min, .iconD2: return "germany"
+        case .iconEps, .icon, .iconEpsEnsembleMean: return "global"
+        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean: return "europe"
+        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean: return "germany"
         }
     }
 
@@ -176,11 +207,11 @@ enum IconDomains: String, CaseIterable, GenericDomain {
     /// icon-d2 1-65.... 63=78m, 62=126m
     var numberOfModelFullLevels: Int {
         switch self {
-        case .iconEps, .icon:
+        case .iconEps, .icon, .iconEpsEnsembleMean:
             return 120 // was 90
-        case .iconEuEps, .iconEu:
+        case .iconEuEps, .iconEu, .iconEuEpsEnsembleMean:
             return 74 // was 60
-        case .iconD2Eps, .iconD2_15min, .iconD2:
+        case .iconD2Eps, .iconD2_15min, .iconD2, .iconD2EpsEnsembleMean:
             return 65
         }
     }
