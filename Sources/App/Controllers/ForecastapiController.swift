@@ -994,6 +994,8 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             return .single(EcmwfDomain.wam025_ensemble_mean, VariableOrSpread<EcmwfWaveVariable>.self)
         case .ncep_gefswave025_ensemble_mean:
             return .single(GfsDomain.gefswave025_ensemble_mean, VariableOrSpread<GfsWaveVariable>.self)
+        case .geosphere_arome_austria:
+            return .single(GeoSphereDomain.arome_austria, GeoSphereVariable.self)
         default:
             return nil
         }
@@ -1436,7 +1438,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .metno_nordic:
             return try await MetNoReader(domain: .nordic_pp, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
         case .geosphere_arome_austria:
-            return try await GeoSphereReader(domain: .arome_austria, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options).flatMap({ [$0] }) ?? []
+            return [] // migrated
         case .gem_seamless:
             let probabilities = try await ProbabilityReader.makeGemReader(lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             return [probabilities] + (try await GemMixer(domains: [.gem_global, .gem_regional, .gem_hrdps_continental], lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.reader ?? [])
@@ -2003,7 +2005,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .metno_nordic:
             return try await MetNoReader(domain: .nordic_pp, gridpoint: gridpoint, options: options)
         case .geosphere_arome_austria:
-            return try await GeoSphereReader(domain: .arome_austria, gridpoint: gridpoint, options: options)
+            return nil // migrated
         case .gem_global, .cmc_gem_gdps:
             return try await GemReader(domain: .gem_global, gridpoint: gridpoint, options: options)
         case .gem_regional, .cmc_gem_rdps:

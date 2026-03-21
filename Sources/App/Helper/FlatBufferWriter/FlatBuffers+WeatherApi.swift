@@ -991,8 +991,7 @@ extension MultiDomains {
         case .metno_nordic:
             return .metnoNordic
         case .geosphere_arome_austria:
-            // TODO: Register geosphere_arome_austria in the open-meteo SDK FlatBuffer schema
-            return .metnoNordic
+            return .geosphereAromeAustria
         case .era5_seamless, .copernicus_era5_seamless:
             return .era5Seamless
         case .era5, .copernicus_era5:
