@@ -50,6 +50,7 @@ Apps:
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
 - [Emojiton Weather](https://emojiton.com/weather) Get the local weather forecast for your location with fun emoji representations
 - [Evaporative Cooler Forecaster](https://SwampCooler.app) Swamp cooler effectiveness forecast with cost & energy savings, Android/iOS app
+- [FlyDecision](https://flydecision.com/) Automated weather forecast analysis and flight condition scoring for paragliding pilots, with interactive takeoff mapping.
 - [Home Assistant](https://www.home-assistant.io/integrations/open_meteo/) A popular open source smart home platform.
 - [Lively Weather](https://www.rocksdanister.com/weather) Windows native weather app powered by DirectX12 animations.
 - [LunaLink](https://www.lunalink.de) A site for hunters, fishermen and nature observers: It provides sun and moon values ​​(including moon brightness) as well as the weather for individual locations in Central Europe.
@@ -81,6 +82,7 @@ Apps:
 - [Weatherian](https://weatherian.com/) Multi-model meteogram (multi-platform)
 - [weewx-DWD](https://github.com/roe-dl/weewx-DWD) Weather forecasts etc. for WeeWX
 - [WetBulb](https://github.com/Isma1306/wetbulb-forecast) A simple app that shows you the wetbulb temp 24h forecast and tells you if it is dangerous.
+- [WorldWeatherMonitor](https://world-weather-monitor.vercel.app/) An interactive world weather map that displays real-time weather conditions for cities around the globe.
 
 Repositories:
 
@@ -92,6 +94,7 @@ Repositories:
 - [Weather-Cli](https://github.com/Rayrsn/Weather-Cli) A CLI program written in golang that allows you to get weather information from the terminal
 - [WeatherReport.jl](https://github.com/vnegi10/WeatherReport.jl) A simple weather app for the Julia REPL
 - [wthrr-the-weathercrab](https://github.com/tobealive/wthrr-the-weathercrab) Weather companion for the terminal
+- [weather-cli-dualprovider](https://github.com/jimishol/weather-cli-dualprovider) Minimal Bash CLI (single-file core; requires weather.en) fetching Open‑Meteo forecasts with a fallback provider; localized WMO descriptions. License: GPL‑3.0.
 
 Other:
 

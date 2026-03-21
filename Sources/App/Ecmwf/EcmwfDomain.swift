@@ -7,13 +7,29 @@ enum EcmwfDomain: String, GenericDomain {
 
     case ifs025
     case ifs025_ensemble
+    case ifs025_ensemble_mean
 
     case wam025
     case wam025_ensemble
+    case wam025_ensemble_mean
 
     case aifs025
     case aifs025_single
     case aifs025_ensemble
+    case aifs025_ensemble_mean
+    
+    var ensembleMeanDomain: Self? {
+        switch self {
+        case .ifs025_ensemble:
+            return .ifs025_ensemble_mean
+        case .aifs025_ensemble:
+            return .aifs025_ensemble_mean
+        case .wam025_ensemble:
+            return .wam025_ensemble_mean
+        default:
+            return nil
+        }
+    }
 
     func getDownloadForecastSteps(run: Int) -> [Int] {
         if self == .aifs025 || self == .aifs025_single || self == .aifs025_ensemble {
@@ -47,12 +63,18 @@ enum EcmwfDomain: String, GenericDomain {
             return .ecmwf_wam025_ensemble
         case .aifs025_ensemble:
             return .ecmwf_aifs025_ensemble
+        case .ifs025_ensemble_mean:
+            return .ecmwf_ifs025_ensemble_mean
+        case .wam025_ensemble_mean:
+            return .ecmwf_wam025_ensemble_mean
+        case .aifs025_ensemble_mean:
+            return .ecmwf_aifs025_ensemble_mean
         }
     }
 
     var domainRegistryStatic: DomainRegistry? {
         switch self {
-        case .wam025:
+        case .wam025, .ifs025_ensemble_mean, .aifs025, .aifs025_ensemble, .aifs025_single, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             return .ecmwf_ifs025
         default:
             return domainRegistry
@@ -69,10 +91,10 @@ enum EcmwfDomain: String, GenericDomain {
 
     var omFileLength: Int {
         switch self {
-        case .ifs04, .ifs04_ensemble, .ifs025, .ifs025_ensemble, .wam025, .wam025_ensemble:
+        case .ifs04, .ifs04_ensemble, .ifs025, .ifs025_ensemble, .wam025, .wam025_ensemble, .ifs025_ensemble_mean, .wam025_ensemble_mean:
             // 10 days forecast, 3-hourly data
             return (240 + 3 * 24) / dtHours // 104
-        case .aifs025, .aifs025_single, .aifs025_ensemble:
+        case .aifs025, .aifs025_single, .aifs025_ensemble, .aifs025_ensemble_mean:
             // 15 days forecast, 6-hourly data
             return (360 + 3 * 24) / dtHours // 72
         }
@@ -80,7 +102,7 @@ enum EcmwfDomain: String, GenericDomain {
 
     var dtSeconds: Int {
         switch self {
-        case .aifs025, .aifs025_single, .aifs025_ensemble:
+        case .aifs025, .aifs025_single, .aifs025_ensemble, .aifs025_ensemble_mean:
             return 6 * 3600
         default:
             return 3 * 3600
@@ -91,11 +113,11 @@ enum EcmwfDomain: String, GenericDomain {
         switch self {
         case .ifs04, .ifs04_ensemble:
             return 6 * 3600
-        case .ifs025, .ifs025_ensemble:
+        case .ifs025, .ifs025_ensemble, .ifs025_ensemble_mean:
             return 6 * 3600
-        case .wam025, .wam025_ensemble:
+        case .wam025, .wam025_ensemble, .wam025_ensemble_mean:
             return 6 * 3600
-        case .aifs025, .aifs025_single, .aifs025_ensemble:
+        case .aifs025, .aifs025_single, .aifs025_ensemble, .aifs025_ensemble_mean:
             return 6 * 3600
         }
     }
@@ -104,7 +126,7 @@ enum EcmwfDomain: String, GenericDomain {
         switch self {
         case .ifs04, .ifs04_ensemble:
             return RegularGrid(nx: 900, ny: 451, latMin: -90, lonMin: -180, dx: 360 / 900, dy: 180 / 450)
-        case .ifs025, .ifs025_ensemble, .aifs025, .wam025, .wam025_ensemble, .aifs025_single, .aifs025_ensemble:
+        case .ifs025, .ifs025_ensemble, .aifs025, .wam025, .wam025_ensemble, .aifs025_single, .aifs025_ensemble, .ifs025_ensemble_mean, .wam025_ensemble_mean, .aifs025_ensemble_mean:
             return RegularGrid(nx: 1440, ny: 721, latMin: -90, lonMin: -180, dx: 360 / 1440, dy: 180 / (721 - 1))
         }
     }
@@ -112,6 +134,8 @@ enum EcmwfDomain: String, GenericDomain {
     var countEnsembleMember: Int {
         switch self {
         case .ifs04, .ifs025, .wam025:
+            return 1
+        case .ifs025_ensemble_mean, .aifs025_ensemble_mean, .wam025_ensemble_mean:
             return 1
         case .ifs04_ensemble, .ifs025_ensemble, .wam025_ensemble, .aifs025_ensemble:
             return 50 + 1

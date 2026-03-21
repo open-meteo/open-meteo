@@ -306,14 +306,26 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
             return .init(variable: .massDensity, altitude: 8, previousDay: previousDay)
         case .wind_speed_10m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_speed_40m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 40, previousDay: previousDay)
+        case .wind_speed_80m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 80, previousDay: previousDay)
         case .wind_speed_100m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .wind_speed_120m_spread:
+            return .init(variable: .windSpeed, aggregation: .spread, altitude: 120, previousDay: previousDay)
         case .wind_speed_200m_spread:
             return .init(variable: .windSpeed, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .wind_direction_10m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 10, previousDay: previousDay)
+        case .wind_direction_40m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 40, previousDay: previousDay)
+        case .wind_direction_80m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 80, previousDay: previousDay)
         case .wind_direction_100m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 100, previousDay: previousDay)
+        case .wind_direction_120m_spread:
+            return .init(variable: .windDirection, aggregation: .spread, altitude: 120, previousDay: previousDay)
         case .wind_direction_200m_spread:
             return .init(variable: .windDirection, aggregation: .spread, altitude: 200, previousDay: previousDay)
         case .snowfall_spread:
@@ -577,6 +589,77 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .shortwave_radiation_clear_sky_instant:
             // TODO: register in sdk shortwave_radiation_clear_sky_instant
             return .init(variable: .shortwaveRadiationClearSky)
+        case .sea_water_salinity:
+            // TODO: register in sdk sea_water_salinity
+            return .init(variable: .seaSaltAerosol)
+        case .relative_humidity_2m_spread:
+            return .init(variable: .relativeHumidity, aggregation: .spread, altitude: 2)
+        case .apparent_temperature_spread:
+            return .init(variable: .apparentTemperature, aggregation: .spread, altitude: 2)
+        case .soil_temperature_0_to_10cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 0, depthTo: 10)
+        case .soil_temperature_10_to_40cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 10, depthTo: 40)
+        case .soil_temperature_40_to_100cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 40, depthTo: 100)
+        case .soil_temperature_100_to_200cm_spread:
+            return .init(variable: .soilTemperature, aggregation: .spread, depth: 100, depthTo: 200)
+        case .soil_moisture_0_to_10cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 0, depthTo: 10)
+        case .soil_moisture_10_to_40cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 10, depthTo: 40)
+        case .soil_moisture_40_to_100cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 40, depthTo: 100)
+        case .soil_moisture_100_to_200cm_spread:
+            return .init(variable: .soilMoisture, aggregation: .spread, depth: 100, depthTo: 200)
+        case .rain_spread:
+            return .init(variable: .rain, aggregation: .spread)
+        case .surface_pressure_spread:
+            return .init(variable: .surfacePressure, aggregation: .spread)
+        case .et0_fao_evapotranspiration_spread:
+            return .init(variable: .et0FaoEvapotranspiration, aggregation: .spread)
+        case .vapour_pressure_deficit_spread:
+            return .init(variable: .vapourPressureDeficit, aggregation: .spread)
+        case .visibility_spread:
+            return .init(variable: .visibility, aggregation: .spread)
+        case .surface_temperature_spread:
+            return .init(variable: .surfaceTemperature, aggregation: .spread)
+        case .uv_index_spread:
+            return .init(variable: .uvIndex, aggregation: .spread)
+        case .uv_index_clear_sky_spread:
+            return .init(variable: .uvIndexClearSky, aggregation: .spread)
+        case .wet_bulb_temperature_2m_spread:
+            return .init(variable: .wetBulbTemperature, aggregation: .spread, altitude: 2)
+        case .cape_spread:
+            return .init(variable: .cape, aggregation: .spread)
+        case .convective_inhibition_spread:
+            return .init(variable: .convectiveInhibition, aggregation: .spread)
+        case .freezing_level_height_spread:
+            return .init(variable: .freezingLevelHeight, aggregation: .spread)
+        case .snowfall_height_spread:
+            return .init(variable: .snowfallHeight, aggregation: .spread)
+        case .diffuse_radiation_spread:
+            return .init(variable: .diffuseRadiation, aggregation: .spread)
+        case .shortwave_radiation_instant_spread:
+            return .init(variable: .shortwaveRadiationInstant, aggregation: .spread)
+        case .direct_radiation_instant_spread:
+            return .init(variable: .directRadiationInstant, aggregation: .spread)
+        case .diffuse_radiation_instant_spread:
+            return .init(variable: .diffuseRadiationInstant, aggregation: .spread)
+        case .direct_normal_irradiance_spread:
+            return .init(variable: .directNormalIrradiance, aggregation: .spread)
+        case .direct_normal_irradiance_instant_spread:
+            return .init(variable: .directNormalIrradianceInstant, aggregation: .spread)
+        case .global_tilted_irradiance_spread:
+            return .init(variable: .globalTiltedIrradiance, aggregation: .spread)
+        case .global_tilted_irradiance_instant_spread:
+            return .init(variable: .globalTiltedIrradianceInstant, aggregation: .spread)
+        case .temperature_80m_spread:
+            return .init(variable: .temperature, aggregation: .spread, altitude: 80)
+        case .temperature_120m_spread:
+            return .init(variable: .temperature, aggregation: .spread, altitude: 120)
+        case .snow_depth_water_equivalent_spread:
+            return .init(variable: .snowDepthWaterEquivalent, aggregation: .spread)
         }
     }
 }
@@ -1129,6 +1212,41 @@ extension MultiDomains {
         case .dwd_sis_europe_africa_v4:
             // TODO register domain in SDK
             return .iconD2
+        case .dwd_icon_eps_ensemble_mean_seamless:
+            return .dwdIconEpsEnsembleMeanSeamless
+        case .dwd_icon_eps_ensemble_mean:
+            return .dwdIconEpsEnsembleMean
+        case .dwd_icon_eu_eps_ensemble_mean:
+            return .dwdIconEuEpsEnsembleMean
+        case .dwd_icon_d2_eps_ensemble_mean:
+            return .dwdIconD2EpsEnsembleMean
+        case .ecmwf_ifs025_ensemble_mean:
+            return .ecmwfIfs025EnsembleMean
+        case .ecmwf_aifs025_ensemble_mean:
+            return .ecmwfAifs025EnsembleMean
+        case .ncep_gefs025_ensemble_mean:
+            return .ncepGefs025EnsembleMean
+        case .ncep_gefs05_ensemble_mean:
+            return .ncepGefs05EnsembleMean
+        case .ncep_gefs_ensemble_mean_seamless:
+            return .ncepGefsEnsembleMeanSeamless
+        case .cmc_gem_geps_ensemble_mean:
+            return .cmcGemGepsEnsembleMean
+        case .bom_access_global_ensemble_mean:
+            return .bomAccessGlobalEnsemble // TODO mean domain in SDK
+        case .ukmo_global_ensemble_mean_20km:
+            return .ukmoGlobalEnsembleMean20km
+        case .ukmo_uk_ensemble_mean_2km:
+            return .ukmoUkEnsembleMean2km
+        case .meteoswiss_icon_ch1_ensemble_mean:
+            return .meteoswissIconCh1EnsembleMean
+        case .meteoswiss_icon_ch2_ensemble_mean:
+            return .meteoswissIconCh2EnsembleMean
+        case .ecmwf_wam025_ensemble_mean:
+            return .ecmwfWam025Ensemble // TODO register mean
+        case .ncep_gefswave025_ensemble_mean:
+            return .ncepGefswave025 // TODO register mean
         }
     }
 }
+

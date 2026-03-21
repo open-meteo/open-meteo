@@ -49,7 +49,7 @@ struct Dem90: GenericDomain {
     }
 
     /// Get elevation for coordinate. Access to om files is cached.
-    static func read(lat: Float, lon: Float, logger: Logger, httpClient: HTTPClient) async throws -> Float {
+    static func read(lat: Float, lon: Float, logger: Logger, httpClient: HTTPClient?) async throws -> Float {
         if lat < -90 || lat >= 90 || lon < -180 || lon >= 180 {
             return .nan
         }

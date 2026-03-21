@@ -75,7 +75,7 @@ struct OmFileSplitter {
     }
 
     /// Prefetch all required data into memory
-    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws {
+    func willNeed(variable: String, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?) async throws {
         // TODO: maybe we can keep the file handles better in scope
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
@@ -171,12 +171,12 @@ struct OmFileSplitter {
         }
     }
 
-    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> Array2DFastTime {
+    func read2D<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?) async throws -> Array2DFastTime {
         let data = try await read(variable: variable, location: location, level: level, time: time, logger: logger, httpClient: httpClient)
         return Array2DFastTime(data: data, nLocations: location.count, nTime: time.time.count)
     }
 
-    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient) async throws -> [Float] {
+    func read<Variable: GenericVariable>(variable: Variable, location: Range<Int>, level: Int, time: TimerangeDtAndSettings, logger: Logger, httpClient: HTTPClient?) async throws -> [Float] {
         let indexTime = time.time.toIndexTime()
         let nTime = indexTime.count
         var start = indexTime.lowerBound
