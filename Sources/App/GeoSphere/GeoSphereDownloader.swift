@@ -146,7 +146,6 @@ struct GeoSphereDownloader: AsyncCommand {
             ("MXT2M", .temperature_2m_max, nil, false),
             ("TSURF", .surface_temperature, nil, false),
             ("RH2M", .relative_humidity_2m, nil, false),
-            ("SP", .surface_pressure, (1.0 / 100.0, 0), false),      // Pa -> hPa
             ("TCC", .cloud_cover, (100, 0), false),                    // fraction -> percent
             ("LCC", .cloud_cover_low, (100, 0), false),                    // fraction -> percent
             ("MCC", .cloud_cover_mid, (100, 0), false),                    // fraction -> percent
@@ -161,12 +160,7 @@ struct GeoSphereDownloader: AsyncCommand {
             ("SSNOW", .snow_depth_water_equivalent, nil, true),
             ("SUNDUR", .sunshine_duration, nil, true),
         ]
-
-        // Retain processed arrays for TCC, TP, SNOW to reuse in weather code calculation
-        var cloudCoverSpatial: Array2DFastSpace? = nil
-        var precipSpatial: Array2DFastSpace? = nil
-        var snowSpatial: Array2DFastSpace? = nil
-
+        
         for (ncName, omVar, fma, isAccumulated) in simpleVariables {
             if let onlyVariables, !onlyVariables.contains(omVar) {
                 continue
@@ -193,86 +187,82 @@ struct GeoSphereDownloader: AsyncCommand {
                 }
             }
 
-            // Retain for weather code calculation
-            switch ncName {
-            case "TCC": cloudCoverSpatial = spatial
-            case "TP": precipSpatial = spatial
-            case "SNOW": snowSpatial = spatial
-            default: break
-            }
-
             for t in 0..<nTime {
                 let slice = Array(spatial[t, 0..<nLocations])
                 try await writer.write(time: run.add(hours: t), member: 0, variable: omVar, data: slice)
             }
         }
+        
+        logger.info("Converting surface pressure to MSL pressure")
+        guard let t2m = try ncFile.getVariable(name: "T2M")?.readAndScale() else {
+            fatalError("Could not read T2M")
+        }
+        guard let surfacePressure = try ncFile.getVariable(name: "SP")?.readAndScale() else {
+            fatalError("Could not read SP")
+        }
+        guard let z = try ncFile.getVariable(name: "ZSURF")?.readAndScale() else {
+            fatalError("Could not read ZSURF")
+        }
+        
+        let msl = Array2DFastSpace(data: zip(surfacePressure, zip(t2m, z)).map {
+            return $0 / 100 * Meteorology.sealevelPressureFactor(temperature: $1.0, elevation: $1.1 / 9.80665)
+        }, nLocations: nLocations, nTime: nTime)
 
-        let needsWind = onlyVariables == nil || onlyVariables!.contains(.wind_speed_10m) || onlyVariables!.contains(.wind_direction_10m)
-        let needsGusts = onlyVariables == nil || onlyVariables!.contains(.wind_gusts_10m)
-        let needsWeatherCode = onlyVariables == nil || onlyVariables!.contains(.weather_code)
-
-        // Process wind from u/v components
-        var ugustSpatial: Array2DFastSpace? = nil
-        var vgustSpatial: Array2DFastSpace? = nil
-
-        if needsWind {
-            logger.info("Processing wind speed and direction")
-            guard let uData = try ncFile.getVariable(name: "U10M")?.readAndScale() else {
-                fatalError("Could not read U10M")
-            }
-            guard let vData = try ncFile.getVariable(name: "V10M")?.readAndScale() else {
-                fatalError("Could not read V10M")
-            }
-            let uSpatial = Array2DFastSpace(data: uData, nLocations: nLocations, nTime: nTime)
-            let vSpatial = Array2DFastSpace(data: vData, nLocations: nLocations, nTime: nTime)
-
-            for t in 0..<nTime {
-                let u = Array(uSpatial[t, 0..<nLocations])
-                let v = Array(vSpatial[t, 0..<nLocations])
-                let speed = zip(u, v).map(Meteorology.windspeed)
-                let direction = Meteorology.windirectionFast(u: u, v: v)
-                try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_speed_10m, data: speed)
-                try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_direction_10m, data: direction)
-            }
+        for t in 0..<nTime {
+            try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.pressure_msl, data: Array(msl[t, 0..<nLocations]))
         }
 
-        if needsGusts || needsWeatherCode {
-            logger.info("Processing wind gusts")
-            guard let ugustData = try ncFile.getVariable(name: "UGUST")?.readAndScale() else {
-                fatalError("Could not read UGUST")
-            }
-            guard let vgustData = try ncFile.getVariable(name: "VGUST")?.readAndScale() else {
-                fatalError("Could not read VGUST")
-            }
-            ugustSpatial = Array2DFastSpace(data: ugustData, nLocations: nLocations, nTime: nTime)
-            vgustSpatial = Array2DFastSpace(data: vgustData, nLocations: nLocations, nTime: nTime)
 
-            if needsGusts {
-                for t in 0..<nTime {
-                    let u = Array(ugustSpatial![t, 0..<nLocations])
-                    let v = Array(vgustSpatial![t, 0..<nLocations])
-                    let gustSpeed = zip(u, v).map(Meteorology.windspeed)
-                    try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_gusts_10m, data: gustSpeed)
-                }
-            }
+        logger.info("Processing wind speed and direction")
+        guard let uData = try ncFile.getVariable(name: "U10M")?.readAndScale() else {
+            fatalError("Could not read U10M")
+        }
+        guard let vData = try ncFile.getVariable(name: "V10M")?.readAndScale() else {
+            fatalError("Could not read V10M")
+        }
+        let uSpatial = Array2DFastSpace(data: uData, nLocations: nLocations, nTime: nTime)
+        let vSpatial = Array2DFastSpace(data: vData, nLocations: nLocations, nTime: nTime)
+
+        for t in 0..<nTime {
+            let u = Array(uSpatial[t, 0..<nLocations])
+            let v = Array(vSpatial[t, 0..<nLocations])
+            let speed = zip(u, v).map(Meteorology.windspeed)
+            let direction = Meteorology.windirectionFast(u: u, v: v)
+            try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_speed_10m, data: speed)
+            try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_direction_10m, data: direction)
+        }
+
+        logger.info("Processing wind gusts")
+        guard let ugustData = try ncFile.getVariable(name: "UGUST")?.readAndScale() else {
+            fatalError("Could not read UGUST")
+        }
+        guard let vgustData = try ncFile.getVariable(name: "VGUST")?.readAndScale() else {
+            fatalError("Could not read VGUST")
+        }
+        let ugustSpatial = Array2DFastSpace(data: ugustData, nLocations: nLocations, nTime: nTime)
+        let vgustSpatial = Array2DFastSpace(data: vgustData, nLocations: nLocations, nTime: nTime)
+
+        for t in 0..<nTime {
+            let u = Array(ugustSpatial[t, 0..<nLocations])
+            let v = Array(vgustSpatial[t, 0..<nLocations])
+            let gustSpeed = zip(u, v).map(Meteorology.windspeed)
+            try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.wind_gusts_10m, data: gustSpeed)
         }
 
         // Weather code converted from SYMBOL GeoSphere-specific codes, not WMO
-        if needsWeatherCode {
-            logger.info("Converting weather code")
-            
-            /// https://github.com/Geosphere-Austria/dataset-api-docs/issues/30
-            let symbolToWmo = [Float.nan ,0,1,2,3,3,45,45,61,63,65,66,66,66,71,73,75,81,81,82,85,85,85,85,85,86,95,95,95,96,99,96,99]
-            
-            guard let symbol = try ncFile.getVariable(name: "SYMBOL")?.readAndScale() else {
-                fatalError("Could not read U10M")
-            }
-            let weatherCode = symbol.map({symbolToWmo[Int(round($0))]})
-            var spatial = Array2DFastSpace(data: weatherCode, nLocations: nLocations, nTime: nTime)
-
-            for t in 0..<nTime {
-                try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.weather_code, data: Array(spatial[t, 0..<nLocations]))
-            }
+        logger.info("Converting weather code")
+        /// https://github.com/Geosphere-Austria/dataset-api-docs/issues/30
+        let symbolToWmo = [Float.nan ,0,1,2,3,3,45,45,61,63,65,66,66,66,71,73,75,81,81,82,85,85,85,85,85,86,95,95,95,96,99,96,99]
+        guard let symbol = try ncFile.getVariable(name: "SYMBOL")?.readAndScale() else {
+            fatalError("Could not read U10M")
+        }
+        let spatial = Array2DFastSpace(
+            data: symbol.map({symbolToWmo[Int(round($0))]}),
+            nLocations: nLocations,
+            nTime: nTime
+        )
+        for t in 0..<nTime {
+            try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.weather_code, data: Array(spatial[t, 0..<nLocations]))
         }
 
         await curl.printStatistics()

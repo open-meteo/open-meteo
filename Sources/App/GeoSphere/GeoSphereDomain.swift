@@ -78,7 +78,7 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
     case precipitation
     case rain
     case snowfall_water_equivalent
-    case surface_pressure
+    case pressure_msl
     case cloud_cover
     case cloud_cover_low
     case cloud_cover_mid
@@ -97,7 +97,7 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         switch self {
         case .temperature_2m, .relative_humidity_2m: return true
         case .precipitation, .rain, .snowfall_water_equivalent: return true
-        case .surface_pressure: return true
+        case .pressure_msl: return true
         case .cloud_cover: return true
         case .shortwave_radiation: return true
         case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
@@ -129,7 +129,7 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
             return 10
         case .wind_gusts_10m:
             return 10
-        case .surface_pressure:
+        case .pressure_msl:
             return 10
         case .shortwave_radiation:
             return 1
@@ -158,7 +158,7 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
             return .hermite(bounds: 0...100)
         case .convective_inhibition:
             return .hermite(bounds: nil)
-        case .surface_pressure:
+        case .pressure_msl:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
             return .hermite(bounds: 0...100)
@@ -205,7 +205,7 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
             return .millimetre
         case .wind_gusts_10m:
             return .metrePerSecond
-        case .surface_pressure:
+        case .pressure_msl:
             return .hectopascal
         case .shortwave_radiation:
             return .wattPerSquareMetre
@@ -305,7 +305,7 @@ struct GeoSphereReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             try await prefetchData(raw: .relative_humidity_2m, time: time)
             try await prefetchData(raw: .wind_speed_10m, time: time)
         case .pressure_msl:
-            try await prefetchData(raw: .surface_pressure, time: time)
+            try await prefetchData(raw: .pressure_msl, time: time)
             try await prefetchData(raw: .temperature_2m, time: time)
         case .dewpoint_2m, .dew_point_2m:
             try await prefetchData(raw: .temperature_2m, time: time)
@@ -362,7 +362,7 @@ struct GeoSphereReader: GenericReaderDerivedSimple, GenericReaderProtocol {
             // Inverse of MetNo: GeoSphere provides surface_pressure, so we compute sea-level pressure.
             // MetNo provides pressure_msl and derives surface_pressure.
             let temperature = try await get(raw: .temperature_2m, time: time).data
-            let pressure = try await get(raw: .surface_pressure, time: time)
+            let pressure = try await get(raw: .pressure_msl, time: time)
             return DataAndUnit(Meteorology.sealevelPressure(temperature: temperature, pressure: pressure.data, elevation: reader.targetElevation), pressure.unit)
         case .dewpoint_2m, .dew_point_2m:
             let temperature = try await get(raw: .temperature_2m, time: time)
