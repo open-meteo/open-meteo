@@ -587,11 +587,9 @@ extension VariableAndPreviousDay: FlatBuffersVariable {
         case .wave_peak_period_spread:
             return .init(variable: .wavePeakPeriod, aggregation: .spread)
         case .shortwave_radiation_clear_sky_instant:
-            // TODO: register in sdk shortwave_radiation_clear_sky_instant
-            return .init(variable: .shortwaveRadiationClearSky)
+            return .init(variable: .shortwaveRadiationClearSkyInstant)
         case .sea_water_salinity:
-            // TODO: register in sdk sea_water_salinity
-            return .init(variable: .seaSaltAerosol)
+            return .init(variable: .seaWaterSalinity)
         case .relative_humidity_2m_spread:
             return .init(variable: .relativeHumidity, aggregation: .spread, altitude: 2)
         case .apparent_temperature_spread:
@@ -1207,8 +1205,7 @@ extension MultiDomains {
         case .ncep_aigefs025_ensemble_mean:
             return .ncepAigefs025
         case .dwd_sis_europe_africa_v4:
-            // TODO register domain in SDK
-            return .iconD2
+            return .dwdSisEuropeAfricaV4
         case .dwd_icon_eps_ensemble_mean_seamless:
             return .dwdIconEpsEnsembleMeanSeamless
         case .dwd_icon_eps_ensemble_mean:
@@ -1230,7 +1227,7 @@ extension MultiDomains {
         case .cmc_gem_geps_ensemble_mean:
             return .cmcGemGepsEnsembleMean
         case .bom_access_global_ensemble_mean:
-            return .bomAccessGlobalEnsemble // TODO mean domain in SDK
+            return .bomAccessGlobalEnsembleMean
         case .ukmo_global_ensemble_mean_20km:
             return .ukmoGlobalEnsembleMean20km
         case .ukmo_uk_ensemble_mean_2km:
@@ -1240,9 +1237,9 @@ extension MultiDomains {
         case .meteoswiss_icon_ch2_ensemble_mean:
             return .meteoswissIconCh2EnsembleMean
         case .ecmwf_wam025_ensemble_mean:
-            return .ecmwfWam025Ensemble // TODO register mean
+            return .ecmwfWam025EnsembleMean
         case .ncep_gefswave025_ensemble_mean:
-            return .ncepGefswave025 // TODO register mean
+            return .ncepGefswave025EnsembleMean
         }
     }
 }
