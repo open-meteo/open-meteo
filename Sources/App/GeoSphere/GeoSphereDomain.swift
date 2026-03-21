@@ -70,6 +70,8 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
 enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMixable {
     case temperature_2m
     case relative_humidity_2m
+    case temperature_2m_min
+    case temperature_2m_max
     case wind_speed_10m
     case wind_direction_10m
     case wind_gusts_10m
@@ -78,8 +80,15 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
     case snowfall_water_equivalent
     case surface_pressure
     case cloud_cover
+    case cloud_cover_low
+    case cloud_cover_mid
+    case cloud_cover_high
+    case surface_temperature
+    case snow_depth_water_equivalent
+    
     case shortwave_radiation
     case cape
+    case convective_inhibition
     case snowfall_height
     case sunshine_duration
     case weather_code
@@ -93,6 +102,8 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
         case .shortwave_radiation: return true
         case .wind_gusts_10m, .wind_speed_10m, .wind_direction_10m: return true
         case .cape, .snowfall_height, .sunshine_duration, .weather_code: return false
+        default:
+            return false
         }
     }
 
@@ -102,9 +113,11 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
 
     var scalefactor: Float {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature, .temperature_2m_min, .temperature_2m_max:
             return 20
-        case .cloud_cover:
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
+            return 1
+        case .convective_inhibition:
             return 1
         case .relative_humidity_2m:
             return 1
@@ -132,15 +145,19 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
             return 1
         case .weather_code:
             return 1
+        case .snow_depth_water_equivalent:
+            return 1 // 1mm res
         }
     }
 
     var interpolation: ReaderInterpolation {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature, .temperature_2m_min, .temperature_2m_max:
             return .hermite(bounds: nil)
-        case .cloud_cover:
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             return .hermite(bounds: 0...100)
+        case .convective_inhibition:
+            return .hermite(bounds: nil)
         case .surface_pressure:
             return .hermite(bounds: nil)
         case .relative_humidity_2m:
@@ -167,14 +184,16 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
             return .backwards_sum
         case .weather_code:
             return .backwards
+        case .snow_depth_water_equivalent:
+            return .linear
         }
     }
 
     var unit: SiUnit {
         switch self {
-        case .temperature_2m:
+        case .temperature_2m, .surface_temperature, .temperature_2m_min, .temperature_2m_max:
             return .celsius
-        case .cloud_cover:
+        case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             return .percentage
         case .relative_humidity_2m:
             return .percentage
@@ -196,12 +215,16 @@ enum GeoSphereVariable: String, CaseIterable, GenericVariable, GenericVariableMi
             return .degreeDirection
         case .cape:
             return .joulePerKilogram
+        case .convective_inhibition:
+            return .joulePerKilogram
         case .snowfall_height:
             return .metre
         case .sunshine_duration:
             return .seconds
         case .weather_code:
             return .wmoCode
+        case .snow_depth_water_equivalent:
+            return .millimetre
         }
     }
 

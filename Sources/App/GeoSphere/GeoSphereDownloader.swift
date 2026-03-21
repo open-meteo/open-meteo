@@ -63,28 +63,20 @@ struct GeoSphereDownloader: AsyncCommand {
         let demFile = "\(domain.downloadDirectory)NWP_DEM.nc"
 
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItemIfExists(at: demFile)
+        }
 
-        _ = try await curl.downloadNetCdf(
+        let nc = try await curl.downloadNetCdf(
             url: demUrl,
             file: demFile,
             ncVariable: "oro",
             bzip2Decode: false
         )
 
-        guard let nc = try NetCDF.open(path: demFile, allowUpdate: false) else {
-            fatalError("Could not open DEM file")
-        }
-
         // Variable is "oro" with shape (time=1, lat, lon)
-        guard var elevation = try nc.getVariable(name: "oro")?.asType(Float.self)?.read() else {
+        guard let elevation = try nc.getVariable(name: "oro")?.asType(Float.self)?.read() else {
             fatalError("Could not read oro (elevation) variable from DEM")
-        }
-
-        // Mask sea/invalid points to -999
-        for i in elevation.indices {
-            if elevation[i].isNaN || elevation[i] < -100 {
-                elevation[i] = -999
-            }
         }
 
         logger.info("Writing elevation file (\(elevation.count) grid points)")
@@ -104,24 +96,24 @@ struct GeoSphereDownloader: AsyncCommand {
 
         // Download bulk NetCDF file directly from the public data hub
         let runStr = run.format_YYYYMMddHH
-        let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
+        //let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
+        let url = "file:///Users/patrick/Downloads/nwp_2026032106.nc"
 
         logger.info("Downloading forecast from \(url)")
 
         let forecastFile = "\(domain.downloadDirectory)nwp_\(runStr).nc"
         try FileManager.default.createDirectory(atPath: domain.downloadDirectory, withIntermediateDirectories: true)
+        defer {
+            try? FileManager.default.removeItemIfExists(at: forecastFile)
+        }
 
-        _ = try await curl.downloadNetCdf(
+        let ncFile = try await curl.downloadNetCdf(
             url: url,
             file: forecastFile,
             ncVariable: "T2M",
             bzip2Decode: false
         )
-
-        guard let ncFile = try NetCDF.open(path: forecastFile, allowUpdate: false) else {
-            fatalError("Could not open forecast NetCDF file")
-        }
-
+        
         let dimensions = ncFile.getDimensions()
         for d in dimensions {
             logger.debug("Forecast dimension: \(d.name) = \(d.length)")
@@ -150,15 +142,23 @@ struct GeoSphereDownloader: AsyncCommand {
 
         let simpleVariables: [(ncName: String, omVar: GeoSphereVariable, multiplyAdd: (multiply: Float, add: Float)?, isAccumulated: Bool)] = [
             ("T2M", .temperature_2m, nil, false),
+            ("MNT2M", .temperature_2m_min, nil, false),
+            ("MXT2M", .temperature_2m_max, nil, false),
+            ("TSURF", .surface_temperature, nil, false),
             ("RH2M", .relative_humidity_2m, nil, false),
             ("SP", .surface_pressure, (1.0 / 100.0, 0), false),      // Pa -> hPa
             ("TCC", .cloud_cover, (100, 0), false),                    // fraction -> percent
+            ("LCC", .cloud_cover_low, (100, 0), false),                    // fraction -> percent
+            ("MCC", .cloud_cover_mid, (100, 0), false),                    // fraction -> percent
+            ("HCC", .cloud_cover_high, (100, 0), false),                    // fraction -> percent
             ("GRAD", .shortwave_radiation, (1.0 / 3600.0, 0), true),  // Ws/m² -> W/m²
             ("CAPE", .cape, nil, false),
+            ("CIN", .convective_inhibition, nil, false),
             ("SNOWLMT", .snowfall_height, nil, false),
             ("TP", .precipitation, nil, true),
             ("RAIN", .rain, nil, true),
             ("SNOW", .snowfall_water_equivalent, nil, true),
+            ("SSNOW", .snow_depth_water_equivalent, nil, true),
             ("SUNDUR", .sunshine_duration, nil, true),
         ]
 
@@ -257,71 +257,21 @@ struct GeoSphereDownloader: AsyncCommand {
             }
         }
 
-        // Weather code derived from raw fields (SYMBOL uses GeoSphere-specific codes, not WMO)
+        // Weather code converted from SYMBOL GeoSphere-specific codes, not WMO
         if needsWeatherCode {
-            logger.info("Calculating weather code")
-
-            // Read TCC/TP/SNOW from retained arrays if available, otherwise read from NetCDF
-            if cloudCoverSpatial == nil {
-                guard let data = try ncFile.getVariable(name: "TCC")?.readAndScale() else {
-                    fatalError("Could not read TCC for weather code")
-                }
-                var spatial = Array2DFastSpace(data: data, nLocations: nLocations, nTime: nTime)
-                spatial.data.multiplyAdd(multiply: 100, add: 0)
-                cloudCoverSpatial = spatial
+            logger.info("Converting weather code")
+            
+            /// https://github.com/Geosphere-Austria/dataset-api-docs/issues/30
+            let symbolToWmo = [Float.nan ,0,1,2,3,3,45,45,61,63,65,66,66,66,71,73,75,81,81,82,85,85,85,85,85,86,95,95,95,96,99,96,99]
+            
+            guard let symbol = try ncFile.getVariable(name: "SYMBOL")?.readAndScale() else {
+                fatalError("Could not read U10M")
             }
-            if precipSpatial == nil {
-                guard let data = try ncFile.getVariable(name: "TP")?.readAndScale() else {
-                    fatalError("Could not read TP for weather code")
-                }
-                var spatial = Array2DFastSpace(data: data, nLocations: nLocations, nTime: nTime)
-                spatial.data.deaccumulateOverTimeSpatial(nTime: nTime)
-                for i in 0..<nLocations { spatial.data[i] = .nan }
-                precipSpatial = spatial
-            }
-            if snowSpatial == nil {
-                guard let data = try ncFile.getVariable(name: "SNOW")?.readAndScale() else {
-                    fatalError("Could not read SNOW for weather code")
-                }
-                var spatial = Array2DFastSpace(data: data, nLocations: nLocations, nTime: nTime)
-                spatial.data.deaccumulateOverTimeSpatial(nTime: nTime)
-                for i in 0..<nLocations { spatial.data[i] = .nan }
-                snowSpatial = spatial
-            }
-
-            // Read CAPE once before the loop
-            let capeSpatial: Array2DFastSpace?
-            if let capeVar = ncFile.getVariable(name: "CAPE"),
-               let capeData = try capeVar.readAndScale() {
-                capeSpatial = Array2DFastSpace(data: capeData, nLocations: nLocations, nTime: nTime)
-            } else {
-                capeSpatial = nil
-            }
+            let weatherCode = symbol.map({symbolToWmo[Int(round($0))]})
+            var spatial = Array2DFastSpace(data: weatherCode, nLocations: nLocations, nTime: nTime)
 
             for t in 0..<nTime {
-                let cloudcover = Array(cloudCoverSpatial![t, 0..<nLocations])
-                let precipitation = Array(precipSpatial![t, 0..<nLocations])
-                let snowfallCm = Array(snowSpatial![t, 0..<nLocations]).map({ $0 * 0.7 })
-
-                let uGust = Array(ugustSpatial![t, 0..<nLocations])
-                let vGust = Array(vgustSpatial![t, 0..<nLocations])
-                let gusts = zip(uGust, vGust).map(Meteorology.windspeed)
-
-                let capeSpatialData = capeSpatial.map { Array($0[t, 0..<nLocations]) }
-
-                let weatherCode = WeatherCode.calculate(
-                    cloudcover: cloudcover,
-                    precipitation: precipitation,
-                    convectivePrecipitation: nil,
-                    snowfallCentimeters: snowfallCm,
-                    gusts: gusts,
-                    cape: capeSpatialData,
-                    liftedIndex: nil,
-                    visibilityMeters: nil,
-                    categoricalFreezingRain: nil,
-                    modelDtSeconds: domain.dtSeconds
-                )
-                try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.weather_code, data: weatherCode)
+                try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.weather_code, data: Array(spatial[t, 0..<nLocations]))
             }
         }
 
