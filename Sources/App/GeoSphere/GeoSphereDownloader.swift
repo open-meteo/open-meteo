@@ -96,8 +96,8 @@ struct GeoSphereDownloader: AsyncCommand {
 
         // Download bulk NetCDF file directly from the public data hub
         let runStr = run.format_YYYYMMddHH
-        //let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
-        let url = "file:///Users/patrick/Downloads/nwp_2026032106.nc"
+        let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
+        //let url = "file:///Users/patrick/Downloads/nwp_2026032106.nc"
 
         logger.info("Downloading forecast from \(url)")
 
