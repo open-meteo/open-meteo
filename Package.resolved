@@ -1,5 +1,5 @@
 {
-  "originHash" : "332d785d6ec3ea7ed690e1fb49513b65d4ee4178305f48e2cd2a702e5e21af91",
+  "originHash" : "40de2dab0ba13d8b326edcab5fec8a4230d92128fa7ccfef67ac52b86ac081be",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -149,8 +149,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-crypto.git",
       "state" : {
-        "revision" : "fa308c07a6fa04a727212d793e761460e41049c3",
-        "version" : "4.3.0"
+        "revision" : "6f70fa9eab24c1fd982af18c281c4525d05e3095",
+        "version" : "4.2.0"
       }
     },
     {
@@ -158,8 +158,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-distributed-tracing.git",
       "state" : {
-        "revision" : "dc4030184203ffafbb2ec614352487235d747fe0",
-        "version" : "1.4.1"
+        "revision" : "e109d8b5308d0e05201d9a1dd1c475446a946a11",
+        "version" : "1.4.0"
+      }
+    },
+    {
+      "identity" : "swift-hdf5",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/open-meteo/swift-hdf5.git",
+      "state" : {
+        "branch" : "main",
+        "revision" : "cd2d6810160064644a209eef574be804292c1029"
       }
     },
     {
@@ -203,8 +212,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-nio.git",
       "state" : {
-        "revision" : "b31565862a8f39866af50bc6676160d8dda7de35",
-        "version" : "2.96.0"
+        "revision" : "e932d3c4d8f77433c8f7093b5ebcbf91463948a0",
+        "version" : "2.95.0"
       }
     },
     {
