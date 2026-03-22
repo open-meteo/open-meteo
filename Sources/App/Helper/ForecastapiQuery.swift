@@ -219,8 +219,8 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
         return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: logger, httpClient: httpClient)
     }
 
-    func readerOptions(for request: Request) throws -> GenericReaderOptions {
-        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: request.application.http.client.shared)
+    func readerOptions(for request: Request, allowRemoteArchive: Bool) throws -> GenericReaderOptions {
+        return try GenericReaderOptions(tilt: tilt, azimuth: azimuth, logger: request.logger, httpClient: allowRemoteArchive ? request.application.http.client.shared : nil)
     }
 
     /// Parse `start_date` and `end_date` parameter to range of timestamps
@@ -266,7 +266,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
 
     /// Reads coordinates, elevation, timezones and start/end dataparameter and prepares an array.
     /// For each element, an API response object will be returned later
-    func prepareCoordinates(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> ApiRequestGeometry {
+    func prepareCoordinates(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient?) async throws -> ApiRequestGeometry {
         let dates = try getStartEndDates()
         if let bb = try getBoundingBox() {
             let timezones = allowTimezones ? self.timezone : []
@@ -344,7 +344,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Reads coordinates and timezone fields
     /// If only one timezone is given, use the same timezone for all coordinates
     /// Throws errors on invalid coordinates, timezones or invalid counts
-    private func getCoordinatesWithTimezone(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
+    private func getCoordinatesWithTimezone(allowTimezones: Bool, logger: Logger, httpClient: HTTPClient?) async throws -> [(coordinate: CoordinatesAndElevation, timezone: TimezoneWithOffset)] {
         let coordinates = try await getCoordinates(logger: logger, httpClient: httpClient)
 
         guard allowTimezones, timezone.count > 0 else {
@@ -369,7 +369,7 @@ struct ApiQueryParameter: Content, ApiUnitsSelectable {
     /// Parse latitude, longitude and elevation arrays to an array of coordinates
     /// If no elevation is provided, a DEM is used to resolve the elevation
     /// Throws errors on invalid coordinate ranges
-    private func getCoordinates(logger: Logger, httpClient: HTTPClient) async throws -> [CoordinatesAndElevation] {
+    private func getCoordinates(logger: Logger, httpClient: HTTPClient?) async throws -> [CoordinatesAndElevation] {
         guard latitude.count == longitude.count else {
             throw ForecastApiError.latitudeAndLongitudeCountMustBeTheSame
         }
@@ -623,7 +623,7 @@ struct CoordinatesAndElevation {
     let locationId: Int
 
     /// If elevation is `nil` it will resolve it from DEM. If `NaN` it stays `NaN`.
-    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan, logger: Logger, httpClient: HTTPClient) async throws {
+    init(latitude: Float, longitude: Float, locationId: Int, elevation: Float? = .nan, logger: Logger, httpClient: HTTPClient?) async throws {
         if latitude > 90 || latitude < -90 || latitude.isNaN {
             throw ForecastApiError.latitudeMustBeInRangeOfMinus90to90(given: latitude)
         }

@@ -83,6 +83,11 @@ enum OpenMeteo {
     static let numberOfLocationsMaximum: Int = {
         return (Environment.get("LOCATIONS_LIMIT").map(Int.init) ?? 1000) ?? 1000
     }()
+    
+    /// Only attempt to fetch data from the REMOTE_DATA_DIRECTORY older than this age in seconds
+    static let remoteDataDirectoryMinimumAge: Int? = {
+        return Environment.get("REMOTE_DATA_DIRECTORY_MINIMUM_AGE").map(Int.init) ?? nil
+    }()
 
     /// Cache all data access using spare files in this directory
     /*static var cacheDirectory = {

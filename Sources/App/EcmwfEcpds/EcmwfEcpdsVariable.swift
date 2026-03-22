@@ -45,7 +45,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
     case precipitation
     case total_column_integrated_water_vapour
     
-    //case sea_surface_temperature
+    case sea_surface_temperature
+    case sea_water_salinity
     case boundary_layer_height
     case snow_density
     
@@ -61,7 +62,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         return (rawValue, 0)
     }
 
-    /// Scalefactor to compress data
+    /// Scale-factor to compress data
     var scalefactor: Float {
         switch self {
         case .wind_u_component_100m, .wind_v_component_100m, .wind_u_component_10m, .wind_v_component_10m, .wind_u_component_200m, .wind_v_component_200m: return 20 // 0.05 m/s resolution. Typically 10, but want to have sligthly higher resolution
@@ -88,7 +89,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .snow_depth: return 100
         case .boundary_layer_height: return 0.2 // 5m resolution
         case .total_column_integrated_water_vapour: return 10
-        //case .sea_surface_temperature: return 20
+        case .sea_surface_temperature: return 20
+        case .sea_water_salinity: return 50 // 0.02 g/m3 resolution
         case .cape: return 0.1
         case .potential_evapotranspiration: return 10
         case .convective_inhibition: return 1
@@ -161,8 +163,10 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return .hermite(bounds: 0...10e9)
         case .total_column_integrated_water_vapour:
             return .hermite(bounds: nil)
-        //case .sea_surface_temperature:
-        //    return .hermite(bounds: nil)
+        case .sea_surface_temperature:
+            return .hermite(bounds: nil)
+        case .sea_water_salinity:
+            return .hermite(bounds: 0...10e9)
         case .cape:
             return .hermite(bounds: 0...10e9)
         case .potential_evapotranspiration:
@@ -280,7 +284,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .snow_depth: return .metre
         case .boundary_layer_height: return .metre
         case .total_column_integrated_water_vapour: return .kilogramPerSquareMetre
-        //case .sea_surface_temperature: return .celsius
+        case .sea_surface_temperature: return .celsius
         case .cape: return .joulePerKilogram
         case .potential_evapotranspiration: return .millimetre
         case .convective_inhibition: return .joulePerKilogram
@@ -299,6 +303,8 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .lightning_density:
             // Add unit "strikes per 100 km2 per hour"
             return .dimensionless
+        case .sea_water_salinity:
+            return .gramPerKilogram
         }
     }
 
@@ -421,12 +427,16 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
             return "zos"
         case .lightning_density:
             return "litota1,litota3,litota6"
+        case .sea_surface_temperature:
+            return "sst"
+        case .sea_water_salinity:
+            return "so"
         }
     }
     
     func multiplyAdd(dtSeconds: Int) -> (multiply: Float, add: Float)? {
         switch self {
-        case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m:
+        case .surface_temperature, .soil_temperature_0_to_7cm, .soil_temperature_7_to_28cm, .soil_temperature_28_to_100cm, .soil_temperature_100_to_255cm, .temperature_2m, .temperature_2m_min, .temperature_2m_max, .dew_point_2m, .sea_surface_temperature:
             return (1, -273.15)
         case .cloud_cover, .cloud_cover_low, .cloud_cover_mid, .cloud_cover_high:
             return (100, 0)

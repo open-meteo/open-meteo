@@ -27,7 +27,7 @@ final class RemoteFileManager: Sendable {
     private let cache = RemoteFileManagerCache()
     
     /// Execute a closure with a reader. If the remote file was modified during execution, restart the execution
-    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
+    func with<R, Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, fn: (_ value: Key.Value) async throws -> R) async throws -> R? {
         guard let value = try await get(file: file, client: client, logger: logger, forceNew: false) else {
             return nil
         }
@@ -44,7 +44,7 @@ final class RemoteFileManager: Sendable {
     /// Check if the file is available locally or remotely.
     /// `with<R>()` is recommended to automatically reload files if they are modified during execution
     /// Note: If the file is remote, the reader may throw `CurlError.fileModifiedSinceLastDownload` if the file was modified on the remote end
-    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
+    func get<Key: RemoteFileManageable>(file: Key, client: HTTPClient?, logger: Logger, forceNew: Bool = false) async throws -> Key.Value? {
         guard let backend = try await cache.get(key: file, client: client, logger: logger, forceNew: forceNew) else {
             return nil
         }
@@ -155,7 +155,7 @@ fileprivate final actor RemoteFileManagerCache {
     
     /// On cache miss, create a new reader
     /// If `forceNew` is set, do not use cached meta data
-    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
+    nonisolated private func open<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> (value: LocalOrRemote?, lastValidated: Timestamp) {
         let localFile = key.getFilePath()
         if FileManager.default.fileExists(atPath: localFile) {
             let file = try MmapFile(fn: try FileHandle.openFileReading(file: localFile))
@@ -168,7 +168,7 @@ fileprivate final actor RemoteFileManagerCache {
             }
         }
         
-        guard let remoteFile = key.getRemoteUrl() else {
+        guard let client, let remoteFile = key.getRemoteUrl() else {
             return (nil, .now())
         }
         let now = Timestamp.now()
@@ -216,7 +216,7 @@ fileprivate final actor RemoteFileManagerCache {
     /**
      Get a resource identified by a key. If the request is currently being requested, enqueue the request
      */
-    func get<Key: RemoteFileManageable>(key: Key, client: HTTPClient, logger: Logger, forceNew: Bool) async throws -> LocalOrRemote? {
+    func get<Key: RemoteFileManageable>(key: Key, client: HTTPClient?, logger: Logger, forceNew: Bool) async throws -> LocalOrRemote? {
         let key = AnyRemoteFileManageable(key: key)
         guard let state = cache[key], !(forceNew == true && state.isCached) else {
             // Value not cached or needs to be refreshed
@@ -311,11 +311,11 @@ fileprivate final actor RemoteFileManagerCache {
                             }
                             statistics.remoteModified += 1
                             let activeBlocks = old.fn.listOfActiveBlocks(maxAgeSeconds: 15*60)
-                            logger.warning("OmFileManager: Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
+                            logger.error("OmFileManager: Remote file modified \(key). \(activeBlocks.count) blocks active in the last 15 minutes")
                             if activeBlocks.count > 0 {
                                 let startPreload = DispatchTime.now()
                                 try await new.preloadBlocks(blocks: activeBlocks)
-                                logger.warning("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
+                                logger.error("OmFileManager: Preload completed in \(startPreload.timeElapsedPretty())")
                             }
                             guard let reader = try await key2.makeRemoteCaptureNotOmFile(file: new) else {
                                 entry.value = nil
@@ -324,7 +324,7 @@ fileprivate final actor RemoteFileManagerCache {
                             entry.value = .remote(reader)
                         } else {
                             // File was deleted on remote server
-                            logger.warning("OmFileManager: Remote file deleted \(key).")
+                            logger.error("OmFileManager: Remote file deleted \(key).")
                             statistics.remoteDeleted += 1
                             entry.value = nil
                         }
@@ -333,7 +333,7 @@ fileprivate final actor RemoteFileManagerCache {
                         // If they are deleted, the cache might immediately write new data into the cached slot
                         let deletedBlocks = old.fn.deleteCachedBlocks(olderThanSeconds: 60)
                         if deletedBlocks > 0 {
-                            logger.warning("OmFileManager: \(deletedBlocks) blocks have been deleted")
+                            logger.error("OmFileManager: \(deletedBlocks) blocks have been deleted")
                         }
                     }
                 }
@@ -352,9 +352,9 @@ fileprivate final actor RemoteFileManagerCache {
             }
         }
         if statistics.ticks.isMultiple(of: 10), total > 0 {
-            logger.warning("OmFileManager: \(total) open files, \(running) running. Revalidation took \(startRevalidation.timeElapsedPretty()). \(statistics)")
+            logger.error("OmFileManager: \(total) open files, \(running) running. Revalidation took \(startRevalidation.timeElapsedPretty()). \(statistics)")
             if OpenMeteo.remoteDataDirectory != nil {
-                logger.warning("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
+                logger.error("\(OpenMeteo.dataBlockCache.cache.statistics().prettyPrint)")
             }
             statistics.reset()
         }

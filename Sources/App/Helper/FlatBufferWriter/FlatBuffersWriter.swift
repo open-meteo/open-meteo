@@ -176,6 +176,8 @@ extension ModelFlatbufferSerialisable {
         let minutely15 = await (try minutely15(variables: variables.minutely15Variables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let daily = await (try daily(variables: variables.dailyVariables)).map { $0.encodeFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
         let monthly = await (try monthly(variables: variables.monthlyVariables)).map { $0.encodeMonthlyFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+        let weekly = await (try weekly(variables: variables.weeklyVariables)).map { $0.encodeMonthlyFlatBuffers(&fbb, memberOffset: Self.memberOffset) } ?? Offset()
+
         let current = await (try current(variables: variables.currentVariables)).map { $0.encodeFlatBuffers(&fbb) } ?? Offset()
         let generationTimeMs = fixedGenerationTime ?? (Date().timeIntervalSince(generationTimeStart) * 1000)
         
@@ -194,7 +196,8 @@ extension ModelFlatbufferSerialisable {
             dailyOffset: daily,
             hourlyOffset: hourly,
             minutely15Offset: minutely15,
-            monthlyOffset: monthly
+            monthlyOffset: monthly,
+            weeklyOffset: weekly
         )
         fbb.finish(offset: result, addPrefix: true)
     }
