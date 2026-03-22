@@ -51,7 +51,7 @@ extension GenericDomain {
     }
 
     /// The the file containing static information for elevation of soil types
-    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
+    func getStaticFile(type: ReaderStaticVariable, httpClient: HTTPClient?, logger: Logger) async -> (any OmFileReaderArrayProtocol<Float>)? {
         guard let domainRegistryStatic else {
             return nil
         }
@@ -72,7 +72,7 @@ extension GenericDomain {
     }
 
     /// Meta JSON for time-series data
-    func getMetaJson(client: HTTPClient, logger: Logger) async throws -> ModelUpdateMetaJson? {
+    func getMetaJson(client: HTTPClient?, logger: Logger) async throws -> ModelUpdateMetaJson? {
         return try await RemoteFileManager.instance.get(
             file: ModelUpdateMetaFile(domain: self.domainRegistry),
             client: client,
@@ -80,7 +80,7 @@ extension GenericDomain {
         )
     }
     
-    func getLatestFullRun(client: HTTPClient, logger: Logger) async throws -> Timestamp? {
+    func getLatestFullRun(client: HTTPClient?, logger: Logger) async throws -> Timestamp? {
         return try await RemoteFileManager.instance.get(
             file: FullRunMetaFile.latest(self.domainRegistry),
             client: client,

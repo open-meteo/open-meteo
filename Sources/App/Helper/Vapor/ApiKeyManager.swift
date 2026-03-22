@@ -152,7 +152,11 @@ extension Request {
                 guard self.method != .POST else {
                     throw ForecastApiError.generic(message: "Please use the customer- prefixed URL for POST requests")
                 }
-                return self.redirect(to: "\(scheme)://customer-\(host)/\(url.string)")
+                let url = "\(scheme)://customer-\(host)/\(url.string)"
+                guard url.count < 3500 else {
+                    throw ForecastApiError.generic(message: "Your API URL is too long for automatic redirection from the open-access API to the commercial endpoints. Instead, use the 'customer-' prefixed URLs directly. Refer to the API documentation and select 'Usage -> Commercial' to obtain the correct customer URLs.")
+                }
+                return self.redirect(to: url)
             }
             let responder = try await fn(host, params)
             if responder.numberOfLocations > OpenMeteo.numberOfLocationsMaximum {
