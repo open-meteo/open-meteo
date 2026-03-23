@@ -184,7 +184,7 @@ struct SyncCommand: AsyncCommand {
         
         // Note: Ceph S3 has issues with HTTP2 and API actions with empty body payloads. Fallback to HTTP1.1
         // See: https://github.com/swift-server/async-http-client/issues/602
-        let client = server.contains(".your-objectstorage.com") ? application.http1Client : application.dedicatedHttpClient
+        let client = server.contains(".your-objectstorage.com") || server.contains("s3.open-meteo.com") ? application.http1Client : application.dedicatedHttpClient
         
         /// 2025-07-28 For whatever reason, the hetzner s3 storage returns 404 from time to time. Maybe updates are not perfectly atomic
         let curl = Curl(logger: logger, client: client, retryError4xx: true)
