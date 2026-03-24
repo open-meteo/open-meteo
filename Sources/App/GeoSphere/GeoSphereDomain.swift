@@ -38,13 +38,10 @@ enum GeoSphereDomain: String, GenericDomain, CaseIterable {
         return false
     }
 
-    /// Runs every 3 hours (00, 03, 06, 09, 12, 15, 18, 21) with ~4h delay
+    /// Runs every 3 hours (00, 03, 06, 09, 12, 15, 18, 21) with 03:20 delay
     var lastRun: Timestamp {
-        let t = Timestamp.now()
-        // Subtract 4 hours for delay, then floor to nearest 3h
-        let adjustedHour = (t.hour - 4 + 24) % 24
-        let runHour = adjustedHour - (adjustedHour % 3)
-        return t.with(hour: runHour)
+        // Subtract 3 hours for delay, then floor to nearest 3h
+        return Timestamp.now().add(hours: -3).floor(toNearestHour: 3)
     }
 
     /// 60h forecast + 2 days buffer
