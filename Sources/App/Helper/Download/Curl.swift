@@ -140,7 +140,7 @@ final class Curl: Sendable {
                 request.method = method
                 if let user = user, let password = password {
                     // Request need to be signed in the retry loop because the signature expires after 15 minutes
-                    if url.contains(".your-objectstorage.com") {
+                    if url.contains(".your-objectstorage.com") || url.contains("s3.open-meteo.com") {
                         let signer = AWSSigner(accessKey: user, secretKey: password, region: "us-west-2", service: "s3")
                         try signer.sign(request: &request, body: nil)
                     } else {
