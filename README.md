@@ -115,7 +115,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
 - PHP Laravel https://github.com/michaelnabil230/laravel-weather
 - PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
-- Python https://github.com/m0rp43us/openmeteopy
+- Python https://github.com/open-meteo/python-requests
 - R https://github.com/tpisel/openmeteo
 - Rust: https://github.com/angelodlfrtr/open-meteo-rs
 
