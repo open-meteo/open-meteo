@@ -107,16 +107,16 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 
 ## Client SDKs
 
-- .Net 8 / C# https://github.com/colinnuk/open-meteo-dotnet-client-sdk
+- .Net 8 / C#: https://github.com/colinnuk/open-meteo-dotnet-client-sdk
 - Android library for Geocoding API: https://github.com/woheller69/OmGeoDialog
 - Dart / Flutter: https://github.com/neursh/open-meteo-dart
-- Go https://github.com/HectorMalot/omgo
-- Kotlin https://github.com/open-meteo/open-meteo-api-kotlin
+- Go: https://github.com/HectorMalot/omgo
+- Kotlin: https://github.com/open-meteo/open-meteo-api-kotlin
 - PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
-- PHP Laravel https://github.com/michaelnabil230/laravel-weather
-- PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
-- Python https://github.com/open-meteo/python-requests
-- R https://github.com/tpisel/openmeteo
+- PHP Laravel: https://github.com/michaelnabil230/laravel-weather
+- PHP Symfony 6.2: https://gitlab.com/flibidi67/open-meteo
+- Python: https://github.com/open-meteo/python-requests
+- R: https://github.com/tpisel/openmeteo
 - Rust: https://github.com/angelodlfrtr/open-meteo-rs
 - TypeScript: https://github.com/open-meteo/typescript
 
