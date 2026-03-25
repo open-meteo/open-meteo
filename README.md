@@ -118,6 +118,7 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 - Python https://github.com/open-meteo/python-requests
 - R https://github.com/tpisel/openmeteo
 - Rust: https://github.com/angelodlfrtr/open-meteo-rs
+- TypeScript: https://github.com/open-meteo/typescript
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
