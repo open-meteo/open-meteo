@@ -954,7 +954,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         case .icon_eu_eps:
             return .single(IconDomains.iconEuEps, DwdIconEuEpsGlobalVariable.self)
         case .icon_d2_eps:
-            return .single(IconDomains.iconEuEps, DwdIconD2EpsGlobalVariable.self)
+            return .single(IconDomains.iconD2Eps, DwdIconD2EpsGlobalVariable.self)
         case .dwd_icon_eps_ensemble_mean:
             return .single(IconDomains.iconEpsEnsembleMean, VariableOrSpread<DwdIconEpsGlobalVariable>.self)
         case .dwd_icon_eu_eps_ensemble_mean:
