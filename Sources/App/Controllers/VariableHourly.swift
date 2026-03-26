@@ -876,7 +876,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             if let direct = Reader.variableFromString("direct_radiation") {
                 return .two(.raw(swrad), .raw(direct)) { swrad, direct, _ in
-                    return DataAndUnit(zip(swrad.data, direct.data).map(-), swrad.unit)
+                    return DataAndUnit(zip(swrad.data, direct.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
             return .one(.raw(swrad)) { swrad, time in
@@ -889,7 +889,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             if let diffuse = Reader.variableFromString("diffuse_radiation") {
                 return .two(.raw(swrad), .raw(diffuse)) { swrad, diffuse, _ in
-                    return DataAndUnit(zip(swrad.data, diffuse.data).map(-), swrad.unit)
+                    return DataAndUnit(zip(swrad.data, diffuse.data).map({max($0-$1, 0)}), swrad.unit)
                 }
             }
             return .one(.raw(swrad)) { swrad, time in
