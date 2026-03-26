@@ -112,7 +112,10 @@ final class Curl: Sendable {
         let url: String
         let user: String?
         let password: String?
-        if _url.contains("@") && _url.contains(":") {
+        
+        let endIndex = _url.firstIndex(of: "/") ?? _url.endIndex
+        let prefix = _url[..<endIndex]
+        if prefix.contains("@") && prefix.contains(":") {
             let usernamePassword = _url.split(separator: "/", maxSplits: 1)[1].dropFirst().split(separator: "@", maxSplits: 1)[0].split(separator: ":")
             user = String(usernamePassword.first!)
             password = usernamePassword.count > 1 ? String(usernamePassword[1]) : nil
