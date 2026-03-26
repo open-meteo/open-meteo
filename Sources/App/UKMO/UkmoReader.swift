@@ -306,7 +306,7 @@ struct UkmoReader: GenericReaderDerived, GenericReaderProtocol {
             case .diffuse_radiation:
                 let swrad = try await get(raw: .shortwave_radiation, time: time)
                 let direct = try await get(raw: .direct_radiation, time: time)
-                return DataAndUnit(zip(swrad.data, direct.data).map(-), swrad.unit)
+                return DataAndUnit(zip(swrad.data, direct.data).map({max($0-$1, 0)}), swrad.unit)
             case .direct_radiation_instant:
                 let direct = try await get(raw: .direct_radiation, time: time)
                 let factor = Zensun.backwardsAveragedToInstantFactor(time: time.time, latitude: reader.modelLat, longitude: reader.modelLon)
