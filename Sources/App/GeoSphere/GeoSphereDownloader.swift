@@ -96,8 +96,8 @@ struct GeoSphereDownloader: AsyncCommand {
 
         // Download bulk NetCDF file directly from the public data hub
         let runStr = run.format_YYYYMMddHH
-        let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
-        //let url = "file:///Users/patrick/Downloads/nwp_2026032106.nc"
+        //let url = "https://public.hub.geosphere.at/datahub/resources/nwp-v1-1h-2500m/filelisting/nwp_\(runStr).nc"
+        let url = "file:///Users/patrick/Downloads/nwp_2026032106.nc"
 
         logger.info("Downloading forecast from \(url)")
 
@@ -153,11 +153,10 @@ struct GeoSphereDownloader: AsyncCommand {
             ("GRAD", .shortwave_radiation, (1.0 / 3600.0, 0), true),  // Ws/m² -> W/m²
             ("CAPE", .cape, nil, false),
             ("CIN", .convective_inhibition, nil, false),
-            ("SNOWLMT", .snowfall_height, nil, false),
             ("TP", .precipitation, nil, true),
             ("RAIN", .rain, nil, true),
             ("SNOW", .snowfall_water_equivalent, nil, true),
-            ("SSNOW", .snow_depth_water_equivalent, nil, true),
+            ("SSNOW", .snow_depth_water_equivalent, nil, false),
             ("SUNDUR", .sunshine_duration, nil, true),
         ]
         
@@ -210,6 +209,22 @@ struct GeoSphereDownloader: AsyncCommand {
 
         for t in 0..<nTime {
             try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.pressure_msl, data: Array(msl[t, 0..<nLocations]))
+        }
+        
+        /// Lower snowfall level height below grid-cell elevation to adjust data to mixed terrain
+        /// Use temperature to estimate freezing level height below ground. This is consistent with GFS
+        logger.info("Correct snowfall height from metre above ground to metre above sea level")
+        guard var snowlmt = try ncFile.getVariable(name: "SNOWLMT")?.readAndScale() else {
+            fatalError("Could not read SNOWLMT")
+        }
+        for i in snowlmt.indices {
+            let elevation = z[i]
+            let snowheight = snowlmt[i] + elevation
+            let temperature_2m = t2m[i]
+            snowlmt[i] = snowheight + (snowlmt[i] < 20 && temperature_2m < 0 ? temperature_2m * 0.7 * 100 : 0)
+        }
+        for t in 0..<nTime {
+            try await writer.write(time: run.add(hours: t), member: 0, variable: GeoSphereVariable.snowfall_height, data: Array(snowlmt[nLocations*t ..< nLocations*(t+1)]))
         }
 
 
