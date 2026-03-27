@@ -1,5 +1,5 @@
 {
-  "originHash" : "332d785d6ec3ea7ed690e1fb49513b65d4ee4178305f48e2cd2a702e5e21af91",
+  "originHash" : "b108724d034df381ff0b83abcc1cea71761c61bc25d29cd9b642a285984ef1d7",
   "pins" : [
     {
       "identity" : "async-http-client",
@@ -302,8 +302,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git",
       "state" : {
-        "revision" : "1a653bcc6d3e0c5650886aba5c5a277cd49f0bbd",
-        "version" : "1.0.7"
+        "revision" : "e4db6c3ad57b58d472a05b73cf8ea78352957500",
+        "version" : "1.0.8"
       }
     },
     {

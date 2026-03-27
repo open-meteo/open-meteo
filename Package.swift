@@ -38,7 +38,7 @@ let package = Package(
         //.package(url: "https://github.com/patrick-zippenfenig/SwiftParallelBzip2", from: "0.0.10"), -> code is embedded because linux release build crashes otherwise...
         //.package(url: "/Users/patrick/Documents/curl-swift", branch: "main"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
-        .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.7"),
+        .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
