@@ -1242,6 +1242,9 @@ extension MultiDomains {
             return .ecmwfWam025EnsembleMean
         case .ncep_gefswave025_ensemble_mean:
             return .ncepGefswave025EnsembleMean
+        case .geosphere_seamless:
+            // TODO register in SDK
+            return .geosphereAromeAustria
         }
     }
 }
