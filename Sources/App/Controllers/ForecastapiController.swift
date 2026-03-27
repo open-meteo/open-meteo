@@ -1042,9 +1042,11 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
         if let d = getDomainAndVariable() {
             switch d {
             case .single(let domain, let variable):
-                return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: true)
+                return try await domain.makeGenericHourlyDaily(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             case .singleWithPrecipitationProbability(let domain, let variable, precipitationProb: let precipitationProb):
-                let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: true)
+                guard let reader = try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options) else {
+                    return nil
+                }
                 let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
                 let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: [reader, prob].compactMap({$0}))
                 return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
@@ -1052,7 +1054,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let readers = try await domains.asyncCompactMap { d in
                     let domain: any GenericDomain = d.0
                     let variable: any GenericVariable.Type = d.1
-                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: false)
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 }
                 let prob = try await precipitationProb.makeHourlyReader(variableType: ProbabilityVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)?.asOptionalReader
                 let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers + [prob].compactMap({$0}))
@@ -1061,7 +1063,7 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
                 let readers = try await domains.asyncCompactMap { d in
                     let domain: any GenericDomain = d.0
                     let variable: any GenericVariable.Type = d.1
-                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: false)
+                    return try await domain.makeDerivedHourly(variableType: variable, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
                 }
                 let hourly = GenericReaderMultiSameType<ForecastVariable>(reader: readers)
                 return (hourly, hourly.makeDailyAggregator(allowMinMaxTwoAggregations: false), nil, nil)
@@ -1174,13 +1176,13 @@ enum MultiDomains: String, RawRepresentableString, CaseIterable, Sendable {
             
         case .satellite_radiation_seamless:
             if (-20..<60).contains(lon) { // DWD MTG on 0°
-                return try await DwdSisDomain.europe_africa_v4.makeGenericHourlyDaily(variableType: DwdSisVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: true)
+                return try await DwdSisDomain.europe_africa_v4.makeGenericHourlyDaily(variableType: DwdSisVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             if (-60..<50).contains(lon) { // MSG on 0°
-                return try await EumetsatLsaSafDomain.msg.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: true)
+                return try await EumetsatLsaSafDomain.msg.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             if (50..<90).contains(lon) { // IODC on 41.5°
-                return try await EumetsatLsaSafDomain.iodc.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options, throwOnMissingLocation: true)
+                return try await EumetsatLsaSafDomain.iodc.makeGenericHourlyDaily(variableType: EumetsatLsaSafVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)
             }
             if (90...).contains(lon) { // Himawari on 140°
                 let reader = try await JaxaHimawariDomain.himawari_10min.makeHourlyDeriverCached(variableType: JaxaHimawariVariable.self, lat: lat, lon: lon, elevation: elevation, mode: mode, options: options)

@@ -45,6 +45,7 @@ Apps:
 - [Alpine Conditions](https://www.alpineconditions.com) Allows a user to compare multiple models at once & create ensemble forecasts for any location
 - [BusyRunner](https://busyrunner.com/) Allows users to plan their weekly runs based on the weather.
 - [Breezy Weather](https://github.com/breezy-weather/breezy-weather) A feature-rich, free and open source Material 3 Expressive Android weather app.
+- [Calima Canarias](https://calimacanarias.com) Real-time Saharan dust (calima) forecast and air quality monitoring for the Canary Islands and the rest of Spain.
 - [Cirrus](https://github.com/woheller69/omweather) Android Weather App
 - [Clima](https://f-droid.org/packages/co.prestosole.clima/) Beautiful, minimal, and fast weather app
 - [DroneWeather](https://play.google.com/store/apps/details?id=xyz.droneweather.app) Weather forecasts, satellite count, and KP index for drone pilots.
@@ -107,18 +108,18 @@ Do you use Open-Meteo? Please open a pull request and add your repository or app
 
 ## Client SDKs
 
-- Go https://github.com/HectorMalot/omgo
-- Python https://github.com/m0rp43us/openmeteopy
-- Kotlin https://github.com/open-meteo/open-meteo-api-kotlin
-- .Net / C# https://github.com/AlienDwarf/open-meteo-dotnet
-- dotnet 8 / C# https://github.com/colinnuk/open-meteo-dotnet-client-sdk
-- PHP Laravel https://github.com/michaelnabil230/laravel-weather
-- R https://github.com/tpisel/openmeteo
-- PHP Symfony 6.2 https://gitlab.com/flibidi67/open-meteo
-- PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
+- .Net 8 / C#: https://github.com/colinnuk/open-meteo-dotnet-client-sdk
 - Android library for Geocoding API: https://github.com/woheller69/OmGeoDialog
 - Dart / Flutter: https://github.com/neursh/open-meteo-dart
+- Go: https://github.com/HectorMalot/omgo
+- Kotlin: https://github.com/open-meteo/open-meteo-api-kotlin
+- PHP for Geocoding API: https://gitlab.com/flibidi67/open-meteo-geocoding
+- PHP Laravel: https://github.com/michaelnabil230/laravel-weather
+- PHP Symfony 6.2: https://gitlab.com/flibidi67/open-meteo
+- Python: https://github.com/open-meteo/python-requests
+- R: https://github.com/tpisel/openmeteo
 - Rust: https://github.com/angelodlfrtr/open-meteo-rs
+- TypeScript: https://github.com/open-meteo/typescript
 
 Contributions welcome! Writing a SDK for Open-Meteo is more than welcome and a great way to help users.
 
