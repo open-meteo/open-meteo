@@ -218,7 +218,7 @@ struct GeoSphereDownloader: AsyncCommand {
             fatalError("Could not read SNOWLMT")
         }
         for i in snowlmt.indices {
-            let elevation = z[i]
+            let elevation = z[i] / 9.80665
             let snowheight = snowlmt[i] + elevation
             let temperature_2m = t2m[i]
             snowlmt[i] = snowheight + (snowlmt[i] < 20 && temperature_2m < 0 ? temperature_2m * 0.7 * 100 : 0)
