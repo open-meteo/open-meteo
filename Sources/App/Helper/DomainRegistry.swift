@@ -596,7 +596,7 @@ extension DomainRegistry {
                     continue
                 }
                 try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-                    if variable.contains("_previous_day") && bucket == "openmeteo" {
+                    if variable.contains("_previous_day") && bucket == "openmeteo" && profile == nil {
                         // do not upload data from past days yet
                         return
                     }
