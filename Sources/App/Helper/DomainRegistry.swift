@@ -611,7 +611,7 @@ extension DomainRegistry {
         } else {
             let src = "\(OpenMeteo.dataDirectory)\(dir)"
             try await parseBucket(bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
-                let exclude = bucket == "openmeteo" ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
+                let exclude = bucket == "openmeteo" && profile == nil ? ["*~", "*_previous_day*", "*rolling.om"] : ["*~", "*rolling.om"]
                 logger.info("AWS upload to bucket \(bucket)")
                 let startTimeAws = DispatchTime.now()
                 try Process.awsSync(
