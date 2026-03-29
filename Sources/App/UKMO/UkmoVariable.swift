@@ -145,7 +145,7 @@ enum UkmoSurfaceVariable: String, CaseIterable, UkmoVariableDownloadable, Generi
         case .cape:
             return .hermite(bounds: 0...10e9)
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .uv_index:
             return .hermite(bounds: 0...1000)
         }
