@@ -172,7 +172,7 @@ enum EcmwfEcdpsIfsVariable: String, CaseIterable, GenericVariable {
         case .potential_evapotranspiration:
             return .backwards_sum
         case .convective_inhibition:
-            return .hermite(bounds: nil)
+            return .hermite(bounds: 0...10e9)
         case .precipitation_type:
             return .backwards
         case .visibility:
