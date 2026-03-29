@@ -310,6 +310,14 @@ struct UkmoDownload: AsyncCommand {
                                 data[i] += domainElevation[i]
                             }
                         }
+                        /// CIN is set to -1000 for no convection. Set to 0.
+                        if variable == .convective_inhibition {
+                            for i in data.indices {
+                                if data[i] <= -999 {
+                                    data[i] = 0
+                                }
+                            }
+                        }
                     }
                     let variable = variable.withLevel(level: level)
                     try await writer.write(member: member, variable: variable, data: data)

@@ -222,6 +222,13 @@ struct DmiDownload: AsyncCommand {
                                     grib2d.array.data[i] = 0
                                 }
                             }
+                        case .convective_inhibition:
+                            /// CIN is set to +1000 for no convection. Set to 0.
+                            for i in grib2d.array.data.indices {
+                                if grib2d.array.data[i] == 1000 {
+                                    grib2d.array.data[i] = 0
+                                }
+                            }
                         default:
                             break
                         }

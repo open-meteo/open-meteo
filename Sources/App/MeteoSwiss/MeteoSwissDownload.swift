@@ -147,11 +147,11 @@ struct MeteoSwissDownload: AsyncCommand {
                         if variable == .precipitation {
                             await storagePrecipitation.set(variable: variable, timestamp: timestamp, member: member, data: array2d)
                         }
-                        /// CIN is set to -1000 for missing data. This is really bad for compression. Typical ranges 0...250. Set it to -1 to mark missing data.
+                        /// CIN is set to -1000 for no convection. Set to 0.
                         if variable == .convective_inhibition {
                             for i in array2d.data.indices {
                                 if array2d.data[i] <= -999 {
-                                    array2d.data[i] = -1
+                                    array2d.data[i] = 0
                                 }
                             }
                         }
