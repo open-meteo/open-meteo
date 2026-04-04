@@ -12,12 +12,14 @@ public final actor ApiKeyManager {
     struct KeyAndLimit: Equatable {
         let key: String.SubSequence
         let limit: Int
+        let id: String.SubSequence?
 
         static func readApiKeys(path: String) -> [KeyAndLimit] {
             return (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: ",").sorted().map {
                 let parts = $0.split(separator: ";")
                 let limit = parts.count <= 1 ? 0 : Int(parts[1]) ?? 0
-                return KeyAndLimit(key: parts[0], limit: limit)
+                let id = parts.count <= 2 ? nil : parts[1]
+                return KeyAndLimit(key: parts[0], limit: limit, id: id)
             } ?? []
         }
     }
