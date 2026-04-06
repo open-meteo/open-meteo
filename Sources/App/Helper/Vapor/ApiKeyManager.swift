@@ -105,6 +105,9 @@ public final actor ApiKeyManager {
         }
         let logger = application.logger
         let events = await Self.instance.flushUsage()
+        guard events.count > 0 else {
+            return
+        }
         logger.error("API Key Metrics: Getting session to upload \(events.count) events")
         let meter = StripeMeterEvents(apiKey: apiKey, client: application.http.client.shared, logger: logger)
         do {
