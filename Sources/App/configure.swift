@@ -234,6 +234,11 @@ public func configure(_ app: Application) throws {
         delay: .seconds(10),
         ApiKeyManager.update
     )
+    app.lifecycle.repeatedTask(
+        initialDelay: .seconds(60),
+        delay: .seconds(60),
+        ApiKeyManager.uploadApiKeyMetrics
+    )
     // Those background tasks are not executed in parallel. The delay is after the call completes
     app.lifecycle.repeatedTask(
         initialDelay: .seconds(0),
