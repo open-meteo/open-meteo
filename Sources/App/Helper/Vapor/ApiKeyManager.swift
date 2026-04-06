@@ -29,25 +29,34 @@ public final actor ApiKeyManager {
             return
         }
         self.apiKeys = KeyAndLimit.readApiKeys(path: apiKeysPath)
-        self.usage = .init(repeating: (0, 0), count: apiKeys.count)
+        self.usage = .init()
+        self.usage.reserveCapacity(apiKeys.count)
     }
 
     var apiKeys = [KeyAndLimit]()
 
-    var usage = [(calls: Int32, weight: Float)]()
+    /// usage per customer id
+    var usage = [String: (calls: Int32, weight: Float)]()
 
     func set(_ keys: [KeyAndLimit]) {
         if self.apiKeys == keys {
             return
         }
         self.apiKeys = keys
-        self.usage = .init(repeating: (0, 0), count: keys.count)
     }
 
     /// Return current API key usage
     func getUsage() -> String {
-        let usage = zip(self.apiKeys, self.usage).sorted { $0.1.weight > $1.1.weight }
+        let usage = self.usage.sorted { $0.1.weight > $1.1.weight }
         return usage[0..<min(10, usage.count)].map { "\($0.0)=\($0.1.calls) (w\($0.1.weight))" }.joined(separator: ", ")
+    }
+    
+    /// Return current usage and reset counter to 0
+    func flushUsage() -> [String: (calls: Int32, weight: Float)] {
+        let usage = self.usage
+        self.usage = .init()
+        self.usage.reserveCapacity(self.apiKeys.count)
+        return usage
     }
 
     func isEmpty() -> Bool {
@@ -59,10 +68,14 @@ public final actor ApiKeyManager {
     }
 
     func increment(apikey: String.SubSequence, weight: Float) {
-        guard let index = apiKeys.firstIndex(where: { $0.key == apikey }) else {
+        guard let id = apiKeys.first(where: { $0.key == apikey })?.id.map(String.init) else {
             return
         }
-        usage[index] = (usage[index].calls + 1, usage[index].weight + weight)
+        guard let used = usage[id] else {
+            usage[id] = (1, weight)
+            return
+        }
+        usage[id] = (used.calls + 1, used.weight + weight)
     }
 
     /// Fetch API keys and update database
@@ -84,7 +97,30 @@ public final actor ApiKeyManager {
         // Set new keys
         await ApiKeyManager.instance.set(keys)
     }
+    
+    /// Upload metered API usage events
+    @Sendable public static func uploadApiKeyMetrics(application: Application) async {
+        guard let apiKey = Environment.get("STRIPE_API_KEY") else {
+            return
+        }
+        let logger = application.logger
+        let events = await Self.instance.flushUsage()
+        logger.error("API Key Metrics: Getting session to upload \(events.count) events")
+        let meter = StripeMeterEvents(apiKey: apiKey, client: application.http.client.shared, logger: logger)
+        do {
+            let time = DispatchTime.now()
+            let session = try await meter.getAuthenticationToken()
+            logger.error("API Key Metrics: Established session in \(time.timeElapsedPretty())")
+            let time2 = DispatchTime.now()
+            try await session.submitEvents(eventName: "api_calls", events: events)
+            logger.error("API Key Metrics: Upload of \(events.count) entries completed in \(time2.timeElapsedPretty())")
+        } catch {
+            logger.error("API Key Metrics: Failed to upload. Error: \(error)")
+        }
+    }
 }
+
+
 extension SocketAddress {
     var rateLimitSlot: Int {
         switch self {

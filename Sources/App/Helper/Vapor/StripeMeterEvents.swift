@@ -3,14 +3,14 @@ import Logging
 import NIOCore
 
 public struct StripeMeterEvents {
-    let apikey: String
+    let apiKey: String
     let client: HTTPClient
     let logger: Logger
 
     func getAuthenticationToken() async throws -> StripeMeterSession {
         var request = HTTPClientRequest(url: "https://api.stripe.com/v2/billing/meter_event_session")
         request.method = .POST
-        request.headers.add(name: "Authorization", value: "Bearer \(apikey)")
+        request.headers.add(name: "Authorization", value: "Bearer \(apiKey)")
         request.headers.add(name: "Stripe-Version", value: "2026-03-25.dahlia")
 
         let response = try await client.executeRetry(request, logger: logger)
@@ -26,21 +26,18 @@ fileprivate struct StripeMeterEventSessionResponse: Decodable {
     let authentication_token: String
 }
 
-public protocol StripeEventMetered {
-    var stripeCustomerId: String { get }
-    var value: Int { get }
-}
-
 public struct StripeMeterSession {
     let token: String
     let client: HTTPClient
     let logger: Logger
-
+    
     /// Submit events to stripe. Uses batches of 100 events
-    func submitEvents<T: Collection>(eventName: String, events: T) async throws where T.Element: StripeEventMetered {
-        for chunk in events.evenlyChunked(in: 100) {
-            let eventsJson = events.map {
-                "{\"event_name\":\"\(eventName)\",\"payload\":{\"stripe_customer_id\":\"\($0.stripeCustomerId)\",\"value\":\"\($0.value)\"}}"
+    /// Key is dictionary is used as customer id
+    func submitEvents(eventName: String, events: [String: (calls: Int32, weight: Float)]) async throws {
+        /// Batch by 50 because we send 2 events at once
+        for chunk in events.evenlyChunked(in: 50) {
+            let eventsJson = chunk.map {
+                "{\"event_name\":\"api_calls\",\"payload\":{\"stripe_customer_id\":\"\($0.key)\",\"value\":\"\(Int($0.value.weight))\"}},{\"event_name\":\"http_requests\",\"payload\":{\"stripe_customer_id\":\"\($0.key)\",\"value\":\"\(Int($0.value.calls))\"}}"
             }.joined(separator: ",")
             let json = "{\"events\":[\(eventsJson)]}"
 
