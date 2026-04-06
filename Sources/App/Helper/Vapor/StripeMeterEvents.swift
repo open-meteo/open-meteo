@@ -33,7 +33,7 @@ public struct StripeMeterSession {
     
     /// Submit events to stripe. Uses batches of 100 events
     /// Key is dictionary is used as customer id
-    func submitEvents(eventName: String, events: [String: (calls: Int32, weight: Float)]) async throws {
+    func submit(events: [String: (calls: Int32, weight: Float)]) async throws {
         /// Batch by 50 because we send 2 events at once
         for chunk in events.evenlyChunked(in: 50) {
             let eventsJson = chunk.map {

@@ -7,14 +7,14 @@ import Logging
 @Suite struct StripeMeterTests {
     @Test(.enabled(if: ProcessInfo.processInfo.environment["STRIPE_API_KEY"] != nil))
     func getAuthenticationTokenAndSubmitEvents() async throws {
-        let apikey = ProcessInfo.processInfo.environment["STRIPE_API_KEY"]!
+        let apiKey = ProcessInfo.processInfo.environment["STRIPE_API_KEY"]!
         let logger = Logger(label: "stripe-test")
         let client = HTTPClient.shared
 
-        let meter = StripeMeterEvents(apiKey: apikey, client: client, logger: logger)
+        let meter = StripeMeterEvents(apiKey: apiKey, client: client, logger: logger)
         let session = try await meter.getAuthenticationToken()
         #expect(!session.token.isEmpty)
 
-        try await session.submitEvents(eventName: "api_calls", events: ["cus_UGQ70ABBqUB4pY": (1, 23)])
+        try await session.submit(events: ["cus_UGQ70ABBqUB4pY": (1, 23)])
     }
 }

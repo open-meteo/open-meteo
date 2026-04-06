@@ -112,7 +112,7 @@ public final actor ApiKeyManager {
             let session = try await meter.getAuthenticationToken()
             logger.error("API Key Metrics: Established session in \(time.timeElapsedPretty())")
             let time2 = DispatchTime.now()
-            try await session.submitEvents(eventName: "api_calls", events: events)
+            try await session.submit(events: events)
             logger.error("API Key Metrics: Upload of \(events.count) entries completed in \(time2.timeElapsedPretty())")
         } catch {
             logger.error("API Key Metrics: Failed to upload. Error: \(error)")
