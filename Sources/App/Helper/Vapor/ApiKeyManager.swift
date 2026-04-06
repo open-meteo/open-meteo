@@ -18,7 +18,7 @@ public final actor ApiKeyManager {
             return (try? String(contentsOfFile: path, encoding: .utf8))?.split(separator: ",").sorted().map {
                 let parts = $0.split(separator: ";")
                 let limit = parts.count <= 1 ? 0 : Int(parts[1]) ?? 0
-                let id = parts.count <= 2 ? nil : parts[1]
+                let id = parts.count <= 2 ? nil : parts[2]
                 return KeyAndLimit(key: parts[0], limit: limit, id: id)
             } ?? []
         }
