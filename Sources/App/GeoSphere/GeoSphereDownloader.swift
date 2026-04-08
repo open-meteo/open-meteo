@@ -138,7 +138,7 @@ struct GeoSphereDownloader: AsyncCommand {
 
         logger.info("Forecast has \(nTime) timesteps, grid \(nx)x\(ny) = \(nLocations) locations")
 
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
         let simpleVariables: [(ncName: String, omVar: GeoSphereVariable, multiplyAdd: (multiply: Float, add: Float)?, isAccumulated: Bool)] = [
             ("T2M", .temperature_2m, nil, false),

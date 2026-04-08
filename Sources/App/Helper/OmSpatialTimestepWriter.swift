@@ -1,4 +1,5 @@
 import OmFileFormat
+import Logging
 import Foundation
 
 /**
@@ -27,6 +28,7 @@ actor OmSpatialTimestepWriter {
     let realm: String?
     var fn: FileHandle?
     let storeOnDisk: Bool
+    let logger: Logger
     
     /// Separate ensemble mean+spread calculator and writer. Data is automatically ingested on write() call
     /// AWS upload and finalise also process ensemble mean
@@ -44,7 +46,7 @@ actor OmSpatialTimestepWriter {
     
     /// Create new OM file in data_spatial directory for a given run, timestamp and realm
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GenericDomain, run: Timestamp, time: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
         self.writer = nil
         self.domain = domain
         self.run = run
@@ -52,8 +54,9 @@ actor OmSpatialTimestepWriter {
         self.realm = realm
         self.storeOnDisk = storeOnDisk
         self.fn = nil
+        self.logger = logger
         self.ensembleMean = ensembleMeanDomain.map { ens in
-            (OmSpatialTimestepWriter(domain: ens, run: run, time: time, storeOnDisk: false, realm: nil), EnsembleMeanCalculator())
+            (OmSpatialTimestepWriter(domain: ens, run: run, time: time, storeOnDisk: false, realm: nil, logger: logger), EnsembleMeanCalculator())
         }
     }
     
@@ -178,6 +181,7 @@ actor OmSpatialTimestepWriter {
         let run = run
         let time = time
         try await domain.domainRegistry.parseBucket(uploadS3Bucket).foreachConcurrent(nConcurrent: 4) { (bucket, profile) in
+            let start = DispatchTime.now()
             let destDomain = "s3://\(bucket)/data_spatial/\(domain.domainRegistry.rawValue)/"
             let destRun = "\(destDomain)\(run.format_directoriesYYYYMMddhhmm)/"
             let destFile = "\(destRun)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
@@ -204,6 +208,7 @@ actor OmSpatialTimestepWriter {
                     try Process.awsSync(src: directorySpatial, dest: destDomain, profile: profile)
                 }
             }
+            self.logger.info("AWS Upload to \(bucket) [\(profile ?? "")] took \(start.timeElapsedPretty()) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
         }
     }
     
@@ -276,14 +281,16 @@ actor OmSpatialMultistepWriter {
     let run: Timestamp
     let domain: GenericDomain
     let ensembleMeanDomain: GenericDomain?
+    let logger: Logger
     
     /// `realm` can be used if upper or model levels are generated at a later stage
-    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, ensembleMeanDomain: GenericDomain? = nil) {
+    init(domain: GenericDomain, run: Timestamp, storeOnDisk: Bool, realm: String?, logger: Logger, ensembleMeanDomain: GenericDomain? = nil) {
         self.storeOnDisk = storeOnDisk
         self.realm = realm
         self.domain = domain
         self.run = run
         self.ensembleMeanDomain = ensembleMeanDomain
+        self.logger = logger
     }
     
     /// Write a single variable to the file
@@ -295,7 +302,7 @@ actor OmSpatialMultistepWriter {
         if let writer = writer.first(where: {$0.time == time}) {
             return writer
         }
-        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, ensembleMeanDomain: ensembleMeanDomain)
+        let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: time, storeOnDisk: storeOnDisk, realm: realm, logger: logger, ensembleMeanDomain: ensembleMeanDomain)
         self.writer.append(writer)
         return writer
     }

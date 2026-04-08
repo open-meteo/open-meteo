@@ -268,7 +268,7 @@ struct UkmoDownload: AsyncCommand {
             if let maxForecastHour, forecastHour > maxForecastHour {
                 return []
             }
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: !isEnsemble, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             try await variables.foreachConcurrent(nConcurrent: concurrent) { variable in
                 if variable.skipHour0, timestamp == run {
                     return

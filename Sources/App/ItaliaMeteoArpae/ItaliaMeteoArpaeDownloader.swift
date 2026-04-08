@@ -109,7 +109,7 @@ struct ItaliaMeteoArpaeDownload: AsyncCommand {
         }()
 
         let grid = domain.grid
-        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+        let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
         let curl = Curl(logger: logger, client: application.dedicatedHttpClient, deadLineHours: deadLineHours)
         let variableLevel: [VariableLevel] = ItaliaMeteoArpaeVariablesDownload.allCases.flatMap({ variable in
             variable.levels.map { level in

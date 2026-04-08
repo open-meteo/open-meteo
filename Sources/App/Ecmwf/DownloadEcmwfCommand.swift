@@ -186,8 +186,8 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
             
-            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil) : nil
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writerProbabilities = domain.countEnsembleMember > 1 ? OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: true, realm: nil, logger: logger) : nil
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
 
             if variables.isEmpty {
                 return []
@@ -449,7 +449,7 @@ struct DownloadEcmwfCommand: AsyncCommand {
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: domain == .wam025, realm: nil, logger: logger)
 
             let url = domain.getUrl(base: base, run: run, hour: hour)[0]
             try await curl.downloadEcmwfIndexed(url: url, concurrent: concurrent, downloadFullGribFile: downloadFullGribFile, isIncluded: { entry in

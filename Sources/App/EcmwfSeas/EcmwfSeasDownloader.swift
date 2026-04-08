@@ -173,7 +173,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
                 types.map({"\(server)ope_\(package)_ifs-subs_od_\(stream)_\($0)_\(run.format_YYYYMMdd)T000000Z_\(dayTimestamp.format_YYYYMMdd)_d\((day+1).zeroPadded(len: 2)).bz2"})
             }
             
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: domain == .ec46_weekly, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: domain == .ec46_weekly, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
             
             for url in urls {
                 /// Single GRIB files contains multiple time-steps in mixed order
@@ -264,7 +264,7 @@ struct DownloadEcmwfSeasCommand: AsyncCommand {
         
         let deaverager = GribDeaverager()
         for month in 0...6 {
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil, ensembleMeanDomain: domain.ensembleMeanDomain)
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: storeOnDisk, realm: nil, logger: logger, ensembleMeanDomain: domain.ensembleMeanDomain)
                         
             let monthTimestamp = run.toYearMonth().advanced(by: month).timestamp
             let monthYYYYMM = "\(monthTimestamp.toComponents().year.zeroPadded(len: 4))\(monthTimestamp.toComponents().month.zeroPadded(len: 2))"

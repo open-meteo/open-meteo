@@ -178,7 +178,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
         for run in runs {
             logger.info("Downloading run \(run.iso8601_YYYY_MM_dd_HH_mm)")
             
-            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil)
+            let writer = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: false, realm: nil, logger: logger)
             let deaverager = GribDeaverager()
             let stepsArray = run.hour % 12 == 0 ? fullRunSteps : sideRunSteps
             for steps in stepsArray {
@@ -330,12 +330,13 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
 
         let handles: [GenericVariableHandle] = try await timestamps.enumerated().asyncFlatMap { (i,timestamp) -> [GenericVariableHandle] in
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
-            logger.info("Downloading hour \(hour)")
+            let time = DispatchTime.now()
+            logger.info("Downloading hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm)]")
             let previousHour = (timestamps[max(0, i-1)].timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             /// Delta time seconds considering irregular timesteps
             let dtSeconds = previousHour == 0 ? domain.dtSeconds : ((hour - previousHour) * 3600)
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
 
             let inMemory = VariablePerMemberStorage<EcmwfEcdpsIfsVariable>()
             let file = hour == 0 ? 11 : 1
@@ -398,7 +399,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 logger.info("Processing \(variable) member=\(member) unit=\(unit) stepType=\(stepType) stepRange=\(stepRange) timestep=\(timestamp.format_YYYYMMddHH)")
                 try await writer.write(member: member, variable: variable, data: grib2d.array.data)
             }
-
+            logger.info("Completed hour \(hour) [Time \(Timestamp.now().iso8601_YYYY_MM_dd_HH_mm), elapsed \(time.timeElapsedPretty())]")
             
             let completed = i == timestamps.count - 1            
             let handles = try await writer.finalise()
@@ -435,7 +436,7 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
             let hour = (timestamp.timeIntervalSince1970 - run.timeIntervalSince1970) / 3600
             logger.info("Downloading hour \(hour)")
             
-            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil)
+            let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: timestamp, storeOnDisk: storeOnDisk, realm: nil, logger: logger)
 
             let stream = run.hour % 12 == 0 ? "wave" : "scwv"
             // ope_d2_ifs-ens-cf_od_scwv_fc_20251116T180000Z_20251116T180000Z_0h.bz2

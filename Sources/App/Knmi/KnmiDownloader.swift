@@ -121,7 +121,7 @@ struct KnmiDownload: AsyncCommand {
             let inMemoryAccumulated = VariablePerMemberStorage<KnmiSurfaceVariable>()
             let windSpeedCalculator = WindSpeedCalculator<KnmiSurfaceVariable>(trueNorth: trueNorth)
             let windSpeedCalculatorPressure = WindSpeedCalculator<KnmiPressureVariable>(trueNorth: trueNorth)
-            let writerMultistep = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil)
+            let writerMultistep = OmSpatialMultistepWriter(domain: domain, run: run, storeOnDisk: true, realm: nil, logger: logger)
 
             // process sequentialy, as precipitation need to be in order for deaveraging
             try await stream.foreachConcurrent(nConcurrent: concurrent) { message in

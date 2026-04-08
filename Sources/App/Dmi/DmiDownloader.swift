@@ -114,7 +114,7 @@ struct DmiDownload: AsyncCommand {
                 let inMemory = VariablePerMemberStorage<DmiVariableTemporary>()
                 let inMemorySurface = VariablePerMemberStorage<DmiSurfaceVariable>()
                 let windSpeedCalculator = WindSpeedCalculator<DmiSurfaceVariable>(trueNorth: trueNorth)
-                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil)
+                let writer = OmSpatialTimestepWriter(domain: domain, run: run, time: t, storeOnDisk: true, realm: nil, logger: logger)
 
                 // process sequentialy, as precipitation need to be in order for deaveraging
                 try await stream.foreachConcurrent(nConcurrent: concurrent) { message in
