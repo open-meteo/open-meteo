@@ -363,13 +363,14 @@ struct OmFileSplitter {
                 let skip = previousDay * 86400 / time.dtSeconds
                 let readFile = OmFileType.domainChunk(domain: domain, variable: variable, type: .chunk, chunk: timeChunk, ensembleMember: 0, previousDay: previousDay)
                 try readFile.createDirectory()
-                let tempFile = readFile.getFilePath() + "~"
+                let fileName = readFile.getFilePath()
+                //let tempFile = readFile.getFilePath() + "~"
                 // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
-                FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
-                try FileManager.default.removeItemIfExists(at: tempFile)
-                let fn = try FileHandle.createNewFile(file: tempFile)
-                let omRead = try? await OmFileReader(mmapFile: readFile.getFilePath())
-
+                //FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
+                //try FileManager.default.removeItemIfExists(at: tempFile)
+                let omRead = try? await OmFileReader(mmapFile: fileName)
+                let fn = try FileHandle.createNewFile(file: fileName, overwrite: true, temporary: true)
+                
                 let writeFile = OmFileWriter(fn: fn, initialCapacity: 1024 * 1024)
                 let writer = try writeFile.prepareArray(
                     type: Float.self,
@@ -379,7 +380,7 @@ struct OmFileSplitter {
                     scale_factor: scalefactor,
                     add_offset: 0
                 )
-                return WriterPerStep(read: omRead, writeFile: writeFile, write: writer, writeFn: fn, offsets: offsets, fileName: readFile.getFilePath(), skip: skip)
+                return WriterPerStep(read: omRead, writeFile: writeFile, write: writer, writeFn: fn, offsets: offsets, fileName: fileName, skip: skip)
             }
         }
 
@@ -464,10 +465,9 @@ struct OmFileSplitter {
         for writer in writers {
             let root = try writer.writeFile.write(array: writer.write.finalise(), name: "", children: [])
             try writer.writeFile.writeTrailer(rootVariable: root)
-            try writer.writeFn.close()
-
             // Overwrite existing file, with newly created
-            try FileManager.default.moveFileOverwrite(from: "\(writer.fileName)~", to: writer.fileName)
+            try writer.writeFn.linkTemporary(file: writer.fileName)
+            try writer.writeFn.close()
         }
     }
     
@@ -505,11 +505,8 @@ struct OmFileSplitter {
         
         // Prepare write
         try readFile.createDirectory()
-        let tempFile = readFile.getFilePath() + "~"
-        // Another process might be updating this file right now. E.g. Second flush of GFS ensemble
-        FileManager.default.waitIfFileWasRecentlyModified(at: tempFile)
-        try FileManager.default.removeItemIfExists(at: tempFile)
-        let writeFn = try FileHandle.createNewFile(file: tempFile)
+        let fileName = readFile.getFilePath()
+        let writeFn = try FileHandle.createNewFile(file: fileName, overwrite: true, temporary: true)
         let writeFile = OmFileWriter(fn: writeFn, initialCapacity: 1024 * 1024)
         let writer = try writeFile.prepareArray(
             type: Float.self,
@@ -598,10 +595,8 @@ struct OmFileSplitter {
             try writeFile.write(value: fileTime.dtSeconds, name: "dt_seconds", children: [])
         ])
         try writeFile.writeTrailer(rootVariable: root)
+        try writeFn.linkTemporary(file: fileName)
         try writeFn.close()
-
-        // Overwrite existing file, with newly created
-        try FileManager.default.moveFileOverwrite(from: tempFile, to: readFile.getFilePath())
     }
 }
 

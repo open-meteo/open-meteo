@@ -335,8 +335,7 @@ fileprivate extension HTTPClient {
 
 extension OmFileWriter where FileHandle == Foundation.FileHandle {
     static func write<D: OmFileArrayDataTypeProtocol>(file: String, data: [D], scale_factor: Float = 1, add_offset: Float = 0) throws {
-        let temporary = "\(file)~"
-        let writeFn = try FileHandle.createNewFile(file: temporary)
+        let writeFn = try FileHandle.createNewFile(file: file, overwrite: true, temporary: true)
         let fileWriter = OmFileWriter(fn: writeFn, initialCapacity: 1024 * 1024 * 10)
         let writer = try fileWriter.prepareArray(
             type: D.self,
@@ -353,7 +352,7 @@ extension OmFileWriter where FileHandle == Foundation.FileHandle {
             children: []
         )
         try fileWriter.writeTrailer(rootVariable: variable)
+        try writeFn.linkTemporary(file: file)
         try writeFn.close()
-        try FileManager.default.moveItem(atPath: temporary, toPath: file)
     }
 }

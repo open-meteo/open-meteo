@@ -143,9 +143,7 @@ struct GenericVariableHandle: Sendable {
             let file = OmFileType.run(domain: domain.domainRegistry, variable: variable.omFileName.file, run: run.toIsoDateTime())
             try file.createDirectory()
             let filePath = file.getFilePath()
-            let fileTemp = "\(filePath)~"
-            try FileManager.default.removeItemIfExists(at: fileTemp)
-            let fn = try FileHandle.createNewFile(file: fileTemp)
+            let fn = try FileHandle.createNewFile(file: filePath, overwrite: true, temporary: true)
             
             let chunknLocations = max(1, min(1024 / nTime / nMembers, nx))
             let chunks = nMembers > 1 ? [1, 1, chunknLocations, nTime] : [1, chunknLocations, nTime]
@@ -217,8 +215,7 @@ struct GenericVariableHandle: Sendable {
             let validTime = try writeFile.write(array: validTimeArray, name: "time", children: [])
             let root = try writeFile.write(array: arrayFinalised, name: "", children: [crs, unit, runTime, validTime, coordinates, createdAt].compactMap({$0}))
             try writeFile.writeTrailer(rootVariable: root)
-            
-            try FileManager.default.moveFileOverwrite(from: fileTemp, to: filePath)
+            try fn.linkTemporary(file: filePath)
             progress.finish()
         }
         let validTimes = handles.flatMap({$0.time.map({$0})}).uniqued().sorted()

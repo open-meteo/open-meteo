@@ -78,14 +78,11 @@ actor OmSpatialTimestepWriter {
             try FileManager.default.createDirectory(atPath: path, withIntermediateDirectories: true)
             let realm = realm.map { "_\($0)" } ?? ""
             let filename = "\(path)\(time.iso8601_YYYY_MM_dd_HHmm)\(realm).om"
-            let fileTemp = "\(filename)~"
-            try FileManager.default.removeItemIfExists(at: fileTemp)
-            fn = try FileHandle.createNewFile(file: fileTemp)
+            fn = try FileHandle.createNewFile(file: filename, overwrite: true, temporary: true)
             self.filename = filename
         } else {
             let file = "\(OpenMeteo.tempDirectory)\(Int.random(in: 0..<Int.max)).om"
-            try FileManager.default.removeItemIfExists(at: file)
-            fn = try FileHandle.createNewFile(file: file)
+            fn = try FileHandle.createNewFile(file: file, overwrite: true)
             try FileManager.default.removeItem(atPath: file)
             filename = nil
         }
@@ -244,7 +241,7 @@ actor OmSpatialTimestepWriter {
         try writer.writeTrailer(rootVariable: root)
         
         if let filename {
-            try FileManager.default.moveFileOverwrite(from: "\(filename)~", to: filename)
+            try fn.linkTemporary(file: filename)
         }
         
         let reader = try await OmFileReader(fn: try MmapFile(fn: fn))
