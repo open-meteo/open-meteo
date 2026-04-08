@@ -204,6 +204,9 @@ extension Request {
                 throw ForecastApiError.generic(message: "Only up to \(OpenMeteo.numberOfLocationsMaximum) locations can be requested at once")
             }
             let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+            guard weight <= RateLimiter.limitHourly else {
+                throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
+            }
             let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot)
             if isCFWorker {
                 await RateLimiter.instance.increment(int64: slot, count: weight)
