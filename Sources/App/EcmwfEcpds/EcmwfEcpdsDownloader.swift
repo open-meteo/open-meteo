@@ -241,11 +241,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                         try grib2d.load(message: message)
                         
-                        // Scaling before compression with scalefactor
-                        if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                        }
-                        
                         // Deaccumulate precipitation
                         if isAccumulated {
                             // Collect all accumulated variables and process them as soon as they are in sequential order
@@ -257,14 +252,24 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                                 guard var data = await inMemoryAccumulated.remove(variable: variable, timestamp: time, member: member) else {
                                     break
                                 }
+                                /// Note: Because time-resolution varies, first deaccumulate, then apply multiplyAdd
                                 guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: "accum", stepRange: "0-\(step)", array2d: &data) else {
                                     continue
+                                }
+                                // Scaling before compression with scalefactor
+                                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                                 }
                                 let count = await inMemoryAccumulated.data.count
                                 logger.info("Writing accumulated variable \(variable) member \(member) unit=\(unit) timestamp \(time.format_YYYYMMddHH) backlog \(count)")
                                 try await writer.write(time: time, member: member, variable: variable, data: data.data)
                             }
                             return
+                        }
+                        
+                        // Scaling before compression with scalefactor
+                        if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
                         
                         let writer = try await writer.getWriter(time: timestamp)
@@ -373,11 +378,6 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                 var grib2d = GribArray2D(nx: domain.grid.nx, ny: domain.grid.ny)
                 try grib2d.load(message: message)
                 
-                // Scaling before compression with scalefactor
-                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
-                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                }
-                
                 // Deaccumulate precipitation
                 if isAccumulated {
                     // grib attributes for `stepType` are set wrongly to `instant`
@@ -385,7 +385,11 @@ struct DownloadEcmwfEcpdsCommand: AsyncCommand {
                         return
                     }
                 }
-
+                
+                // Scaling before compression with scalefactor
+                if let fma = variable.multiplyAdd(dtSeconds: dtSeconds) {
+                    grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
+                }
                 
                 // Snow depth retrieved as water equivalent. Use snow density to calculate the actual snow depth.
                 if [EcmwfEcdpsIfsVariable.snow_density, .snow_depth].contains(variable) {

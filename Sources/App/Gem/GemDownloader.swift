@@ -203,11 +203,6 @@ struct GemDownload: AsyncCommand {
                             grib2d.array.shift180Longitudee()
                         }
 
-                        // Scaling before compression with scalefactor
-                        if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
-                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
-                        }
-
                         guard let stepRange = message.get(attribute: "stepRange"),
                               let stepType = message.get(attribute: "stepType") else {
                             fatalError("could not get step range")
@@ -215,6 +210,11 @@ struct GemDownload: AsyncCommand {
                         // Deaccumulate precipitation
                         guard await deaverager.deaccumulateIfRequired(variable: variable, member: member, stepType: stepType, stepRange: stepRange, grib2d: &grib2d) else {
                             continue
+                        }
+                        
+                        // Scaling before compression with scalefactor
+                        if let fma = variable.multiplyAdd(dtSeconds: domain.dtSeconds) {
+                            grib2d.array.data.multiplyAdd(multiply: fma.multiply, add: fma.add)
                         }
 
                         // GEM ensemble does not have wind speed and direction directly, calculate from u/v components
