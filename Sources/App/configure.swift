@@ -57,6 +57,11 @@ enum OpenMeteo {
         return nil
     }()
     
+    /// Generate previous day database. Default true
+    static let generatePreviousDay = {
+        Environment.get("GENERATE_PREVIOUS_DAY") != "false"
+    }()
+    
     /// Data directory with trailing slash
     static let dataRunDirectory: String? = {
         if let dir = Environment.get("DATA_RUN_DIRECTORY") {
