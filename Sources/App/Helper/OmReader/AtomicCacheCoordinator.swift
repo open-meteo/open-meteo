@@ -72,11 +72,27 @@ final actor AtomicCacheCoordinator<Backend: AtomicBlockCacheStorable> {
             }
             
             /// Someone else requested this data. Wait for it to arrive. This is leaving the current concurrency isolation and all data in `queue` might be different afterwards
+            /// The queued call can fail and we need to fail all previously blocked keys
             if queued {
-                let value = try await withCheckedThrowingContinuation(isolation: self) { continuation in
-                    queue[key, default: []].append(continuation)
+                do {
+                    let value = try await withCheckedThrowingContinuation(isolation: self) { continuation in
+                        queue[key, default: []].append(continuation)
+                    }
+                    queuedValue = value
+                } catch {
+                    // If the queued fetch fails, fail all previously blocked keys
+                    if let offset = keyFetchStart {
+                        let count = i - offset
+                        let fetchStart = keyStart &+ UInt64(offset)
+                        for block in 0..<count {
+                            let key = fetchStart &+ UInt64(block)
+                            queue.removeValue(forKey: key)?.forEach({
+                                $0.resume(with: .failure(error))
+                            })
+                        }
+                    }
+                    throw error
                 }
-                queuedValue = value
             }
             
             /// Get data from backend for all prior keys (or if is the last key). Also leaves concurrency isolation.
