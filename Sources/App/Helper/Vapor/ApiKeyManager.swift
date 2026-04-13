@@ -156,7 +156,9 @@ extension Request {
         guard let host = headers[.host].first(where: { $0.contains("open-meteo.com") }) else {
             // localhost or not an openmeteo host
             let params = try parseApiParams()
-            return try await fn(nil, params).response(format: params.formatWithOptions, concurrencySlot: nil)
+            let responder = try await fn(nil, params)
+            let weight = responder.calculateQueryWeight(nVariablesModels: nil)
+            return try await responder.response(format: params.formatWithOptions, concurrencySlot: nil, prefetch: weight < 10)
         }
         let isDevNode = host.contains("eu0") || host.contains("us0")
         let isFreeApi = host.starts(with: subdomain) || alias.contains(where: { host.starts(with: $0) }) == true || isDevNode
@@ -207,7 +209,7 @@ extension Request {
             guard weight <= RateLimiter.limitHourly else {
                 throw ForecastApiError.generic(message: "Your API call requests too much data. Please reduce the number of variables, locations and/or weather models.")
             }
-            let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot)
+            let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
             if isCFWorker {
                 await RateLimiter.instance.increment(int64: slot, count: weight)
             } else {
@@ -239,7 +241,7 @@ extension Request {
             throw ForecastApiError.generic(message: "Only up to \(numberOfLocationsMaximum) locations can be requested at once")
         }
         let weight = responder.calculateQueryWeight(nVariablesModels: nil)
-        let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot)
+        let response = try await responder.response(format: params.formatWithOptions, concurrencySlot: slot, prefetch: weight < 10)
         await ApiKeyManager.instance.increment(apikey: String.SubSequence(apikey), weight: weight)
         return response
     }
