@@ -75,8 +75,7 @@ let package = Package(
         ),
         .systemLibrary(
             name: "CZlib",
-            pkgConfig: "z",
-            providers: [.brew(["zlib"]), .apt(["libz-dev"])]
+            providers: [.brew(["zlib"]), .apt(["libz-dev"]), .yum(["zlib-ng-compat-devel"])]
         ),
         .target(
             name: "CHelper",
