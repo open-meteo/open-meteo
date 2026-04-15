@@ -119,48 +119,48 @@ enum ZipStreamError: Error {
 
 /// Gzip Stream compressor w
 public final class GzipStream {
-    var zstream: UnsafeMutablePointer<z_stream>
+    var zstream: UnsafeMutablePointer<cnioextras_z_stream>
     var writebuffer: ByteBuffer
 
     public init(level: Int32 = 6, chunkCapacity: Int = 4096) throws {
-        zstream = UnsafeMutablePointer<z_stream>.allocate(capacity: 1)
+        zstream = UnsafeMutablePointer<cnioextras_z_stream>.allocate(capacity: 1)
         zstream.pointee.zalloc = nil
         zstream.pointee.zfree = nil
-        let ret = deflateInit2_(zstream, level, Z_DEFLATED, 15 | 16, MAX_MEM_LEVEL, Z_DEFAULT_STRATEGY, ZLIB_VERSION, Int32(MemoryLayout<z_stream>.size))
-        guard ret != Z_STREAM_ERROR else {
+        let ret = cnioextras_z_deflateInit2_(zstream, level, CNIOEXTRAS_Z_DEFLATED, 15 | 16, MAX_MEM_LEVEL, CNIOEXTRAS_Z_DEFAULT_STRATEGY, CNIOEXTRAS_ZLIB_VERSION, Int32(MemoryLayout<cnioextras_z_stream>.size))
+        guard ret != CNIOEXTRAS_Z_STREAM_ERROR else {
             throw ZipStreamError.zlibDeflateInitInvalidParameter
         }
-        guard ret != Z_MEM_ERROR else {
+        guard ret != CNIOEXTRAS_Z_MEM_ERROR else {
             throw ZipStreamError.zlibInsufficientMemory
         }
-        guard ret != Z_VERSION_ERROR else {
+        guard ret != CNIOEXTRAS_Z_VERSION_ERROR else {
             throw ZipStreamError.zlibVersionError
         }
-        guard ret == Z_OK else {
+        guard ret == CNIOEXTRAS_Z_OK else {
             throw ZipStreamError.deflateInitFailed(code: ret)
         }
         self.writebuffer = ByteBufferAllocator().buffer(capacity: chunkCapacity)
         writebuffer.withUnsafeMutableWritableBytes { ptr in
             zstream.pointee.avail_out = UInt32(ptr.count)
-            zstream.pointee.next_out = ptr.baseAddress?.assumingMemoryBound(to: Bytef.self)
+            zstream.pointee.next_out = ptr.baseAddress?.assumingMemoryBound(to: cnioextras_z_Bytef.self)
             zstream.pointee.total_out = 0
         }
     }
 
     public func write(_ str: String) {
         str.withContiguousStorageIfAvailable { body in
-            compress(data: UnsafeRawBufferPointer(body), flush: Z_NO_FLUSH)
+            compress(data: UnsafeRawBufferPointer(body), flush: CNIOEXTRAS_Z_NO_FLUSH)
         } ?? {
             var str = str
             str.withUTF8({ body in
-                compress(data: UnsafeRawBufferPointer(body), flush: Z_NO_FLUSH)
+                compress(data: UnsafeRawBufferPointer(body), flush: CNIOEXTRAS_Z_NO_FLUSH)
             })
         }()
     }
 
     /// flush and return data
     public func finish() -> ByteBuffer {
-        compress(data: nil, flush: Z_FINISH)
+        compress(data: nil, flush: CNIOEXTRAS_Z_FINISH)
         return writebuffer
     }
 
@@ -176,24 +176,24 @@ public final class GzipStream {
                 /// Increase buffer capacity. Always double underlaying storage.
                 writebuffer.reserveCapacity(minimumWritableBytes: writebuffer.writerIndex)
                 writebuffer.withUnsafeMutableWritableBytes({ ptr in
-                    zstream.pointee.avail_out = uInt(ptr.count)
-                    zstream.pointee.next_out = ptr.baseAddress?.assumingMemoryBound(to: Bytef.self)
+                    zstream.pointee.avail_out = cnioextras_z_uInt(ptr.count)
+                    zstream.pointee.next_out = ptr.baseAddress?.assumingMemoryBound(to: cnioextras_z_Bytef.self)
                 })
             }
             let avail_out_before = zstream.pointee.avail_out
-            let ret = deflate(zstream, flush)
+            let ret = cnioextras_z_deflate(zstream, flush)
             writebuffer.moveWriterIndex(forwardBy: Int(avail_out_before - zstream.pointee.avail_out))
-            if ret == Z_STREAM_END {
+            if ret == CNIOEXTRAS_Z_STREAM_END {
                 break
             }
-            guard ret == Z_OK else {
+            guard ret == CNIOEXTRAS_Z_OK else {
                 fatalError("deflate loop error, \(ret)")
             }
         } while zstream.pointee.avail_out == 0
     }
 
     deinit {
-        deflateEnd(zstream)
+        cnioextras_z_deflateEnd(zstream)
         zstream.deallocate()
     }
 }
