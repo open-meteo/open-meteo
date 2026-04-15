@@ -1,5 +1,5 @@
 import Foundation
-import CZlib
+import CNIOExtrasZlib
 import NIOCore
 
 /// Create a simple excel sheet with exactly one sheet and the bare minimum to make it work in office applications

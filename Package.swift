@@ -40,7 +40,8 @@ let package = Package(
         .package(url: "https://github.com/patrick-zippenfenig/SwiftNetCDF.git", from: "1.2.0"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftTimeZoneLookup.git", from: "1.0.8"),
         .package(url: "https://github.com/patrick-zippenfenig/SwiftEccodes.git", from: "1.1.1"),
-        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0")
+        .package(url: "https://github.com/apple/swift-nio.git", from: "2.68.0"),
+        .package(url: "https://github.com/apple/swift-nio-extras.git", from: "1.0.0"),
         //.package(url: "https://github.com/SimplyDanny/SwiftLintPlugins", from: "0.59.1")
     ] + (enableParquet ? [
         .package(url: "https://github.com/patrick-zippenfenig/SwiftArrowParquet.git", from: "1.0.3")
@@ -62,7 +63,7 @@ let package = Package(
                 .product(name: "OmFileFormat", package: "om-file-format"),
                 .product(name: "curl-swift", package: "curl-swift"),
                 .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
-                "CZlib",
+                .product(name: "NIOHTTPCompression", package: "swift-nio-extras")
             ] + (enableParquet ? [
                 .product(name: "SwiftArrowParquet", package: "SwiftArrowParquet")
             ] : []),
@@ -72,10 +73,6 @@ let package = Package(
         ),
         .target(
             name: "Lbzip2"
-        ),
-        .systemLibrary(
-            name: "CZlib",
-            providers: [.brew(["zlib"]), .apt(["libz-dev"]), .yum(["zlib-devel"])]
         ),
         .target(
             name: "CHelper",
