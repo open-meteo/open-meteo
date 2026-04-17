@@ -335,7 +335,9 @@ struct DownloadEcmwfCommand: AsyncCommand {
                         try await rhCalculator.ingest(.temperature(grib2d.array), member: member, writer: writer)
                     }
                     
-                    if variable == .dew_point_2m {
+                    // Convert dew point to relative humidity
+                    if variable == .relative_humidity_2m && variable.gribName == "2d" {
+                        grib2d.array.data.multiplyAdd(multiply: 1, add: -273.15)
                         try await rhCalculator.ingest(.dewpoint(grib2d.array), member: member, writer: writer)
                         return // do not store dewpoint on disk
                     }

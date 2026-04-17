@@ -804,7 +804,7 @@ struct VariableHourlyDeriver<Reader: GenericReaderProtocol>: GenericDeriverProto
             }
             return .two(.raw(temperature), .raw(rh)) { temperature, rh, _ in
                 let dewpoint = zip(temperature.data, rh.data).map(Meteorology.dewpoint)
-                return DataAndUnit(dewpoint, .percentage)
+                return DataAndUnit(dewpoint, .celsius)
             }
         case .vapour_pressure_deficit, .vapor_pressure_deficit:
             guard
